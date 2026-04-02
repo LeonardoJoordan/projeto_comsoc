@@ -1,0 +1,119 @@
+from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPixmap
+from PySide6.QtCore import Qt, QPointF
+
+DPI = 300
+A4_WIDTH_MM = 210
+A4_HEIGHT_MM = 297
+
+def mm_to_px_300(mm):
+    return int((mm * DPI) / 25.4)
+
+class SheetAssembler:
+    def __init__(self, target_w_mm: float, target_h_mm: float):
+        self.target_w_mm = target_w_mm
+        self.target_h_mm = target_h_mm
+        
+        self.printer_margin_mm = 4.0 
+        self.mark_gap_mm = 2.0  
+        self.mark_len_mm = 3.0  
+        self.edge_reserve_mm = self.printer_margin_mm + self.mark_gap_mm + self.mark_len_mm
+        
+        self.card_w_px = mm_to_px_300(target_w_mm)
+        self.card_h_px = mm_to_px_300(target_h_mm)
+        self.mark_len = mm_to_px_300(self.mark_len_mm)
+        self.mark_gap = mm_to_px_300(self.mark_gap_mm)
+        
+        full_a4_short_px = mm_to_px_300(A4_WIDTH_MM)
+        full_a4_long_px = mm_to_px_300(A4_HEIGHT_MM)
+        reserve_px = mm_to_px_300(self.edge_reserve_mm * 2) 
+        
+        usable_short_px = full_a4_short_px - reserve_px
+        usable_long_px = full_a4_long_px - reserve_px
+
+        cols_p = usable_short_px // self.card_w_px
+        rows_p = usable_long_px // self.card_h_px
+        cap_p = cols_p * rows_p
+        
+        cols_l = usable_long_px // self.card_w_px
+        rows_l = usable_short_px // self.card_h_px
+        cap_l = cols_l * rows_l
+        
+        if cap_l > cap_p:
+            self.sheet_w = full_a4_long_px  
+            self.sheet_h = full_a4_short_px
+            self.cols = cols_l
+            self.rows = rows_l
+            self.capacity = cap_l
+        else:
+            self.sheet_w = full_a4_short_px
+            self.sheet_h = full_a4_long_px
+            self.cols = cols_p
+            self.rows = rows_p
+            self.capacity = cap_p
+
+        total_grid_w = self.cols * self.card_w_px
+        total_grid_h = self.rows * self.card_h_px
+        
+        self.margin_left = (self.sheet_w - total_grid_w) // 2
+        self.margin_top = (self.sheet_h - total_grid_h) // 2
+
+    def render_sheet(self, cards: list[QImage]) -> QImage:
+        sheet = QImage(self.sheet_w, self.sheet_h, QImage.Format_ARGB32)
+        sheet.fill(Qt.GlobalColor.white)
+        
+        painter = QPainter(sheet)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+
+        idx = 0
+        limit = len(cards)
+        
+        for r in range(self.rows):
+            for c in range(self.cols):
+                if idx >= limit:
+                    break
+                original_img = cards[idx]
+                x = self.margin_left + (c * self.card_w_px)
+                y = self.margin_top + (r * self.card_h_px)
+                
+                scaled_pix = QPixmap.fromImage(original_img).scaled(
+                    self.card_w_px, self.card_h_px,
+                    Qt.AspectRatioMode.IgnoreAspectRatio, 
+                    Qt.TransformationMode.SmoothTransformation
+                )
+                painter.drawPixmap(x, y, scaled_pix)
+                idx += 1
+
+        self._draw_crop_marks(painter)
+        painter.end()
+        return sheet
+
+    def _draw_crop_marks(self, painter: QPainter):
+        pen = QPen(Qt.GlobalColor.black)
+        pen.setWidth(2) 
+        painter.setPen(pen)
+
+        grid_start_x = self.margin_left
+        grid_end_x = self.margin_left + (self.cols * self.card_w_px)
+        grid_start_y = self.margin_top
+        grid_end_y = self.margin_top + (self.rows * self.card_h_px)
+
+        for c in range(self.cols + 1):
+            x = grid_start_x + (c * self.card_w_px)
+            p1_top = QPointF(x, grid_start_y - self.mark_gap)
+            p2_top = QPointF(x, grid_start_y - self.mark_gap - self.mark_len)
+            painter.drawLine(p1_top, p2_top)
+            
+            p1_btm = QPointF(x, grid_end_y + self.mark_gap)
+            p2_btm = QPointF(x, grid_end_y + self.mark_gap + self.mark_len)
+            painter.drawLine(p1_btm, p2_btm)
+
+        for r in range(self.rows + 1):
+            y = grid_start_y + (r * self.card_h_px)
+            p1_lft = QPointF(grid_start_x - self.mark_gap, y)
+            p2_lft = QPointF(grid_start_x - self.mark_gap - self.mark_len, y)
+            painter.drawLine(p1_lft, p2_lft)
+            
+            p1_rgt = QPointF(grid_end_x + self.mark_gap, y)
+            p2_rgt = QPointF(grid_end_x + self.mark_gap + self.mark_len, y)
+            painter.drawLine(p1_rgt, p2_rgt)
