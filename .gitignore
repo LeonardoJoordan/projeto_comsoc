@@ -1,0 +1,29 @@
+# Ambientes Virtuais e Variáveis
+venv/
+env/
+.venv/
+.env
+
+# Compilados e Cache Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Artefatos do Projeto ComSoc
+output/
+models/*
+!models/.gitkeep
+
+# Compilação e Nuitka
+build/
+dist/
+*.build/
+*.dist/
+*.bin
+
+# Sistema Operacional / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
