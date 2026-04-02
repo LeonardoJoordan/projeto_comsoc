@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor, 
                            QTextBlockFormat, QPixmap, QPainterPathStroker)
 import re
+from core.text_state import TextState
 
 DPI = 96
 
@@ -129,10 +130,9 @@ class DesignerBox(QGraphicsRectItem):
         self.setBrush(QBrush(QColor(255, 255, 255, 50)))
         self.setZValue(100)
 
-        self.vertical_align = "top" 
-
-        self.text_item = QGraphicsTextItem(text, self)
-        self.text_item.setFont(QFont("Arial", 16))
+        self.state = TextState(html_content=text)
+        
+        self.text_item = QGraphicsTextItem("", self)
         self.text_item.setDefaultTextColor(Qt.GlobalColor.black)
         
         self.text_item.document().contentsChanged.connect(self.recalculate_text_position)
@@ -140,15 +140,49 @@ class DesignerBox(QGraphicsRectItem):
         self.text_item.setTextWidth(w) 
         self.text_item.setPos(0, 0)
         
+        self.apply_state()
         self.update_center()
 
     def update_center(self):
         rect = self.rect()
         self.setTransformOriginPoint(rect.center())
 
-    def set_vertical_alignment(self, align_str):
-        self.vertical_align = align_str
+    def apply_state(self):
+        """Reconstrói todo o documento visual com base na Fonte da Verdade."""
+        self.text_item.blockSignals(True)
+        
+        # 1. Limpar sujeiras herdadas e Injetar Conteúdo
+        html = re.sub(r"font-family\s*:[^;\"]+;?", "", self.state.html_content)
+        html = re.sub(r"font-size\s*:[^;\"]+;?", "", html)
+        self.text_item.setHtml(html)
+        
+        # 2. Aplicar Fonte Global (SEMPRE após o setHtml, pois ele reseta o documento)
+        font = QFont(self.state.font_family, self.state.font_size)
+        self.text_item.setFont(font)
+        self.text_item.document().setDefaultFont(font)
+        
+        # 3. Aplicar Alinhamento Horizontal
+        opt = self.text_item.document().defaultTextOption()
+        if self.state.align == "center": opt.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        elif self.state.align == "right": opt.setAlignment(Qt.AlignmentFlag.AlignRight)
+        elif self.state.align == "justify": opt.setAlignment(Qt.AlignmentFlag.AlignJustify)
+        else: opt.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        self.text_item.document().setDefaultTextOption(opt)
+        
+        # 4. Aplicar Margens e Entrelinhas
+        cursor = QTextCursor(self.text_item.document())
+        cursor.select(QTextCursor.SelectionType.Document)
+        fmt = QTextBlockFormat()
+        fmt.setTextIndent(self.state.indent_px)
+        fmt.setLineHeight(self.state.line_height * 100.0, 1)
+        cursor.mergeBlockFormat(fmt)
+        
+        self.text_item.blockSignals(False)
         self.recalculate_text_position()
+
+    def set_vertical_alignment(self, align_str):
+        self.state.vertical_align = align_str
+        self.apply_state()
 
     def recalculate_text_position(self):
         self.text_item.setTextWidth(self.rect().width())
@@ -156,9 +190,9 @@ class DesignerBox(QGraphicsRectItem):
         box_h = self.rect().height()
         
         y = 0
-        if self.vertical_align == "center":
+        if self.state.vertical_align == "center":
             y = (box_h - doc_h) / 2
-        elif self.vertical_align == "bottom":
+        elif self.state.vertical_align == "bottom":
             y = box_h - doc_h
             
         self.text_item.setPos(0, y)
@@ -168,22 +202,13 @@ class DesignerBox(QGraphicsRectItem):
         return re.findall(r"\{([a-zA-Z0-9_]+)\}", text)
 
     def set_alignment(self, align_str):
-        option = self.text_item.document().defaultTextOption()
-        if align_str == "center": option.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        elif align_str == "right": option.setAlignment(Qt.AlignmentFlag.AlignRight)
-        elif align_str == "justify": option.setAlignment(Qt.AlignmentFlag.AlignJustify)
-        else: option.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        self.text_item.document().setDefaultTextOption(option)
+        self.state.align = align_str
+        self.apply_state()
 
     def set_block_format(self, indent=None, line_height=None):
-        cursor = QTextCursor(self.text_item.document())
-        cursor.select(QTextCursor.SelectionType.Document)
-        fmt = QTextBlockFormat()
-        if indent is not None: 
-            fmt.setTextIndent(indent)
-        if line_height is not None:
-            fmt.setLineHeight(line_height * 100.0, 1)
-        cursor.mergeBlockFormat(fmt)
+        if indent is not None: self.state.indent_px = indent
+        if line_height is not None: self.state.line_height = line_height
+        self.apply_state()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():

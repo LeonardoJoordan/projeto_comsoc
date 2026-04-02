@@ -277,11 +277,6 @@ class EditorWindow(QMainWindow):
 
     def add_new_box(self):
         box = DesignerBox(350, 450, 300, 60, "{campo}")
-        from PySide6.QtGui import QFont
-        initial_font = QFont("Arial", 16)
-        box.text_item.setFont(initial_font)
-        box.text_item.document().setDefaultFont(initial_font)
-        
         self.scene.addItem(box)
         self.scene.clearSelection()
         box.setSelected(True)
@@ -319,26 +314,12 @@ class EditorWindow(QMainWindow):
         
         new_box = DesignerBox(new_x, new_y, rect.width(), rect.height(), "")
         new_box.layer_id = None 
-        self.scene.addItem(new_box)
-        self.refresh_layer_list()
         
+        import copy
+        new_box.state = copy.deepcopy(original.state)
         new_box.setRotation(original.rotation())
-        new_box.vertical_align = original.vertical_align
+        new_box.apply_state()
         new_box.update_center()
-        
-        html = original.text_item.toHtml()
-        new_box.text_item.setHtml(html)
-        
-        orig_font = original.text_item.font()
-        new_box.text_item.setFont(orig_font)
-        new_box.text_item.document().setDefaultFont(orig_font)
-        
-        opt = original.text_item.document().defaultTextOption()
-        new_box.text_item.document().setDefaultTextOption(opt)
-        
-        cursor = QTextCursor(original.text_item.document())
-        fmt = cursor.blockFormat()
-        new_box.set_block_format(indent=fmt.textIndent(), line_height=fmt.lineHeight()/100.0 if fmt.lineHeightType() == 1 else 1.15)
 
         self.scene.addItem(new_box)
         self.refresh_layer_list()
@@ -355,43 +336,20 @@ class EditorWindow(QMainWindow):
     def update_text_html(self, html_content):
         box = self._get_selected()
         if box: 
-            current_font = box.text_item.font()
-            box.text_item.setHtml(html_content)
-            box.text_item.document().setDefaultFont(current_font)
-            box.recalculate_text_position()
+            box.state.html_content = html_content
+            box.apply_state()
     
     def update_font_family(self, font):
         box = self._get_selected()
         if box:
-            f = box.text_item.font()
-            f.setFamily(font.family())
-            box.text_item.setFont(f)
-            box.text_item.document().setDefaultFont(f) 
-                        
-            cursor = QTextCursor(box.text_item.document())
-            cursor.select(QTextCursor.SelectionType.Document)
-            
-            fmt = QTextCharFormat()
-            fmt.setFontFamily(font.family())
-            
-            cursor.mergeCharFormat(fmt)
+            box.state.font_family = font.family()
+            box.apply_state()
 
     def update_font_size(self, size):
         box = self._get_selected()
         if box:
-            f = box.text_item.font()
-            f.setPointSize(size)
-            box.text_item.setFont(f)
-            box.text_item.document().setDefaultFont(f)
-                        
-            cursor = QTextCursor(box.text_item.document())
-            cursor.select(QTextCursor.SelectionType.Document)
-            
-            fmt = QTextCharFormat()
-            fmt.setFontPointSize(size) 
-            
-            cursor.mergeCharFormat(fmt)
-            box.recalculate_text_position()
+            box.state.font_size = size
+            box.apply_state()
 
     def update_width(self, width):
         box = self._get_selected()
@@ -438,30 +396,21 @@ class EditorWindow(QMainWindow):
             if isinstance(item, DesignerBox):
                 pos = item.pos()
                 r = item.rect()
-                font = item.text_item.font()
-                fmt = item.text_item.document().begin().blockFormat()
-                
-                opt = item.text_item.document().defaultTextOption()
-                h_code = opt.alignment()
-                h_align = "left"
-                if h_code & Qt.AlignmentFlag.AlignCenter: h_align = "center"
-                elif h_code & Qt.AlignmentFlag.AlignRight: h_align = "right"
-                elif h_code & Qt.AlignmentFlag.AlignJustify: h_align = "justify"
 
                 boxes_data.append({
                     "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
-                    "html": item.text_item.toHtml(),
+                    "html": item.state.html_content,
                     "x": int(pos.x()),
                     "y": int(pos.y()),
                     "w": int(r.width()),
                     "h": int(r.height()),
                     "rotation": int(item.rotation()),
-                    "font_family": item.text_item.document().defaultFont().family(),
-                    "font_size": int(item.text_item.document().defaultFont().pointSize()),
-                    "align": h_align,
-                    "vertical_align": item.vertical_align,
-                    "indent_px": int(fmt.textIndent()),
-                    "line_height": float(f"{fmt.lineHeight() / 100.0:.2f}") if fmt.lineHeightType() == 1 else 1.15
+                    "font_family": item.state.font_family,
+                    "font_size": item.state.font_size,
+                    "align": item.state.align,
+                    "vertical_align": item.state.vertical_align,
+                    "indent_px": item.state.indent_px,
+                    "line_height": item.state.line_height
                 })
             
             elif isinstance(item, SignatureItem):
@@ -618,31 +567,26 @@ class EditorWindow(QMainWindow):
             )
             
             if "html" in b:
-                box.text_item.setHtml(b["html"])
-                from PySide6.QtGui import QFont
-                default_font = QFont(b.get("font_family", "Arial"), b.get("font_size", 16))
-                box.text_item.document().setDefaultFont(default_font)
+                box.state.html_content = b["html"]
+                
+            box.state.font_family = b.get("font_family", "Arial")
+            box.state.font_size = b.get("font_size", 16)
+            box.state.vertical_align = b.get("vertical_align", "top")
+            box.state.align = b.get("align", "left")
+            box.state.indent_px = b.get("indent_px", 0)
+            box.state.line_height = b.get("line_height", 1.15)
 
-            box.vertical_align = b.get("vertical_align", "top")
             box.setRotation(b.get("rotation", 0))
+            box.apply_state()
             box.update_center() 
 
-            if "align" in b:
-                box.set_alignment(b["align"])
-            
             self.scene.addItem(box)
-            box.recalculate_text_position()
 
             saved_placeholders = data.get("placeholders", [])
             self.lst_placeholders.clear()
             for p in saved_placeholders:
                 self.lst_placeholders.addItem(p)
             self.sync_placeholders_list()
-            
-            box.set_block_format(
-                indent=b.get("indent_px", 0),
-                line_height=b.get("line_height", 1.15)
-            )
         self._zoom_to_fit()
 
         self.setWindowTitle(f"Editor Visual de Modelo - {data['name']}")

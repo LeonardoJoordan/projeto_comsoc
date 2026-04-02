@@ -134,7 +134,7 @@ class EditorDeTextoPanel(QWidget):
         self.spin_indent = QDoubleSpinBox()
         self.spin_indent.setRange(0, 500)
         self.spin_indent.setSuffix(" px")
-        self.spin_indent.valueChanged.connect(lambda val: self.indentChanged.emit(val))
+        self.spin_indent.valueChanged.connect(self._on_indent_changed)
         form_space.addRow("Recuo 1ª:", self.spin_indent)
         
         self.spin_lh = QDoubleSpinBox()
@@ -197,59 +197,58 @@ class EditorDeTextoPanel(QWidget):
         self.blockSignals(True)
         self.txt_content.blockSignals(True)
 
-        html = box.text_item.toHtml()
-        real_font = box.text_item.font()
+        state = box.state
 
-        ui_html = re.sub(r"font-family:[^;\"']+(;)?", "", html)
-        ui_html = re.sub(r"font-size:[^;\"']+(;)?", "", ui_html)
-
-        self.txt_content.setHtml(ui_html)
+        # 1. Carrega apenas o conteúdo limpo no editor e força fonte padrão UI
+        self.txt_content.setHtml(state.html_content)
         self.txt_content.setFont(QFont("Segoe UI", 11))
 
         cursor = self.txt_content.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
         self.txt_content.setTextCursor(cursor)
 
-        self.cbo_font.setCurrentFont(real_font)
-        self.spin_size.setValue(int(real_font.pointSize()))
-        self.btn_bold.setChecked(real_font.bold())
-        self.btn_italic.setChecked(real_font.italic())
-        self.btn_underline.setChecked(real_font.underline())
+        # 2. Preenche os controles com os metadados puros da Fonte da Verdade
+        self.cbo_font.setCurrentFont(QFont(state.font_family))
+        self.spin_size.setValue(state.font_size)
+        
+        self.update_buttons_state()
 
-        opt = box.text_item.document().defaultTextOption()
-        align = opt.alignment()
-        if align & Qt.AlignmentFlag.AlignRight:
-            self.cbo_align.setCurrentIndex(2)
-        elif align & Qt.AlignmentFlag.AlignCenter:
-            self.cbo_align.setCurrentIndex(1)
-        elif align & Qt.AlignmentFlag.AlignJustify:
-            self.cbo_align.setCurrentIndex(3)
-        else:
-            self.cbo_align.setCurrentIndex(0)
+        if state.align == "right": self.cbo_align.setCurrentIndex(2)
+        elif state.align == "center": self.cbo_align.setCurrentIndex(1)
+        elif state.align == "justify": self.cbo_align.setCurrentIndex(3)
+        else: self.cbo_align.setCurrentIndex(0)
 
-        v_idx = 0
-        if box.vertical_align == "center":
-            v_idx = 1
-        elif box.vertical_align == "bottom":
-            v_idx = 2
-        self.cbo_valign.setCurrentIndex(v_idx)
+        if state.vertical_align == "center": self.cbo_valign.setCurrentIndex(1)
+        elif state.vertical_align == "bottom": self.cbo_valign.setCurrentIndex(2)
+        else: self.cbo_valign.setCurrentIndex(0)
 
-        cursor_block = QTextCursor(box.text_item.document())
-        fmt_block = cursor_block.blockFormat()
-        self.spin_indent.setValue(fmt_block.textIndent())
+        self.spin_indent.setValue(state.indent_px)
+        self.spin_lh.setValue(state.line_height)
 
-        if fmt_block.lineHeightType() == 1:
-            self.spin_lh.setValue(fmt_block.lineHeight() / 100.0)
-        else:
-            self.spin_lh.setValue(1.15)
+        # Refletir o recuo no próprio editor de texto para feedback visual
+        cursor_block = QTextCursor(self.txt_content.document())
+        cursor_block.select(QTextCursor.SelectionType.Document)
+        fmt = QTextBlockFormat()
+        fmt.setTextIndent(state.indent_px)
+        cursor_block.mergeBlockFormat(fmt)
 
         self.txt_content.blockSignals(False)
         self.blockSignals(False)
 
+    def _on_indent_changed(self, val):
+        self.indentChanged.emit(val)
+        # Atualiza o feedback visual do espaçamento em tempo real enquanto digita
+        cursor = QTextCursor(self.txt_content.document())
+        cursor.select(QTextCursor.SelectionType.Document)
+        fmt = QTextBlockFormat()
+        fmt.setTextIndent(val)
+        cursor.mergeBlockFormat(fmt)
+
     def _emit_clean_html(self):
         raw_html = self.txt_content.toHtml()
-        clean_html = re.sub(r"font-family:[^;\"']+(;)?", "", raw_html)
-        clean_html = re.sub(r"font-size:[^;\"']+(;)?", "", clean_html)
+        # Regex corrigida: ignora aspas simples geradas pelo Qt no nome da fonte
+        clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", raw_html)
+        clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
         self.htmlChanged.emit(clean_html)
 
 class AssinaturaPanel(QWidget):
