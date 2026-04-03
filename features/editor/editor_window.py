@@ -244,6 +244,7 @@ class EditorWindow(QMainWindow):
         main_layout.addWidget(right_container)
 
         self.scene.selectionChanged.connect(self.on_selection_changed)
+        self.scene.changed.connect(self.update_position_ui)
 
         self.shortcut_dup = QShortcut(QKeySequence("Ctrl+J"), self)
         self.shortcut_dup.activated.connect(self.duplicate_selected)
@@ -377,35 +378,43 @@ class EditorWindow(QMainWindow):
         box.setSelected(True)
         self.refresh_layer_list()
 
+    def update_position_ui(self):
+        """Atualiza os campos X e Y no topo em tempo real."""
+        sel = self.scene.selectedItems()
+        if not sel:
+            self.spin_pos_x.setEnabled(False)
+            self.spin_pos_y.setEnabled(False)
+            return
+
+        item = sel[0]
+        self.spin_pos_x.blockSignals(True)
+        self.spin_pos_y.blockSignals(True)
+        
+        self.spin_pos_x.setEnabled(True)
+        self.spin_pos_y.setEnabled(True)
+
+        if isinstance(item, Guideline):
+            if item.is_vertical:
+                self.spin_pos_x.setValue(item.pos().x())
+                self.spin_pos_y.setEnabled(False)
+            else:
+                self.spin_pos_y.setValue(item.pos().y())
+                self.spin_pos_x.setEnabled(False)
+        else:
+            self.spin_pos_x.setValue(item.pos().x())
+            self.spin_pos_y.setValue(item.pos().y())
+
+        self.spin_pos_x.blockSignals(False)
+        self.spin_pos_y.blockSignals(False)
+
     def on_selection_changed(self):
+        """Gerencia a troca de painéis laterais quando a seleção muda."""
         sel = self.scene.selectedItems()
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
         signatures = [i for i in sel if isinstance(i, SignatureItem)]
         
-        # --- UI Posição X/Y ---
-        self.spin_pos_x.blockSignals(True)
-        self.spin_pos_y.blockSignals(True)
-        if sel:
-            item = sel[0]
-            self.spin_pos_x.setEnabled(True)
-            self.spin_pos_y.setEnabled(True)
-            if isinstance(item, Guideline):
-                if item.is_vertical:
-                    self.spin_pos_x.setValue(item.pos().x())
-                    self.spin_pos_y.setEnabled(False)
-                else:
-                    self.spin_pos_y.setValue(item.pos().y())
-                    self.spin_pos_x.setEnabled(False)
-            else:
-                self.spin_pos_x.setValue(item.pos().x())
-                self.spin_pos_y.setValue(item.pos().y())
-        else:
-            self.spin_pos_x.setEnabled(False)
-            self.spin_pos_y.setEnabled(False)
-            self.spin_pos_x.setValue(0)
-            self.spin_pos_y.setValue(0)
-        self.spin_pos_x.blockSignals(False)
-        self.spin_pos_y.blockSignals(False)
+        # Atualiza a posição X/Y imediatamente ao selecionar
+        self.update_position_ui()
 
         if boxes:
             target_box = boxes[0]
