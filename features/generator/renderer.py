@@ -12,6 +12,8 @@ class NativeRenderer:
         h = self.tpl["canvas_size"]["h"]
         
         image = QImage(w, h, QImage.Format_ARGB32)
+        image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
+        image.setDotsPerMeterY(3780)
         image.fill(Qt.GlobalColor.white)
 
         painter = QPainter(image)
@@ -30,6 +32,8 @@ class NativeRenderer:
         h = self.tpl["canvas_size"]["h"]
         
         image = QImage(w, h, QImage.Format_ARGB32)
+        image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
+        image.setDotsPerMeterY(3780)
         image.fill(Qt.GlobalColor.white)
 
         painter = QPainter(image)
@@ -45,6 +49,8 @@ class NativeRenderer:
         h = self.tpl["canvas_size"]["h"]
         
         image = QImage(w, h, QImage.Format_ARGB32)
+        image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
+        image.setDotsPerMeterY(3780)
         image.fill(Qt.GlobalColor.white)
 
         painter = QPainter(image)
@@ -98,15 +104,29 @@ class NativeRenderer:
         return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
 
     def _draw_html_box(self, painter, box_data, html_text):
+        from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat
+        
         painter.save()
         doc = QTextDocument()
         doc.setDocumentMargin(0) 
         
-        font_family = box_data.get("font_family", "Arial")
-        font_size = box_data.get("font_size", 12)
-        doc.setDefaultStyleSheet(f"body {{ color: black; font-family: '{font_family}'; font-size: {font_size}pt; }}")
-        doc.setHtml(html_text)
+        # 0. Limpeza Retroativa: Remove cores e links para que o gerador não imprima azul
+        clean_html = re.sub(r"color\s*:[^;\"]+;?", "", html_text)
+        clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
+        clean_html = re.sub(r"(?i)</a>", "", clean_html)
+        
+        # 1. Injetar o HTML limpo
+        doc.setHtml(clean_html)
 
+        # 2. Aplicar a mesma Fonte Global nativa usada no DesignerBox
+        font_family = box_data.get("font_family", "Arial")
+        font_size = box_data.get("font_size", 16)
+        font = QFont(font_family, font_size)
+        doc.setDefaultFont(font)
+
+        # 3. Aplicar Alinhamento Horizontal
         align_str = box_data.get("align", "left")
         opts = doc.defaultTextOption()
         if align_str == "center":
@@ -118,6 +138,14 @@ class NativeRenderer:
         else:
             opts.setAlignment(Qt.AlignmentFlag.AlignLeft)
         doc.setDefaultTextOption(opts)
+        
+        # 4. Clonar as exatas propriedades de Margem e Entrelinha do Editor
+        cursor = QTextCursor(doc)
+        cursor.select(QTextCursor.SelectionType.Document)
+        fmt = QTextBlockFormat()
+        fmt.setTextIndent(box_data.get("indent_px", 0.0))
+        fmt.setLineHeight(box_data.get("line_height", 1.15) * 100.0, 1) # '1' = ProportionalHeight
+        cursor.mergeBlockFormat(fmt)
         
         w = box_data.get("w", 300)
         h = box_data.get("h", 100)

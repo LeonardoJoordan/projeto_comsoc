@@ -125,9 +125,12 @@ class DesignerBox(QGraphicsRectItem):
         self.text_item = QGraphicsTextItem("", self)
         self.text_item.setDefaultTextColor(Qt.GlobalColor.black)
         
+        # CORREÇÃO CRÍTICA: Zera a margem fantasma nativa do Editor para equiparar ao Gerador
+        self.text_item.document().setDocumentMargin(0)
+        
         self.text_item.document().contentsChanged.connect(self.recalculate_text_position)
 
-        self.text_item.setTextWidth(w) 
+        self.text_item.setTextWidth(w)
         self.text_item.setPos(0, 0)
         
         self.apply_state()
@@ -152,11 +155,14 @@ class DesignerBox(QGraphicsRectItem):
         """Reconstrói todo o documento visual com base na Fonte da Verdade."""
         self.text_item.blockSignals(True)
         
-        # 1. Limpar sujeiras herdadas e Injetar Conteúdo
+        # 1. Limpeza Retroativa e Injeção de Conteúdo (conserta JSONs antigos já infectados)
         html = re.sub(r"font-family\s*:[^;\"]+;?", "", self.state.html_content)
         html = re.sub(r"font-size\s*:[^;\"]+;?", "", html)
-        
-        # Expurgar cabeçalhos retroativamente (conserta modelos JSON já salvos)
+        html = re.sub(r"color\s*:[^;\"]+;?", "", html)
+        html = re.sub(r"background-color\s*:[^;\"]+;?", "", html)
+        html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", html)
+        html = re.sub(r"(?i)<a\b[^>]*>", "", html)
+        html = re.sub(r"(?i)</a>", "", html)
         html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", html)
         html = re.sub(r"(?i)</h[1-6]>", "</p>", html)
         

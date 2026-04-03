@@ -246,12 +246,19 @@ class EditorDeTextoPanel(QWidget):
 
     def _emit_clean_html(self):
         raw_html = self.txt_content.toHtml()
-        # Regex corrigida: ignora aspas simples geradas pelo Qt no nome da fonte
+        
+        # FAXINA GERAL: Remove fontes, tamanhos, cores, fundos e decorações indesejadas do Ctrl+V
         clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", raw_html)
         clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"color\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
         
-        # CORREÇÃO DE TAMANHO ABSOLUTO: 
-        # Rebaixa tags de título (h1, h2...) vindas do Ctrl+V para parágrafos comuns (p).
+        # Extermina Hiperlinks fantasmas (tags <a>) mantendo apenas o texto limpo
+        clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
+        clean_html = re.sub(r"(?i)</a>", "", clean_html)
+        
+        # Rebaixa tags de título (h1, h2...) para parágrafos comuns (p)
         clean_html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean_html)
         clean_html = re.sub(r"(?i)</h[1-6]>", "</p>", clean_html)
         
