@@ -155,6 +155,11 @@ class DesignerBox(QGraphicsRectItem):
         # 1. Limpar sujeiras herdadas e Injetar Conteúdo
         html = re.sub(r"font-family\s*:[^;\"]+;?", "", self.state.html_content)
         html = re.sub(r"font-size\s*:[^;\"]+;?", "", html)
+        
+        # Expurgar cabeçalhos retroativamente (conserta modelos JSON já salvos)
+        html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", html)
+        html = re.sub(r"(?i)</h[1-6]>", "</p>", html)
+        
         self.text_item.setHtml(html)
         
         # 2. Aplicar Fonte Global (SEMPRE após o setHtml, pois ele reseta o documento)

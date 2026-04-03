@@ -249,6 +249,12 @@ class EditorDeTextoPanel(QWidget):
         # Regex corrigida: ignora aspas simples geradas pelo Qt no nome da fonte
         clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", raw_html)
         clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
+        
+        # CORREÇÃO DE TAMANHO ABSOLUTO: 
+        # Rebaixa tags de título (h1, h2...) vindas do Ctrl+V para parágrafos comuns (p).
+        clean_html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean_html)
+        clean_html = re.sub(r"(?i)</h[1-6]>", "</p>", clean_html)
+        
         self.htmlChanged.emit(clean_html)
 
 class AssinaturaPanel(QWidget):
