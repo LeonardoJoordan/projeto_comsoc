@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal, QEvent
 from pathlib import Path
 import shutil
 
-from .canvas_items import DesignerBox, Guideline, px_to_mm, SignatureItem
+from .canvas_items import DesignerBox, Guideline, px_to_mm, SignatureItem, ImageItem
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel, AssinaturaPanel
 from core.template_manager import slugify_model_name
 
@@ -138,12 +138,18 @@ class EditorWindow(QMainWindow):
         self.btn_add_bg.setMinimumHeight(40)
         self.btn_add_bg.clicked.connect(self._on_click_load_bg)
         
+        self.btn_add_img = QPushButton("📸 Imagem")
+        self.btn_add_img.setToolTip("Adicionar imagem solta")
+        self.btn_add_img.setMinimumHeight(40)
+        self.btn_add_img.clicked.connect(self._on_click_add_image)
+        
         self.btn_add_sig = QPushButton("✍️ Assinatura")
         self.btn_add_sig.setToolTip("Adicionar imagem de assinatura")
         self.btn_add_sig.setMinimumHeight(40)
         self.btn_add_sig.clicked.connect(self._on_click_add_signature)
         
         row_assets.addWidget(self.btn_add_bg)
+        row_assets.addWidget(self.btn_add_img)
         row_assets.addWidget(self.btn_add_sig)
         ly_boxes.addLayout(row_assets)
 
@@ -445,7 +451,7 @@ class EditorWindow(QMainWindow):
             return # Aborta silenciosamente se a cena já foi destruída (ao fechar o app)
             
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
-        signatures = [i for i in sel if isinstance(i, SignatureItem)]
+        signatures = [i for i in sel if isinstance(i, (SignatureItem, ImageItem))]
         
         # Atualiza a posição X/Y imediatamente ao selecionar
         self.update_position_ui()
@@ -560,6 +566,7 @@ class EditorWindow(QMainWindow):
     def export_to_json(self):
         boxes_data = []
         signatures_data = []
+        images_data = []
         
         for item in self.scene.items():
             if isinstance(item, DesignerBox):
@@ -597,6 +604,19 @@ class EditorWindow(QMainWindow):
                     "longest_side": max(pix.width(), pix.height())
                 })
 
+            elif isinstance(item, ImageItem):
+                pos = item.pos()
+                pix = item.pixmap()
+                images_data.append({
+                    "path": getattr(item, "_original_path", ""), 
+                    "visible": item.isVisible(),
+                    "x": int(pos.x()),
+                    "y": int(pos.y()),
+                    "width": int(pix.width()),
+                    "height": int(pix.height()),
+                    "longest_side": max(pix.width(), pix.height())
+                })
+
         ordered_placeholders = []
         for i in range(self.lst_placeholders.count()):
             ordered_placeholders.append(self.lst_placeholders.item(i).text())
@@ -607,6 +627,7 @@ class EditorWindow(QMainWindow):
             "background_path": self.background_path,
             "placeholders": ordered_placeholders,
             "signatures": signatures_data,
+            "images": images_data,
             "boxes": boxes_data
         }
                 
@@ -628,6 +649,11 @@ class EditorWindow(QMainWindow):
             rel_sig = self._import_asset(sig["path"], model_dir)
             if rel_sig:
                 sig["path"] = rel_sig
+
+        for img in data.get("images", []):
+            rel_img = self._import_asset(img["path"], model_dir)
+            if rel_img:
+                img["path"] = rel_img
 
         file_path = model_dir / "template_v3.json"
         
@@ -655,7 +681,7 @@ class EditorWindow(QMainWindow):
             
         self.background_path = path
         self.bg_item = self.scene.addPixmap(pixmap)
-        self.bg_item.setZValue(-95) 
+        self.bg_item.setZValue(-100) 
         
         rect = pixmap.rect()
         self.scene.setSceneRect(rect)
@@ -714,6 +740,24 @@ class EditorWindow(QMainWindow):
             sig.setPos(center)
             self.scene.addItem(sig)
 
+    def _on_click_add_image(self):
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg)")
+        if path:
+            img = ImageItem(path)
+            center = self.view.mapToScene(self.view.viewport().rect().center())
+            img.setPos(center)
+            
+            # Trava automática no Z-Value topo da faixa de Imagens
+            base_z = 1
+            for item in self.scene.items():
+                if isinstance(item, ImageItem) and item.zValue() >= base_z:
+                    base_z = int(item.zValue()) + 1
+            img.setZValue(min(base_z, 100))
+            
+            self.scene.addItem(img)
+            self.refresh_layer_list()
+
     def get_all_model_placeholders(self):
         placeholders = set()
         for item in self.scene.items():
@@ -753,7 +797,7 @@ class EditorWindow(QMainWindow):
             if bg_path.exists():
                 self.load_background_image(str(bg_path))
 
-        from .canvas_items import SignatureItem
+        from .canvas_items import SignatureItem, ImageItem
         for sig_data in data.get("signatures", []):
             raw_path = sig_data["path"]
             sig_path = path.parent / raw_path if not Path(raw_path).is_absolute() else Path(raw_path)
@@ -763,6 +807,16 @@ class EditorWindow(QMainWindow):
                 sig.setPos(sig_data["x"], sig_data["y"])
                 sig.resize_by_longest_side(sig_data["longest_side"])
                 self.scene.addItem(sig)
+
+        for img_data in data.get("images", []):
+            raw_path = img_data["path"]
+            img_path = path.parent / raw_path if not Path(raw_path).is_absolute() else Path(raw_path)
+
+            if img_path.exists():
+                img = ImageItem(str(img_path))
+                img.setPos(img_data["x"], img_data["y"])
+                img.resize_by_longest_side(img_data["longest_side"])
+                self.scene.addItem(img)
 
         for b in data.get("boxes", []):
             box = DesignerBox(
@@ -818,6 +872,8 @@ class EditorWindow(QMainWindow):
             return f"{prefix}_{raw}"
         elif isinstance(item, SignatureItem):
             return f"{prefix}_Assinatura"
+        elif isinstance(item, ImageItem):
+            return f"{prefix}_Imagem"
         if item == self.bg_item:
             return f"{prefix}_Fundo"
         return f"{prefix}_Objeto"
@@ -825,30 +881,60 @@ class EditorWindow(QMainWindow):
     def refresh_layer_list(self):
         self.layer_list.blockSignals(True)
         self.layer_list.clear()
-        items = self.scene.items()
         
-        valid_items = []
-        for item in items:
-            if isinstance(item, (DesignerBox, SignatureItem)) or item == self.bg_item:
-                valid_items.append(item)
-                if not hasattr(item, 'layer_id') or item.layer_id is None:
-                    item.layer_id = self._get_next_layer_id()
+        assinaturas = []
+        textos = []
+        imagens = []
+        fundo = None
+        
+        for item in self.scene.items():
+            if item == self.bg_item: fundo = item
+            elif isinstance(item, SignatureItem): assinaturas.append(item)
+            elif isinstance(item, DesignerBox): textos.append(item)
+            elif isinstance(item, ImageItem): imagens.append(item)
+            
+            if not hasattr(item, 'layer_id') or item.layer_id is None:
+                item.layer_id = self._get_next_layer_id()
 
-        # Ordenar do maior Z-Value (topo visual) para o menor
-        valid_items.sort(key=lambda x: x.zValue(), reverse=True)
+        assinaturas.sort(key=lambda x: x.zValue(), reverse=True)
+        textos.sort(key=lambda x: x.zValue(), reverse=True)
+        imagens.sort(key=lambda x: x.zValue(), reverse=True)
 
-        for item in valid_items:
-            name = self._generate_layer_name(item.layer_id, item)
-            list_item = QListWidgetItem(name)
-            list_item.setData(Qt.ItemDataRole.UserRole, item)
+        def add_header(title):
+            header = QListWidgetItem(f"--- {title} ---")
+            header.setFlags(Qt.ItemFlag.NoItemFlags)
+            header.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            from PySide6.QtGui import QBrush, QColor
+            header.setBackground(QBrush(QColor("#e0e0e0")))
+            header.setForeground(QBrush(QColor("#555555")))
+            self.layer_list.addItem(header)
+
+        def add_items(item_list):
+            for item in item_list:
+                name = self._generate_layer_name(item.layer_id, item)
+                list_item = QListWidgetItem(name)
+                list_item.setData(Qt.ItemDataRole.UserRole, item)
+                flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsUserCheckable
+                list_item.setFlags(flags)
+                list_item.setCheckState(Qt.CheckState.Checked if item.isVisible() else Qt.CheckState.Unchecked)
+                self.layer_list.addItem(list_item)
+
+        if assinaturas:
+            add_header("ASSINATURAS")
+            add_items(assinaturas)
             
-            # Adiciona Checkbox (Nativo) e mantém permissão de Drag
-            flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsUserCheckable
-            list_item.setFlags(flags)
-            list_item.setCheckState(Qt.CheckState.Checked if item.isVisible() else Qt.CheckState.Unchecked)
+        if textos:
+            add_header("TEXTOS")
+            add_items(textos)
+        
+        if imagens:
+            add_header("IMAGENS")
+            add_items(imagens)
             
-            self.layer_list.addItem(list_item)
-            
+        if fundo:
+            add_header("FUNDO")
+            add_items([fundo])
+
         self.layer_list.blockSignals(False)
 
     def _on_layer_list_clicked(self, list_item):
@@ -875,9 +961,14 @@ class EditorWindow(QMainWindow):
             if target:
                 items_in_order.append(target)
                 
-        # Extrai os Z-Values existentes e ordena do maior para o menor
-        available_zs = sorted([item.zValue() for item in items_in_order], reverse=True)
+        assinaturas = [i for i in items_in_order if isinstance(i, SignatureItem)]
+        textos = [i for i in items_in_order if isinstance(i, DesignerBox)]
+        imagens = [i for i in items_in_order if isinstance(i, ImageItem)]
         
-        # Redistribui as profundidades na nova ordem garantindo coerência
-        for i, target in enumerate(items_in_order):
-            target.setZValue(available_zs[i])
+        # Blinda o Z-Value matematicamente, não importa pra onde o usuário tentou arrastar
+        for i, item in enumerate(assinaturas): item.setZValue(250 - i)
+        for i, item in enumerate(textos): item.setZValue(200 - i)
+        for i, item in enumerate(imagens): item.setZValue(100 - i)
+        
+        # Redesenha forçadamente para que o item "pule" de volta para a sua seção correta caso tenha sido arrastado pra fora dela
+        self.refresh_layer_list()

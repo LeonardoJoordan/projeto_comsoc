@@ -118,7 +118,7 @@ class DesignerBox(QGraphicsRectItem):
         
         self.setPen(QPen(Qt.GlobalColor.red, 2, Qt.PenStyle.DashLine))
         self.setBrush(QBrush(QColor(255, 255, 255, 50)))
-        self.setZValue(100)
+        self.setZValue(101)
 
         self.state = TextState(html_content=text)
         
@@ -284,7 +284,38 @@ class SignatureItem(QGraphicsPixmapItem):
             QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges
         )
         self._original_pixmap = pixmap
-        self.setZValue(50)
+        self.setZValue(201)
+
+    def resize_by_longest_side(self, size_px):
+        w = self._original_pixmap.width()
+        h = self._original_pixmap.height()
+        
+        if w > h:
+            new_w = size_px
+            new_h = (h * size_px) / w
+        else:
+            new_h = size_px
+            new_w = (w * size_px) / h
+            
+        scaled = self._original_pixmap.scaled(
+            new_w, new_h, 
+            Qt.AspectRatioMode.KeepAspectRatio, 
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.setPixmap(scaled)
+
+class ImageItem(QGraphicsPixmapItem):
+    def __init__(self, pixmap_path, parent=None):
+        pixmap = QPixmap(pixmap_path)
+        super().__init__(pixmap)
+        self._original_path = pixmap_path
+        self.setFlags(
+            QGraphicsItem.GraphicsItemFlag.ItemIsMovable |
+            QGraphicsItem.GraphicsItemFlag.ItemIsSelectable |
+            QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges
+        )
+        self._original_pixmap = pixmap
+        self.setZValue(1) # Base Z para Imagens (Faixa de 1 a 100)
 
     def resize_by_longest_side(self, size_px):
         w = self._original_pixmap.width()

@@ -70,6 +70,28 @@ class NativeRenderer:
             if not bg.isNull():
                 painter.drawPixmap(0, 0, bg)
 
+        for img in self.tpl.get("images", []):
+            if not img.get("visible", True): continue
+            
+            raw_path = img.get("path", "")
+            img_path = Path(raw_path)
+            
+            # Fallback de resolução de caminho (resolve assets relativos quando acionado via gerador)
+            if not img_path.exists() and self.tpl.get("background_path"):
+                bg_path = Path(self.tpl["background_path"])
+                if bg_path.is_absolute():
+                    alt_path = bg_path.parent.parent / raw_path
+                    if alt_path.exists(): img_path = alt_path
+
+            if img_path.exists():
+                pix = QPixmap(str(img_path))
+                w, h = img.get("width", 0), img.get("height", 0)
+                
+                # Blindagem contra corrompimento de QImage/QPixmap ou dimensões ausentes
+                if not pix.isNull() and w > 0 and h > 0:
+                    scaled = pix.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    painter.drawPixmap(int(img.get("x", 0)), int(img.get("y", 0)), scaled)
+
         for box in self.tpl.get("boxes", []):
             if not box.get("visible", True):
                 continue

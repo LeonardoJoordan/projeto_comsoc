@@ -327,7 +327,7 @@ class AssinaturaPanel(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         
-        lbl = QLabel("PROPRIEDADES DA ASSINATURA")
+        lbl = QLabel("PROPRIEDADES DA IMAGEM / ASSINATURA")
         lbl.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 5px;")
         layout.addWidget(lbl)
         
