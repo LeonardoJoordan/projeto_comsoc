@@ -1,5 +1,6 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTableWidget, 
-                               QTableWidgetItem, QApplication, QMenu)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
+                               QTableWidgetItem, QApplication, QMenu, QPushButton, QSpinBox,
+                               QAbstractItemView)
 from PySide6.QtGui import QKeySequence, QFontMetrics, QAction
 from PySide6.QtCore import Qt, QTimer
 
@@ -13,6 +14,8 @@ class RichTableWidget(QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setItemDelegate(HTMLDelegate(self))
+        self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -71,6 +74,80 @@ class RichTableWidget(QTableWidget):
             for item in self.selectedItems():
                 item.setText("")
                 item.setData(self.RICH_ROLE, None)
+
+    def _add_rows(self, count: int):
+        has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        for _ in range(count):
+            row_idx = self.rowCount()
+            self.insertRow(row_idx)
+            if has_sig_col:
+                default_chk = Qt.CheckState.Checked
+                if row_idx > 0 and self.item(0, 0):
+                    default_chk = self.item(0, 0).checkState()
+                item = QTableWidgetItem("")
+                item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                item.setCheckState(default_chk)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(row_idx, 0, item)
+
+    def _duplicate_selected_rows(self):
+        indexes = self.selectionModel().selectedIndexes()
+        if not indexes: return
+        
+        rows_to_dup = sorted(list(set(idx.row() for idx in indexes)), reverse=True)
+        cols = self.columnCount()
+        has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        
+        for r in rows_to_dup:
+            new_row = r + 1
+            self.insertRow(new_row)
+            
+            for c in range(cols):
+                old_item = self.item(r, c)
+                if old_item:
+                    new_item = QTableWidgetItem(old_item.text())
+                    if c == 0 and has_sig_col:
+                        new_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                        new_item.setCheckState(old_item.checkState())
+                        new_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    
+                    rich_data = old_item.data(self.RICH_ROLE)
+                    if rich_data:
+                        new_item.setData(self.RICH_ROLE, rich_data)
+                        
+                    self.setItem(new_row, c, new_item)
+
+    def _toggle_word_wrap(self, state: bool):
+        self.setWordWrap(state)
+        if state:
+            self.resizeRowsToContents()
+            # Adiciona 15px de "respiro" para evitar o scroll interno nas células
+            for r in range(self.rowCount()):
+                self.setRowHeight(r, self.rowHeight(r) + 15)
+        else:
+            # Força todas as linhas a voltarem ao tamanho compacto padrão
+            for r in range(self.rowCount()):
+                self.setRowHeight(r, 30)
+
+    def _delete_selected_rows_action(self):
+        # selectedIndexes pega as coordenadas visuais, mesmo se a célula estiver virgem/vazia
+        indexes = self.selectionModel().selectedIndexes()
+        if not indexes: return
+        
+        rows_to_del = sorted(list(set(idx.row() for idx in indexes)), reverse=True)
+        
+        for r in rows_to_del:
+            self.removeRow(r)
+            
+        # Se a tabela ficar vazia, recria a linha inicial padrão
+        if self.rowCount() == 0:
+            self.insertRow(0)
+            has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+            if has_sig_col:
+                item = QTableWidgetItem("")
+                item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                item.setCheckState(Qt.CheckState.Checked)
+                self.setItem(0, 0, item)
 
     def _toggle_format(self, tag: str):
         items = self.selectedItems()
@@ -134,6 +211,43 @@ class RichTableWidget(QTableWidget):
 
         if not grid_struct: return
 
+        header = self.horizontalHeader()
+        has_sig_col = (header.count() > 0 and self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+
+        # --- LÓGICA DE PREENCHIMENTO EM MASSA (1 célula copiada -> Várias selecionadas) ---
+        is_single_cell = (len(grid_struct) == 1 and len(grid_struct[0]) == 1)
+        selected_indexes = self.selectionModel().selectedIndexes()
+        
+        if is_single_cell and len(selected_indexes) > 1:
+            val_plain = grid_struct[0][0].plain
+            val_rich = grid_style[0][0].rich_html if (grid_style and len(grid_style) > 0 and len(grid_style[0]) > 0) else val_plain
+            
+            affected_cols_logical = set()
+            for idx in selected_indexes:
+                r = idx.row()
+                c_visual = idx.column()
+                c_logical = header.logicalIndex(c_visual)
+                
+                if has_sig_col and c_logical == 0:
+                    continue  # Protege a checkbox
+                    
+                item = self.item(r, c_logical)
+                if item is None:
+                    item = QTableWidgetItem()
+                    self.setItem(r, c_logical, item)
+                    
+                item.setText(val_plain)
+                item.setData(self.RICH_ROLE, val_rich)
+                affected_cols_logical.add(c_logical)
+                
+            if affected_cols_logical:
+                # Autoajuste de colunas baseado nas recém alteradas
+                QTimer.singleShot(0, lambda: self._autofit_columns_after_paste(
+                    affected_cols_logical, 0, self.rowCount() - 1, padding_px=20
+                ))
+            return
+
+        # --- LÓGICA PADRÃO DE COLAGEM (Tabela/Bloco) ---
         curr = self.currentIndex()
         if not curr.isValid():
             start_row = 0
@@ -142,10 +256,7 @@ class RichTableWidget(QTableWidget):
             start_row = curr.row()
             start_col_logical = curr.column()
 
-        header = self.horizontalHeader()
         start_visual_col = header.visualIndex(start_col_logical)
-        
-        has_sig_col = (header.count() > 0 and self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
         
         # Desloca a colagem para o lado se o usuário tentou colar em cima da checkbox de assinatura
         if has_sig_col and start_col_logical == 0:
@@ -212,7 +323,37 @@ class TablePanel(QWidget):
         title.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(title)
 
+        # --- Barra de Ferramentas da Tabela ---
+        toolbar_layout = QHBoxLayout()
+        toolbar_layout.setContentsMargins(0, 5, 0, 5)
+        
+        self.spin_add_rows = QSpinBox()
+        self.spin_add_rows.setMinimum(1)
+        self.spin_add_rows.setMaximum(500)
+        self.spin_add_rows.setFixedWidth(50)
+        
+        self.btn_add_rows = QPushButton("➕ Adicionar Linha(s)")
+        self.btn_duplicate_row = QPushButton("📑 Duplicar Linha(s)")
+        self.btn_delete_rows = QPushButton("🗑️ Excluir Linha(s)")
+        self.btn_toggle_wrap = QPushButton("↕️ Expandir Células")
+        self.btn_toggle_wrap.setCheckable(True)
+        
+        toolbar_layout.addWidget(self.spin_add_rows)
+        toolbar_layout.addWidget(self.btn_add_rows)
+        toolbar_layout.addWidget(self.btn_duplicate_row)
+        toolbar_layout.addWidget(self.btn_delete_rows)
+        toolbar_layout.addStretch()
+        toolbar_layout.addWidget(self.btn_toggle_wrap)
+        
+        layout.addLayout(toolbar_layout)
+
         self.table = RichTableWidget(0, 0)
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionsMovable(True)
         layout.addWidget(self.table, 1)
+
+        # --- Conexões da Barra de Ferramentas ---
+        self.btn_add_rows.clicked.connect(lambda: self.table._add_rows(self.spin_add_rows.value()))
+        self.btn_duplicate_row.clicked.connect(self.table._duplicate_selected_rows)
+        self.btn_delete_rows.clicked.connect(self.table._delete_selected_rows_action)
+        self.btn_toggle_wrap.toggled.connect(self.table._toggle_word_wrap)
