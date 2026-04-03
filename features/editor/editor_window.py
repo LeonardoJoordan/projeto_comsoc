@@ -45,9 +45,15 @@ class EditorWindow(QMainWindow):
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.view.setBackgroundBrush(QBrush(QColor("#e0e0e0")))
         self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        self.view.installEventFilter(self)
         
-        self.bg_item = None  
+        # Otimização de UX: Zoom segue o ponteiro do mouse
+        self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        
+        # Filtra a view e o viewport para impedir o vazamento do Scroll
+        self.view.installEventFilter(self)
+        self.view.viewport().installEventFilter(self)
+        
+        self.bg_item = None
         self.background_path = None
         
         self.fallback_bg = self.scene.addRect(0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
@@ -252,6 +258,15 @@ class EditorWindow(QMainWindow):
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
         self.shortcut_save.activated.connect(self.export_to_json)
 
+        self.shortcut_bold = QShortcut(QKeySequence("Ctrl+B"), self)
+        self.shortcut_bold.activated.connect(lambda: self.editor_texto_panel.btn_bold.click() if self.editor_texto_panel.isEnabled() else None)
+
+        self.shortcut_italic = QShortcut(QKeySequence("Ctrl+I"), self)
+        self.shortcut_italic.activated.connect(lambda: self.editor_texto_panel.btn_italic.click() if self.editor_texto_panel.isEnabled() else None)
+
+        self.shortcut_underline = QShortcut(QKeySequence("Ctrl+U"), self)
+        self.shortcut_underline.activated.connect(lambda: self.editor_texto_panel.btn_underline.click() if self.editor_texto_panel.isEnabled() else None)
+
     def showEvent(self, event):
         super().showEvent(event)
         self._zoom_to_fit()
@@ -307,11 +322,13 @@ class EditorWindow(QMainWindow):
         layout.addWidget(sep)
 
     def eventFilter(self, source, event):
-        if source == self.view:
+        # Escuta tanto a view principal quanto o viewport das barras de rolagem
+        if source in (self.view, self.view.viewport()):
             # --- 1. Zoom com Ctrl + Scroll ---
             if event.type() == QEvent.Type.Wheel and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
                 zoom_factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
                 self.view.scale(zoom_factor, zoom_factor)
+                event.accept() # Mata o evento nativo de rolagem
                 return True
 
             # --- Eventos de Teclado (Pressionar) ---
@@ -329,7 +346,8 @@ class EditorWindow(QMainWindow):
                         self.scene.removeItem(item)
                     self.on_selection_changed()
                     self.sync_placeholders_list()
-                    return True 
+                    self.refresh_layer_list() # Atualiza a lista para expurgar itens deletados
+                    return True
                 
                 elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
                     step = 10 if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
