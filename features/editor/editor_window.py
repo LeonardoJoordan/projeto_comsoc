@@ -237,33 +237,46 @@ class EditorWindow(QMainWindow):
         layout.addWidget(sep)
 
     def eventFilter(self, source, event):
-        if source == self.view and event.type() == QEvent.Type.KeyPress:
-            key = event.key()
-            
-            if key == Qt.Key.Key_Delete:
-                selected = self.scene.selectedItems()
-                for item in selected: 
-                    self.scene.removeItem(item)
-                self.on_selection_changed()
-                self.sync_placeholders_list()
-                return True 
-            
-            elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
-                step = 1
-                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
-                    step = 10
+        if source == self.view:
+            # --- 1. Zoom com Ctrl + Scroll ---
+            if event.type() == QEvent.Type.Wheel and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
+                zoom_factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
+                self.view.scale(zoom_factor, zoom_factor)
+                return True
+
+            # --- Eventos de Teclado (Pressionar) ---
+            if event.type() == QEvent.Type.KeyPress:
+                key = event.key()
                 
-                dx, dy = 0, 0
-                if key == Qt.Key.Key_Left: dx = -step
-                elif key == Qt.Key.Key_Right: dx = step
-                elif key == Qt.Key.Key_Up: dy = -step
-                elif key == Qt.Key.Key_Down: dy = step
+                # 2. Ativar Pan (Mãozinha) ao segurar Espaço
+                if key == Qt.Key.Key_Space and not event.isAutoRepeat():
+                    self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+                    return True
                 
-                sel_items = self.scene.selectedItems()
-                if sel_items:
-                    for item in sel_items:
-                        item.moveBy(dx, dy)
+                if key == Qt.Key.Key_Delete:
+                    selected = self.scene.selectedItems()
+                    for item in selected: 
+                        self.scene.removeItem(item)
+                    self.on_selection_changed()
+                    self.sync_placeholders_list()
                     return True 
+                
+                elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
+                    step = 10 if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
+                    dx = -step if key == Qt.Key.Key_Left else (step if key == Qt.Key.Key_Right else 0)
+                    dy = -step if key == Qt.Key.Key_Up else (step if key == Qt.Key.Key_Down else 0)
+                    sel_items = self.scene.selectedItems()
+                    if sel_items:
+                        for item in sel_items:
+                            item.moveBy(dx, dy)
+                        return True 
+
+            # --- Eventos de Teclado (Soltar) ---
+            elif event.type() == QEvent.Type.KeyRelease:
+                # 3. Desativar Pan (Voltar para seleção) ao soltar Espaço
+                if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
+                    self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+                    return True
         
         return super().eventFilter(source, event)
 
