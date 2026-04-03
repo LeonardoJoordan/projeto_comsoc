@@ -2,7 +2,7 @@ import json
 from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidget, 
                                QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton, 
                                QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
-                               QListWidgetItem)
+                               QListWidgetItem, QDoubleSpinBox)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, 
                            QKeySequence, QTextCursor, QTextCharFormat)
 from PySide6.QtCore import Qt, Signal, QEvent
@@ -53,7 +53,39 @@ class EditorWindow(QMainWindow):
         self.fallback_bg = self.scene.addRect(0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
         self.fallback_bg.setZValue(-100)
         
-        main_layout.addWidget(self.view, 1)
+        center_container = QWidget()
+        center_layout = QVBoxLayout(center_container)
+        center_layout.setContentsMargins(0, 0, 0, 0)
+        
+        self.top_bar = QWidget()
+        top_layout = QHBoxLayout(self.top_bar)
+        top_layout.setContentsMargins(10, 5, 10, 5)
+        top_layout.addWidget(QLabel("<b>POSIÇÃO DO ITEM (X, Y):</b>"))
+        
+        self.spin_pos_x = QDoubleSpinBox()
+        self.spin_pos_x.setRange(-5000, 20000)
+        self.spin_pos_x.setDecimals(1)
+        self.spin_pos_x.setPrefix("X: ")
+        self.spin_pos_x.setSuffix(" px")
+        self.spin_pos_x.setEnabled(False)
+        self.spin_pos_x.valueChanged.connect(self.apply_position_x)
+        
+        self.spin_pos_y = QDoubleSpinBox()
+        self.spin_pos_y.setRange(-5000, 20000)
+        self.spin_pos_y.setDecimals(1)
+        self.spin_pos_y.setPrefix("Y: ")
+        self.spin_pos_y.setSuffix(" px")
+        self.spin_pos_y.setEnabled(False)
+        self.spin_pos_y.valueChanged.connect(self.apply_position_y)
+        
+        top_layout.addWidget(self.spin_pos_x)
+        top_layout.addWidget(self.spin_pos_y)
+        top_layout.addStretch()
+        
+        center_layout.addWidget(self.top_bar)
+        center_layout.addWidget(self.view, 1)
+        
+        main_layout.addWidget(center_container, 1)
 
         right_container = QWidget()
         right_container.setFixedWidth(400)
@@ -168,6 +200,40 @@ class EditorWindow(QMainWindow):
         self.assinatura_panel.sideChanged.connect(self.update_signature_size)
         right_layout.addWidget(self.assinatura_panel)
 
+        self._add_separator(right_layout)
+        
+        grp_doc = QFrame()
+        ly_doc = QVBoxLayout(grp_doc)
+        ly_doc.setContentsMargins(0, 0, 0, 0)
+        lbl_doc = QLabel("<b>DIMENSÕES DO DOCUMENTO</b> <small style='color:gray'>(Ajuste Proporcional)</small>")
+        ly_doc.addWidget(lbl_doc)
+        
+        row_doc = QHBoxLayout()
+        from PySide6.QtWidgets import QSpinBox
+        self.spin_doc_w = QSpinBox()
+        self.spin_doc_w.setRange(10, 20000)
+        self.spin_doc_w.setSuffix(" px")
+        self.spin_doc_w.setPrefix("Largura: ")
+        self.spin_doc_w.setEnabled(False)
+        
+        self.spin_doc_h = QSpinBox()
+        self.spin_doc_h.setRange(10, 20000)
+        self.spin_doc_h.setSuffix(" px")
+        self.spin_doc_h.setPrefix("Altura: ")
+        self.spin_doc_h.setReadOnly(True) # A altura é calculada automaticamente
+        
+        self.btn_apply_doc_size = QPushButton("Aplicar Novo Tamanho")
+        self.btn_apply_doc_size.setEnabled(False)
+        self.btn_apply_doc_size.clicked.connect(self.apply_document_resize)
+        
+        row_doc.addWidget(self.spin_doc_w)
+        row_doc.addWidget(self.spin_doc_h)
+        ly_doc.addLayout(row_doc)
+        ly_doc.addWidget(self.btn_apply_doc_size)
+        
+        right_layout.addWidget(grp_doc)
+        self.spin_doc_w.valueChanged.connect(self._on_doc_w_changed)
+
         right_layout.addStretch()
         self.btn_save = QPushButton("Salvar Modelo (JSON)")
         self.btn_save.setMinimumHeight(50)
@@ -272,7 +338,8 @@ class EditorWindow(QMainWindow):
                     if sel_items:
                         for item in sel_items:
                             item.moveBy(dx, dy)
-                        return True 
+                        self.on_selection_changed() # Sincroniza a barra superior
+                        return True
 
             # --- Eventos de Teclado (Soltar) ---
             elif event.type() == QEvent.Type.KeyRelease:
@@ -291,6 +358,18 @@ class EditorWindow(QMainWindow):
             pos = rect.height() / 2
         self.scene.addItem(Guideline(pos, is_vertical=vertical))
 
+    def apply_position_x(self, val):
+        sel = self.scene.selectedItems()
+        if sel:
+            item = sel[0]
+            item.setPos(val, item.pos().y())
+
+    def apply_position_y(self, val):
+        sel = self.scene.selectedItems()
+        if sel:
+            item = sel[0]
+            item.setPos(item.pos().x(), val)
+
     def add_new_box(self):
         box = DesignerBox(350, 450, 300, 60, "{campo}")
         self.scene.addItem(box)
@@ -303,6 +382,31 @@ class EditorWindow(QMainWindow):
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
         signatures = [i for i in sel if isinstance(i, SignatureItem)]
         
+        # --- UI Posição X/Y ---
+        self.spin_pos_x.blockSignals(True)
+        self.spin_pos_y.blockSignals(True)
+        if sel:
+            item = sel[0]
+            self.spin_pos_x.setEnabled(True)
+            self.spin_pos_y.setEnabled(True)
+            if isinstance(item, Guideline):
+                if item.is_vertical:
+                    self.spin_pos_x.setValue(item.pos().x())
+                    self.spin_pos_y.setEnabled(False)
+                else:
+                    self.spin_pos_y.setValue(item.pos().y())
+                    self.spin_pos_x.setEnabled(False)
+            else:
+                self.spin_pos_x.setValue(item.pos().x())
+                self.spin_pos_y.setValue(item.pos().y())
+        else:
+            self.spin_pos_x.setEnabled(False)
+            self.spin_pos_y.setEnabled(False)
+            self.spin_pos_x.setValue(0)
+            self.spin_pos_y.setValue(0)
+        self.spin_pos_x.blockSignals(False)
+        self.spin_pos_y.blockSignals(False)
+
         if boxes:
             target_box = boxes[0]
             self.editor_texto_panel.load_from_item(target_box)
@@ -507,12 +611,47 @@ class EditorWindow(QMainWindow):
         
         self.fallback_bg.hide()
         self._zoom_to_fit()
+        
+        # --- Ativar e popular controles de dimensão do documento ---
+        if hasattr(self, 'spin_doc_w'):
+            self.spin_doc_w.blockSignals(True)
+            self.spin_doc_w.setValue(rect.width())
+            self.spin_doc_h.setValue(rect.height())
+            self._doc_aspect_ratio = rect.width() / rect.height() if rect.height() > 0 else 1
+            self.spin_doc_w.setEnabled(True)
+            self.btn_apply_doc_size.setEnabled(True)
+            self.spin_doc_w.blockSignals(False)
 
     def _on_click_load_bg(self):
         from PySide6.QtWidgets import QFileDialog
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Fundo", "", "Imagens (*.png *.jpg *.jpeg)")
         if path:
             self.load_background_image(path)
+
+    def _on_doc_w_changed(self, new_w):
+        if hasattr(self, '_doc_aspect_ratio'):
+            new_h = int(new_w / self._doc_aspect_ratio)
+            self.spin_doc_h.setValue(new_h)
+
+    def apply_document_resize(self):
+        if not self.bg_item or not self.background_path:
+            return
+            
+        from PySide6.QtGui import QPixmap
+        new_w = self.spin_doc_w.value()
+        new_h = self.spin_doc_h.value()
+        
+        # Recarrega a imagem original e aplica o redimensionamento suave
+        pixmap = QPixmap(self.background_path)
+        scaled_pixmap = pixmap.scaled(new_w, new_h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+        
+        self.bg_item.setPixmap(scaled_pixmap)
+        
+        # Ajusta os limites do palco (canvas) para o novo tamanho
+        rect = scaled_pixmap.rect()
+        self.scene.setSceneRect(rect)
+        self.view.setSceneRect(rect)
+        self._zoom_to_fit()
 
     def _on_click_add_signature(self):
         from PySide6.QtWidgets import QFileDialog

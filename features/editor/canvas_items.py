@@ -41,53 +41,6 @@ class Guideline(QGraphicsLineItem):
         stroker.setWidth(10) 
         return stroker.createStroke(path)
     
-    def mouseDoubleClickEvent(self, event):
-        rect = self.scene().sceneRect()
-        
-        if self.is_vertical:
-            axis_name = "Horizontal (X)"
-            total_px = rect.width()
-            current_px = self.pos().x()
-        else:
-            axis_name = "Vertical (Y)"
-            total_px = rect.height()
-            current_px = self.pos().y()
-
-        total_mm = px_to_mm(total_px)
-        current_mm = px_to_mm(current_px)
-
-        label = (f"Posição (mm). Total disponível: {total_mm:.2f} mm\n"
-                 f"Pode usar contas: '100/2', '{total_mm:.0f}-10', etc.")
-        
-        expression, ok = QInputDialog.getText(
-            None, 
-            f"Editar Guia {axis_name}", 
-            label, 
-            QLineEdit.EchoMode.Normal,
-            f"{current_mm:.2f}"
-        )
-
-        if ok and expression:
-            try:
-                sanitized = expression.replace(",", ".")
-                allowed_chars = set("0123456789.+-*/() ")
-                if not set(sanitized).issubset(allowed_chars):
-                    raise ValueError("Caracteres inválidos")
-                
-                final_val_mm = float(eval(sanitized))
-                new_px = mm_to_px(final_val_mm)
-                
-                if self.is_vertical:
-                    self.setPos(new_px, 0)
-                else:
-                    self.setPos(0, new_px)
-                
-                self.scene().update()
-            except Exception as e:
-                print(f"Erro na conta: {e}")
-
-        super().mouseDoubleClickEvent(event)
-
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
             new_pos = value
