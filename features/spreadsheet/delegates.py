@@ -14,6 +14,20 @@ class RichTextEditor(QTextEdit):
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
     def keyPressEvent(self, event):
+        # Comportamento estilo Excel: Tab e Enter mudam de célula.
+        if event.modifiers() == Qt.KeyboardModifier.NoModifier:
+            if event.key() == Qt.Key.Key_Tab:
+                event.ignore()
+                return
+            elif event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                event.ignore()
+                return
+        # Shift+Enter insere quebra de linha normal dentro da célula
+        elif event.modifiers() == Qt.KeyboardModifier.ShiftModifier:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                super().keyPressEvent(event)
+                return
+
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             key = event.key()
             if key == Qt.Key.Key_B:

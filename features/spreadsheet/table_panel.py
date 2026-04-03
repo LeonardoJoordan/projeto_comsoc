@@ -1,11 +1,13 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QLabel, QTableWidget, 
-                               QTableWidgetItem, QApplication, QMenu)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
+                               QTableWidgetItem, QApplication, QMenu, QSplitter, 
+                               QPushButton, QSpinBox)
 from PySide6.QtGui import QKeySequence, QFontMetrics, QAction
 from PySide6.QtCore import Qt, QTimer
 
 # Importações relativas ao domínio
-from .clipboard import parse_clipboard_html_table, parse_tsv
-from .delegates import HTMLDelegate
+import re
+from .clipboard import parse_clipboard_html_table, parse_tsv, sanitize_inline_html
+from .delegates import HTMLDelegate, RichTextEditor
 
 class RichTableWidget(QTableWidget):
     RICH_ROLE = Qt.ItemDataRole.UserRole
@@ -52,6 +54,54 @@ class RichTableWidget(QTableWidget):
             return
 
         super().keyPressEvent(event)
+
+    def add_empty_rows(self, count: int = 1):
+        has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        for _ in range(count):
+            row_idx = self.rowCount()
+            self.insertRow(row_idx)
+            if has_sig_col:
+                default_chk = Qt.CheckState.Checked
+                if row_idx > 0 and self.item(0, 0):
+                    default_chk = self.item(0, 0).checkState()
+                item = QTableWidgetItem("")
+                item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                item.setCheckState(default_chk)
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(row_idx, 0, item)
+
+    def duplicate_selected_rows(self):
+        sel_indexes = self.selectionModel().selectedIndexes()
+        if not sel_indexes:
+            return
+        
+        has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        rows_to_dup = sorted(list(set([idx.row() for idx in sel_indexes])), reverse=True)
+        
+        for r in rows_to_dup:
+            new_row_idx = r + 1
+            self.insertRow(new_row_idx)
+            
+            for c in range(self.columnCount()):
+                old_item = self.item(r, c)
+                new_item = QTableWidgetItem()
+                
+                # Força a criação do checkbox na coluna 0, mesmo que old_item seja nulo
+                if has_sig_col and c == 0:
+                    new_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    check_state = old_item.checkState() if old_item else Qt.CheckState.Checked
+                    new_item.setCheckState(check_state)
+                    new_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                
+                # Copia texto e rich text, se existirem
+                if old_item:
+                    new_item.setText(old_item.text())
+                    rich_val = old_item.data(self.RICH_ROLE)
+                    if rich_val:
+                        new_item.setData(self.RICH_ROLE, rich_val)
+                        
+                self.setItem(new_row_idx, c, new_item)
+
 
     def _handle_delete(self):
         sel_rows = self.selectionModel().selectedRows()
@@ -212,7 +262,154 @@ class TablePanel(QWidget):
         title.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(title)
 
+        splitter = QSplitter(Qt.Orientation.Vertical)
+        layout.addWidget(splitter, 1)
+
+        # Tabela (Topo)
         self.table = RichTableWidget(0, 0)
         self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionsMovable(True)
-        layout.addWidget(self.table, 1)
+        splitter.addWidget(self.table)
+
+        # Painel Inferior (Controles + Editor)
+        bottom_panel = QWidget()
+        bottom_layout = QVBoxLayout(bottom_panel)
+        bottom_layout.setContentsMargins(0, 5, 0, 0)
+
+        toolbar = QHBoxLayout()
+        
+        self.btn_add_row = QPushButton("+ Adicionar")
+        self.spin_add_rows = QSpinBox()
+        self.spin_add_rows.setRange(1, 100)
+        self.spin_add_rows.setFixedWidth(45)
+        self.btn_dup_row = QPushButton("Duplicar")
+        self.btn_del_row = QPushButton("Remover")
+
+        toolbar.addWidget(self.btn_add_row)
+        toolbar.addWidget(self.spin_add_rows)
+        toolbar.addWidget(QLabel("linhas"))
+        toolbar.addSpacing(15)
+        toolbar.addWidget(self.btn_dup_row)
+        toolbar.addWidget(self.btn_del_row)
+        toolbar.addStretch()
+
+        self.btn_bold = QPushButton("B")
+        self.btn_bold.setFixedSize(24, 24)
+        self.btn_bold.setStyleSheet("font-weight: bold;")
+        self.btn_italic = QPushButton("I")
+        self.btn_italic.setFixedSize(24, 24)
+        self.btn_italic.setStyleSheet("font-style: italic;")
+        self.btn_underline = QPushButton("U")
+        self.btn_underline.setFixedSize(24, 24)
+        self.btn_underline.setStyleSheet("text-decoration: underline;")
+
+        toolbar.addWidget(self.btn_bold)
+        toolbar.addWidget(self.btn_italic)
+        toolbar.addWidget(self.btn_underline)
+
+        bottom_layout.addLayout(toolbar)
+
+        self.detail_editor = RichTextEditor()
+        self.detail_editor.setPlaceholderText("Selecione uma célula para editar o conteúdo aqui...")
+        self.detail_editor.setEnabled(False) # Começa desativado até selecionar algo
+        bottom_layout.addWidget(self.detail_editor)
+
+        splitter.addWidget(bottom_panel)
+        splitter.setSizes([500, 150])
+
+        self.btn_add_row.clicked.connect(lambda: self.table.add_empty_rows(self.spin_add_rows.value()))
+        self.btn_dup_row.clicked.connect(self.table.duplicate_selected_rows)
+        self.btn_del_row.clicked.connect(self.table._handle_delete)
+
+        self._updating_editor = False
+        self.table.currentCellChanged.connect(self._on_cell_selected)
+        self.table.itemChanged.connect(self._on_table_item_changed)
+        self.detail_editor.textChanged.connect(self._on_editor_text_changed)
+
+        self.btn_bold.clicked.connect(self.detail_editor._toggle_weight)
+        self.btn_italic.clicked.connect(self.detail_editor._toggle_italic)
+        self.btn_underline.clicked.connect(self.detail_editor._toggle_underline)
+
+    def _on_cell_selected(self, current_row, current_col, previous_row, previous_col):
+        if current_row < 0 or current_col < 0:
+            self.detail_editor.blockSignals(True)
+            self.detail_editor.setEnabled(False)
+            self.detail_editor.clear()
+            self.detail_editor.blockSignals(False)
+            return
+            
+        has_sig_col = (self.table.horizontalHeaderItem(0) and self.table.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        if has_sig_col and current_col == 0:
+            self.detail_editor.blockSignals(True)
+            self.detail_editor.setEnabled(False)
+            self.detail_editor.clear()
+            self.detail_editor.blockSignals(False)
+            return
+            
+        self.detail_editor.setEnabled(True)
+        item = self.table.item(current_row, current_col)
+        
+        self._updating_editor = True
+        self.detail_editor.blockSignals(True) # Bloqueia apenas durante a carga do dado
+        
+        if item:
+            rich_text = item.data(self.table.RICH_ROLE)
+            if rich_text:
+                self.detail_editor.setHtml(rich_text)
+            else:
+                self.detail_editor.setText(item.text())
+        else:
+            self.detail_editor.clear()
+            
+        self.detail_editor.blockSignals(False) # Libera o editor para você poder digitar
+        self._updating_editor = False
+
+    def _on_editor_text_changed(self):
+        if self._updating_editor:
+            return
+            
+        row = self.table.currentRow()
+        col = self.table.currentColumn()
+        
+        if row < 0 or col < 0:
+            return
+            
+        has_sig_col = (self.table.horizontalHeaderItem(0) and self.table.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        if has_sig_col and col == 0:
+            return # Trava de segurança: Nunca edite ou injete HTML na coluna de assinatura
+
+        item = self.table.item(row, col)
+
+        raw_html = self.detail_editor.toHtml()
+        html_content_only = re.sub(r'<(head|style|script)[^>]*>.*?</\1>', '', raw_html, flags=re.IGNORECASE | re.DOTALL)
+        clean_html = sanitize_inline_html(html_content_only).strip()
+        plain_text = self.detail_editor.toPlainText()
+        
+        self.table.blockSignals(True)
+        
+        # Cria o item dinamicamente se a célula selecionada for virgem
+        if not item:
+            item = QTableWidgetItem()
+            self.table.setItem(row, col, item)
+            
+        item.setData(self.table.RICH_ROLE, clean_html)
+        item.setText(plain_text)
+        self.table.blockSignals(False)
+        
+        self.table.viewport().update()
+        # Emite sinal para atualizar o Live Preview na MainWindow em tempo real
+        self.table.itemSelectionChanged.emit()
+
+    def _on_table_item_changed(self, item):
+        if self._updating_editor:
+            return
+            
+        # Sincroniza a edição da grade direto para o editor inferior
+        if item and item.row() == self.table.currentRow() and item.column() == self.table.currentColumn():
+            self._updating_editor = True
+            rich_text = item.data(self.table.RICH_ROLE)
+            if rich_text:
+                self.detail_editor.setHtml(rich_text)
+            else:
+                self.detail_editor.setText(item.text())
+            self._updating_editor = False
