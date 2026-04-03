@@ -71,6 +71,8 @@ class NativeRenderer:
                 painter.drawPixmap(0, 0, bg)
 
         for box in self.tpl.get("boxes", []):
+            if not box.get("visible", True):
+                continue
             needed_vars = re.findall(r"\{([a-zA-Z0-9_]+)\}", box["html"])
             should_skip = False
             for var in needed_vars:
@@ -90,6 +92,8 @@ class NativeRenderer:
                 continue
 
         for sig in self.tpl.get("signatures", []):
+            if not sig.get("visible", True):
+                continue
             if Path(sig["path"]).exists():
                 pix = QPixmap(sig["path"])
                 scaled = pix.scaled(sig["width"], sig["height"], 

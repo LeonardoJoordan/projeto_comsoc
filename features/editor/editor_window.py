@@ -569,6 +569,7 @@ class EditorWindow(QMainWindow):
                 boxes_data.append({
                     "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
                     "html": item.state.html_content,
+                    "visible": item.isVisible(),
                     "x": int(pos.x()),
                     "y": int(pos.y()),
                     "w": int(r.width()),
@@ -588,6 +589,7 @@ class EditorWindow(QMainWindow):
                 pix = item.pixmap()
                 signatures_data.append({
                     "path": getattr(item, "_original_path", ""), 
+                    "visible": item.isVisible(),
                     "x": int(pos.x()),
                     "y": int(pos.y()),
                     "width": int(pix.width()),
