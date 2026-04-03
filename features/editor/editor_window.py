@@ -807,6 +807,7 @@ class EditorWindow(QMainWindow):
                 sig.setPos(sig_data["x"], sig_data["y"])
                 sig.resize_by_longest_side(sig_data["longest_side"])
                 self.scene.addItem(sig)
+                sig.setVisible(sig_data.get("visible", True))
 
         for img_data in data.get("images", []):
             raw_path = img_data["path"]
@@ -817,6 +818,7 @@ class EditorWindow(QMainWindow):
                 img.setPos(img_data["x"], img_data["y"])
                 img.resize_by_longest_side(img_data["longest_side"])
                 self.scene.addItem(img)
+                img.setVisible(img_data.get("visible", True))
 
         for b in data.get("boxes", []):
             box = DesignerBox(
@@ -843,6 +845,7 @@ class EditorWindow(QMainWindow):
             box.update_center() 
 
             self.scene.addItem(box)
+            box.setVisible(b.get("visible", True))
 
             saved_placeholders = data.get("placeholders", [])
             self.lst_placeholders.clear()

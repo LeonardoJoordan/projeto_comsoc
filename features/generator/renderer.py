@@ -114,8 +114,15 @@ class NativeRenderer:
                 continue
 
         for sig in self.tpl.get("signatures", []):
-            if not sig.get("visible", True):
+            # A decisão da tabela sobrepõe a do JSON. Se não houver info na tabela, usa o JSON.
+            show_sig = row_rich.get("__use_signature__")
+            
+            if show_sig is None:
+                show_sig = sig.get("visible", True)
+                
+            if not show_sig:
                 continue
+
             if Path(sig["path"]).exists():
                 pix = QPixmap(sig["path"])
                 scaled = pix.scaled(sig["width"], sig["height"], 

@@ -378,7 +378,8 @@ class MainWindow(QMainWindow):
                             sig["path"] = str(model_dir / sig["path"])
 
                     placeholders = data.get("placeholders", [])
-                    self._update_table_columns(placeholders)
+                    signatures = data.get("signatures", [])
+                    self._update_table_columns(placeholders, signatures)
                     
                     self.cached_model_data = data
                     
@@ -398,16 +399,37 @@ class MainWindow(QMainWindow):
         self.log_panel.append(f"Modelo '{model_name}' salvo. Atualizando lista...")
         self._reload_models_from_disk(select_name=model_name)
     
-    def _update_table_columns(self, placeholders):
+    def _update_table_columns(self, placeholders, signatures=None):
         self.table_panel.table.clearContents()
         self.table_panel.table.setRowCount(0)
         self.table_panel.table.setColumnCount(0)
         
         if not placeholders: return
+        
+        has_sig = bool(signatures)
+        headers = []
+        if has_sig:
+            headers.append("✍️ Ass.")
+        headers.extend(placeholders)
             
-        self.table_panel.table.setColumnCount(len(placeholders))
-        self.table_panel.table.setHorizontalHeaderLabels(placeholders)
+        self.table_panel.table.setColumnCount(len(headers))
+        self.table_panel.table.setHorizontalHeaderLabels(headers)
         self.table_panel.table.setRowCount(1)
+
+        if has_sig:
+            from PySide6.QtWidgets import QTableWidgetItem
+            self.table_panel.table.setColumnWidth(0, 50) # Coluna estreita para a checkbox
+            default_state = True
+            for sig in signatures:
+                if not sig.get("visible", True):
+                    default_state = False
+                    break
+            
+            chk_item = QTableWidgetItem("")
+            chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            chk_item.setCheckState(Qt.CheckState.Checked if default_state else Qt.CheckState.Unchecked)
+            chk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter) # Tentativa de alinhamento central
+            self.table_panel.table.setItem(0, 0, chk_item)
 
     def _open_model_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
@@ -500,6 +522,11 @@ class MainWindow(QMainWindow):
         for c in range(cols):
             key = headers[c]
             item = table.item(row_idx, c)
+            
+            if key == "✍️ Ass.":
+                row_data["__use_signature__"] = (item.checkState() == Qt.CheckState.Checked) if item else True
+                continue
+                
             val = ""
             if item:
                 val = item.data(Qt.ItemDataRole.UserRole)
@@ -533,6 +560,13 @@ class MainWindow(QMainWindow):
             for c in range(cols):
                 key = headers[c]
                 item = table.item(r, c)
+                
+                if key == "✍️ Ass.":
+                    use_sig = (item.checkState() == Qt.CheckState.Checked) if item else True
+                    row_p["__use_signature__"] = use_sig
+                    row_r["__use_signature__"] = use_sig
+                    continue
+
                 val_plain = item.text().strip() if item else ""
                 val_rich = item.data(Qt.ItemDataRole.UserRole) if item else ""
                 if not val_rich: val_rich = val_plain

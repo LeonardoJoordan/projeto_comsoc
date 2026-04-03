@@ -61,6 +61,12 @@ class RichTableWidget(QTableWidget):
                 self.removeRow(r)
             if self.rowCount() == 0:
                 self.insertRow(0)
+                has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Assinatura")
+                if has_sig_col:
+                    item = QTableWidgetItem("")
+                    item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    item.setCheckState(Qt.CheckState.Checked)
+                    self.setItem(0, 0, item)
         else:
             for item in self.selectedItems():
                 item.setText("")
@@ -138,6 +144,14 @@ class RichTableWidget(QTableWidget):
 
         header = self.horizontalHeader()
         start_visual_col = header.visualIndex(start_col_logical)
+        
+        has_sig_col = (header.count() > 0 and self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        
+        # Desloca a colagem para o lado se o usuário tentou colar em cima da checkbox de assinatura
+        if has_sig_col and start_col_logical == 0:
+            start_col_logical = 1
+            start_visual_col = header.visualIndex(start_col_logical)
+            
         required_rows = start_row + len(grid_struct)
         if required_rows > self.rowCount():
             self.setRowCount(required_rows)
@@ -148,6 +162,18 @@ class RichTableWidget(QTableWidget):
         for r, row_data in enumerate(grid_struct):
             dest_row = start_row + r
             style_row = grid_style[r] if r < len(grid_style) else []
+
+            if has_sig_col:
+                sig_item = self.item(dest_row, 0)
+                if sig_item is None:
+                    default_chk = Qt.CheckState.Checked
+                    if self.rowCount() > 0 and self.item(0, 0):
+                        default_chk = self.item(0, 0).checkState()
+                    sig_item = QTableWidgetItem("")
+                    sig_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    sig_item.setCheckState(default_chk)
+                    sig_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.setItem(dest_row, 0, sig_item)
 
             for c, cell_plain in enumerate(row_data):
                 target_visual_col = start_visual_col + c
