@@ -66,6 +66,43 @@ class Guideline(QGraphicsLineItem):
                 
         return super().itemChange(change, value)
 
+class ResizeHandle(QGraphicsRectItem):
+    def __init__(self, parent):
+        super().__init__(-6, -6, 12, 12, parent)
+        self.setBrush(QBrush(QColor("#27ae60"))) # Verde para destacar
+        self.setPen(QPen(Qt.GlobalColor.white, 2))
+        self.setAcceptHoverEvents(True)
+        self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+        self._is_resizing = False
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_resizing = True
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self._is_resizing:
+            parent = self.parentItem()
+            if parent:
+                # Converte a posição do mouse na cena de volta para as coordenadas do pai
+                parent_pos = self.mapToParent(event.pos())
+                new_w = max(40, parent_pos.x()) # Impede que a caixa encolha a ponto de bugar
+                new_h = max(30, parent_pos.y())
+                
+                parent.setRect(0, 0, new_w, new_h)
+                parent.recalculate_text_position()
+                parent.update_center()
+                
+                if parent.scene():
+                    parent.scene().update() # Força o gatilho 'changed' da cena
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        self._is_resizing = False
+        super().mouseReleaseEvent(event)
+
 class DesignerBox(QGraphicsRectItem):
     SNAP_DISTANCE = 15
 
@@ -95,6 +132,17 @@ class DesignerBox(QGraphicsRectItem):
         
         self.apply_state()
         self.update_center()
+        
+        # --- Instanciar Alça de Redimensionamento ---
+        self.handle_br = ResizeHandle(self)
+        self.handle_br.setPos(w, h)
+        self.handle_br.hide()
+
+    def setRect(self, *args):
+        super().setRect(*args)
+        if hasattr(self, 'handle_br'):
+            r = self.rect()
+            self.handle_br.setPos(r.width(), r.height())
 
     def update_center(self):
         rect = self.rect()
@@ -164,6 +212,13 @@ class DesignerBox(QGraphicsRectItem):
         self.apply_state()
 
     def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            if hasattr(self, 'handle_br'):
+                if self.isSelected():
+                    self.handle_br.show()
+                else:
+                    self.handle_br.hide()
+
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
             new_pos = value
             rect = self.rect()

@@ -380,7 +380,11 @@ class EditorWindow(QMainWindow):
 
     def update_position_ui(self):
         """Atualiza os campos X e Y no topo em tempo real."""
-        sel = self.scene.selectedItems()
+        try:
+            sel = self.scene.selectedItems()
+        except RuntimeError:
+            return # Aborta silenciosamente se a cena já foi destruída (ao fechar o app)
+            
         if not sel:
             self.spin_pos_x.setEnabled(False)
             self.spin_pos_y.setEnabled(False)
@@ -404,12 +408,23 @@ class EditorWindow(QMainWindow):
             self.spin_pos_x.setValue(item.pos().x())
             self.spin_pos_y.setValue(item.pos().y())
 
+        # Sincroniza Largura e Altura no painel se for uma Caixa de Texto sendo arrastada pela alça
+        if isinstance(item, DesignerBox):
+            self.caixa_texto_panel.blockSignals(True)
+            self.caixa_texto_panel.spin_w.setValue(int(item.rect().width()))
+            self.caixa_texto_panel.spin_h.setValue(int(item.rect().height()))
+            self.caixa_texto_panel.blockSignals(False)
+
         self.spin_pos_x.blockSignals(False)
         self.spin_pos_y.blockSignals(False)
 
     def on_selection_changed(self):
         """Gerencia a troca de painéis laterais quando a seleção muda."""
-        sel = self.scene.selectedItems()
+        try:
+            sel = self.scene.selectedItems()
+        except RuntimeError:
+            return # Aborta silenciosamente se a cena já foi destruída (ao fechar o app)
+            
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
         signatures = [i for i in sel if isinstance(i, SignatureItem)]
         
