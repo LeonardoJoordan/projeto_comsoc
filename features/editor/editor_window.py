@@ -32,7 +32,10 @@ class EditorWindow(QMainWindow):
         left_layout.addWidget(lbl_layers)
 
         self.layer_list = QListWidget()
+        self.layer_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.layer_list.itemClicked.connect(self._on_layer_list_clicked)
+        self.layer_list.itemChanged.connect(self._on_layer_item_changed)
+        self.layer_list.model().rowsMoved.connect(self._on_layer_reordered)
         left_layout.addWidget(self.layer_list)
         
         main_layout.addWidget(left_container)
@@ -628,6 +631,7 @@ class EditorWindow(QMainWindow):
         return f"{prefix}_Objeto"
 
     def refresh_layer_list(self):
+        self.layer_list.blockSignals(True)
         self.layer_list.clear()
         items = self.scene.items()
         
@@ -638,11 +642,22 @@ class EditorWindow(QMainWindow):
                 if not hasattr(item, 'layer_id') or item.layer_id is None:
                     item.layer_id = self._get_next_layer_id()
 
+        # Ordenar do maior Z-Value (topo visual) para o menor
+        valid_items.sort(key=lambda x: x.zValue(), reverse=True)
+
         for item in valid_items:
             name = self._generate_layer_name(item.layer_id, item)
             list_item = QListWidgetItem(name)
             list_item.setData(Qt.ItemDataRole.UserRole, item)
+            
+            # Adiciona Checkbox (Nativo) e mantém permissão de Drag
+            flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsUserCheckable
+            list_item.setFlags(flags)
+            list_item.setCheckState(Qt.CheckState.Checked if item.isVisible() else Qt.CheckState.Unchecked)
+            
             self.layer_list.addItem(list_item)
+            
+        self.layer_list.blockSignals(False)
 
     def _on_layer_list_clicked(self, list_item):
         target_item = list_item.data(Qt.ItemDataRole.UserRole)
@@ -651,3 +666,26 @@ class EditorWindow(QMainWindow):
             target_item.setSelected(True)
             self.view.ensureVisible(target_item)
             self.view.setFocus()
+
+    def _on_layer_item_changed(self, list_item):
+        target_item = list_item.data(Qt.ItemDataRole.UserRole)
+        if target_item:
+            is_visible = (list_item.checkState() == Qt.CheckState.Checked)
+            target_item.setVisible(is_visible)
+
+    def _on_layer_reordered(self, parent, start, end, destination, row):
+        count = self.layer_list.count()
+        items_in_order = []
+        
+        for i in range(count):
+            list_item = self.layer_list.item(i)
+            target = list_item.data(Qt.ItemDataRole.UserRole)
+            if target:
+                items_in_order.append(target)
+                
+        # Extrai os Z-Values existentes e ordena do maior para o menor
+        available_zs = sorted([item.zValue() for item in items_in_order], reverse=True)
+        
+        # Redistribui as profundidades na nova ordem garantindo coerência
+        for i, target in enumerate(items_in_order):
+            target.setZValue(available_zs[i])
