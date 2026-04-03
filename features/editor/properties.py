@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, 
                                QFormLayout, QTextEdit, QFontComboBox, QPushButton, 
                                QComboBox, QDoubleSpinBox, QColorDialog)
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
 
@@ -54,6 +54,29 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_rot.setValue(int(box.rotation()))
         self.blockSignals(False)
 
+class CleanTextEdit(QTextEdit):
+    """Campo de texto customizado que intercepta o Ctrl+V e purifica o HTML."""
+    def insertFromMimeData(self, source: QMimeData):
+        if source.hasHtml():
+            raw = source.html()
+            # Exterminador no momento exato da colagem
+            clean = re.sub(r"font-family\s*:[^;\"]+;?", "", raw)
+            clean = re.sub(r"font-size\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"color\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"background-color\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"(?i)<a\b[^>]*>", "", clean)
+            clean = re.sub(r"(?i)</a>", "", clean)
+            clean = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean)
+            clean = re.sub(r"(?i)</h[1-6]>", "</p>", clean)
+            
+            new_mime = QMimeData()
+            new_mime.setHtml(clean)
+            new_mime.setText(source.text())
+            super().insertFromMimeData(new_mime)
+        else:
+            super().insertFromMimeData(source)
+
 class EditorDeTextoPanel(QWidget):
     htmlChanged = Signal(str)
     fontFamilyChanged = Signal(QFont)
@@ -75,10 +98,13 @@ class EditorDeTextoPanel(QWidget):
         layout.addWidget(lbl)
         
         layout.addWidget(QLabel("Texto:"))
-        self.txt_content = QTextEdit()
-        self.txt_content.setStyleSheet("background-color: #FFFFFF; color: #000000;")
+        
+        self.txt_content = CleanTextEdit()
         self.txt_content.setMinimumHeight(160)
+        self.txt_content.setStyleSheet("background-color: #FFFFFF; color: #000000; border: 1px solid #aaa;") 
         self.txt_content.textChanged.connect(self._emit_clean_html)
+        
+        # INSERE A CAIXA NO LAYOUT PARA ELA APARECER
         layout.addWidget(self.txt_content)
         
         row_font = QHBoxLayout()
@@ -207,8 +233,19 @@ class EditorDeTextoPanel(QWidget):
 
         state = box.state
 
-        # 1. Carrega apenas o conteúdo limpo no editor e força fonte padrão UI
-        self.txt_content.setHtml(state.html_content)
+        # 1. Limpeza Retroativa UI: Remove links/cores antigas do JSON antes de jogar no painel
+        clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", state.html_content)
+        clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"color\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
+        clean_html = re.sub(r"(?i)</a>", "", clean_html)
+        clean_html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean_html)
+        clean_html = re.sub(r"(?i)</h[1-6]>", "</p>", clean_html)
+
+        # Carrega o conteúdo purificado no editor e força fonte padrão UI
+        self.txt_content.setHtml(clean_html)
         self.txt_content.setFont(QFont("Segoe UI", 11))
 
         cursor = self.txt_content.textCursor()
@@ -253,12 +290,6 @@ class EditorDeTextoPanel(QWidget):
             self.btn_color.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #aaa; border-radius: 3px;")
             self.fontColorChanged.emit(hex_color)
             self.txt_content.setFocus()
-        # Atualiza o feedback visual do espaçamento em tempo real enquanto digita
-        cursor = QTextCursor(self.txt_content.document())
-        cursor.select(QTextCursor.SelectionType.Document)
-        fmt = QTextBlockFormat()
-        fmt.setTextIndent(val)
-        cursor.mergeBlockFormat(fmt)
 
     def _on_indent_changed(self, val):
         self.indentChanged.emit(val)
