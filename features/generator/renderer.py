@@ -104,7 +104,7 @@ class NativeRenderer:
         return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
 
     def _draw_html_box(self, painter, box_data, html_text):
-        from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat
+        from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush
         
         painter.save()
         doc = QTextDocument()
@@ -121,10 +121,20 @@ class NativeRenderer:
         doc.setHtml(clean_html)
 
         # 2. Aplicar a mesma Fonte Global nativa usada no DesignerBox
+        from PySide6.QtGui import QColor, QBrush
+        
         font_family = box_data.get("font_family", "Arial")
         font_size = box_data.get("font_size", 16)
         font = QFont(font_family, font_size)
         doc.setDefaultFont(font)
+        
+        font_color = box_data.get("font_color", "#000000")
+        
+        cursor_color = QTextCursor(doc)
+        cursor_color.select(QTextCursor.SelectionType.Document)
+        char_fmt = QTextCharFormat()
+        char_fmt.setForeground(QBrush(QColor(font_color)))
+        cursor_color.mergeCharFormat(char_fmt)
 
         # 3. Aplicar Alinhamento Horizontal
         align_str = box_data.get("align", "left")

@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, 
                                QFormLayout, QTextEdit, QFontComboBox, QPushButton, 
-                               QComboBox, QDoubleSpinBox)
+                               QComboBox, QDoubleSpinBox, QColorDialog)
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
@@ -58,6 +58,7 @@ class EditorDeTextoPanel(QWidget):
     htmlChanged = Signal(str)
     fontFamilyChanged = Signal(QFont)
     fontSizeChanged = Signal(int)
+    fontColorChanged = Signal(str)
     boldChanged = Signal(bool) 
     alignChanged = Signal(str)
     verticalAlignChanged = Signal(str)
@@ -110,9 +111,16 @@ class EditorDeTextoPanel(QWidget):
         self.btn_underline.setCheckable(True)
         self.btn_underline.clicked.connect(lambda: self.set_format_attribute("underline"))
 
+        self.btn_color = QPushButton("")
+        self.btn_color.setFixedWidth(30)
+        self.btn_color.setToolTip("Cor do Texto")
+        self.btn_color.setStyleSheet("background-color: #000000; border: 1px solid #aaa; border-radius: 3px;")
+        self.btn_color.clicked.connect(self._choose_color)
+
         row_style.addWidget(self.btn_bold)
         row_style.addWidget(self.btn_italic)
         row_style.addWidget(self.btn_underline)
+        row_style.addWidget(self.btn_color)
         
         self.cbo_align = QComboBox()
         self.cbo_align.addItems(["Esq", "Cen", "Dir", "Just"])
@@ -211,6 +219,9 @@ class EditorDeTextoPanel(QWidget):
         self.cbo_font.setCurrentFont(QFont(state.font_family))
         self.spin_size.setValue(state.font_size)
         
+        color_hex = getattr(state, 'font_color', '#000000')
+        self.btn_color.setStyleSheet(f"background-color: {color_hex}; border: 1px solid #aaa; border-radius: 3px;")
+        
         self.update_buttons_state()
 
         if state.align == "right": self.cbo_align.setCurrentIndex(2)
@@ -234,6 +245,20 @@ class EditorDeTextoPanel(QWidget):
 
         self.txt_content.blockSignals(False)
         self.blockSignals(False)
+
+    def _choose_color(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            hex_color = color.name()
+            self.btn_color.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #aaa; border-radius: 3px;")
+            self.fontColorChanged.emit(hex_color)
+            self.txt_content.setFocus()
+        # Atualiza o feedback visual do espaçamento em tempo real enquanto digita
+        cursor = QTextCursor(self.txt_content.document())
+        cursor.select(QTextCursor.SelectionType.Document)
+        fmt = QTextBlockFormat()
+        fmt.setTextIndent(val)
+        cursor.mergeBlockFormat(fmt)
 
     def _on_indent_changed(self, val):
         self.indentChanged.emit(val)

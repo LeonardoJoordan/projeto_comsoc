@@ -2,7 +2,7 @@ from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTe
                                QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem)
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor, 
-                           QTextBlockFormat, QPixmap, QPainterPathStroker)
+                           QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat)
 import re
 from core.text_state import TextState
 
@@ -168,10 +168,18 @@ class DesignerBox(QGraphicsRectItem):
         
         self.text_item.setHtml(html)
         
-        # 2. Aplicar Fonte Global (SEMPRE após o setHtml, pois ele reseta o documento)
+        # 2. Aplicar Fonte Global e Cor NATIVA (SEMPRE após o setHtml, pois ele reseta o documento)
         font = QFont(self.state.font_family, self.state.font_size)
         self.text_item.setFont(font)
         self.text_item.document().setDefaultFont(font)
+        
+        color = QColor(getattr(self.state, 'font_color', '#000000'))
+        
+        cursor_color = QTextCursor(self.text_item.document())
+        cursor_color.select(QTextCursor.SelectionType.Document)
+        char_fmt = QTextCharFormat()
+        char_fmt.setForeground(QBrush(color))
+        cursor_color.mergeCharFormat(char_fmt)
         
         # 3. Aplicar Alinhamento Horizontal
         opt = self.text_item.document().defaultTextOption()

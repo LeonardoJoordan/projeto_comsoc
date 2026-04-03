@@ -195,6 +195,7 @@ class EditorWindow(QMainWindow):
         self.editor_texto_panel.htmlChanged.connect(self._on_content_updated)
         self.editor_texto_panel.fontFamilyChanged.connect(self.update_font_family)
         self.editor_texto_panel.fontSizeChanged.connect(self.update_font_size)
+        self.editor_texto_panel.fontColorChanged.connect(self.update_font_color)
         self.editor_texto_panel.alignChanged.connect(self.update_align)
         self.editor_texto_panel.verticalAlignChanged.connect(self.update_vertical_align)
         self.editor_texto_panel.indentChanged.connect(self.update_indent)
@@ -513,6 +514,12 @@ class EditorWindow(QMainWindow):
             box.state.font_size = size
             box.apply_state()
 
+    def update_font_color(self, color_hex):
+        box = self._get_selected()
+        if box:
+            box.state.font_color = color_hex
+            box.apply_state()
+
     def update_width(self, width):
         box = self._get_selected()
         if box:
@@ -569,6 +576,7 @@ class EditorWindow(QMainWindow):
                     "rotation": int(item.rotation()),
                     "font_family": item.state.font_family,
                     "font_size": item.state.font_size,
+                    "font_color": getattr(item.state, 'font_color', '#000000'),
                     "align": item.state.align,
                     "vertical_align": item.state.vertical_align,
                     "indent_px": item.state.indent_px,
@@ -768,6 +776,7 @@ class EditorWindow(QMainWindow):
                 
             box.state.font_family = b.get("font_family", "Arial")
             box.state.font_size = b.get("font_size", 16)
+            box.state.font_color = b.get("font_color", "#000000")
             box.state.vertical_align = b.get("vertical_align", "top")
             box.state.align = b.get("align", "left")
             box.state.indent_px = b.get("indent_px", 0)
