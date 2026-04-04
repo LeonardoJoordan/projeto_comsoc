@@ -10,7 +10,7 @@ from pathlib import Path
 import shutil
 
 from .canvas_items import DesignerBox, Guideline, px_to_mm, SignatureItem, ImageItem
-from .properties import CaixaDeTextoPanel, EditorDeTextoPanel, AssinaturaPanel
+from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 
@@ -29,6 +29,52 @@ class EditorWindow(QMainWindow):
         left_container.setFixedWidth(220)
         left_layout = QVBoxLayout(left_container)
         
+        # --- Grupo: Linhas Guia ---
+        grp_guides = QFrame()
+        ly_guides = QVBoxLayout(grp_guides)
+        ly_guides.setContentsMargins(0, 0, 0, 10)
+        lbl_guides = QLabel("<b>LINHAS GUIA</b> <small style='color:gray'>(Duplo clique p/ editar)</small>")
+        ly_guides.addWidget(lbl_guides)
+        
+        row_guides = QHBoxLayout()
+        row_guides.setSpacing(10)
+        btn_guide_v = QPushButton("Vertical (|)")
+        btn_guide_v.clicked.connect(lambda: self.add_guide(vertical=True))
+        btn_guide_h = QPushButton("Horizontal (—)")
+        btn_guide_h.clicked.connect(lambda: self.add_guide(vertical=False))
+        row_guides.addWidget(btn_guide_v)
+        row_guides.addWidget(btn_guide_h)
+        ly_guides.addLayout(row_guides)
+        left_layout.addWidget(grp_guides)
+        self._add_separator(left_layout)
+
+        # --- Grupo: Elementos ---
+        grp_boxes = QFrame()
+        ly_boxes = QVBoxLayout(grp_boxes)
+        ly_boxes.setContentsMargins(0, 0, 0, 10)
+        ly_boxes.addWidget(QLabel("<b>ELEMENTOS</b>"))
+        
+        self.btn_add = QPushButton("+ Caixa de Texto")
+        self.btn_add.setMinimumHeight(40)
+        self.btn_add.clicked.connect(self.add_new_box)
+        ly_boxes.addWidget(self.btn_add)
+
+        row_assets = QHBoxLayout()
+        row_assets.setSpacing(5)
+        self.btn_add_bg = QPushButton("🖼️ Fundo")
+        self.btn_add_bg.clicked.connect(self._on_click_load_bg)
+        self.btn_add_img = QPushButton("📸 Img")
+        self.btn_add_img.clicked.connect(self._on_click_add_image)
+        self.btn_add_sig = QPushButton("✍️ Ass.")
+        self.btn_add_sig.clicked.connect(self._on_click_add_signature)
+        
+        row_assets.addWidget(self.btn_add_bg)
+        row_assets.addWidget(self.btn_add_img)
+        row_assets.addWidget(self.btn_add_sig)
+        ly_boxes.addLayout(row_assets)
+        left_layout.addWidget(grp_boxes)
+        self._add_separator(left_layout)
+
         lbl_layers = QLabel("<b>CAMADAS</b>")
         left_layout.addWidget(lbl_layers)
 
@@ -64,11 +110,50 @@ class EditorWindow(QMainWindow):
         center_layout = QVBoxLayout(center_container)
         center_layout.setContentsMargins(0, 0, 0, 0)
         
-        self.top_bar = QWidget()
-        top_layout = QHBoxLayout(self.top_bar)
-        top_layout.setContentsMargins(10, 5, 10, 5)
-        top_layout.addWidget(QLabel("<b>POSIÇÃO DO ITEM (X, Y):</b>"))
+        center_layout.addWidget(self.view, 1)
         
+        main_layout.addWidget(center_container, 1)
+
+        right_container = QWidget()
+        right_container.setFixedWidth(400)
+        right_layout = QVBoxLayout(right_container)
+
+        # --- Grupo: Dimensões do Documento ---
+        grp_doc = QFrame()
+        ly_doc = QVBoxLayout(grp_doc)
+        ly_doc.setContentsMargins(0, 0, 0, 10)
+        lbl_physical = QLabel("<b>DIMENSÕES DO DOCUMENTO</b>")
+        ly_doc.addWidget(lbl_physical)
+        
+        row_phys = QHBoxLayout()
+        self.spin_phys_w = QDoubleSpinBox()
+        self.spin_phys_w.setRange(10, 2000)
+        self.spin_phys_w.setSuffix(" mm")
+        self.spin_phys_w.setPrefix("Larg: ")
+        self.spin_phys_w.setDecimals(1)
+        self.spin_phys_w.setValue(100.0) 
+        
+        self.spin_phys_h = QDoubleSpinBox()
+        self.spin_phys_h.setRange(10, 2000)
+        self.spin_phys_h.setSuffix(" mm")
+        self.spin_phys_h.setPrefix("Alt: ")
+        self.spin_phys_h.setDecimals(1)
+        self.spin_phys_h.setValue(150.0) 
+        
+        row_phys.addWidget(self.spin_phys_w)
+        row_phys.addWidget(self.spin_phys_h)
+        ly_doc.addLayout(row_phys)
+        right_layout.addWidget(grp_doc)
+        self._add_separator(right_layout)
+
+        # --- Grupo: Propriedades do Item (Posição X, Y) ---
+        grp_pos = QFrame()
+        ly_pos = QVBoxLayout(grp_pos)
+        ly_pos.setContentsMargins(0, 0, 0, 10)
+        lbl_pos = QLabel("<b>PROPRIEDADES DO ITEM</b>")
+        ly_pos.addWidget(lbl_pos)
+        
+        row_pos = QHBoxLayout()
         self.spin_pos_x = QDoubleSpinBox()
         self.spin_pos_x.setRange(-5000, 20000)
         self.spin_pos_x.setDecimals(1)
@@ -85,76 +170,10 @@ class EditorWindow(QMainWindow):
         self.spin_pos_y.setEnabled(False)
         self.spin_pos_y.valueChanged.connect(self.apply_position_y)
         
-        top_layout.addWidget(self.spin_pos_x)
-        top_layout.addWidget(self.spin_pos_y)
-        top_layout.addStretch()
-        
-        center_layout.addWidget(self.top_bar)
-        center_layout.addWidget(self.view, 1)
-        
-        main_layout.addWidget(center_container, 1)
-
-        right_container = QWidget()
-        right_container.setFixedWidth(400)
-        right_layout = QVBoxLayout(right_container)
-        
-        grp_guides = QFrame()
-        ly_guides = QVBoxLayout(grp_guides)
-        ly_guides.setContentsMargins(0, 0, 0, 10)
-        
-        lbl_guides = QLabel("<b>LINHAS GUIA</b> <small style='color:gray'>(Duplo clique p/ editar)</small>")
-        ly_guides.addWidget(lbl_guides)
-        
-        row_guides = QHBoxLayout()
-        row_guides.setSpacing(10)
-        
-        btn_guide_v = QPushButton("Vertical (|)")
-        btn_guide_v.clicked.connect(lambda: self.add_guide(vertical=True))
-        
-        btn_guide_h = QPushButton("Horizontal (—)")
-        btn_guide_h.clicked.connect(lambda: self.add_guide(vertical=False))
-        
-        row_guides.addWidget(btn_guide_v)
-        row_guides.addWidget(btn_guide_h)
-        ly_guides.addLayout(row_guides)
-
-        right_layout.addWidget(grp_guides)
-        self._add_separator(right_layout)
-
-        grp_boxes = QFrame()
-        ly_boxes = QVBoxLayout(grp_boxes)
-        ly_boxes.setContentsMargins(0, 0, 0, 10)
-        ly_boxes.addWidget(QLabel("<b>ELEMENTOS</b>"))
-        
-        self.btn_add = QPushButton("+ Adicionar Caixa Texto")
-        self.btn_add.setMinimumHeight(40)
-        self.btn_add.clicked.connect(self.add_new_box)
-        ly_boxes.addWidget(self.btn_add)
-
-        row_assets = QHBoxLayout()
-        row_assets.setSpacing(10)
-
-        self.btn_add_bg = QPushButton("🖼️ Fundo")
-        self.btn_add_bg.setToolTip("Definir imagem de fundo")
-        self.btn_add_bg.setMinimumHeight(40)
-        self.btn_add_bg.clicked.connect(self._on_click_load_bg)
-        
-        self.btn_add_img = QPushButton("📸 Imagem")
-        self.btn_add_img.setToolTip("Adicionar imagem solta")
-        self.btn_add_img.setMinimumHeight(40)
-        self.btn_add_img.clicked.connect(self._on_click_add_image)
-        
-        self.btn_add_sig = QPushButton("✍️ Assinatura")
-        self.btn_add_sig.setToolTip("Adicionar imagem de assinatura")
-        self.btn_add_sig.setMinimumHeight(40)
-        self.btn_add_sig.clicked.connect(self._on_click_add_signature)
-        
-        row_assets.addWidget(self.btn_add_bg)
-        row_assets.addWidget(self.btn_add_img)
-        row_assets.addWidget(self.btn_add_sig)
-        ly_boxes.addLayout(row_assets)
-
-        right_layout.addWidget(grp_boxes)
+        row_pos.addWidget(self.spin_pos_x)
+        row_pos.addWidget(self.spin_pos_y)
+        ly_pos.addLayout(row_pos)
+        right_layout.addWidget(grp_pos)
         self._add_separator(right_layout)
 
         container_misto = QWidget()
@@ -209,38 +228,7 @@ class EditorWindow(QMainWindow):
         self.editor_texto_panel.lineHeightChanged.connect(self.update_line_height)
         right_layout.addWidget(self.editor_texto_panel)
 
-        self.assinatura_panel = AssinaturaPanel()
-        self.assinatura_panel.setVisible(False)
-        self.assinatura_panel.sideChanged.connect(self.update_signature_size)
-        right_layout.addWidget(self.assinatura_panel)
-
         self._add_separator(right_layout)
-        
-        grp_doc = QFrame()
-        ly_doc = QVBoxLayout(grp_doc)
-        ly_doc.setContentsMargins(0, 0, 0, 0)
-        lbl_physical = QLabel("<b>DIMENSÕES FÍSICAS (Impressão PDF)</b>")
-        ly_doc.addWidget(lbl_physical)
-        
-        row_phys = QHBoxLayout()
-        self.spin_phys_w = QDoubleSpinBox()
-        self.spin_phys_w.setRange(10, 2000)
-        self.spin_phys_w.setSuffix(" mm")
-        self.spin_phys_w.setPrefix("Larg: ")
-        self.spin_phys_w.setDecimals(1)
-        self.spin_phys_w.setValue(100.0) # Padrão
-        
-        self.spin_phys_h = QDoubleSpinBox()
-        self.spin_phys_h.setRange(10, 2000)
-        self.spin_phys_h.setSuffix(" mm")
-        self.spin_phys_h.setPrefix("Alt: ")
-        self.spin_phys_h.setDecimals(1)
-        self.spin_phys_h.setValue(150.0) # Padrão
-        
-        row_phys.addWidget(self.spin_phys_w)
-        row_phys.addWidget(self.spin_phys_h)
-        ly_doc.addLayout(row_phys)
-        right_layout.addWidget(grp_doc)
 
         right_layout.addStretch()
         self.btn_save = QPushButton("Salvar Modelo (JSON)")
@@ -428,11 +416,17 @@ class EditorWindow(QMainWindow):
             self.spin_pos_x.setValue(item.pos().x())
             self.spin_pos_y.setValue(item.pos().y())
 
-        # Sincroniza Largura e Altura no painel se for uma Caixa de Texto sendo arrastada pela alça
+        # Sincroniza Largura e Altura no painel
         if isinstance(item, DesignerBox):
             self.caixa_texto_panel.blockSignals(True)
             self.caixa_texto_panel.spin_w.setValue(int(item.rect().width()))
             self.caixa_texto_panel.spin_h.setValue(int(item.rect().height()))
+            self.caixa_texto_panel.blockSignals(False)
+        elif isinstance(item, (ImageItem, SignatureItem)):
+            self.caixa_texto_panel.blockSignals(True)
+            rect = item.pixmap().rect()
+            self.caixa_texto_panel.spin_w.setValue(int(rect.width()))
+            self.caixa_texto_panel.spin_h.setValue(int(rect.height()))
             self.caixa_texto_panel.blockSignals(False)
 
         self.spin_pos_x.blockSignals(False)
@@ -443,13 +437,12 @@ class EditorWindow(QMainWindow):
         try:
             sel = self.scene.selectedItems()
         except RuntimeError:
-            return # Aborta silenciosamente se a cena já foi destruída (ao fechar o app)
+            return 
             
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
         images = [i for i in sel if isinstance(i, ImageItem)]
         signatures = [i for i in sel if isinstance(i, SignatureItem)]
         
-        # Atualiza a posição X/Y imediatamente ao selecionar
         self.update_position_ui()
 
         if boxes:
@@ -458,20 +451,15 @@ class EditorWindow(QMainWindow):
             self.editor_texto_panel.setEnabled(True)
             self.caixa_texto_panel.load_from_item(target_box)
             self.caixa_texto_panel.setEnabled(True)
-        elif images:
+        elif images or signatures:
+            target = images[0] if images else signatures[0]
             self.editor_texto_panel.setEnabled(False)
-            self.caixa_texto_panel.load_from_image(images[0])
+            self.caixa_texto_panel.load_from_image(target)
             self.caixa_texto_panel.setEnabled(True)
         else:
             self.editor_texto_panel.setEnabled(False)
             self.caixa_texto_panel.setEnabled(False)
 
-        # Assinaturas continuam no painel exclusivo delas
-        if signatures:
-            self.assinatura_panel.load_from_item(signatures[0])
-            self.assinatura_panel.setVisible(True)
-        else:
-            self.assinatura_panel.setVisible(False)
 
     def duplicate_selected(self):
         original = self._get_selected()
@@ -500,7 +488,7 @@ class EditorWindow(QMainWindow):
 
     def _get_selected(self):
         sel = self.scene.selectedItems()
-        valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem))]
+        valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
         return valid_items[0] if valid_items else None
 
     def update_text_html(self, html_content):
@@ -535,7 +523,7 @@ class EditorWindow(QMainWindow):
                 item.setRect(0, 0, width, r.height())
                 item.recalculate_text_position()
                 item.update_center() 
-            elif isinstance(item, ImageItem):
+            elif isinstance(item, (ImageItem, SignatureItem)):
                 h = self.caixa_texto_panel.spin_h.value()
                 item.resize_custom(width, h)
 
@@ -547,7 +535,7 @@ class EditorWindow(QMainWindow):
                 item.setRect(0, 0, r.width(), height)
                 item.recalculate_text_position()
                 item.update_center()
-            elif isinstance(item, ImageItem):
+            elif isinstance(item, (ImageItem, SignatureItem)):
                 w = self.caixa_texto_panel.spin_w.value()
                 item.resize_custom(w, height)
 
@@ -555,7 +543,7 @@ class EditorWindow(QMainWindow):
         item = self._get_selected()
         if item:
             item.setRotation(angle)
-            if isinstance(item, ImageItem):
+            if isinstance(item, (ImageItem, SignatureItem)):
                 rect = item.pixmap().rect()
                 item.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
 
@@ -680,10 +668,6 @@ class EditorWindow(QMainWindow):
         
         QMessageBox.information(self, "Sucesso", f"Modelo '{model_name}' salvo com sucesso em:\n{file_path}")
 
-    def update_signature_size(self, size):
-        sel = self.scene.selectedItems()
-        if sel and isinstance(sel[0], SignatureItem):
-            sel[0].resize_by_longest_side(size)
     
     def load_background_image(self, path):
         from PySide6.QtGui import QPixmap
