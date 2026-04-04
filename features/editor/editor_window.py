@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal, QEvent
 from pathlib import Path
 import shutil
 
-from .canvas_items import DesignerBox, Guideline, px_to_mm, SignatureItem, ImageItem
+from .canvas_items import DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, ImageItem
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
@@ -159,7 +159,7 @@ class EditorWindow(QMainWindow):
         self.spin_pos_x.setRange(-5000, 20000)
         self.spin_pos_x.setDecimals(1)
         self.spin_pos_x.setPrefix("X: ")
-        self.spin_pos_x.setSuffix(" px")
+        self.spin_pos_x.setSuffix(" mm")
         self.spin_pos_x.setEnabled(False)
         self.spin_pos_x.valueChanged.connect(self.apply_position_x)
         
@@ -167,7 +167,7 @@ class EditorWindow(QMainWindow):
         self.spin_pos_y.setRange(-5000, 20000)
         self.spin_pos_y.setDecimals(1)
         self.spin_pos_y.setPrefix("Y: ")
-        self.spin_pos_y.setSuffix(" px")
+        self.spin_pos_y.setSuffix(" mm")
         self.spin_pos_y.setEnabled(False)
         self.spin_pos_y.valueChanged.connect(self.apply_position_y)
         
@@ -372,13 +372,13 @@ class EditorWindow(QMainWindow):
         sel = self.scene.selectedItems()
         if sel:
             item = sel[0]
-            item.setPos(val, item.pos().y())
+            item.setPos(mm_to_px(val), item.pos().y())
 
     def apply_position_y(self, val):
         sel = self.scene.selectedItems()
         if sel:
             item = sel[0]
-            item.setPos(item.pos().x(), val)
+            item.setPos(item.pos().x(), mm_to_px(val))
 
     def add_new_box(self):
         box = DesignerBox(350, 450, 300, 60, "{campo}")
@@ -408,26 +408,26 @@ class EditorWindow(QMainWindow):
 
         if isinstance(item, Guideline):
             if item.is_vertical:
-                self.spin_pos_x.setValue(item.pos().x())
+                self.spin_pos_x.setValue(px_to_mm(item.pos().x()))
                 self.spin_pos_y.setEnabled(False)
             else:
-                self.spin_pos_y.setValue(item.pos().y())
+                self.spin_pos_y.setValue(px_to_mm(item.pos().y()))
                 self.spin_pos_x.setEnabled(False)
         else:
-            self.spin_pos_x.setValue(item.pos().x())
-            self.spin_pos_y.setValue(item.pos().y())
+            self.spin_pos_x.setValue(px_to_mm(item.pos().x()))
+            self.spin_pos_y.setValue(px_to_mm(item.pos().y()))
 
         # Sincroniza Largura e Altura no painel
         if isinstance(item, DesignerBox):
             self.caixa_texto_panel.blockSignals(True)
-            self.caixa_texto_panel.spin_w.setValue(int(item.rect().width()))
-            self.caixa_texto_panel.spin_h.setValue(int(item.rect().height()))
+            self.caixa_texto_panel.spin_w.setValue(px_to_mm(item.rect().width()))
+            self.caixa_texto_panel.spin_h.setValue(px_to_mm(item.rect().height()))
             self.caixa_texto_panel.blockSignals(False)
         elif isinstance(item, (ImageItem, SignatureItem)):
             self.caixa_texto_panel.blockSignals(True)
             rect = item.pixmap().rect()
-            self.caixa_texto_panel.spin_w.setValue(int(rect.width()))
-            self.caixa_texto_panel.spin_h.setValue(int(rect.height()))
+            self.caixa_texto_panel.spin_w.setValue(px_to_mm(rect.width()))
+            self.caixa_texto_panel.spin_h.setValue(px_to_mm(rect.height()))
             self.caixa_texto_panel.blockSignals(False)
 
         self.spin_pos_x.blockSignals(False)
@@ -516,29 +516,31 @@ class EditorWindow(QMainWindow):
             box.state.font_color = color_hex
             box.apply_state()
 
-    def update_width(self, width):
+    def update_width(self, width_mm):
         item = self._get_selected()
+        width_px = mm_to_px(width_mm)
         if item:
             if isinstance(item, DesignerBox):
                 r = item.rect()
-                item.setRect(0, 0, width, r.height())
+                item.setRect(0, 0, width_px, r.height())
                 item.recalculate_text_position()
                 item.update_center() 
             elif isinstance(item, (ImageItem, SignatureItem)):
-                h = self.caixa_texto_panel.spin_h.value()
-                item.resize_custom(width, h)
+                h_px = mm_to_px(self.caixa_texto_panel.spin_h.value())
+                item.resize_custom(width_px, h_px)
 
-    def update_height(self, height):
+    def update_height(self, height_mm):
         item = self._get_selected()
+        height_px = mm_to_px(height_mm)
         if item:
             if isinstance(item, DesignerBox):
                 r = item.rect()
-                item.setRect(0, 0, r.width(), height)
+                item.setRect(0, 0, r.width(), height_px)
                 item.recalculate_text_position()
                 item.update_center()
             elif isinstance(item, (ImageItem, SignatureItem)):
-                w = self.caixa_texto_panel.spin_w.value()
-                item.resize_custom(w, height)
+                w_px = mm_to_px(self.caixa_texto_panel.spin_w.value())
+                item.resize_custom(w_px, height_px)
 
     def update_rotation(self, angle):
         item = self._get_selected()

@@ -5,7 +5,7 @@ from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
 
-from .canvas_items import DesignerBox, SignatureItem, ImageItem
+from .canvas_items import DesignerBox, SignatureItem, ImageItem, px_to_mm
 
 class CaixaDeTextoPanel(QWidget):
     widthChanged = Signal(int)
@@ -25,15 +25,17 @@ class CaixaDeTextoPanel(QWidget):
         form.setSpacing(4)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        self.spin_w = QSpinBox()
-        self.spin_w.setRange(10, 5000)
-        self.spin_w.setSuffix(" px")
+        self.spin_w = QDoubleSpinBox()
+        self.spin_w.setRange(1.0, 5000.0)
+        self.spin_w.setDecimals(1)
+        self.spin_w.setSuffix(" mm")
         self.spin_w.valueChanged.connect(self.widthChanged.emit)
         form.addRow("Larg:", self.spin_w)
 
-        self.spin_h = QSpinBox()
-        self.spin_h.setRange(10, 5000)
-        self.spin_h.setSuffix(" px")
+        self.spin_h = QDoubleSpinBox()
+        self.spin_h.setRange(1.0, 5000.0)
+        self.spin_h.setDecimals(1)
+        self.spin_h.setSuffix(" mm")
         self.spin_h.valueChanged.connect(self.heightChanged.emit)
         form.addRow("Alt:", self.spin_h)
 
@@ -59,22 +61,22 @@ class CaixaDeTextoPanel(QWidget):
     def _on_w_changed(self, val):
         if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
             self.spin_h.blockSignals(True)
-            self.spin_h.setValue(int(val / self._aspect_ratio))
+            self.spin_h.setValue(val / self._aspect_ratio)
             self.spin_h.blockSignals(False)
         self.widthChanged.emit(val)
 
     def _on_h_changed(self, val):
         if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
             self.spin_w.blockSignals(True)
-            self.spin_w.setValue(int(val * self._aspect_ratio))
+            self.spin_w.setValue(val * self._aspect_ratio)
             self.spin_w.blockSignals(False)
         self.heightChanged.emit(val)
 
     def load_from_item(self, box: DesignerBox):
         self.blockSignals(True) 
         rect = box.rect()
-        self.spin_w.setValue(int(rect.width()))
-        self.spin_h.setValue(int(rect.height()))
+        self.spin_w.setValue(px_to_mm(rect.width()))
+        self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(int(box.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
         self.blockSignals(False)
@@ -82,8 +84,8 @@ class CaixaDeTextoPanel(QWidget):
     def load_from_image(self, img: ImageItem):
         self.blockSignals(True)
         rect = img.pixmap().rect()
-        self.spin_w.setValue(int(rect.width()))
-        self.spin_h.setValue(int(rect.height()))
+        self.spin_w.setValue(px_to_mm(rect.width()))
+        self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(int(img.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
         self.blockSignals(False)
