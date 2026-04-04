@@ -2,7 +2,7 @@ import json
 from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidget, 
                                QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton, 
                                QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
-                               QListWidgetItem, QDoubleSpinBox)
+                               QListWidgetItem, QDoubleSpinBox, QComboBox)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, 
                            QKeySequence, QTextCursor, QTextCharFormat)
 from PySide6.QtCore import Qt, Signal, QEvent

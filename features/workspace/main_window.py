@@ -5,7 +5,7 @@ from datetime import datetime
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
-                                  QInputDialog)
+                                  QInputDialog, QComboBox)
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QPainter, QImage, QPageLayout
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
@@ -93,6 +93,12 @@ class MainWindow(QMainWindow):
         self.btn_sel_out.clicked.connect(self._select_output_folder)
         ly_out.addWidget(self.btn_sel_out)
 
+        self.cbo_export_format = QComboBox()
+        self.cbo_export_format.addItems(["PNG", "PDF"])
+        self.cbo_export_format.setFixedWidth(60)
+        self.cbo_export_format.setToolTip("Formato de saída da geração")
+        ly_out.addWidget(self.cbo_export_format)
+
         self.btn_config_name = QPushButton("⚙️")
         self.btn_config_name.setFixedWidth(40)
         self.btn_config_name.setToolTip("Configurar padrão de nome dos arquivos e impressão")
@@ -122,6 +128,8 @@ class MainWindow(QMainWindow):
 
         self.preview_panel.cbo_models.currentTextChanged.connect(self._on_model_changed)
         self.table_panel.table.itemSelectionChanged.connect(self._on_table_selection)
+        # Conecta a mudança de formato para salvar a preferência automaticamente
+        self.cbo_export_format.currentTextChanged.connect(self._save_export_format_pref)
 
         # --- Conexões dos Botões de Controle ---
         self.controls_panel.btn_add_model.clicked.connect(self._on_add_model)
@@ -330,6 +338,7 @@ class MainWindow(QMainWindow):
             full_pattern = slug
 
         imposition_cfg = self.cached_model_data.get("imposition_settings", None)
+        export_format = self.cbo_export_format.currentText()
 
         self.manager = RenderManager(
             renderer, 
@@ -337,7 +346,8 @@ class MainWindow(QMainWindow):
             rows_rich, 
             output_dir, 
             full_pattern,
-            imposition_settings=imposition_cfg
+            imposition_settings=imposition_cfg,
+            export_format=export_format
         )
         
         self.manager.progress_updated.connect(self.progress_bar.setValue)
@@ -370,6 +380,13 @@ class MainWindow(QMainWindow):
                     data = json.load(f)
                     
                     self.current_filename_suffix = data.get("output_suffix", "")
+                    # Recupera o último formato salvo para este modelo específico
+                    last_fmt = data.get("last_export_format", "PNG")
+                    self.cbo_export_format.blockSignals(True)
+                    idx = self.cbo_export_format.findText(last_fmt)
+                    if idx >= 0:
+                        self.cbo_export_format.setCurrentIndex(idx)
+                    self.cbo_export_format.blockSignals(False)
                     model_dir = json_path.parent
                     if data.get("background_path") and not Path(data["background_path"]).is_absolute():
                         data["background_path"] = str(model_dir / data["background_path"])
@@ -579,6 +596,29 @@ class MainWindow(QMainWindow):
                 data_plain.append(row_p)
                 data_rich.append(row_r)
         return data_plain, data_rich
+    
+    def _save_export_format_pref(self, fmt):
+        """Salva a preferência de formato de saída diretamente no JSON do modelo."""
+        if not self.active_model_name or not self.cached_model_data:
+            return
+            
+        slug = slugify_model_name(self.active_model_name)
+        json_path = Path("models") / slug / "template_v3.json"
+        
+        if json_path.exists():
+            try:
+                # Atualiza tanto o cache em memória quanto o arquivo físico
+                self.cached_model_data["last_export_format"] = fmt
+                
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                data["last_export_format"] = fmt
+                
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                print(f"Erro ao salvar preferência de formato: {e}")
     
     def _select_output_folder(self):
         start_dir = self.txt_output_path.text() or ""

@@ -13,13 +13,14 @@ class RenderManager(QObject):
     finished_process = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, renderer, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None):
+    def __init__(self, renderer, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None, export_format="PNG"):
         super().__init__()
         self.renderer = renderer
         self.rows_plain = rows_plain
         self.rows_rich = rows_rich
         self.output_dir = output_dir
         self.pattern = filename_pattern
+        self.export_format = export_format.upper()
         
         self.imposition_settings = imposition_settings or {"enabled": False}
         self.is_imposition = self.imposition_settings.get("enabled", False)
@@ -88,7 +89,7 @@ class RenderManager(QObject):
             
             if not worker_tasks: continue
             
-            w = PageRenderWorker(worker_tasks, self.renderer, self.output_dir, self.imposition_settings)
+            w = PageRenderWorker(worker_tasks, self.renderer, self.output_dir, self.imposition_settings, self.export_format)
             w.page_finished.connect(self._on_page_finished)
             w.error_occurred.connect(self.error_occurred)
             w.finished.connect(self._check_all_finished)
@@ -108,7 +109,7 @@ class RenderManager(QObject):
             
             if not chunk: continue
             
-            w = DirectRenderWorker(chunk, self.renderer, self.output_dir)
+            w = DirectRenderWorker(chunk, self.renderer, self.output_dir, self.export_format)
             w.card_finished.connect(self._on_direct_card_finished)
             w.error_occurred.connect(self.error_occurred)
             w.finished.connect(self._check_all_finished)
