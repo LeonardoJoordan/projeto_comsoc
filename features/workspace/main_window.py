@@ -104,11 +104,6 @@ class MainWindow(QMainWindow):
         self.chk_single_pdf.setVisible(False)
         ly_out.addWidget(self.chk_single_pdf)
 
-        self.chk_single_pdf = QCheckBox("Arquivo Único")
-        self.chk_single_pdf.setToolTip("Agrupa todos os cartões num único arquivo PDF.")
-        self.chk_single_pdf.setVisible(False)
-        ly_out.addWidget(self.chk_single_pdf)
-
         self.btn_config_name = QPushButton("⚙️")
         self.btn_config_name.setFixedWidth(40)
         self.btn_config_name.setToolTip("Configurar padrão de nome dos arquivos e impressão")
@@ -131,10 +126,8 @@ class MainWindow(QMainWindow):
 
         self.cached_model_data = None
         
+        # O reload já se encarrega de setar o active_model_name e chamar o _on_model_changed
         self._reload_models_from_disk()
-        
-        self.active_model_name = self.preview_panel.cbo_models.currentText()
-        self._on_model_changed(self.active_model_name)
 
         self.preview_panel.cbo_models.currentTextChanged.connect(self._on_model_changed)
 
@@ -144,9 +137,6 @@ class MainWindow(QMainWindow):
         self.chk_single_pdf.toggled.connect(self._save_single_pdf_pref)
 
         self.table_panel.table.itemSelectionChanged.connect(self._on_table_selection)
-        # Conecta a mudança de formato para salvar a preferência automaticamente
-        self.cbo_export_format.currentTextChanged.connect(self._save_export_format_pref)
-        self.cbo_export_format.currentTextChanged.connect(self._toggle_single_pdf_option)
 
         # --- Conexões dos Botões de Controle ---
         self.controls_panel.btn_add_model.clicked.connect(self._on_add_model)
@@ -420,16 +410,6 @@ class MainWindow(QMainWindow):
                     self.cbo_export_format.blockSignals(False)
                     self.chk_single_pdf.blockSignals(False)
 
-                    # Recupera o último formato salvo para este modelo específico
-                    last_fmt = data.get("last_export_format", "PNG")
-                    self.cbo_export_format.blockSignals(True)
-                    idx = self.cbo_export_format.findText(last_fmt)
-                    if idx >= 0:
-                        self.cbo_export_format.setCurrentIndex(idx)
-                    self.cbo_export_format.blockSignals(False)
-                    
-                    # Força a atualização visual do checkbox de Arquivo Único após carregar a preferência
-                    self._toggle_single_pdf_option(self.cbo_export_format.currentText())
                     model_dir = json_path.parent
                     if data.get("background_path") and not Path(data["background_path"]).is_absolute():
                         data["background_path"] = str(model_dir / data["background_path"])
@@ -639,36 +619,6 @@ class MainWindow(QMainWindow):
                 data_plain.append(row_p)
                 data_rich.append(row_r)
         return data_plain, data_rich
-    
-    def _toggle_single_pdf_option(self, fmt):
-        if fmt == "PDF":
-            self.chk_single_pdf.setVisible(True)
-        else:
-            self.chk_single_pdf.setVisible(False)
-            self.chk_single_pdf.setChecked(False)
-    
-    def _save_export_format_pref(self, fmt):
-        """Salva a preferência de formato de saída diretamente no JSON do modelo."""
-        if not self.active_model_name or not self.cached_model_data:
-            return
-            
-        slug = slugify_model_name(self.active_model_name)
-        json_path = Path("models") / slug / "template_v3.json"
-        
-        if json_path.exists():
-            try:
-                # Atualiza tanto o cache em memória quanto o arquivo físico
-                self.cached_model_data["last_export_format"] = fmt
-                
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                
-                data["last_export_format"] = fmt
-                
-                with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-            except Exception as e:
-                print(f"Erro ao salvar preferência de formato: {e}")
     
     def _toggle_single_pdf_option(self, fmt):
         """Gerencia a visibilidade do checkbox de PDF único."""

@@ -80,19 +80,8 @@ class NamingDialog(QDialog):
 
         layout.addWidget(QLabel("<b>2. Saída e Impressão:</b>"))
         
-        self.chk_imposition = QCheckBox("Habilitar Imposição (Agrupamento na folha)")
-        self.chk_imposition.setChecked(self.imposition_settings.get("enabled", False))
-        self.chk_imposition.toggled.connect(self._toggle_imposition_ui)
-        layout.addWidget(self.chk_imposition)
-
-        # Container para agrupar os controles de imposição e facilitar o ocultamento
-        self.container_imposition = QWidget()
-        self.container_imposition.setVisible(self.chk_imposition.isChecked())
-        ly_imp = QVBoxLayout(self.container_imposition)
-        ly_imp.setContentsMargins(10, 0, 0, 0) # Recuo à esquerda para hierarquia
-
-        # -- Folha de Saída --
-        ly_imp.addWidget(QLabel("Folha de saída (Largura x Altura):"))
+        # -- Folha de Saída (Independente da imposição) --
+        layout.addWidget(QLabel("Folha de saída (Largura x Altura):"))
         ly_sheet = QHBoxLayout()
         self.spin_sheet_w_mm = QDoubleSpinBox()
         self.spin_sheet_w_mm.setRange(50, 2000)
@@ -110,7 +99,18 @@ class NamingDialog(QDialog):
         ly_sheet.addWidget(QLabel("x"))
         ly_sheet.addWidget(self.spin_sheet_h_mm)
         ly_sheet.addStretch()
-        ly_imp.addLayout(ly_sheet)
+        layout.addLayout(ly_sheet)
+
+        self.chk_imposition = QCheckBox("Habilitar Imposição (Agrupamento na folha)")
+        self.chk_imposition.setChecked(self.imposition_settings.get("enabled", False))
+        self.chk_imposition.toggled.connect(self._toggle_imposition_ui)
+        layout.addWidget(self.chk_imposition)
+
+        # Container para agrupar os controles de imposição e facilitar o ocultamento
+        self.container_imposition = QWidget()
+        self.container_imposition.setVisible(self.chk_imposition.isChecked())
+        ly_imp = QVBoxLayout(self.container_imposition)
+        ly_imp.setContentsMargins(10, 0, 0, 0) # Recuo à esquerda para hierarquia
 
         # -- Dimensões do Modelo --
         ly_imp.addWidget(QLabel("Dimensões do modelo final (Largura x Altura):"))
