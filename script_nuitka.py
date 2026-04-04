@@ -1,5 +1,6 @@
 import subprocess
 import sys
+import platform
 import os
 from pathlib import Path
 
@@ -11,32 +12,33 @@ def build_app():
     main_file = base_dir / "main.py"
     exe_name = "COMSOC_OFICIAL"
 
-    # Comando corrigido
+   # Base do comando Nuitka
     cmd = [
         sys.executable, "-m", "nuitka",
         "--standalone",
         "--onefile",
         f"--output-filename={exe_name}",
         "--output-dir=build",
-        
-        # Plugins e Interface
         "--plugin-enable=pyside6",
-        "--windows-console-mode=disable",
-        
-        # Blindagem de Sistema (conforme seu script de sucesso)
         "--include-module=encodings",
         "--include-module=sqlite3",
-        
-        # Inclusão da Arquitetura de Features
         "--include-package=features",
         "--include-package=core",
         "--include-package=shared",
-        
-        # Otimização de busca de módulos
-        "--follow-imports",
-        
-        str(main_file)
+        "--follow-imports"
     ]
+
+    # Injeção de argumentos específicos por Sistema Operacional
+    sistema = platform.system()
+    if sistema == "Windows":
+        cmd.insert(cmd.index("--plugin-enable=pyside6") + 1, "--windows-console-mode=disable")
+        # Se possuir um ícone no futuro, descomente e ajuste: 
+        # cmd.append("--windows-icon-from-ico=assets/icone.ico")
+    elif sistema == "Darwin": # macOS
+        cmd.append("--macos-create-app-bundle")
+        # cmd.append("--macos-app-icon=assets/icone.icns")
+    
+    cmd.append(str(main_file))
     
     try:
         os.makedirs("build", exist_ok=True)

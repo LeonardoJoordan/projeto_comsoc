@@ -20,6 +20,7 @@ from features.editor.editor_window import EditorWindow
 from features.generator.manager import RenderManager
 from features.generator.export_dialog import NamingDialog
 from core.template_manager import slugify_model_name
+from core.paths import get_models_dir
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -168,8 +169,8 @@ class MainWindow(QMainWindow):
         old_slug = slugify_model_name(old_name)
         new_slug = slugify_model_name(new_name)
         
-        old_dir = Path("models") / old_slug
-        new_dir = Path("models") / new_slug
+        old_dir = get_models_dir() / old_slug
+        new_dir = get_models_dir() / new_slug
 
         if new_dir.exists():
             QMessageBox.warning(self, "Erro", f"Já existe um modelo com o slug '{new_slug}'.")
@@ -202,7 +203,7 @@ class MainWindow(QMainWindow):
             return
 
         original_slug = slugify_model_name(original_name)
-        original_dir = Path("models") / original_slug
+        original_dir = get_models_dir() / original_slug
 
         if not original_dir.exists():
             self.log_panel.append("ERRO: Pasta do modelo original não encontrada.")
@@ -213,7 +214,7 @@ class MainWindow(QMainWindow):
             suffix = " (Cópia)" if counter == 1 else f" (Cópia {counter})"
             new_name = f"{original_name}{suffix}"
             new_slug = slugify_model_name(new_name)
-            new_dir = Path("models") / new_slug
+            new_dir = get_models_dir() / new_slug
             
             if not new_dir.exists():
                 break
@@ -266,7 +267,7 @@ class MainWindow(QMainWindow):
             new_imposition = dlg.get_imposition_settings() 
             self.current_filename_suffix = new_suffix
             
-            json_path = Path("models") / slug / "template_v3.json"
+            json_path = get_models_dir() / slug / "template_v3.json"
             if json_path.exists():
                 try:
                     with open(json_path, "r", encoding="utf-8") as f:
@@ -302,7 +303,7 @@ class MainWindow(QMainWindow):
             return
             
         slug = slugify_model_name(current_name)
-        template_path = Path("models") / slug / "template_v3.json"
+        template_path = get_models_dir() / slug / "template_v3.json"
 
         if not template_path.exists():
             self.log_panel.append(f"ERRO: Modelo '{self.active_model_name}' não encontrado.")
@@ -383,7 +384,7 @@ class MainWindow(QMainWindow):
         if not name: return
 
         slug = slugify_model_name(name)
-        json_path = Path("models") / slug / "template_v3.json"
+        json_path = get_models_dir() / slug / "template_v3.json"
 
         if json_path.exists():
             try:
@@ -483,7 +484,7 @@ class MainWindow(QMainWindow):
         self.editor_window.modelSaved.connect(self._on_editor_saved)
 
         slug = slugify_model_name(current_model_name)
-        json_path = Path("models") / slug / "template_v3.json"
+        json_path = get_models_dir() / slug / "template_v3.json"
 
         if json_path.exists():
             self.editor_window.load_from_json(str(json_path))
@@ -494,7 +495,7 @@ class MainWindow(QMainWindow):
         self.preview_panel.cbo_models.blockSignals(True)
         self.preview_panel.cbo_models.clear()
 
-        models_dir = Path("models")
+        models_dir = get_models_dir()
         models_dir.mkdir(parents=True, exist_ok=True)
 
         found = []
@@ -537,7 +538,7 @@ class MainWindow(QMainWindow):
         if not model_name: return
 
         slug = slugify_model_name(model_name)
-        model_dir = Path("models") / slug
+        model_dir = get_models_dir() / slug
 
         if not model_dir.exists(): return
 
@@ -640,7 +641,7 @@ class MainWindow(QMainWindow):
         if not self.active_model_name:
             return
         slug = slugify_model_name(self.active_model_name)
-        json_path = Path("models") / slug / "template_v3.json"
+        json_path = get_models_dir() / slug / "template_v3.json"
         if json_path.exists():
             try:
                 if self.cached_model_data:

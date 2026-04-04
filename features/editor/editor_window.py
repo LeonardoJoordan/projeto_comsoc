@@ -12,6 +12,7 @@ import shutil
 from .canvas_items import DesignerBox, Guideline, px_to_mm, SignatureItem, ImageItem
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel, AssinaturaPanel
 from core.template_manager import slugify_model_name
+from core.paths import get_models_dir
 
 class EditorWindow(QMainWindow):
     modelSaved = Signal(str, list)
@@ -661,7 +662,7 @@ class EditorWindow(QMainWindow):
             self.setWindowTitle(f"Editor Visual de Modelo - {model_name}")
 
         slug = slugify_model_name(model_name)
-        model_dir = Path("models") / slug
+        model_dir = get_models_dir() / slug
         model_dir.mkdir(parents=True, exist_ok=True)
         
         if self.background_path:
