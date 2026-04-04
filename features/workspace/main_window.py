@@ -1,4 +1,6 @@
 from pathlib import Path
+import zipfile
+import os
 import shutil
 import json
 from datetime import datetime
@@ -51,10 +53,18 @@ class MainWindow(QMainWindow):
 
         self.preview_panel = PreviewPanel()
         self.controls_panel = ControlsPanel()
+        self.controls_panel.setFixedWidth(110) # Trava a largura da sidebar
         self.log_panel = LogPanel()
 
-        left_stack.addWidget(self.preview_panel, 5)
-        left_stack.addWidget(self.controls_panel, 0)
+        # Agrupa Preview e Controls lado a lado
+        preview_container = QWidget()
+        preview_layout = QHBoxLayout(preview_container)
+        preview_layout.setContentsMargins(0, 0, 0, 0)
+        preview_layout.setSpacing(10)
+        preview_layout.addWidget(self.controls_panel, 0)
+        preview_layout.addWidget(self.preview_panel, 1)
+
+        left_stack.addWidget(preview_container, 5)
         left_stack.addWidget(self.log_panel, 3)
 
         # --- BARRA DE PROGRESSO ---
@@ -85,7 +95,7 @@ class MainWindow(QMainWindow):
         ly_out.addWidget(QLabel("Saída:"))
         
         self.txt_output_path = QLineEdit()
-        self.txt_output_path.setPlaceholderText("Padrão: ./output/nome_do_modelo")
+        self.txt_output_path.setPlaceholderText("Padrão: Documentos/ProjetoComSoc_Saida/modelo")
         ly_out.addWidget(self.txt_output_path)
 
         self.btn_sel_out = QPushButton("...")
@@ -127,6 +137,9 @@ class MainWindow(QMainWindow):
 
         self.cached_model_data = None
         
+        # Garante que um usuário novato não veja uma tela em branco
+        self._ensure_starter_pack()
+
         # O reload já se encarrega de setar o active_model_name e chamar o _on_model_changed
         self._reload_models_from_disk()
 
@@ -145,11 +158,110 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_remove_model.clicked.connect(self._on_remove_model)
         self.controls_panel.btn_rename_model.clicked.connect(self._on_rename_model) 
         self.controls_panel.btn_config_model.clicked.connect(self._open_model_dialog)
+        self.controls_panel.btn_import_models.clicked.connect(self._on_import_models)
+        self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
 
         self.settings = QSettings("Projeto ComSoc", "MainApp")
         last_output = self.settings.value("last_output_dir", "")
         if last_output:
             self.txt_output_path.setText(str(last_output))
+
+    def _ensure_starter_pack(self):
+        from core.paths import get_models_dir
+        models_dir = get_models_dir()
+        
+        # Se a pasta já contém algo, o usuário não é novo. Interrompe a criação.
+        if any(models_dir.iterdir()):
+            return
+            
+        self.log_panel.append("🌱 Primeiro uso detectado. Preparando Modelo de Exemplo...")
+        slug = "modelo_exemplo"
+        example_dir = models_dir / slug
+        example_dir.mkdir(parents=True, exist_ok=True)
+        
+        example_data = {
+            "name": "Modelo Exemplo",
+            "canvas_size": {"w": 1000, "h": 1000},
+            "target_w_mm": 100.0,
+            "target_h_mm": 100.0,
+            "placeholders": ["Nome", "Cargo"],
+            "boxes": [
+                {
+                    "id": "Nome",
+                    "html": "<b>{Nome}</b>",
+                    "x": 350, "y": 400, "w": 300, "h": 60,
+                    "font_family": "Arial", "font_size": 36,
+                    "align": "center", "visible": True
+                },
+                {
+                    "id": "Cargo",
+                    "html": "<i>{Cargo}</i>",
+                    "x": 350, "y": 480, "w": 300, "h": 60,
+                    "font_family": "Arial", "font_size": 24,
+                    "align": "center", "visible": True
+                }
+            ]
+        }
+        with open(example_dir / "template_v3.json", "w", encoding="utf-8") as f:
+            json.dump(example_data, f, indent=4, ensure_ascii=False)
+
+    def _on_import_models(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Importar Modelo", "", "Pacotes de Modelo ZIP (*.zip)")
+        if not file_path: return
+
+        try:
+            from core.paths import get_models_dir
+            models_dir = get_models_dir()
+            
+            with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                zip_ref.extractall(models_dir)
+            
+            self.log_panel.append(f"📥 Modelo(s) importado(s) de: {Path(file_path).name}")
+            self._reload_models_from_disk()
+            QMessageBox.information(self, "Sucesso", "Importação concluída com sucesso!")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro na Importação", f"Ocorreu um erro ao descompactar:\n{e}")
+
+    def _on_export_models(self):
+        all_models = [self.preview_panel.cbo_models.itemText(i) for i in range(self.preview_panel.cbo_models.count())]
+        
+        if not all_models:
+            QMessageBox.warning(self, "Atenção", "Nenhum modelo disponível para exportar.")
+            return
+            
+        from features.workspace.export_models_dialog import ExportModelsDialog
+        dlg = ExportModelsDialog(self, all_models)
+        if not dlg.exec():
+            return
+            
+        selected_models = dlg.get_selected_models()
+        if not selected_models:
+            QMessageBox.warning(self, "Atenção", "Nenhum modelo foi selecionado para exportação.")
+            return
+            
+        save_path, _ = QFileDialog.getSaveFileName(self, "Exportar Modelos", "Modelos_ProjetoComSoc.zip", "Arquivos ZIP (*.zip)")
+        if not save_path: return
+        
+        try:
+            from core.paths import get_models_dir
+            models_dir = get_models_dir()
+            
+            with zipfile.ZipFile(save_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for model_name in selected_models:
+                    slug = slugify_model_name(model_name)
+                    model_dir = models_dir / slug
+                    if not model_dir.exists(): continue
+                    
+                    for root, _, files in os.walk(model_dir):
+                        for file in files:
+                            file_path = Path(root) / file
+                            arcname = Path(slug) / file_path.relative_to(model_dir)
+                            zipf.write(file_path, arcname)
+            
+            self.log_panel.append(f"📤 {len(selected_models)} modelo(s) exportado(s) para: {Path(save_path).name}")
+            QMessageBox.information(self, "Sucesso", f"{len(selected_models)} modelo(s) exportado(s) com sucesso!")
+        except Exception as e:
+            QMessageBox.critical(self, "Erro na Exportação", f"Falha ao gerar o arquivo ZIP:\n{e}")
 
     def _on_rename_model(self):
         old_name = self.preview_panel.cbo_models.currentText()
@@ -325,7 +437,11 @@ class MainWindow(QMainWindow):
             base_dir = Path(custom_path)
             self.settings.setValue("last_output_dir", custom_path)
         else:
-            base_dir = Path("output") / slug
+            from PySide6.QtCore import QStandardPaths
+            docs_loc = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
+            if not docs_loc: 
+                docs_loc = str(Path.home())
+            base_dir = Path(docs_loc) / "ProjetoComSoc_Saida" / slug
 
         timestamp = datetime.now().strftime("%y.%m.%d_%H.%M.%S")
         folder_name = f"Lote_{timestamp}"
