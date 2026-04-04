@@ -13,7 +13,7 @@ class RenderManager(QObject):
     finished_process = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, renderer, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None, export_format="PNG"):
+    def __init__(self, renderer, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0):
         super().__init__()
         self.renderer = renderer
         self.rows_plain = rows_plain
@@ -21,6 +21,9 @@ class RenderManager(QObject):
         self.output_dir = output_dir
         self.pattern = filename_pattern
         self.export_format = export_format.upper()
+        self.single_pdf = single_pdf
+        self.target_w_mm = target_w_mm
+        self.target_h_mm = target_h_mm
         
         self.imposition_settings = imposition_settings or {"enabled": False}
         self.is_imposition = self.imposition_settings.get("enabled", False)
@@ -47,6 +50,10 @@ class RenderManager(QObject):
 
         cpu_count = os.cpu_count() or 4
         num_threads = max(1, cpu_count - 2)
+        
+        # Trava o multiprocessamento para evitar colisão de escrita no mesmo arquivo PDF
+        if self.single_pdf and self.export_format == "PDF":
+            num_threads = 1
 
         if self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
@@ -89,7 +96,7 @@ class RenderManager(QObject):
             
             if not worker_tasks: continue
             
-            w = PageRenderWorker(worker_tasks, self.renderer, self.output_dir, self.imposition_settings, self.export_format)
+            w = PageRenderWorker(worker_tasks, self.renderer, self.output_dir, self.imposition_settings, self.export_format, self.single_pdf)
             w.page_finished.connect(self._on_page_finished)
             w.error_occurred.connect(self.error_occurred)
             w.finished.connect(self._check_all_finished)
@@ -109,7 +116,7 @@ class RenderManager(QObject):
             
             if not chunk: continue
             
-            w = DirectRenderWorker(chunk, self.renderer, self.output_dir, self.export_format)
+            w = DirectRenderWorker(chunk, self.renderer, self.output_dir, self.export_format, self.single_pdf, self.target_w_mm, self.target_h_mm)
             w.card_finished.connect(self._on_direct_card_finished)
             w.error_occurred.connect(self.error_occurred)
             w.finished.connect(self._check_all_finished)

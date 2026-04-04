@@ -242,6 +242,27 @@ class EditorWindow(QMainWindow):
         row_doc.addWidget(self.spin_doc_w)
         row_doc.addWidget(self.spin_doc_h)
         ly_doc.addLayout(row_doc)
+        lbl_physical = QLabel("<br><b>DIMENSÕES FÍSICAS (Impressão PDF)</b>")
+        ly_doc.addWidget(lbl_physical)
+        
+        row_phys = QHBoxLayout()
+        self.spin_phys_w = QDoubleSpinBox()
+        self.spin_phys_w.setRange(10, 2000)
+        self.spin_phys_w.setSuffix(" mm")
+        self.spin_phys_w.setPrefix("Larg: ")
+        self.spin_phys_w.setDecimals(1)
+        self.spin_phys_w.setValue(100.0) # Padrão
+        
+        self.spin_phys_h = QDoubleSpinBox()
+        self.spin_phys_h.setRange(10, 2000)
+        self.spin_phys_h.setSuffix(" mm")
+        self.spin_phys_h.setPrefix("Alt: ")
+        self.spin_phys_h.setDecimals(1)
+        self.spin_phys_h.setValue(150.0) # Padrão
+        
+        row_phys.addWidget(self.spin_phys_w)
+        row_phys.addWidget(self.spin_phys_h)
+        ly_doc.addLayout(row_phys)
         ly_doc.addWidget(self.btn_apply_doc_size)
         
         right_layout.addWidget(grp_doc)
@@ -624,6 +645,8 @@ class EditorWindow(QMainWindow):
         data = {
             "name": "modelo_v3_projeto",
             "canvas_size": {"w": int(self.scene.width()), "h": int(self.scene.height())},
+            "target_w_mm": self.spin_phys_w.value(),
+            "target_h_mm": self.spin_phys_h.value(),
             "background_path": self.background_path,
             "placeholders": ordered_placeholders,
             "signatures": signatures_data,
@@ -786,6 +809,10 @@ class EditorWindow(QMainWindow):
         canvas_w = data.get("canvas_size", {}).get("w", 1000)
         canvas_h = data.get("canvas_size", {}).get("h", 1000)
         self.scene.setSceneRect(0, 0, canvas_w, canvas_h)
+
+        if hasattr(self, 'spin_phys_w'):
+            self.spin_phys_w.setValue(data.get("target_w_mm", 100.0))
+            self.spin_phys_h.setValue(data.get("target_h_mm", 150.0))
         
         self.fallback_bg = self.scene.addRect(0, 0, canvas_w, canvas_h, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
         self.fallback_bg.setZValue(-100)

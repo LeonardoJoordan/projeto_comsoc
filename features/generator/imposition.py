@@ -2,51 +2,59 @@ from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPixmap
 from PySide6.QtCore import Qt, QPointF
 
 DPI = 300
-A4_WIDTH_MM = 210
-A4_HEIGHT_MM = 297
 
 def mm_to_px_300(mm):
     return int((mm * DPI) / 25.4)
 
 class SheetAssembler:
-    def __init__(self, target_w_mm: float, target_h_mm: float):
+    def __init__(self, target_w_mm: float, target_h_mm: float, sheet_w_mm: float = 210.0, sheet_h_mm: float = 297.0, crop_marks: bool = True):
         self.target_w_mm = target_w_mm
         self.target_h_mm = target_h_mm
+        self.crop_marks = crop_marks
         
-        self.printer_margin_mm = 4.0 
-        self.mark_gap_mm = 2.0  
-        self.mark_len_mm = 3.0  
-        self.edge_reserve_mm = self.printer_margin_mm + self.mark_gap_mm + self.mark_len_mm
+        # Conforme solicitado: 5mm de margem técnica da impressora
+        self.printer_margin_mm = 5.0 
         
+        if self.crop_marks:
+            # 5mm adicionais reservados para a área das marcas (gap + linha)
+            self.mark_gap_mm = 2.0  
+            self.mark_len_mm = 3.0  
+            self.edge_reserve_mm = self.printer_margin_mm + 5.0 # Total 10mm por lado
+        else:
+            # Sem marcas, apenas a margem de segurança da impressora
+            self.mark_gap_mm = 0.0
+            self.mark_len_mm = 0.0
+            self.edge_reserve_mm = self.printer_margin_mm
+
         self.card_w_px = mm_to_px_300(target_w_mm)
         self.card_h_px = mm_to_px_300(target_h_mm)
         self.mark_len = mm_to_px_300(self.mark_len_mm)
         self.mark_gap = mm_to_px_300(self.mark_gap_mm)
         
-        full_a4_short_px = mm_to_px_300(A4_WIDTH_MM)
-        full_a4_long_px = mm_to_px_300(A4_HEIGHT_MM)
+        full_sheet_w_px = mm_to_px_300(sheet_w_mm)
+        full_sheet_h_px = mm_to_px_300(sheet_h_mm)
         reserve_px = mm_to_px_300(self.edge_reserve_mm * 2) 
         
-        usable_short_px = full_a4_short_px - reserve_px
-        usable_long_px = full_a4_long_px - reserve_px
+        usable_w_px = full_sheet_w_px - reserve_px
+        usable_h_px = full_sheet_h_px - reserve_px
 
-        cols_p = usable_short_px // self.card_w_px
-        rows_p = usable_long_px // self.card_h_px
+        cols_p = usable_w_px // self.card_w_px
+        rows_p = usable_h_px // self.card_h_px
         cap_p = cols_p * rows_p
         
-        cols_l = usable_long_px // self.card_w_px
-        rows_l = usable_short_px // self.card_h_px
+        cols_l = usable_h_px // self.card_w_px
+        rows_l = usable_w_px // self.card_h_px
         cap_l = cols_l * rows_l
         
         if cap_l > cap_p:
-            self.sheet_w = full_a4_long_px  
-            self.sheet_h = full_a4_short_px
+            self.sheet_w = full_sheet_h_px  
+            self.sheet_h = full_sheet_w_px
             self.cols = cols_l
             self.rows = rows_l
             self.capacity = cap_l
         else:
-            self.sheet_w = full_a4_short_px
-            self.sheet_h = full_a4_long_px
+            self.sheet_w = full_sheet_w_px
+            self.sheet_h = full_sheet_h_px
             self.cols = cols_p
             self.rows = rows_p
             self.capacity = cap_p
@@ -84,7 +92,8 @@ class SheetAssembler:
                 painter.drawPixmap(x, y, scaled_pix)
                 idx += 1
 
-        self._draw_crop_marks(painter)
+        if self.crop_marks:
+            self._draw_crop_marks(painter)
         painter.end()
         return sheet
 
