@@ -69,15 +69,22 @@ class Guideline(QGraphicsLineItem):
 class ResizeHandle(QGraphicsRectItem):
     def __init__(self, parent):
         super().__init__(-6, -6, 12, 12, parent)
-        self.setBrush(QBrush(QColor("#27ae60"))) # Verde para destacar
+        self.setBrush(QBrush(QColor("#27ae60")))
         self.setPen(QPen(Qt.GlobalColor.white, 2))
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.CursorShape.SizeFDiagCursor)
         self._is_resizing = False
+        self.initial_ratio = 1.0
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_resizing = True
+            parent = self.parentItem()
+            if hasattr(parent, 'rect'):
+                r = parent.rect()
+            else:
+                r = parent.pixmap().rect()
+            self.initial_ratio = r.width() / r.height() if r.height() > 0 else 1.0
             event.accept()
         else:
             super().mousePressEvent(event)
@@ -86,17 +93,19 @@ class ResizeHandle(QGraphicsRectItem):
         if self._is_resizing:
             parent = self.parentItem()
             if parent:
-                # Converte a posição do mouse na cena de volta para as coordenadas do pai
                 parent_pos = self.mapToParent(event.pos())
-                new_w = max(40, parent_pos.x()) # Impede que a caixa encolha a ponto de bugar
+                new_w = max(40, parent_pos.x())
                 new_h = max(30, parent_pos.y())
                 
-                parent.setRect(0, 0, new_w, new_h)
-                parent.recalculate_text_position()
-                parent.update_center()
+                # A mágica da proporção travada acontece aqui:
+                if getattr(parent, 'keep_proportion', True):
+                    new_h = new_w / self.initial_ratio
+                
+                if hasattr(parent, 'resize_from_handle'):
+                    parent.resize_from_handle(new_w, new_h)
                 
                 if parent.scene():
-                    parent.scene().update() # Força o gatilho 'changed' da cena
+                    parent.scene().update() 
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
@@ -137,9 +146,15 @@ class DesignerBox(QGraphicsRectItem):
         self.update_center()
         
         # --- Instanciar Alça de Redimensionamento ---
+        self.keep_proportion = True
         self.handle_br = ResizeHandle(self)
         self.handle_br.setPos(w, h)
         self.handle_br.hide()
+
+    def resize_from_handle(self, w, h):
+        self.setRect(0, 0, w, h)
+        self.recalculate_text_position()
+        self.update_center()
 
     def setRect(self, *args):
         super().setRect(*args)
@@ -274,6 +289,8 @@ class DesignerBox(QGraphicsRectItem):
         super().paint(painter, option, widget)
 
 class SignatureItem(QGraphicsPixmapItem):
+    SNAP_DISTANCE = 15
+
     def __init__(self, pixmap_path, parent=None):
         pixmap = QPixmap(pixmap_path)
         super().__init__(pixmap)
@@ -285,11 +302,50 @@ class SignatureItem(QGraphicsPixmapItem):
         )
         self._original_pixmap = pixmap
         self.setZValue(201)
+        
+        self.keep_proportion = True
+        self.handle_br = ResizeHandle(self)
+        rect = self.pixmap().rect()
+        self.handle_br.setPos(rect.width(), rect.height())
+        self.handle_br.hide()
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            if hasattr(self, 'handle_br'):
+                if self.isSelected():
+                    self.handle_br.show()
+                else:
+                    self.handle_br.hide()
+
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            new_pos = value
+            rect = self.pixmap().rect()
+            w, h = rect.width(), rect.height()
+            
+            x_candidates = [(new_pos.x(), 0), (new_pos.x() + w/2, w/2), (new_pos.x() + w, w)]
+            y_candidates = [(new_pos.y(), 0), (new_pos.y() + h/2, h/2), (new_pos.y() + h, h)]
+            
+            best_x, best_y = new_pos.x(), new_pos.y()
+            min_dist_x, min_dist_y = self.SNAP_DISTANCE, self.SNAP_DISTANCE
+
+            for item in self.scene().items():
+                if isinstance(item, Guideline):
+                    if item.is_vertical:
+                        for (cx, offset) in x_candidates:
+                            if abs(cx - item.x()) < min_dist_x:
+                                min_dist_x = abs(cx - item.x())
+                                best_x = item.x() - offset
+                    else:
+                        for (cy, offset) in y_candidates:
+                            if abs(cy - item.y()) < min_dist_y:
+                                min_dist_y = abs(cy - item.y())
+                                best_y = item.y() - offset
+            return QPointF(best_x, best_y)
+        return super().itemChange(change, value)
 
     def resize_by_longest_side(self, size_px):
         w = self._original_pixmap.width()
         h = self._original_pixmap.height()
-        
         if w > h:
             new_w = size_px
             new_h = (h * size_px) / w
@@ -303,6 +359,8 @@ class SignatureItem(QGraphicsPixmapItem):
             Qt.TransformationMode.SmoothTransformation
         )
         self.setPixmap(scaled)
+        if hasattr(self, 'handle_br'):
+            self.handle_br.setPos(new_w, new_h)
 
     def resize_custom(self, w, h):
         if w <= 0 or h <= 0: return
@@ -312,8 +370,15 @@ class SignatureItem(QGraphicsPixmapItem):
             Qt.TransformationMode.SmoothTransformation
         )
         self.setPixmap(scaled)
+        if hasattr(self, 'handle_br'):
+            self.handle_br.setPos(w, h)
+
+    def resize_from_handle(self, w, h):
+        self.resize_custom(w, h)
 
 class ImageItem(QGraphicsPixmapItem):
+    SNAP_DISTANCE = 15
+
     def __init__(self, pixmap_path, parent=None):
         pixmap = QPixmap(pixmap_path)
         super().__init__(pixmap)
@@ -324,12 +389,51 @@ class ImageItem(QGraphicsPixmapItem):
             QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges
         )
         self._original_pixmap = pixmap
-        self.setZValue(1) # Base Z para Imagens (Faixa de 1 a 100)
+        self.setZValue(1) 
+        
+        self.keep_proportion = True
+        self.handle_br = ResizeHandle(self)
+        rect = self.pixmap().rect()
+        self.handle_br.setPos(rect.width(), rect.height())
+        self.handle_br.hide()
+
+    def itemChange(self, change, value):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            if hasattr(self, 'handle_br'):
+                if self.isSelected():
+                    self.handle_br.show()
+                else:
+                    self.handle_br.hide()
+
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            new_pos = value
+            rect = self.pixmap().rect()
+            w, h = rect.width(), rect.height()
+            
+            x_candidates = [(new_pos.x(), 0), (new_pos.x() + w/2, w/2), (new_pos.x() + w, w)]
+            y_candidates = [(new_pos.y(), 0), (new_pos.y() + h/2, h/2), (new_pos.y() + h, h)]
+            
+            best_x, best_y = new_pos.x(), new_pos.y()
+            min_dist_x, min_dist_y = self.SNAP_DISTANCE, self.SNAP_DISTANCE
+
+            for item in self.scene().items():
+                if isinstance(item, Guideline):
+                    if item.is_vertical:
+                        for (cx, offset) in x_candidates:
+                            if abs(cx - item.x()) < min_dist_x:
+                                min_dist_x = abs(cx - item.x())
+                                best_x = item.x() - offset
+                    else:
+                        for (cy, offset) in y_candidates:
+                            if abs(cy - item.y()) < min_dist_y:
+                                min_dist_y = abs(cy - item.y())
+                                best_y = item.y() - offset
+            return QPointF(best_x, best_y)
+        return super().itemChange(change, value)
 
     def resize_by_longest_side(self, size_px):
         w = self._original_pixmap.width()
         h = self._original_pixmap.height()
-        
         if w > h:
             new_w = size_px
             new_h = (h * size_px) / w
@@ -343,6 +447,8 @@ class ImageItem(QGraphicsPixmapItem):
             Qt.TransformationMode.SmoothTransformation
         )
         self.setPixmap(scaled)
+        if hasattr(self, 'handle_br'):
+            self.handle_br.setPos(new_w, new_h)
 
     def resize_custom(self, w, h):
         if w <= 0 or h <= 0: return
@@ -352,3 +458,8 @@ class ImageItem(QGraphicsPixmapItem):
             Qt.TransformationMode.SmoothTransformation
         )
         self.setPixmap(scaled)
+        if hasattr(self, 'handle_br'):
+            self.handle_br.setPos(w, h)
+
+    def resize_from_handle(self, w, h):
+        self.resize_custom(w, h)

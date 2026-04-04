@@ -11,6 +11,7 @@ class CaixaDeTextoPanel(QWidget):
     widthChanged = Signal(int)
     heightChanged = Signal(int)
     rotationChanged = Signal(int)
+    proportionToggled = Signal(bool) # Novo sinal para a Checkbox
 
     def __init__(self):
         super().__init__()
@@ -29,6 +30,7 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_w.setRange(1.0, 5000.0)
         self.spin_w.setDecimals(1)
         self.spin_w.setSuffix(" mm")
+        self.spin_w.setKeyboardTracking(False)
         self.spin_w.valueChanged.connect(self.widthChanged.emit)
         form.addRow("Larg:", self.spin_w)
 
@@ -36,12 +38,14 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_h.setRange(1.0, 5000.0)
         self.spin_h.setDecimals(1)
         self.spin_h.setSuffix(" mm")
+        self.spin_h.setKeyboardTracking(False)
         self.spin_h.valueChanged.connect(self.heightChanged.emit)
         form.addRow("Alt:", self.spin_h)
 
         self.spin_rot = QSpinBox()
         self.chk_proporcao = QCheckBox("Manter proporção")
         self.chk_proporcao.setChecked(True)
+        self.chk_proporcao.toggled.connect(self.proportionToggled.emit)
         form.addRow("", self.chk_proporcao)
 
         # Intercepta os sinais para calcular a proporção antes de emitir para a cena
@@ -79,15 +83,23 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(int(box.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
+        
+        self.chk_proporcao.blockSignals(True)
+        self.chk_proporcao.setChecked(getattr(box, 'keep_proportion', True))
+        self.chk_proporcao.blockSignals(False)
         self.blockSignals(False)
 
-    def load_from_image(self, img: ImageItem):
+    def load_from_image(self, img):
         self.blockSignals(True)
         rect = img.pixmap().rect()
         self.spin_w.setValue(px_to_mm(rect.width()))
         self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(int(img.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
+        
+        self.chk_proporcao.blockSignals(True)
+        self.chk_proporcao.setChecked(getattr(img, 'keep_proportion', True))
+        self.chk_proporcao.blockSignals(False)
         self.blockSignals(False)
 
 class CleanTextEdit(QTextEdit):

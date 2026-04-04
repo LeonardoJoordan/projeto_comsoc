@@ -132,6 +132,7 @@ class EditorWindow(QMainWindow):
         self.spin_phys_w.setSuffix(" mm")
         self.spin_phys_w.setPrefix("Larg: ")
         self.spin_phys_w.setDecimals(1)
+        self.spin_phys_w.setKeyboardTracking(False)
         self.spin_phys_w.setValue(100.0) 
         
         self.spin_phys_h = QDoubleSpinBox()
@@ -139,6 +140,7 @@ class EditorWindow(QMainWindow):
         self.spin_phys_h.setSuffix(" mm")
         self.spin_phys_h.setPrefix("Alt: ")
         self.spin_phys_h.setDecimals(1)
+        self.spin_phys_h.setKeyboardTracking(False)
         self.spin_phys_h.setValue(150.0) 
         
         row_phys.addWidget(self.spin_phys_w)
@@ -160,6 +162,7 @@ class EditorWindow(QMainWindow):
         self.spin_pos_x.setDecimals(1)
         self.spin_pos_x.setPrefix("X: ")
         self.spin_pos_x.setSuffix(" mm")
+        self.spin_pos_x.setKeyboardTracking(False)
         self.spin_pos_x.setEnabled(False)
         self.spin_pos_x.valueChanged.connect(self.apply_position_x)
         
@@ -168,6 +171,7 @@ class EditorWindow(QMainWindow):
         self.spin_pos_y.setDecimals(1)
         self.spin_pos_y.setPrefix("Y: ")
         self.spin_pos_y.setSuffix(" mm")
+        self.spin_pos_y.setKeyboardTracking(False)
         self.spin_pos_y.setEnabled(False)
         self.spin_pos_y.valueChanged.connect(self.apply_position_y)
         
@@ -187,6 +191,7 @@ class EditorWindow(QMainWindow):
         self.caixa_texto_panel.widthChanged.connect(self.update_width)
         self.caixa_texto_panel.heightChanged.connect(self.update_height)
         self.caixa_texto_panel.rotationChanged.connect(self.update_rotation)
+        self.caixa_texto_panel.proportionToggled.connect(self.update_proportion_lock)
         layout_misto.addWidget(self.caixa_texto_panel, 1)
 
         v_sep = QFrame()
@@ -549,6 +554,11 @@ class EditorWindow(QMainWindow):
             if isinstance(item, (ImageItem, SignatureItem)):
                 rect = item.pixmap().rect()
                 item.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
+
+    def update_proportion_lock(self, locked):
+        item = self._get_selected()
+        if item:
+            item.keep_proportion = locked
 
     def update_align(self, align_str):
         box = self._get_selected()
