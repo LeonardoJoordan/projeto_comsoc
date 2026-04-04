@@ -219,31 +219,7 @@ class EditorWindow(QMainWindow):
         grp_doc = QFrame()
         ly_doc = QVBoxLayout(grp_doc)
         ly_doc.setContentsMargins(0, 0, 0, 0)
-        lbl_doc = QLabel("<b>DIMENSÕES DO DOCUMENTO</b> <small style='color:gray'>(Ajuste Proporcional)</small>")
-        ly_doc.addWidget(lbl_doc)
-        
-        row_doc = QHBoxLayout()
-        from PySide6.QtWidgets import QSpinBox
-        self.spin_doc_w = QSpinBox()
-        self.spin_doc_w.setRange(10, 20000)
-        self.spin_doc_w.setSuffix(" px")
-        self.spin_doc_w.setPrefix("Largura: ")
-        self.spin_doc_w.setEnabled(False)
-        
-        self.spin_doc_h = QSpinBox()
-        self.spin_doc_h.setRange(10, 20000)
-        self.spin_doc_h.setSuffix(" px")
-        self.spin_doc_h.setPrefix("Altura: ")
-        self.spin_doc_h.setReadOnly(True) # A altura é calculada automaticamente
-        
-        self.btn_apply_doc_size = QPushButton("Aplicar Novo Tamanho")
-        self.btn_apply_doc_size.setEnabled(False)
-        self.btn_apply_doc_size.clicked.connect(self.apply_document_resize)
-        
-        row_doc.addWidget(self.spin_doc_w)
-        row_doc.addWidget(self.spin_doc_h)
-        ly_doc.addLayout(row_doc)
-        lbl_physical = QLabel("<br><b>DIMENSÕES FÍSICAS (Impressão PDF)</b>")
+        lbl_physical = QLabel("<b>DIMENSÕES FÍSICAS (Impressão PDF)</b>")
         ly_doc.addWidget(lbl_physical)
         
         row_phys = QHBoxLayout()
@@ -264,10 +240,7 @@ class EditorWindow(QMainWindow):
         row_phys.addWidget(self.spin_phys_w)
         row_phys.addWidget(self.spin_phys_h)
         ly_doc.addLayout(row_phys)
-        ly_doc.addWidget(self.btn_apply_doc_size)
-        
         right_layout.addWidget(grp_doc)
-        self.spin_doc_w.valueChanged.connect(self._on_doc_w_changed)
 
         right_layout.addStretch()
         self.btn_save = QPushButton("Salvar Modelo (JSON)")
@@ -731,16 +704,6 @@ class EditorWindow(QMainWindow):
         
         self.fallback_bg.hide()
         self._zoom_to_fit()
-        
-        # --- Ativar e popular controles de dimensão do documento ---
-        if hasattr(self, 'spin_doc_w'):
-            self.spin_doc_w.blockSignals(True)
-            self.spin_doc_w.setValue(rect.width())
-            self.spin_doc_h.setValue(rect.height())
-            self._doc_aspect_ratio = rect.width() / rect.height() if rect.height() > 0 else 1
-            self.spin_doc_w.setEnabled(True)
-            self.btn_apply_doc_size.setEnabled(True)
-            self.spin_doc_w.blockSignals(False)
 
     def _on_click_load_bg(self):
         from PySide6.QtWidgets import QFileDialog
@@ -748,30 +711,6 @@ class EditorWindow(QMainWindow):
         if path:
             self.load_background_image(path)
 
-    def _on_doc_w_changed(self, new_w):
-        if hasattr(self, '_doc_aspect_ratio'):
-            new_h = int(new_w / self._doc_aspect_ratio)
-            self.spin_doc_h.setValue(new_h)
-
-    def apply_document_resize(self):
-        if not self.bg_item or not self.background_path:
-            return
-            
-        from PySide6.QtGui import QPixmap
-        new_w = self.spin_doc_w.value()
-        new_h = self.spin_doc_h.value()
-        
-        # Recarrega a imagem original e aplica o redimensionamento suave
-        pixmap = QPixmap(self.background_path)
-        scaled_pixmap = pixmap.scaled(new_w, new_h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-        
-        self.bg_item.setPixmap(scaled_pixmap)
-        
-        # Ajusta os limites do palco (canvas) para o novo tamanho
-        rect = scaled_pixmap.rect()
-        self.scene.setSceneRect(rect)
-        self.view.setSceneRect(rect)
-        self._zoom_to_fit()
 
     def _on_click_add_signature(self):
         from PySide6.QtWidgets import QFileDialog
@@ -871,7 +810,7 @@ class EditorWindow(QMainWindow):
                 img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
                 img.setVisible(img_data.get("visible", True))
-                
+
         for b in data.get("boxes", []):
             box = DesignerBox(
                 x=b.get("x", 0), 
