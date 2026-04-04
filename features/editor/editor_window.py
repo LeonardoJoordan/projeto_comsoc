@@ -192,6 +192,7 @@ class EditorWindow(QMainWindow):
         self.caixa_texto_panel.heightChanged.connect(self.update_height)
         self.caixa_texto_panel.rotationChanged.connect(self.update_rotation)
         self.caixa_texto_panel.proportionToggled.connect(self.update_proportion_lock)
+        self.caixa_texto_panel.restoreRequested.connect(self.restore_item_state)
         layout_misto.addWidget(self.caixa_texto_panel, 1)
 
         v_sep = QFrame()
@@ -212,7 +213,7 @@ class EditorWindow(QMainWindow):
         self.lst_placeholders.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.lst_placeholders.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.lst_placeholders.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.lst_placeholders.setFixedHeight(75) 
+        self.lst_placeholders.setFixedHeight(150) 
         ly_cols_compact.addWidget(self.lst_placeholders)
         
         layout_misto.addWidget(grp_cols_compact, 1)
@@ -559,6 +560,25 @@ class EditorWindow(QMainWindow):
         item = self._get_selected()
         if item:
             item.keep_proportion = locked
+
+    def restore_item_state(self):
+        item = self._get_selected()
+        if not item: return
+        
+        item.setRotation(0)
+        
+        from .canvas_items import ImageItem, SignatureItem, DesignerBox
+        if isinstance(item, (ImageItem, SignatureItem)):
+            if hasattr(item, '_original_pixmap') and not item._original_pixmap.isNull():
+                w_px = item._original_pixmap.width()
+                h_px = item._original_pixmap.height()
+                item.resize_custom(w_px, h_px)
+                item.setTransformOriginPoint(w_px / 2, h_px / 2) # Corrige o pivô de giro
+            self.caixa_texto_panel.load_from_image(item) # Recarrega a UI com os dados puros
+            
+        elif isinstance(item, DesignerBox):
+            item.update_center()
+            self.caixa_texto_panel.load_from_item(item)
 
     def update_align(self, align_str):
         box = self._get_selected()

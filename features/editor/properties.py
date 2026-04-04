@@ -12,6 +12,7 @@ class CaixaDeTextoPanel(QWidget):
     heightChanged = Signal(int)
     rotationChanged = Signal(int)
     proportionToggled = Signal(bool) # Novo sinal para a Checkbox
+    restoreRequested = Signal()
 
     def __init__(self):
         super().__init__()
@@ -58,6 +59,11 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_rot.setWrapping(True) 
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
         form.addRow("Rot:", self.spin_rot)
+
+        self.btn_restore = QPushButton("🔄 Restaurar Original")
+        self.btn_restore.setToolTip("Restaura as dimensões originais e zera a rotação")
+        self.btn_restore.clicked.connect(self.restoreRequested.emit)
+        form.addRow("", self.btn_restore)
 
         layout.addLayout(form)
         layout.addStretch()
