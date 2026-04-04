@@ -89,7 +89,7 @@ class NativeRenderer:
                 
                 # Blindagem contra corrompimento de QImage/QPixmap ou dimensões ausentes
                 if not pix.isNull() and w > 0 and h > 0:
-                    scaled = pix.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    scaled = pix.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
                     painter.drawPixmap(int(img.get("x", 0)), int(img.get("y", 0)), scaled)
 
         for box in self.tpl.get("boxes", []):
@@ -126,7 +126,7 @@ class NativeRenderer:
             if Path(sig["path"]).exists():
                 pix = QPixmap(sig["path"])
                 scaled = pix.scaled(sig["width"], sig["height"], 
-                                   Qt.AspectRatioMode.KeepAspectRatio, 
+                                   Qt.AspectRatioMode.IgnoreAspectRatio, 
                                    Qt.TransformationMode.SmoothTransformation)
                 painter.drawPixmap(sig["x"], sig["y"], scaled)
 
