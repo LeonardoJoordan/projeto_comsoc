@@ -6,47 +6,41 @@ from pathlib import Path
 def build_app():
     print("🚀 Iniciando a blindagem e compilação do C.O.M.S.O.C. com Nuitka...")
     
-    # Define o ponto de entrada e o nome do executável final
-    base_dir = Path(__file__).parent
+    # Define o ponto de entrada e caminhos
+    base_dir = Path(__file__).parent.absolute()
     main_file = base_dir / "main.py"
     exe_name = "COMSOC_OFICIAL"
 
-    # Comando Nuitka com as técnicas do seu script de sucesso e blindagem Linux
+    # Comando corrigido
     cmd = [
         sys.executable, "-m", "nuitka",
-        "--standalone",                  # Empacota todas as dependências 
-        "--onefile",                     # Gera um único executável para facilitar a distribuição 
-        f"--output-filename={exe_name}", # Nome personalizado do binário 
-        "--output-dir=build",            # Pasta de destino 
+        "--standalone",
+        "--onefile",
+        f"--output-filename={exe_name}",
+        "--output-dir=build",
         
-        # --- Plugins e Interface ---
-        "--plugin-enable=pyside6",       # Plugin essencial para mapear o Qt
-        "--windows-console-mode=disable", # Remove o terminal em background (caso rode no Windows)
+        # Plugins e Interface
+        "--plugin-enable=pyside6",
+        "--windows-console-mode=disable",
         
-        # --- Blindagem e Inclusão de Assets (Técnicas do script 2) ---
-        "--include-module=encodings",    # Vacina contra bugs de acentuação (UTF-8) 
-        "--include-module=sqlite3",      # Garante suporte a banco de dados se necessário 
+        # Blindagem de Sistema (conforme seu script de sucesso)
+        "--include-module=encodings",
+        "--include-module=sqlite3",
         
-        # --- Compressão Extrema ---
-        "--zstd-compression-level=3",    # Usa a lib zstandard para reduzir o tamanho final
-        
-        # --- Inclusão de Pastas do Projeto (Features) ---
-        # Como usamos Vertical Slicing, garantimos que todas as pastas de domínio entrem
+        # Inclusão da Arquitetura de Features
         "--include-package=features",
         "--include-package=core",
         "--include-package=shared",
         
-        # --- Inclusão de Dados Externos ---
-        # Se houver uma pasta de modelos padrão ou ícones, mapeamos aqui
-        # "--include-data-dir=models=models", 
+        # Otimização de busca de módulos
+        "--follow-imports",
         
         str(main_file)
     ]
     
     try:
-        # Garante que a pasta de build exista
         os.makedirs("build", exist_ok=True)
-        
+        # Executa o processo
         subprocess.run(cmd, check=True)
         print(f"\n✅ Missão Cumprida! O executável '{exe_name}' está pronto na pasta 'build'.")
     except subprocess.CalledProcessError as e:
