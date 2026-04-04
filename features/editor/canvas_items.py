@@ -334,3 +334,12 @@ class ImageItem(QGraphicsPixmapItem):
             Qt.TransformationMode.SmoothTransformation
         )
         self.setPixmap(scaled)
+
+    def resize_custom(self, w, h):
+        if w <= 0 or h <= 0: return
+        scaled = self._original_pixmap.scaled(
+            w, h, 
+            Qt.AspectRatioMode.IgnoreAspectRatio, 
+            Qt.TransformationMode.SmoothTransformation
+        )
+        self.setPixmap(scaled)

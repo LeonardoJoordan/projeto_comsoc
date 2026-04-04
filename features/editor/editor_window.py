@@ -473,7 +473,8 @@ class EditorWindow(QMainWindow):
             return # Aborta silenciosamente se a cena já foi destruída (ao fechar o app)
             
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
-        signatures = [i for i in sel if isinstance(i, (SignatureItem, ImageItem))]
+        images = [i for i in sel if isinstance(i, ImageItem)]
+        signatures = [i for i in sel if isinstance(i, SignatureItem)]
         
         # Atualiza a posição X/Y imediatamente ao selecionar
         self.update_position_ui()
@@ -484,10 +485,15 @@ class EditorWindow(QMainWindow):
             self.editor_texto_panel.setEnabled(True)
             self.caixa_texto_panel.load_from_item(target_box)
             self.caixa_texto_panel.setEnabled(True)
+        elif images:
+            self.editor_texto_panel.setEnabled(False)
+            self.caixa_texto_panel.load_from_image(images[0])
+            self.caixa_texto_panel.setEnabled(True)
         else:
             self.editor_texto_panel.setEnabled(False)
             self.caixa_texto_panel.setEnabled(False)
 
+        # Assinaturas continuam no painel exclusivo delas
         if signatures:
             self.assinatura_panel.load_from_item(signatures[0])
             self.assinatura_panel.setVisible(True)
@@ -519,10 +525,10 @@ class EditorWindow(QMainWindow):
         new_box.setSelected(True)
         self.sync_placeholders_list()
 
-    def _get_selected(self) -> DesignerBox | None:
+    def _get_selected(self):
         sel = self.scene.selectedItems()
-        boxes = [i for i in sel if isinstance(i, DesignerBox)]
-        return boxes[0] if boxes else None
+        valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem))]
+        return valid_items[0] if valid_items else None
 
     def update_text_html(self, html_content):
         box = self._get_selected()
@@ -549,25 +555,36 @@ class EditorWindow(QMainWindow):
             box.apply_state()
 
     def update_width(self, width):
-        box = self._get_selected()
-        if box:
-            r = box.rect()
-            box.setRect(0, 0, width, r.height())
-            box.recalculate_text_position()
-            box.update_center() 
+        item = self._get_selected()
+        if item:
+            if isinstance(item, DesignerBox):
+                r = item.rect()
+                item.setRect(0, 0, width, r.height())
+                item.recalculate_text_position()
+                item.update_center() 
+            elif isinstance(item, ImageItem):
+                h = self.caixa_texto_panel.spin_h.value()
+                item.resize_custom(width, h)
 
     def update_height(self, height):
-        box = self._get_selected()
-        if box:
-            r = box.rect()
-            box.setRect(0, 0, r.width(), height)
-            box.recalculate_text_position()
-            box.update_center() 
+        item = self._get_selected()
+        if item:
+            if isinstance(item, DesignerBox):
+                r = item.rect()
+                item.setRect(0, 0, r.width(), height)
+                item.recalculate_text_position()
+                item.update_center()
+            elif isinstance(item, ImageItem):
+                w = self.caixa_texto_panel.spin_w.value()
+                item.resize_custom(w, height)
 
     def update_rotation(self, angle):
-        box = self._get_selected()
-        if box:
-            box.setRotation(angle)
+        item = self._get_selected()
+        if item:
+            item.setRotation(angle)
+            if isinstance(item, ImageItem):
+                rect = item.pixmap().rect()
+                item.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
 
     def update_align(self, align_str):
         box = self._get_selected()
@@ -636,7 +653,8 @@ class EditorWindow(QMainWindow):
                     "y": int(pos.y()),
                     "width": int(pix.width()),
                     "height": int(pix.height()),
-                    "longest_side": max(pix.width(), pix.height())
+                    "longest_side": max(pix.width(), pix.height()),
+                    "rotation": int(item.rotation())
                 })
 
         ordered_placeholders = []
@@ -844,10 +862,16 @@ class EditorWindow(QMainWindow):
             if img_path.exists():
                 img = ImageItem(str(img_path))
                 img.setPos(img_data["x"], img_data["y"])
-                img.resize_by_longest_side(img_data["longest_side"])
+                
+                if "width" in img_data and "height" in img_data:
+                    img.resize_custom(img_data["width"], img_data["height"])
+                else:
+                    img.resize_by_longest_side(img_data.get("longest_side", 100))
+                    
+                img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
                 img.setVisible(img_data.get("visible", True))
-
+                
         for b in data.get("boxes", []):
             box = DesignerBox(
                 x=b.get("x", 0), 

@@ -1,11 +1,11 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, 
                                QFormLayout, QTextEdit, QFontComboBox, QPushButton, 
-                               QComboBox, QDoubleSpinBox, QColorDialog)
+                               QComboBox, QDoubleSpinBox, QColorDialog, QCheckBox)
 from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
 
-from .canvas_items import DesignerBox, SignatureItem
+from .canvas_items import DesignerBox, SignatureItem, ImageItem
 
 class CaixaDeTextoPanel(QWidget):
     widthChanged = Signal(int)
@@ -17,8 +17,9 @@ class CaixaDeTextoPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        lbl = QLabel("<b>DIMENSÕES DA CAIXA</b>")
+        lbl = QLabel("<b>DIMENSÕES E ROTAÇÃO</b>")
         layout.addWidget(lbl)
+        self._aspect_ratio = 1.0
         
         form = QFormLayout()
         form.setSpacing(4)
@@ -37,6 +38,15 @@ class CaixaDeTextoPanel(QWidget):
         form.addRow("Alt:", self.spin_h)
 
         self.spin_rot = QSpinBox()
+        self.chk_proporcao = QCheckBox("Manter proporção")
+        self.chk_proporcao.setChecked(True)
+        form.addRow("", self.chk_proporcao)
+
+        # Intercepta os sinais para calcular a proporção antes de emitir para a cena
+        self.spin_w.valueChanged.disconnect(self.widthChanged.emit)
+        self.spin_h.valueChanged.disconnect(self.heightChanged.emit)
+        self.spin_w.valueChanged.connect(self._on_w_changed)
+        self.spin_h.valueChanged.connect(self._on_h_changed)
         self.spin_rot.setRange(-360, 360)
         self.spin_rot.setSuffix(" °")
         self.spin_rot.setWrapping(True) 
@@ -46,12 +56,36 @@ class CaixaDeTextoPanel(QWidget):
         layout.addLayout(form)
         layout.addStretch()
 
+    def _on_w_changed(self, val):
+        if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
+            self.spin_h.blockSignals(True)
+            self.spin_h.setValue(int(val / self._aspect_ratio))
+            self.spin_h.blockSignals(False)
+        self.widthChanged.emit(val)
+
+    def _on_h_changed(self, val):
+        if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
+            self.spin_w.blockSignals(True)
+            self.spin_w.setValue(int(val * self._aspect_ratio))
+            self.spin_w.blockSignals(False)
+        self.heightChanged.emit(val)
+
     def load_from_item(self, box: DesignerBox):
         self.blockSignals(True) 
         rect = box.rect()
         self.spin_w.setValue(int(rect.width()))
         self.spin_h.setValue(int(rect.height()))
         self.spin_rot.setValue(int(box.rotation()))
+        if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
+        self.blockSignals(False)
+
+    def load_from_image(self, img: ImageItem):
+        self.blockSignals(True)
+        rect = img.pixmap().rect()
+        self.spin_w.setValue(int(rect.width()))
+        self.spin_h.setValue(int(rect.height()))
+        self.spin_rot.setValue(int(img.rotation()))
+        if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
         self.blockSignals(False)
 
 class CleanTextEdit(QTextEdit):
