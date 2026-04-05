@@ -347,13 +347,15 @@ class EditorWindow(QMainWindow):
                     return True
                 
                 elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
+                    from PySide6.QtWidgets import QGraphicsItem
                     step = 10 if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
                     dx = -step if key == Qt.Key.Key_Left else (step if key == Qt.Key.Key_Right else 0)
                     dy = -step if key == Qt.Key.Key_Up else (step if key == Qt.Key.Key_Down else 0)
                     sel_items = self.scene.selectedItems()
                     if sel_items:
                         for item in sel_items:
-                            item.moveBy(dx, dy)
+                            if item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable:
+                                item.moveBy(dx, dy)
                         self.on_selection_changed() # Sincroniza a barra superior
                         return True
 
@@ -606,10 +608,12 @@ class EditorWindow(QMainWindow):
                 pos = item.pos()
                 r = item.rect()
 
+                from PySide6.QtWidgets import QGraphicsItem
                 boxes_data.append({
                     "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
                     "html": item.state.html_content,
                     "visible": item.isVisible(),
+                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": int(pos.x()),
                     "y": int(pos.y()),
                     "w": int(r.width()),
@@ -627,9 +631,11 @@ class EditorWindow(QMainWindow):
             elif isinstance(item, SignatureItem):
                 pos = item.pos()
                 pix = item.pixmap()
+                from PySide6.QtWidgets import QGraphicsItem
                 signatures_data.append({
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
+                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": int(pos.x()),
                     "y": int(pos.y()),
                     "width": int(pix.width()),
@@ -640,9 +646,11 @@ class EditorWindow(QMainWindow):
             elif isinstance(item, ImageItem):
                 pos = item.pos()
                 pix = item.pixmap()
+                from PySide6.QtWidgets import QGraphicsItem
                 images_data.append({
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
+                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": int(pos.x()),
                     "y": int(pos.y()),
                     "width": int(pix.width()),
@@ -805,11 +813,16 @@ class EditorWindow(QMainWindow):
             sig_path = path.parent / raw_path if not Path(raw_path).is_absolute() else Path(raw_path)
 
             if sig_path.exists():
+                from PySide6.QtWidgets import QGraphicsItem
                 sig = SignatureItem(str(sig_path))
                 sig.setPos(sig_data["x"], sig_data["y"])
                 sig.resize_by_longest_side(sig_data["longest_side"])
                 self.scene.addItem(sig)
                 sig.setVisible(sig_data.get("visible", True))
+                if sig_data.get("locked", False):
+                    sig.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                    sig.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                    sig.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
         for img_data in data.get("images", []):
             raw_path = img_data["path"]
@@ -824,9 +837,14 @@ class EditorWindow(QMainWindow):
                 else:
                     img.resize_by_longest_side(img_data.get("longest_side", 100))
                     
+                from PySide6.QtWidgets import QGraphicsItem
                 img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
                 img.setVisible(img_data.get("visible", True))
+                if img_data.get("locked", False):
+                    img.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                    img.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                    img.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
         for b in data.get("boxes", []):
             box = DesignerBox(
@@ -849,11 +867,16 @@ class EditorWindow(QMainWindow):
             box.state.line_height = b.get("line_height", 1.15)
 
             box.setRotation(b.get("rotation", 0))
+            from PySide6.QtWidgets import QGraphicsItem
             box.apply_state()
             box.update_center() 
 
             self.scene.addItem(box)
             box.setVisible(b.get("visible", True))
+            if b.get("locked", False):
+                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                box.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
             saved_placeholders = data.get("placeholders", [])
             self.lst_placeholders.clear()
@@ -911,11 +934,38 @@ class EditorWindow(QMainWindow):
         textos.sort(key=lambda x: x.zValue(), reverse=True)
         imagens.sort(key=lambda x: x.zValue(), reverse=True)
 
+        from PySide6.QtWidgets import QGraphicsItem, QPushButton, QGraphicsOpacityEffect
+
+        def toggle_item_visibility(item, effect):
+            new_vis = not item.isVisible()
+            item.setVisible(new_vis)
+            # Aplica opacidade 1.0 (visível) ou 0.15 (oculto)
+            effect.setOpacity(1.0 if new_vis else 0.15)
+
+        def toggle_item_lock(item, effect, label):
+            is_locked = not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+            new_locked = not is_locked
+            
+            item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, not new_locked)
+            item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, not new_locked)
+            
+            if new_locked:
+                item.setSelected(False) # Força a perda de seleção imediata
+                item.setAcceptedMouseButtons(Qt.MouseButton.NoButton) # Fica invisível aos cliques
+                if hasattr(item, 'handle_br'):
+                    item.handle_br.hide()
+            else:
+                item.setAcceptedMouseButtons(Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton) # Restaura a detecção de cliques
+                
+            # Aplica opacidade 1.0 (trancado) ou 0.15 (destrancado)
+            effect.setOpacity(1.0 if new_locked else 0.15)
+            label.setStyleSheet("color: #888888; font-style: italic;" if new_locked else "")
+
         def add_header(title):
+            from PySide6.QtGui import QBrush, QColor
             header = QListWidgetItem(f"--- {title} ---")
             header.setFlags(Qt.ItemFlag.NoItemFlags)
             header.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            from PySide6.QtGui import QBrush, QColor
             header.setBackground(QBrush(QColor("#e0e0e0")))
             header.setForeground(QBrush(QColor("#555555")))
             self.layer_list.addItem(header)
@@ -923,12 +973,56 @@ class EditorWindow(QMainWindow):
         def add_items(item_list):
             for item in item_list:
                 name = self._generate_layer_name(item.layer_id, item)
-                list_item = QListWidgetItem(name)
+                list_item = QListWidgetItem()
                 list_item.setData(Qt.ItemDataRole.UserRole, item)
-                flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled | Qt.ItemFlag.ItemIsUserCheckable
+                
+                # Removemos Qt.ItemFlag.ItemIsUserCheckable para sumir com a checkbox nativa
+                flags = Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled
                 list_item.setFlags(flags)
-                list_item.setCheckState(Qt.CheckState.Checked if item.isVisible() else Qt.CheckState.Unchecked)
+                
+                w = QWidget()
+                ly = QHBoxLayout(w)
+                ly.setContentsMargins(5, 0, 5, 0)
+                ly.setSpacing(2) # Espaçamento curto entre os elementos
+                
+                # --- Botão Visibilidade (Olho - ESQUERDA) ---
+                btn_vis = QPushButton("👁️")
+                btn_vis.setFixedSize(24, 24)
+                btn_vis.setStyleSheet("border: none; background: transparent; font-size: 14px;")
+                btn_vis.setCursor(Qt.CursorShape.PointingHandCursor)
+                
+                effect_vis = QGraphicsOpacityEffect()
+                is_visible = item.isVisible()
+                effect_vis.setOpacity(1.0 if is_visible else 0.15)
+                btn_vis.setGraphicsEffect(effect_vis)
+                
+                btn_vis.clicked.connect(lambda checked=False, itm=item, eff=effect_vis: toggle_item_visibility(itm, eff))
+                ly.addWidget(btn_vis)
+                
+                # --- Nome da Camada (CENTRO) ---
+                lbl = QLabel(name)
+                is_locked = not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+                if is_locked:
+                    lbl.setStyleSheet("color: #888888; font-style: italic;")
+                ly.addWidget(lbl, 1) # Toma todo o espaço restante
+                
+                # --- Botão Bloqueio (Cadeado - DIREITA) ---
+                btn_lock = QPushButton("🔒")
+                btn_lock.setFixedSize(24, 24)
+                btn_lock.setStyleSheet("border: none; background: transparent; font-size: 14px;")
+                btn_lock.setCursor(Qt.CursorShape.PointingHandCursor)
+                
+                effect_lock = QGraphicsOpacityEffect()
+                effect_lock.setOpacity(1.0 if is_locked else 0.15) # Sincroniza com sua personalização
+                btn_lock.setGraphicsEffect(effect_lock)
+                
+                btn_lock.clicked.connect(lambda checked=False, itm=item, eff=effect_lock, l=lbl: toggle_item_lock(itm, eff, l))
+                ly.addWidget(btn_lock)
+                
+                # --- Finalização ---
+                list_item.setSizeHint(w.sizeHint())
                 self.layer_list.addItem(list_item)
+                self.layer_list.setItemWidget(list_item, w)
 
         if assinaturas:
             add_header("ASSINATURAS")

@@ -248,7 +248,7 @@ class DesignerBox(QGraphicsRectItem):
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             if hasattr(self, 'handle_br'):
-                if self.isSelected():
+                if self.isSelected() and (self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable):
                     self.handle_br.show()
                 else:
                     self.handle_br.hide()
@@ -312,7 +312,7 @@ class SignatureItem(QGraphicsPixmapItem):
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             if hasattr(self, 'handle_br'):
-                if self.isSelected():
+                if self.isSelected() and (self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable):
                     self.handle_br.show()
                 else:
                     self.handle_br.hide()
@@ -400,7 +400,7 @@ class ImageItem(QGraphicsPixmapItem):
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             if hasattr(self, 'handle_br'):
-                if self.isSelected():
+                if self.isSelected() and (self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable):
                     self.handle_br.show()
                 else:
                     self.handle_br.hide()
