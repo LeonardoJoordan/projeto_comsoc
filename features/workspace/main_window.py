@@ -27,8 +27,9 @@ from core.paths import get_models_dir
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Projeto ComSoc - Construtor Otimizado")
-        self.resize(1300, 750)
+        self.setWindowTitle("Projeto COMSOC - Construtor Otimizado de Material Social Oficial e Cerimonial")
+        self.setMinimumSize(1024, 680)
+        self.resize(1280, 720)
 
         central = QWidget()
         self.setCentralWidget(central)
@@ -36,16 +37,16 @@ class MainWindow(QMainWindow):
         root = QHBoxLayout(central)
         root.setContentsMargins(10, 10, 10, 10)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        root.addWidget(splitter)
+        self.splitter = QSplitter(Qt.Orientation.Horizontal)
+        root.addWidget(self.splitter)
 
         self.current_filename_suffix = "" 
         self.manager = None 
 
         # --- Painel ESQUERDO ---
         left = QWidget()
-        left.setMinimumWidth(620)
-        splitter.addWidget(left)
+        left.setMinimumWidth(500) # Ajustado para a nova largura mínima
+        self.splitter.addWidget(left)
 
         left_stack = QVBoxLayout(left)
         left_stack.setContentsMargins(0, 0, 0, 0)
@@ -130,10 +131,10 @@ class MainWindow(QMainWindow):
 
         # --- Painel DIREITO ---
         self.table_panel = TablePanel()
-        splitter.addWidget(self.table_panel)
+        self.splitter.addWidget(self.table_panel)
 
-        splitter.setSizes([620, 820])
-        splitter.setCollapsible(0, False)
+        self.splitter.setSizes([640, 640])
+        self.splitter.setCollapsible(0, False)
 
         self.cached_model_data = None
         
@@ -162,6 +163,17 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
 
         self.settings = QSettings("Projeto ComSoc", "MainApp")
+        
+        # Restaura a geometria e o estado da janela (posição e tamanho)
+        geometry = self.settings.value("geometry")
+        if geometry:
+            self.restoreGeometry(geometry)
+            
+        # Restaura o estado do divisor (largura das colunas interna)
+        splitter_state = self.settings.value("splitterState")
+        if splitter_state:
+            self.splitter.restoreState(splitter_state)
+
         last_output = self.settings.value("last_output_dir", "")
         if last_output:
             self.txt_output_path.setText(str(last_output))
@@ -840,3 +852,9 @@ class MainWindow(QMainWindow):
             self.log_panel.append(f"❌ Erro durante impressão: {e}")
         finally:
             painter.end()
+
+    def closeEvent(self, event):
+        """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
+        self.settings.setValue("geometry", self.saveGeometry())
+        self.settings.setValue("splitterState", self.splitter.saveState())
+        super().closeEvent(event)
