@@ -863,11 +863,22 @@ class EditorWindow(QMainWindow):
         self.scene.setSceneRect(0, 0, canvas_w, canvas_h)
 
         if hasattr(self, 'spin_phys_w'):
+            # Bloqueia os sinais para não disparar o resize enquanto a cena está morta
+            self.spin_phys_w.blockSignals(True)
+            self.spin_phys_h.blockSignals(True)
+            
             self.spin_phys_w.setValue(data.get("target_w_mm", 100.0))
             self.spin_phys_h.setValue(data.get("target_h_mm", 150.0))
+            
+            self.spin_phys_w.blockSignals(False)
+            self.spin_phys_h.blockSignals(False)
         
+        # Agora recriamos o papel em segurança
         self.fallback_bg = self.scene.addRect(0, 0, canvas_w, canvas_h, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
         self.fallback_bg.setZValue(-200) # Afundado!
+        
+        # Força a atualização da prancheta manualmente agora que é 100% seguro
+        self._on_physical_size_changed()
 
         if data.get("background_path"):
             bg_path_raw = data["background_path"]

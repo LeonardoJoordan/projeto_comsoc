@@ -445,15 +445,13 @@ class MainWindow(QMainWindow):
         renderer = NativeRenderer(tpl_data)
 
         custom_path = self.txt_output_path.text().strip()
-        if custom_path:
-            base_dir = Path(custom_path)
-            self.settings.setValue("last_output_dir", custom_path)
-        else:
-            from PySide6.QtCore import QStandardPaths
-            docs_loc = QStandardPaths.writableLocation(QStandardPaths.StandardLocation.DocumentsLocation)
-            if not docs_loc: 
-                docs_loc = str(Path.home())
-            base_dir = Path(docs_loc) / "ProjetoComSoc_Saida" / slug
+        if not custom_path:
+            QMessageBox.warning(self, "Atenção", "Por favor, selecione uma pasta de saída antes de gerar o material.")
+            self.log_panel.append("🛑 Geração cancelada: Pasta de saída não definida.")
+            return
+
+        base_dir = Path(custom_path)
+        self.settings.setValue("last_output_dir", custom_path)
 
         timestamp = datetime.now().strftime("%y.%m.%d_%H.%M.%S")
         folder_name = f"Lote_{timestamp}"
