@@ -83,6 +83,7 @@ class EditorWindow(QMainWindow):
         self.layer_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.layer_list.itemClicked.connect(self._on_layer_list_clicked)
         self.layer_list.itemChanged.connect(self._on_layer_item_changed)
+        self.layer_list.itemDoubleClicked.connect(self.rename_layer)
         self.layer_list.model().rowsMoved.connect(self._on_layer_reordered)
         left_layout.addWidget(self.layer_list)
         
@@ -610,6 +611,7 @@ class EditorWindow(QMainWindow):
 
                 from PySide6.QtWidgets import QGraphicsItem
                 boxes_data.append({
+                    "custom_name": getattr(item, "custom_name", ""),
                     "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
                     "html": item.state.html_content,
                     "visible": item.isVisible(),
@@ -633,6 +635,7 @@ class EditorWindow(QMainWindow):
                 pix = item.pixmap()
                 from PySide6.QtWidgets import QGraphicsItem
                 signatures_data.append({
+                    "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
@@ -648,6 +651,7 @@ class EditorWindow(QMainWindow):
                 pix = item.pixmap()
                 from PySide6.QtWidgets import QGraphicsItem
                 images_data.append({
+                    "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
@@ -720,8 +724,15 @@ class EditorWindow(QMainWindow):
             self.scene.removeItem(self.bg_item)
             
         self.background_path = path
+        
+        from PySide6.QtWidgets import QGraphicsItem
         self.bg_item = self.scene.addPixmap(pixmap)
         self.bg_item.setZValue(-100) 
+        
+        # Bloqueio permanente (Ghosting) do Fundo
+        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         
         rect = pixmap.rect()
         self.scene.setSceneRect(rect)
@@ -815,6 +826,7 @@ class EditorWindow(QMainWindow):
             if sig_path.exists():
                 from PySide6.QtWidgets import QGraphicsItem
                 sig = SignatureItem(str(sig_path))
+                sig.custom_name = sig_data.get("custom_name", "")
                 sig.setPos(sig_data["x"], sig_data["y"])
                 sig.resize_by_longest_side(sig_data["longest_side"])
                 self.scene.addItem(sig)
@@ -830,6 +842,7 @@ class EditorWindow(QMainWindow):
 
             if img_path.exists():
                 img = ImageItem(str(img_path))
+                img.custom_name = img_data.get("custom_name", "")
                 img.setPos(img_data["x"], img_data["y"])
                 
                 if "width" in img_data and "height" in img_data:
@@ -854,6 +867,7 @@ class EditorWindow(QMainWindow):
                 h=b.get("h", 60), 
                 text=b.get("id", "Placeholder") 
             )
+            box.custom_name = b.get("custom_name", "")
             
             if "html" in b:
                 box.state.html_content = b["html"]
@@ -898,6 +912,9 @@ class EditorWindow(QMainWindow):
         return 99
 
     def _generate_layer_name(self, layer_id, item):
+        if hasattr(item, 'custom_name') and item.custom_name:
+            return item.custom_name
+            
         prefix = f"{layer_id:02d}"
         if isinstance(item, DesignerBox):
             raw = item.text_item.toPlainText().strip().replace("\n", " ")
@@ -1019,6 +1036,12 @@ class EditorWindow(QMainWindow):
                 btn_lock.clicked.connect(lambda checked=False, itm=item, eff=effect_lock, l=lbl: toggle_item_lock(itm, eff, l))
                 ly.addWidget(btn_lock)
                 
+                # Remove controles interativos se for a camada de fundo fixa
+                if item == self.bg_item:
+                    btn_vis.setVisible(False)
+                    btn_lock.setVisible(False)
+                    lbl.setStyleSheet("color: #888888; font-weight: bold;")
+                
                 # --- Finalização ---
                 list_item.setSizeHint(w.sizeHint())
                 self.layer_list.addItem(list_item)
@@ -1077,3 +1100,19 @@ class EditorWindow(QMainWindow):
         
         # Redesenha forçadamente para que o item "pule" de volta para a sua seção correta caso tenha sido arrastado pra fora dela
         self.refresh_layer_list()
+
+    def rename_layer(self, list_item):
+        """Abre um popup para renomear a camada com duplo clique."""
+        item = list_item.data(Qt.ItemDataRole.UserRole)
+        
+        # Ignora se for cabeçalho ou o Fundo (que é estático)
+        if not item or item == self.bg_item:
+            return
+            
+        current_name = self._generate_layer_name(item.layer_id, item)
+        from PySide6.QtWidgets import QInputDialog
+        new_name, ok = QInputDialog.getText(self, "Renomear Camada", "Novo nome para a camada:", text=current_name)
+        
+        if ok and new_name.strip():
+            item.custom_name = new_name.strip()
+            self.refresh_layer_list()
