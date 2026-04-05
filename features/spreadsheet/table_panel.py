@@ -16,6 +16,14 @@ class RichTableWidget(QTableWidget):
         self.setItemDelegate(HTMLDelegate(self))
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self.itemChanged.connect(self._force_qty_alignment)
+
+    def _force_qty_alignment(self, item):
+        # Se a mudança foi na coluna 0, bloqueia sinais para evitar loop e centraliza
+        if item.column() == 0:
+            self.blockSignals(True)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.blockSignals(False)
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -76,19 +84,30 @@ class RichTableWidget(QTableWidget):
                 item.setData(self.RICH_ROLE, None)
 
     def _add_rows(self, count: int):
-        has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        # Detecta a presença das colunas funcionais pelos headers
+        has_qty_col = (self.columnCount() > 0 and self.horizontalHeaderItem(0).text() == "🔢 Qtd")
+        has_sig_col = (self.columnCount() > 1 and self.horizontalHeaderItem(1).text() == "✍️ Ass.")
+        
         for _ in range(count):
             row_idx = self.rowCount()
             self.insertRow(row_idx)
+            
+            # 1. Coluna Quantidade (Sempre Index 0)
+            if has_qty_col:
+                qty_item = QTableWidgetItem("1")
+                qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(row_idx, 0, qty_item)
+            
+            # 2. Coluna Assinatura (Sempre Index 1 se existir)
             if has_sig_col:
                 default_chk = Qt.CheckState.Checked
-                if row_idx > 0 and self.item(0, 0):
-                    default_chk = self.item(0, 0).checkState()
-                item = QTableWidgetItem("")
-                item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                item.setCheckState(default_chk)
-                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.setItem(row_idx, 0, item)
+                if row_idx > 0 and self.item(0, 1):
+                    default_chk = self.item(0, 1).checkState()
+                sig_item = QTableWidgetItem("")
+                sig_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                sig_item.setCheckState(default_chk)
+                sig_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(row_idx, 1, sig_item)
 
     def _duplicate_selected_rows(self):
         indexes = self.selectionModel().selectedIndexes()
@@ -96,7 +115,10 @@ class RichTableWidget(QTableWidget):
         
         rows_to_dup = sorted(list(set(idx.row() for idx in indexes)), reverse=True)
         cols = self.columnCount()
-        has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        
+        # Identifica os índices das colunas funcionais pelos headers atuais
+        has_qty_col = (cols > 0 and self.horizontalHeaderItem(0).text() == "🔢 Qtd")
+        has_sig_col = (cols > 1 and self.horizontalHeaderItem(1).text() == "✍️ Ass.")
         
         for r in rows_to_dup:
             new_row = r + 1
@@ -104,18 +126,27 @@ class RichTableWidget(QTableWidget):
             
             for c in range(cols):
                 old_item = self.item(r, c)
-                if old_item:
-                    new_item = QTableWidgetItem(old_item.text())
-                    if c == 0 and has_sig_col:
-                        new_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                        new_item.setCheckState(old_item.checkState())
-                        new_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    
-                    rich_data = old_item.data(self.RICH_ROLE)
-                    if rich_data:
-                        new_item.setData(self.RICH_ROLE, rich_data)
+                if not old_item:
+                    continue
+                
+                new_item = QTableWidgetItem(old_item.text())
+                
+                # Caso especial: Coluna de Assinatura (Index 1)
+                if has_sig_col and c == 1:
+                    new_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    new_item.setCheckState(old_item.checkState())
+                    new_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                
+                # Caso especial: Coluna de Qtd ou texto comum (copia alinhamento)
+                else:
+                    new_item.setTextAlignment(old_item.textAlignment())
+
+                # Preserva os dados Rich Text (HTML) se existirem
+                rich_data = old_item.data(self.RICH_ROLE)
+                if rich_data:
+                    new_item.setData(self.RICH_ROLE, rich_data)
                         
-                    self.setItem(new_row, c, new_item)
+                self.setItem(new_row, c, new_item)
 
     def _toggle_word_wrap(self, state: bool):
         self.setWordWrap(state)
@@ -270,21 +301,45 @@ class RichTableWidget(QTableWidget):
         affected_cols_logical = set()
         row_end = start_row + len(grid_struct) - 1
 
+        # Identifica os índices das colunas funcionais
+        has_qty_col = (header.count() > 0 and self.horizontalHeaderItem(0).text() == "🔢 Qtd")
+        has_sig_col = (header.count() > 1 and self.horizontalHeaderItem(1).text() == "✍️ Ass.")
+
         for r, row_data in enumerate(grid_struct):
             dest_row = start_row + r
             style_row = grid_style[r] if r < len(grid_style) else []
 
+            # 1. Garante a inicialização da Coluna Qtd (Index 0)
+            if has_qty_col:
+                qty_item = self.item(dest_row, 0)
+                if qty_item is None:
+                    qty_item = QTableWidgetItem("1")
+                    qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.setItem(dest_row, 0, qty_item)
+
+            # 2. Garante a inicialização da Coluna Assinatura (Index 1)
+            # 1. Garante a inicialização da Coluna Qtd (Index 0)
+            if has_qty_col:
+                qty_item = self.item(dest_row, 0)
+                if qty_item is None:
+                    qty_item = QTableWidgetItem("1")
+                    qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                    self.setItem(dest_row, 0, qty_item)
+
+            # 2. Garante a inicialização da Coluna Assinatura (Index 1)
             if has_sig_col:
-                sig_item = self.item(dest_row, 0)
+                sig_item = self.item(dest_row, 1)
                 if sig_item is None:
+                    # Tenta copiar o estado da primeira linha ou assume Checked
                     default_chk = Qt.CheckState.Checked
-                    if self.rowCount() > 0 and self.item(0, 0):
-                        default_chk = self.item(0, 0).checkState()
+                    if self.rowCount() > 0 and self.item(0, 1):
+                        default_chk = self.item(0, 1).checkState()
+                    
                     sig_item = QTableWidgetItem("")
                     sig_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                     sig_item.setCheckState(default_chk)
                     sig_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    self.setItem(dest_row, 0, sig_item)
+                    self.setItem(dest_row, 1, sig_item)
 
             for c, cell_plain in enumerate(row_data):
                 target_visual_col = start_visual_col + c

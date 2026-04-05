@@ -80,6 +80,9 @@ class HTMLDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent, option, index):
         editor = RichTextEditor(parent)
+        # Se for a coluna 0 (🔢 Qtd), força o alinhamento central no editor
+        if index.column() == 0:
+            editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         return editor
 
     def setEditorData(self, editor, index):
@@ -99,6 +102,10 @@ class HTMLDelegate(QStyledItemDelegate):
         
         model.setData(index, clean_html.strip(), Qt.ItemDataRole.UserRole)
         model.setData(index, plain, Qt.ItemDataRole.DisplayRole)
+        
+        # Garante que o alinhamento central persista no modelo após a edição na coluna 0
+        if index.column() == 0:
+            model.setData(index, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)
 
     def updateEditorGeometry(self, editor, option, index):
         editor.setGeometry(option.rect)

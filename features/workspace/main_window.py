@@ -7,7 +7,7 @@ from datetime import datetime
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
-                                  QInputDialog, QComboBox, QCheckBox)
+                                  QInputDialog, QComboBox, QCheckBox, QTableWidgetItem)
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QPainter, QImage, QPageLayout
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
@@ -573,21 +573,31 @@ class MainWindow(QMainWindow):
         self.table_panel.table.setRowCount(0)
         self.table_panel.table.setColumnCount(0)
         
-        if not placeholders: return
-        
+        headers = ["🔢 Qtd"] # Coluna 0
         has_sig = bool(signatures)
-        headers = []
+        
         if has_sig:
-            headers.append("✍️ Ass.")
+            headers.append("✍️ Ass.") # Coluna 1
+        
         headers.extend(placeholders)
             
         self.table_panel.table.setColumnCount(len(headers))
         self.table_panel.table.setHorizontalHeaderLabels(headers)
-        self.table_panel.table.setRowCount(1)
-
+        
+        # Ajuste de larguras iniciais
+        self.table_panel.table.setColumnWidth(0, 50) # Qtd
         if has_sig:
-            from PySide6.QtWidgets import QTableWidgetItem
-            self.table_panel.table.setColumnWidth(0, 50) # Coluna estreita para a checkbox
+            self.table_panel.table.setColumnWidth(1, 50) # Assinatura
+
+        self.table_panel.table.setRowCount(1)
+        
+        # 1. Configura a célula de Quantidade (Index 0)
+        qty_item = QTableWidgetItem("1")
+        qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table_panel.table.setItem(0, 0, qty_item)
+        
+        # 2. Configura a célula de Assinatura (Index 1), se existir
+        if has_sig:
             default_state = True
             for sig in signatures:
                 if not sig.get("visible", True):
@@ -597,8 +607,8 @@ class MainWindow(QMainWindow):
             chk_item = QTableWidgetItem("")
             chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
             chk_item.setCheckState(Qt.CheckState.Checked if default_state else Qt.CheckState.Unchecked)
-            chk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter) # Tentativa de alinhamento central
-            self.table_panel.table.setItem(0, 0, chk_item)
+            chk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table_panel.table.setItem(0, 1, chk_item)
 
     def _open_model_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
@@ -692,6 +702,10 @@ class MainWindow(QMainWindow):
             key = headers[c]
             item = table.item(row_idx, c)
             
+            # Ignora a coluna de quantidade no preview técnico do cartão
+            if key == "🔢 Qtd":
+                continue
+                
             if key == "✍️ Ass.":
                 row_data["__use_signature__"] = (item.checkState() == Qt.CheckState.Checked) if item else True
                 continue
@@ -725,28 +739,47 @@ class MainWindow(QMainWindow):
 
         for r in range(rows):
             row_p, row_r = {}, {}
-            is_empty = True
+            multiplier = 1
+            has_content = False
+            
             for c in range(cols):
                 key = headers[c]
                 item = table.item(r, c)
                 
+                # 1. Trata a nova coluna de Quantidade
+                if key == "🔢 Qtd":
+                    try:
+                        val = int(item.text().strip()) if item else 1
+                        multiplier = max(0, val) # Impede números negativos
+                    except ValueError:
+                        multiplier = 1
+                    continue
+
+                # 2. Trata a coluna de Assinatura
                 if key == "✍️ Ass.":
                     use_sig = (item.checkState() == Qt.CheckState.Checked) if item else True
                     row_p["__use_signature__"] = use_sig
                     row_r["__use_signature__"] = use_sig
                     continue
 
+                # 3. Trata placeholders comuns
                 val_plain = item.text().strip() if item else ""
                 val_rich = item.data(Qt.ItemDataRole.UserRole) if item else ""
                 if not val_rich: val_rich = val_plain
                 
-                if val_plain: is_empty = False
+                if val_plain: 
+                    has_content = True
+                
                 row_p[key] = val_plain
                 row_r[key] = val_rich
 
-            if not is_empty:
-                data_plain.append(row_p)
-                data_rich.append(row_r)
+            # Validação: Se a linha tiver conteúdo OU o multiplicador for > 0, 
+            # nós geramos (isso permite gerar cartões sem placeholders).
+            if multiplier > 0:
+                for _ in range(multiplier):
+                    data_plain.append(row_p.copy())
+                    data_rich.append(row_r.copy())
+                    
         return data_plain, data_rich
     
     def _toggle_single_pdf_option(self, fmt):

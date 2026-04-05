@@ -44,17 +44,23 @@ class RenderManager(QObject):
         
         all_tasks_data = []
         used_names = set()
-        for i, row in enumerate(self.rows_plain):
+        
+        # O total_cards agora reflete a lista já multiplicada vinda da MainWindow
+        for i in range(len(self.rows_plain)):
+            row = self.rows_plain[i]
+            # Build output filename garante unicidade (ex: arquivo_01, arquivo_02)
             fname = build_output_filename(self.pattern, row, used_names)
             all_tasks_data.append( (self.rows_plain[i], self.rows_rich[i], fname) )
 
+        # Define a força bruta de processamento
         cpu_count = os.cpu_count() or 4
         num_threads = max(1, cpu_count - 2)
         
-        # Trava o multiprocessamento para evitar colisão de escrita no mesmo arquivo PDF
+        # Se for PDF Único, precisamos de apenas 1 thread para não corromper o arquivo
         if self.single_pdf and self.export_format == "PDF":
             num_threads = 1
 
+        # Dispara o modo correto baseado na configuração do modelo
         if self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
         else:
