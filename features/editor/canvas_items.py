@@ -6,7 +6,7 @@ from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
 import re
 from core.text_state import TextState
 
-DPI = 96
+DPI = 300
 
 def mm_to_px(mm):
     return (mm * DPI) / 25.4
@@ -463,3 +463,40 @@ class ImageItem(QGraphicsPixmapItem):
 
     def resize_from_handle(self, w, h):
         self.resize_custom(w, h)
+
+class BackgroundItem(ImageItem):
+    """
+    Herdando de ImageItem, o fundo atua como um PowerClip (Máscara de Corte).
+    Ele ganha alças de redimensionamento e vira uma camada livre (Z-Value -100), 
+    mas é renderizado estritamente dentro da área da prancheta.
+    """
+    def __init__(self, pixmap_path, parent=None):
+        super().__init__(pixmap_path, parent)
+        self.setZValue(-100)
+
+    def paint(self, painter, option, widget=None):
+        """MÁGICA VISUAL: Corta a pintura da imagem nas bordas exatas do documento."""
+        if self.scene():
+            from PySide6.QtGui import QPainterPath
+            path = QPainterPath()
+            path.addRect(self.scene().sceneRect())
+            local_path = self.mapFromScene(path) # Traduz as coordenadas do documento para as da imagem
+            
+            # Aplica a máscara (PowerClip)
+            painter.setClipPath(local_path)
+            
+        super().paint(painter, option, widget)
+
+    def shape(self):
+        """MÁGICA DE UX: Impede que o usuário selecione a parte invisível da imagem clicando no nada."""
+        base_shape = super().shape()
+        if self.scene():
+            from PySide6.QtGui import QPainterPath
+            path = QPainterPath()
+            path.addRect(self.scene().sceneRect())
+            local_path = self.mapFromScene(path)
+            
+            # O formato "clicável" é apenas a interseção entre o tamanho real da imagem e o tamanho do documento
+            return base_shape.intersected(local_path)
+            
+        return base_shape

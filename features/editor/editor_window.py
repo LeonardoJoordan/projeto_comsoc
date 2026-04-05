@@ -9,7 +9,7 @@ from PySide6.QtCore import Qt, Signal, QEvent
 from pathlib import Path
 import shutil
 
-from .canvas_items import DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, ImageItem
+from .canvas_items import DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, ImageItem, BackgroundItem
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
@@ -106,7 +106,7 @@ class EditorWindow(QMainWindow):
         self.background_path = None
         
         self.fallback_bg = self.scene.addRect(0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
-        self.fallback_bg.setZValue(-100)
+        self.fallback_bg.setZValue(-200) # Afundado para -200 para ficar atrás do BackgroundItem (-100)
         
         center_container = QWidget()
         center_layout = QVBoxLayout(center_container)
@@ -146,6 +146,11 @@ class EditorWindow(QMainWindow):
         
         row_phys.addWidget(self.spin_phys_w)
         row_phys.addWidget(self.spin_phys_h)
+        
+        # Conecta as caixas de texto à função dinâmica
+        self.spin_phys_w.valueChanged.connect(self._on_physical_size_changed)
+        self.spin_phys_h.valueChanged.connect(self._on_physical_size_changed)
+        
         ly_doc.addLayout(row_phys)
         right_layout.addWidget(grp_doc)
         self._add_separator(right_layout)
@@ -264,6 +269,10 @@ class EditorWindow(QMainWindow):
 
         self.shortcut_underline = QShortcut(QKeySequence("Ctrl+U"), self)
         self.shortcut_underline.activated.connect(lambda: self.editor_texto_panel.btn_underline.click() if self.editor_texto_panel.isEnabled() else None)
+
+        # --- FORÇA A SINCRONIA INICIAL ---
+        # Faz o quadrado branco (1000x1000) se transformar no retângulo exato ditado pelas caixas (100x150mm) a 300 DPI
+        self._on_physical_size_changed()
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -678,6 +687,18 @@ class EditorWindow(QMainWindow):
             "images": images_data,
             "boxes": boxes_data
         }
+        
+        from .canvas_items import BackgroundItem
+        if self.bg_item and isinstance(self.bg_item, BackgroundItem):
+            from PySide6.QtWidgets import QGraphicsItem
+            data["bg_props"] = {
+                "x": int(self.bg_item.pos().x()),
+                "y": int(self.bg_item.pos().y()),
+                "w": int(self.bg_item.pixmap().width()),
+                "h": int(self.bg_item.pixmap().height()),
+                "visible": self.bg_item.isVisible(),
+                "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+            }
                 
         model_name = self.windowTitle().replace("Editor Visual de Modelo - ", "")
         if not model_name or "Gerador de Cartões em Lote - GCL" in model_name:
@@ -714,32 +735,69 @@ class EditorWindow(QMainWindow):
         QMessageBox.information(self, "Sucesso", f"Modelo '{model_name}' salvo com sucesso em:\n{file_path}")
 
     
-    def load_background_image(self, path):
+    def load_background_image(self, path, update_ui=True, props=None):
         from PySide6.QtGui import QPixmap
         pixmap = QPixmap(path)
-        if pixmap.isNull():
-            return
+        if pixmap.isNull(): return
         
         if self.bg_item:
             self.scene.removeItem(self.bg_item)
             
         self.background_path = path
         
-        from PySide6.QtWidgets import QGraphicsItem
-        self.bg_item = self.scene.addPixmap(pixmap)
-        self.bg_item.setZValue(-100) 
+        # Instancia o fundo livre em vez de um Pixmap cimentado
+        from .canvas_items import BackgroundItem
+        self.bg_item = BackgroundItem(path)
+        self.scene.addItem(self.bg_item)
         
-        # Bloqueio permanente (Ghosting) do Fundo
-        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-        self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        if props:
+            # Se for carregado via JSON, recupera posições e bloqueios
+            self.bg_item.setPos(props.get("x", 0), props.get("y", 0))
+            if "w" in props and "h" in props:
+                self.bg_item.resize_custom(props["w"], props["h"])
+            self.bg_item.setVisible(props.get("visible", True))
+            if props.get("locked", False):
+                from PySide6.QtWidgets import QGraphicsItem
+                self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        elif not update_ui:
+            # Fallback para JSONs antigos: estica para o tamanho da tela para não quebrar layout
+            w_px = mm_to_px(self.spin_phys_w.value())
+            h_px = mm_to_px(self.spin_phys_h.value())
+            self.bg_item.resize_custom(w_px, h_px)
+
+        if update_ui:
+            # Lê o tamanho original da imagem ao importar manualmente e molda a "Prancheta"
+            w_mm = px_to_mm(pixmap.width())
+            h_mm = px_to_mm(pixmap.height())
+            
+            self.spin_phys_w.blockSignals(True)
+            self.spin_phys_h.blockSignals(True)
+            self.spin_phys_w.setValue(w_mm)
+            self.spin_phys_h.setValue(h_mm)
+            self.spin_phys_w.blockSignals(False)
+            self.spin_phys_h.blockSignals(False)
+            
+        self._on_physical_size_changed()
+        self._zoom_to_fit()
+
+    def _on_physical_size_changed(self, _=None):
+        """Redimensiona APENAS a prancheta (papel branco). A imagem de fundo agora é livre."""
+        if not hasattr(self, 'scene'): return
         
-        rect = pixmap.rect()
+        w_px = mm_to_px(self.spin_phys_w.value())
+        h_px = mm_to_px(self.spin_phys_h.value())
+        
+        from PySide6.QtCore import QRectF
+        rect = QRectF(0, 0, w_px, h_px)
+        
         self.scene.setSceneRect(rect)
         self.view.setSceneRect(rect)
         
-        self.fallback_bg.hide()
-        self._zoom_to_fit()
+        if self.fallback_bg:
+            self.fallback_bg.setRect(rect)
+            self.fallback_bg.show() # Garante que o papel branco esteja visível como base
 
     def _on_click_load_bg(self):
         from PySide6.QtWidgets import QFileDialog
@@ -809,14 +867,17 @@ class EditorWindow(QMainWindow):
             self.spin_phys_h.setValue(data.get("target_h_mm", 150.0))
         
         self.fallback_bg = self.scene.addRect(0, 0, canvas_w, canvas_h, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
-        self.fallback_bg.setZValue(-100)
+        self.fallback_bg.setZValue(-200) # Afundado!
 
         if data.get("background_path"):
             bg_path_raw = data["background_path"]
             bg_path = path.parent / bg_path_raw if not Path(bg_path_raw).is_absolute() else Path(bg_path_raw)
             
             if bg_path.exists():
-                self.load_background_image(str(bg_path))
+                self.load_background_image(str(bg_path), update_ui=False, props=data.get("bg_props"))
+            
+            if bg_path.exists():
+                self.load_background_image(str(bg_path), update_ui=False) # <- update_ui=False para respeitar as medidas salvas
 
         from .canvas_items import SignatureItem, ImageItem
         for sig_data in data.get("signatures", []):
@@ -925,7 +986,8 @@ class EditorWindow(QMainWindow):
             return f"{prefix}_Assinatura"
         elif isinstance(item, ImageItem):
             return f"{prefix}_Imagem"
-        if item == self.bg_item:
+        from .canvas_items import BackgroundItem
+        if isinstance(item, BackgroundItem):
             return f"{prefix}_Fundo"
         return f"{prefix}_Objeto"
 
@@ -938,8 +1000,9 @@ class EditorWindow(QMainWindow):
         imagens = []
         fundo = None
         
+        from .canvas_items import BackgroundItem, SignatureItem, DesignerBox, ImageItem
         for item in self.scene.items():
-            if item == self.bg_item: fundo = item
+            if isinstance(item, BackgroundItem): fundo = item
             elif isinstance(item, SignatureItem): assinaturas.append(item)
             elif isinstance(item, DesignerBox): textos.append(item)
             elif isinstance(item, ImageItem): imagens.append(item)
@@ -1035,13 +1098,7 @@ class EditorWindow(QMainWindow):
                 
                 btn_lock.clicked.connect(lambda checked=False, itm=item, eff=effect_lock, l=lbl: toggle_item_lock(itm, eff, l))
                 ly.addWidget(btn_lock)
-                
-                # Remove controles interativos se for a camada de fundo fixa
-                if item == self.bg_item:
-                    btn_vis.setVisible(False)
-                    btn_lock.setVisible(False)
-                    lbl.setStyleSheet("color: #888888; font-weight: bold;")
-                
+                                
                 # --- Finalização ---
                 list_item.setSizeHint(w.sizeHint())
                 self.layer_list.addItem(list_item)
@@ -1089,14 +1146,17 @@ class EditorWindow(QMainWindow):
             if target:
                 items_in_order.append(target)
                 
+        from .canvas_items import SignatureItem, DesignerBox, ImageItem, BackgroundItem
         assinaturas = [i for i in items_in_order if isinstance(i, SignatureItem)]
         textos = [i for i in items_in_order if isinstance(i, DesignerBox)]
-        imagens = [i for i in items_in_order if isinstance(i, ImageItem)]
+        imagens = [i for i in items_in_order if isinstance(i, ImageItem) and not isinstance(i, BackgroundItem)]
+        fundos = [i for i in items_in_order if isinstance(i, BackgroundItem)]
         
         # Blinda o Z-Value matematicamente, não importa pra onde o usuário tentou arrastar
         for i, item in enumerate(assinaturas): item.setZValue(250 - i)
         for i, item in enumerate(textos): item.setZValue(200 - i)
         for i, item in enumerate(imagens): item.setZValue(100 - i)
+        for i, item in enumerate(fundos): item.setZValue(-100 - i)
         
         # Redesenha forçadamente para que o item "pule" de volta para a sua seção correta caso tenha sido arrastado pra fora dela
         self.refresh_layer_list()
@@ -1105,8 +1165,8 @@ class EditorWindow(QMainWindow):
         """Abre um popup para renomear a camada com duplo clique."""
         item = list_item.data(Qt.ItemDataRole.UserRole)
         
-        # Ignora se for cabeçalho ou o Fundo (que é estático)
-        if not item or item == self.bg_item:
+        # Ignora se for cabeçalho vazio
+        if not item:
             return
             
         current_name = self._generate_layer_name(item.layer_id, item)
