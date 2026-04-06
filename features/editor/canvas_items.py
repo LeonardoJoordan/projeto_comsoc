@@ -295,10 +295,10 @@ class SignatureItem(QGraphicsPixmapItem):
         from PySide6.QtGui import QImageReader, QPixmap
         
         reader = QImageReader(pixmap_path)
-        reader.setAutoTransform(True) # Lê metadados EXIF e rotaciona corretamente fotos de celular
+        reader.setAutoTransform(True) # Lê metadados EXIF e rotaciona corretamente
         size = reader.size()
-        if size.width() > 3000 or size.height() > 3000:
-            size.scale(3000, 3000, Qt.AspectRatioMode.KeepAspectRatio)
+        if size.width() > 800 or size.height() > 800:
+            size.scale(800, 800, Qt.AspectRatioMode.KeepAspectRatio)
             reader.setScaledSize(size)
         
         img = reader.read()
@@ -394,10 +394,10 @@ class ImageItem(QGraphicsPixmapItem):
         from PySide6.QtGui import QImageReader, QPixmap
         
         reader = QImageReader(pixmap_path)
-        reader.setAutoTransform(True) # Proteção contra fotos rotacionadas no EXIF
+        reader.setAutoTransform(True)
         size = reader.size()
-        if size.width() > 4000 or size.height() > 4000:
-            size.scale(4000, 4000, Qt.AspectRatioMode.KeepAspectRatio)
+        if size.width() > 2000 or size.height() > 2000:
+            size.scale(2000, 2000, Qt.AspectRatioMode.KeepAspectRatio)
             reader.setScaledSize(size)
         
         img = reader.read()
