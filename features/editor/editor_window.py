@@ -331,11 +331,24 @@ class EditorWindow(QMainWindow):
     def eventFilter(self, source, event):
         # Escuta tanto a view principal quanto o viewport das barras de rolagem
         if source in (self.view, self.view.viewport()):
-            # --- 1. Zoom com Ctrl + Scroll ---
+            # --- 1. Zoom com Ctrl + Scroll ou Mouse (Wayland/X11) ---
             if event.type() == QEvent.Type.Wheel and (event.modifiers() & Qt.KeyboardModifier.ControlModifier):
-                zoom_factor = 1.15 if event.angleDelta().y() > 0 else 1 / 1.15
-                self.view.scale(zoom_factor, zoom_factor)
+                delta = event.angleDelta().y()
+                if delta == 0:
+                    delta = event.pixelDelta().y()
+                
+                if delta != 0:
+                    zoom_factor = 1.15 if delta > 0 else 1 / 1.15
+                    self.view.scale(zoom_factor, zoom_factor)
                 event.accept() # Mata o evento nativo de rolagem
+                return True
+
+            # --- 1.5. Zoom com Gesto de Pinça (Touchpad) ---
+            if event.type() == QEvent.Type.NativeGesture and event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+                zoom_factor = 1.0 + event.value()
+                if zoom_factor > 0:
+                    self.view.scale(zoom_factor, zoom_factor)
+                event.accept()
                 return True
 
             # --- Eventos de Teclado (Pressionar) ---
