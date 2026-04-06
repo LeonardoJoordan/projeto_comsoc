@@ -749,9 +749,13 @@ class EditorWindow(QMainWindow):
 
     
     def load_background_image(self, path, update_ui=True, props=None):
-        from PySide6.QtGui import QPixmap
-        pixmap = QPixmap(path)
-        if pixmap.isNull(): return
+        from PySide6.QtGui import QImageReader
+        reader = QImageReader(path)
+        reader.setAutoTransform(True)
+        original_size = reader.size()
+        
+        if not reader.canRead() or original_size.isEmpty(): 
+            return
         
         if self.bg_item:
             self.scene.removeItem(self.bg_item)
@@ -782,8 +786,8 @@ class EditorWindow(QMainWindow):
 
         if update_ui:
             # Lê o tamanho original da imagem ao importar manualmente e molda a "Prancheta"
-            w_mm = px_to_mm(pixmap.width())
-            h_mm = px_to_mm(pixmap.height())
+            w_mm = px_to_mm(original_size.width())
+            h_mm = px_to_mm(original_size.height())
             
             self.spin_phys_w.blockSignals(True)
             self.spin_phys_h.blockSignals(True)

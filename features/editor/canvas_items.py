@@ -292,7 +292,18 @@ class SignatureItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
     def __init__(self, pixmap_path, parent=None):
-        pixmap = QPixmap(pixmap_path)
+        from PySide6.QtGui import QImageReader, QPixmap
+        
+        reader = QImageReader(pixmap_path)
+        reader.setAutoTransform(True) # Lê metadados EXIF e rotaciona corretamente fotos de celular
+        size = reader.size()
+        if size.width() > 3000 or size.height() > 3000:
+            size.scale(3000, 3000, Qt.AspectRatioMode.KeepAspectRatio)
+            reader.setScaledSize(size)
+        
+        img = reader.read()
+        pixmap = QPixmap.fromImage(img) if not img.isNull() else QPixmap(pixmap_path)
+        
         super().__init__(pixmap)
         self._original_path = pixmap_path
         self.setFlags(
@@ -380,7 +391,18 @@ class ImageItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
     def __init__(self, pixmap_path, parent=None):
-        pixmap = QPixmap(pixmap_path)
+        from PySide6.QtGui import QImageReader, QPixmap
+        
+        reader = QImageReader(pixmap_path)
+        reader.setAutoTransform(True) # Proteção contra fotos rotacionadas no EXIF
+        size = reader.size()
+        if size.width() > 4000 or size.height() > 4000:
+            size.scale(4000, 4000, Qt.AspectRatioMode.KeepAspectRatio)
+            reader.setScaledSize(size)
+        
+        img = reader.read()
+        pixmap = QPixmap.fromImage(img) if not img.isNull() else QPixmap(pixmap_path)
+        
         super().__init__(pixmap)
         self._original_path = pixmap_path
         self.setFlags(
