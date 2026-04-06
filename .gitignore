@@ -27,3 +27,9 @@ dist/
 Thumbs.db
 .vscode/
 .idea/
+
+# AppImage e Relatórios de Crash
+appimagetool
+COMSOC-x86_64.AppImage
+nuitka-crash-report.xml
+COMSOC.AppDir

@@ -8,7 +8,7 @@ from .imposition import SheetAssembler
 class NamingDialog(QDialog):
     def __init__(self, parent, model_slug: str, available_vars: list[str], 
                  current_pattern: str = "", model_size_px: tuple[int, int] = (1000, 1000),
-                 current_imposition: dict = None):
+                 current_imposition: dict = None, is_dark: bool = True):
         super().__init__(parent)
         self.setWindowTitle("Configurar Saída e Impressão")
         self.resize(500, 450)
@@ -27,6 +27,9 @@ class NamingDialog(QDialog):
             "target_h_mm": 0,
             "print_after_generation": False
         }
+
+        # Captura o estado atual do tema recebido da MainWindow
+        self.current_is_dark = is_dark
 
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
@@ -184,6 +187,27 @@ class NamingDialog(QDialog):
         btns.accepted.connect(self._on_accept)
         btns.rejected.connect(self.reject)
         layout.addWidget(btns)
+
+        # --- Seção: Preferências do Sistema ---
+        from PySide6.QtWidgets import QRadioButton, QButtonGroup
+        grp_system = QGroupBox("Preferências do Sistema (Global)")
+        ly_system = QVBoxLayout(grp_system)
+        
+        self.radio_light = QRadioButton("☀️ Tema Claro")
+        self.radio_dark = QRadioButton("🌙 Tema Escuro (Mint-Y)")
+        
+        self.theme_group = QButtonGroup(self)
+        self.theme_group.addButton(self.radio_light)
+        self.theme_group.addButton(self.radio_dark)
+        
+        if self.current_is_dark:
+            self.radio_dark.setChecked(True)
+        else:
+            self.radio_light.setChecked(True)
+            
+        ly_system.addWidget(self.radio_dark)
+        ly_system.addWidget(self.radio_light)
+        layout.addWidget(grp_system)
 
         # Executa o cálculo inicial somente após toda a interface (incluindo botões) ser criada
         self._update_capacity_preview()

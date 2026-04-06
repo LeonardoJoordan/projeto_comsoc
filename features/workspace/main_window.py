@@ -178,6 +178,10 @@ class MainWindow(QMainWindow):
         if last_output:
             self.txt_output_path.setText(str(last_output))
 
+        # Inicializa o tema visual salvo (padrão é escuro)
+        is_dark = self.settings.value("dark_mode", True, type=bool)
+        self._apply_theme(is_dark)
+
     def _ensure_starter_pack(self):
         from core.paths import get_models_dir
         models_dir = get_models_dir()
@@ -382,11 +386,21 @@ class MainWindow(QMainWindow):
             model_size = (sz.get("w", 1000), sz.get("h", 1000))
             current_imposition = self.cached_model_data.get("imposition_settings") 
 
+        # Lê o tema atual e envia para a janela de configurações
+        is_dark_now = self.settings.value("dark_mode", True, type=bool)
+        
         dlg = NamingDialog(self, slug, vars_available, self.current_filename_suffix, 
                            model_size_px=model_size, 
-                           current_imposition=current_imposition)
+                           current_imposition=current_imposition,
+                           is_dark=is_dark_now)
         
         if dlg.exec():
+            # 1. Verifica e aplica o tema IMEDIATAMENTE caso o usuário tenha alterado
+            new_is_dark = dlg.radio_dark.isChecked()
+            if new_is_dark != is_dark_now:
+                self._apply_theme(new_is_dark)
+
+            # 2. Continua salvando as configurações de Nomenclatura e Imposição
             new_suffix = dlg.get_pattern()
             new_imposition = dlg.get_imposition_settings() 
             self.current_filename_suffix = new_suffix
@@ -883,6 +897,55 @@ class MainWindow(QMainWindow):
             self.log_panel.append(f"❌ Erro durante impressão: {e}")
         finally:
             painter.end()
+
+    def _apply_theme(self, is_dark: bool):
+        from PySide6.QtGui import QPalette, QColor
+        from PySide6.QtWidgets import QApplication
+        
+        app = QApplication.instance()
+        if not app: return
+        
+        app.setStyle("Fusion")
+        
+        if is_dark:
+            palette = QPalette()
+            # Cores exatas extraídas do Mint-Y-Dark
+            bg_color = QColor("#2e2e33")
+            text_color = QColor("#DADADA")
+            alt_base_color = QColor("#222226")
+            button_color = QColor("#333338")
+            highlight_color = QColor("#35A854")
+            
+            palette.setColor(QPalette.ColorRole.Window, bg_color)
+            palette.setColor(QPalette.ColorRole.WindowText, text_color)
+            palette.setColor(QPalette.ColorRole.Base, bg_color)
+            palette.setColor(QPalette.ColorRole.AlternateBase, alt_base_color)
+            palette.setColor(QPalette.ColorRole.ToolTipBase, bg_color)
+            palette.setColor(QPalette.ColorRole.ToolTipText, text_color)
+            palette.setColor(QPalette.ColorRole.Text, text_color)
+            palette.setColor(QPalette.ColorRole.Button, button_color)
+            palette.setColor(QPalette.ColorRole.ButtonText, text_color)
+            palette.setColor(QPalette.ColorRole.BrightText, QColor("#FFFFFF"))
+            palette.setColor(QPalette.ColorRole.Link, QColor("#5294E2"))
+            palette.setColor(QPalette.ColorRole.Highlight, highlight_color)
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
+            
+            # Textos e botões desabilitados
+            disabled_color = QColor(255, 255, 255, 107)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled_color)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_color)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, disabled_color)
+
+            app.setPalette(palette)
+            # Reforço global para bordas finas (Fusion costuma ignorar na paleta)
+            app.setStyleSheet("QTableWidget, QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit { border: 1px solid #202023; }")
+        else:
+            # Restaura o estilo claro nativo
+            app.setPalette(app.style().standardPalette())
+            app.setStyleSheet("")
+            
+        if hasattr(self, 'settings'):
+            self.settings.setValue("dark_mode", is_dark)
 
     def closeEvent(self, event):
         """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
