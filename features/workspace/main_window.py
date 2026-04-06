@@ -938,7 +938,7 @@ class MainWindow(QMainWindow):
 
             app.setPalette(palette)
             # Reforço global para bordas finas (Fusion costuma ignorar na paleta)
-            app.setStyleSheet("QTableWidget, QLineEdit, QSpinBox, QDoubleSpinBox, QTextEdit { border: 1px solid #202023; }")
+            app.setStyleSheet("QTableWidget, QLineEdit, QTextEdit { border: 1px solid #202023; }")
         else:
             # Restaura o estilo claro nativo
             app.setPalette(app.style().standardPalette())
