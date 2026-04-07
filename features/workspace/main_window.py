@@ -222,21 +222,109 @@ class MainWindow(QMainWindow):
             json.dump(example_data, f, indent=4, ensure_ascii=False)
 
     def _on_import_models(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Importar Modelo", "", "Pacotes de Modelo ZIP (*.zip)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Importar Lote", "", "Pacotes de Modelo ZIP (*.zip)")
         if not file_path: return
 
         try:
+            import tempfile
             from core.paths import get_models_dir
+            from features.workspace.import_models_dialog import ImportModelsDialog
+            
             models_dir = get_models_dir()
             
+            # Etapa 1: Espionagem do ZIP (Leitura ultrarrápida de cabeçalhos sem extrair)
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
-                zip_ref.extractall(models_dir)
+                # Descobre as pastas de modelo dentro do zip
+                top_level_folders = set(info.filename.split('/')[0] for info in zip_ref.infolist() if '/' in info.filename)
+                
+                models_in_zip = {} # Mapeamento (Nome Legível do JSON -> Nome da Pasta no Zip)
+                
+                for zip_slug in top_level_folders:
+                    json_path = f"{zip_slug}/template_v3.json"
+                    try:
+                        with zip_ref.open(json_path) as f:
+                            data = json.loads(f.read().decode('utf-8'))
+                            name = data.get("name", zip_slug)
+                            models_in_zip[name] = zip_slug
+                    except KeyError: 
+                        # Se o modelo não tiver um JSON válido, usamos o nome bruto da pasta
+                        models_in_zip[zip_slug] = zip_slug
+                        
+                if not models_in_zip:
+                    QMessageBox.warning(self, "Arquivo Inválido", "Este arquivo ZIP não contém modelos compatíveis com o Projeto ComSoc.")
+                    return
+                
+                # Etapa 2: Checagem de Conflitos e Abertura da Janela de Decisão
+                existing_slugs = set(d.name for d in models_dir.iterdir() if d.is_dir())
+                
+                dlg = ImportModelsDialog(self, list(models_in_zip.keys()), existing_slugs)
+                if not dlg.exec():
+                    return # O usuário clicou em Cancelar
+                    
+                decisions = dlg.get_decisions()
+                
+                # Etapa 3: Extração Cirúrgica via Cache Temporário
+                imported_count = 0
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    zip_ref.extractall(temp_dir)
+                    
+                    for model_name, decision in decisions.items():
+                        if not decision["import"] or decision["action"] == "ignore":
+                            continue # Pula modelos desmarcados ou ignorados
+                            
+                        zip_slug = models_in_zip[model_name]
+                        source_dir = Path(temp_dir) / zip_slug
+                        if not source_dir.exists():
+                            continue
+                            
+                        target_slug = slugify_model_name(model_name)
+                        target_name = model_name
+                        
+                        # Tratamento da Rota Escolhida
+                        if decision["action"] == "replace":
+                            target_dir = models_dir / target_slug
+                            if target_dir.exists():
+                                shutil.rmtree(target_dir) # Esmaga o modelo velho
+                                
+                        elif decision["action"] == "rename":
+                            # Validação dupla: Se por acaso o usuário marcou "Novo Nome" mas o arquivo 
+                            # não era conflito, ele mantém o original. Se for conflito, roda a lógica.
+                            if (models_dir / target_slug).exists():
+                                counter = 1
+                                base_name = f"{model_name} (Nova Importação)"
+                                target_name = base_name
+                                target_slug = slugify_model_name(target_name)
+                                
+                                # Garante um nome livre na pasta de modelos (Ex: Nova Importação 2)
+                                while (models_dir / target_slug).exists():
+                                    counter += 1
+                                    target_name = f"{base_name} {counter}"
+                                    target_slug = slugify_model_name(target_name)
+                            
+                            # Entra no modelo temporário e atualiza o JSON dele silenciosamente
+                            json_file = source_dir / "template_v3.json"
+                            if json_file.exists():
+                                with open(json_file, 'r', encoding='utf-8') as f:
+                                    data = json.load(f)
+                                data['name'] = target_name
+                                with open(json_file, 'w', encoding='utf-8') as f:
+                                    json.dump(data, f, indent=4, ensure_ascii=False)
+                        
+                        # Move a pasta tratada da área de segurança para a pasta oficial
+                        target_dir = models_dir / target_slug
+                        shutil.move(str(source_dir), str(target_dir))
+                        imported_count += 1
             
-            self.log_panel.append(f"📥 Modelo(s) importado(s) de: {Path(file_path).name}")
-            self._reload_models_from_disk()
-            QMessageBox.information(self, "Sucesso", "Importação concluída com sucesso!")
+            # Etapa 4: Finalização e Limpeza Automática do TempDir
+            if imported_count > 0:
+                self.log_panel.append(f"📥 {imported_count} modelo(s) processado(s) e importado(s) de: {Path(file_path).name}")
+                self._reload_models_from_disk()
+                QMessageBox.information(self, "Importação Concluída", f"{imported_count} modelo(s) adicionado(s) à sua biblioteca!")
+            else:
+                self.log_panel.append("⚠️ Processo finalizado: Nenhum modelo novo foi adicionado.")
+                
         except Exception as e:
-            QMessageBox.critical(self, "Erro na Importação", f"Ocorreu um erro ao descompactar:\n{e}")
+            QMessageBox.critical(self, "Falha Crítica", f"O sistema interceptou um erro na montagem do arquivo ZIP:\n{str(e)}")
 
     def _on_export_models(self):
         all_models = [self.preview_panel.cbo_models.itemText(i) for i in range(self.preview_panel.cbo_models.count())]
