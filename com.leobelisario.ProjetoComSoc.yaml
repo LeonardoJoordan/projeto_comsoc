@@ -1,0 +1,37 @@
+app-id: com.leobelisario.ProjetoComSoc
+runtime: org.gnome.Platform
+runtime-version: '45'
+sdk: org.gnome.Sdk
+command: projeto-comsoc
+
+finish-args:
+  # --- Interface Gráfica ---
+  - --socket=fallback-x11
+  - --socket=wayland
+  - --device=dri            # Aceleração de hardware (GPU)
+  
+  # --- Sistema de Arquivos ---
+  # Permite salvar os materiais gerados na pasta Documentos do usuário
+  - --filesystem=xdg-documents/ProjetoComSoc_Saida:create
+  
+  # --- Impressão ---
+  # Dá acesso ao servidor de impressão (CUPS) para o QPrinter funcionar
+  - --socket=cups
+
+modules:
+  - name: nuitka-compiler
+    buildsystem: simple
+    build-commands:
+      # Instala as dependências dentro do ambiente isolado
+      - pip3 install --user PySide6 nuitka
+    
+  - name: projeto-comsoc
+    buildsystem: simple
+    build-commands:
+      # Aqui acontece a mágica: o Nuitka compila seu código em binário fechado
+      # Isso protege sua propriedade intelectual para o registro no INPI
+      - python3 -m nuitka --standalone --onefile main.py -o projeto-comsoc
+      - install -D projeto-comsoc /app/bin/projeto-comsoc
+    sources:
+      - type: dir
+        path: .
