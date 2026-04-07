@@ -36,6 +36,7 @@ class RenderManager(QObject):
 
     def start(self):
         self._is_running = True
+        self._finish_emitted = False # Trava de segurança da Etapa Anterior
         self.cards_done = 0
         self.generated_files = []
         self.workers = []
@@ -45,22 +46,23 @@ class RenderManager(QObject):
         all_tasks_data = []
         used_names = set()
         
-        # O total_cards agora reflete a lista já multiplicada vinda da MainWindow
         for i in range(len(self.rows_plain)):
             row = self.rows_plain[i]
-            # Build output filename garante unicidade (ex: arquivo_01, arquivo_02)
             fname = build_output_filename(self.pattern, row, used_names)
             all_tasks_data.append( (self.rows_plain[i], self.rows_rich[i], fname) )
 
-        # Define a força bruta de processamento
         cpu_count = os.cpu_count() or 4
         num_threads = max(1, cpu_count - 2)
         
-        # Se for PDF Único, precisamos de apenas 1 thread para não corromper o arquivo
-        if self.single_pdf and self.export_format == "PDF":
-            num_threads = 1
+        # --- LÓGICA HÍBRIDA (Fim do castramento de threads) ---
+        self.is_hybrid = (self.single_pdf and self.export_format == "PDF")
+        self.work_dir = self.output_dir / ".temp_hybrid" if self.is_hybrid else self.output_dir
+        self.worker_format = "PNG" if self.is_hybrid else self.export_format
 
-        # Dispara o modo correto baseado na configuração do modelo
+        if self.is_hybrid:
+            self.work_dir.mkdir(parents=True, exist_ok=True)
+            self.log_updated.emit(f"⚡ Modo Híbrido: Gerando em cache ({num_threads} threads)...")
+
         if self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
         else:
@@ -102,7 +104,7 @@ class RenderManager(QObject):
             
             if not worker_tasks: continue
             
-            w = PageRenderWorker(worker_tasks, self.renderer, self.output_dir, self.imposition_settings, self.export_format, self.single_pdf)
+            w = PageRenderWorker(worker_tasks, self.renderer, self.work_dir, self.imposition_settings, self.worker_format, False)
             w.page_finished.connect(self._on_page_finished)
             w.error_occurred.connect(self.error_occurred)
             w.finished.connect(self._check_all_finished)
@@ -122,7 +124,7 @@ class RenderManager(QObject):
             
             if not chunk: continue
             
-            w = DirectRenderWorker(chunk, self.renderer, self.output_dir, self.export_format, self.single_pdf, self.target_w_mm, self.target_h_mm)
+            w = DirectRenderWorker(chunk, self.renderer, self.work_dir, self.worker_format, False, self.target_w_mm, self.target_h_mm)
             w.card_finished.connect(self._on_direct_card_finished)
             w.error_occurred.connect(self.error_occurred)
             w.finished.connect(self._check_all_finished)
@@ -159,7 +161,65 @@ class RenderManager(QObject):
 
     def _check_all_finished(self):
         if all(w.isFinished() for w in self.workers):
-            if self._is_running:
+            if self._is_running and not getattr(self, '_finish_emitted', False):
+                self._finish_emitted = True
                 self.progress_updated.emit(100)
-                self.finished_process.emit()
-                self.log_updated.emit("✅ Processo finalizado com sucesso!")
+                
+                # Desvio Híbrido: Última thread chama a montagem em vez de encerrar.
+                if getattr(self, 'is_hybrid', False):
+                    self._assemble_hybrid_pdf()
+                else:
+                    self.finished_process.emit()
+                    self.log_updated.emit("✅ Processo finalizado com sucesso!")
+
+    def _assemble_hybrid_pdf(self):
+        self.log_updated.emit("📦 Montando arquivo PDF Único final...")
+        try:
+            from PySide6.QtGui import QPainter, QPdfWriter, QPageLayout, QPageSize, QImage
+            from PySide6.QtCore import QSizeF, QMarginsF
+            import shutil
+
+            out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
+            if self.is_imposition:
+                out_path_single = self.output_dir / f"{self.output_dir.name}_Imposicao.pdf"
+
+            writer = QPdfWriter(str(out_path_single))
+            writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
+            
+            layout = writer.pageLayout()
+            layout.setMargins(QMarginsF(0, 0, 0, 0))
+
+            if self.is_imposition:
+                sheet_w = self.imposition_settings.get("sheet_w_mm", 210.0)
+                sheet_h = self.imposition_settings.get("sheet_h_mm", 297.0)
+                layout.setPageSize(QPageSize(QSizeF(sheet_w, sheet_h), QPageSize.Unit.Millimeter))
+            else:
+                layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
+                
+            writer.setPageLayout(layout)
+            painter = QPainter(writer)
+
+            sorted_files = sorted(self.generated_files)
+
+            for i, filename in enumerate(sorted_files):
+                if i > 0:
+                    writer.newPage()
+                img_path = self.work_dir / filename
+                if not img_path.exists(): continue
+                
+                img = QImage(str(img_path))
+                painter.drawImage(layout.paintRectPixels(writer.resolution()), img)
+                del img # Evita vazamento de memória enquanto empilha
+            
+            painter.end()
+
+            # Limpa as evidências (cache) e atualiza os arquivos para impressão direta funcionar
+            shutil.rmtree(self.work_dir, ignore_errors=True)
+            self.generated_files = [out_path_single.name]
+
+            self.finished_process.emit()
+            self.log_updated.emit("✅ Processo finalizado com sucesso!")
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Erro na montagem do PDF: {str(e)}")
+            self.finished_process.emit() # Libera a interface pra não travar no loading
