@@ -15,11 +15,11 @@ def build_app():
    # Base do comando Nuitka
     cmd = [
         sys.executable, "-m", "nuitka",
-        "--standalone",
         "--onefile",
         f"--output-filename={exe_name}",
         "--output-dir=build",
         "--plugin-enable=pyside6",
+        "--include-qt-plugins=imageformats,platforms",
         "--include-module=encodings",
         "--include-module=sqlite3",
         "--include-package=features",
