@@ -4,6 +4,11 @@ runtime-version: '45'
 sdk: org.gnome.Sdk
 command: projeto-comsoc
 
+# Libera o acesso à internet durante a compilação (necessário para o pip baixar o PySide6)
+build-options:
+  build-args:
+    - --share=network
+
 finish-args:
   # --- Interface Gráfica ---
   - --socket=fallback-x11
@@ -19,19 +24,32 @@ finish-args:
   - --socket=cups
 
 modules:
-  - name: nuitka-compiler
+  - name: dependencias
     buildsystem: simple
     build-commands:
-      # Instala as dependências dentro do ambiente isolado
-      - pip3 install --user PySide6 nuitka
+      # Instala o PySide6 puro diretamente na raiz do container (/app)
+      - pip3 install --prefix=/app PySide6
     
   - name: projeto-comsoc
     buildsystem: simple
     build-commands:
-      # Aqui acontece a mágica: o Nuitka compila seu código em binário fechado
-      # Isso protege sua propriedade intelectual para o registro no INPI
-      - python3 -m nuitka --standalone --onefile main.py -o projeto-comsoc
-      - install -D projeto-comsoc /app/bin/projeto-comsoc
+      # Prepara os diretórios internos
+      - mkdir -p /app/share/projeto-comsoc
+      - mkdir -p /app/bin
+      
+      # Copia todo o código-fonte Python para a pasta do sistema
+      - cp -r * /app/share/projeto-comsoc/
+      
+      # Cria o script de inicialização (wrapper) que invoca o Python nativo
+      - |
+        cat << 'EOF' > /app/bin/projeto-comsoc
+        #!/bin/sh
+        export PYTHONPATH="/app/share/projeto-comsoc:$PYTHONPATH"
+        exec python3 /app/share/projeto-comsoc/main.py "$@"
+        EOF
+        
+      # Dá permissão de execução ao script
+      - chmod +x /app/bin/projeto-comsoc
     sources:
       - type: dir
         path: .
