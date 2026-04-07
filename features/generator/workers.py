@@ -1,8 +1,7 @@
-from PySide6.QtCore import QThread, Signal
-from PySide6.QtGui import QImage
+from PySide6.QtCore import QThread, Signal, QSizeF, QMarginsF
+from PySide6.QtGui import QImage, QPainter, QPdfWriter, QPageLayout, QPageSize
 import traceback
-from PySide6.QtGui import QPainter, QPdfWriter, QPageLayout, QPageSize
-from PySide6.QtCore import QMarginsF
+import shutil
 
 # Imports relativos do novo domínio
 from .imposition import SheetAssembler
@@ -43,7 +42,6 @@ class PageRenderWorker(QThread):
                 writer = QPdfWriter(str(out_path_single))
                 
                 # A folha física agora é gerada com precisão em milímetros baseada na montagem final
-                from PySide6.QtCore import QSizeF
                 writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
                 layout = writer.pageLayout()
                 w_sheet_mm = (self.assembler.sheet_w * 25.4) / 300.0
@@ -79,7 +77,6 @@ class PageRenderWorker(QThread):
                         writer_single = QPdfWriter(str(out_path))
                         
                         # Mesmo cálculo milimétrico para os PDFs Avulsos do modo de Imposição
-                        from PySide6.QtCore import QSizeF
                         writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
                         layout_single = writer_single.pageLayout()
                         w_sheet_mm = (self.assembler.sheet_w * 25.4) / 300.0
@@ -136,7 +133,6 @@ class DirectRenderWorker(QThread):
             if self.single_pdf and self.export_format == "PDF":
                 writer = QPdfWriter(str(out_path_single))
                 writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                from PySide6.QtCore import QSizeF
                 layout = writer.pageLayout()
                 layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
                 layout.setMargins(QMarginsF(0, 0, 0, 0))
@@ -157,7 +153,6 @@ class DirectRenderWorker(QThread):
                         out_path = self.output_dir / f"{filename}.pdf"
                         writer_single = QPdfWriter(str(out_path))
                         writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                        from PySide6.QtCore import QSizeF
                         layout_single = writer_single.pageLayout()
                         layout_single.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
                         layout_single.setMargins(QMarginsF(0, 0, 0, 0))
@@ -193,10 +188,6 @@ class HybridAssemblerWorker(QThread):
 
     def run(self):
         try:
-            from PySide6.QtGui import QPainter, QPdfWriter, QPageLayout, QPageSize, QImage
-            from PySide6.QtCore import QSizeF, QMarginsF
-            import shutil
-
             out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
             if self.is_imposition:
                 out_path_single = self.output_dir / f"{self.output_dir.name}_Imposicao.pdf"

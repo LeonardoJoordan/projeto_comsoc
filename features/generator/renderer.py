@@ -1,4 +1,5 @@
-from PySide6.QtGui import QPainter, QImage, QPixmap, QTextDocument
+from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont, 
+                           QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush)
 from PySide6.QtCore import Qt
 import re
 from pathlib import Path
@@ -137,8 +138,6 @@ class NativeRenderer:
         return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
 
     def _draw_html_box(self, painter, box_data, html_text):
-        from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush
-        
         painter.save()
         doc = QTextDocument()
         doc.setDocumentMargin(0) 
@@ -154,8 +153,6 @@ class NativeRenderer:
         doc.setHtml(clean_html)
 
         # 2. Aplicar a mesma Fonte Global nativa usada no DesignerBox
-        from PySide6.QtGui import QColor, QBrush
-        
         font_family = box_data.get("font_family", "Arial")
         font_size = box_data.get("font_size", 16)
         font = QFont(font_family, font_size)

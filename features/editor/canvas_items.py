@@ -1,9 +1,11 @@
-from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem, 
+import re
+from pathlib import Path
+from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem,
                                QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem)
 from PySide6.QtCore import Qt, QPointF
-from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor, 
-                           QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat)
-import re
+from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
+                           QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
+                           QImageReader, QPainterPath)
 from core.text_state import TextState
 
 DPI = 300
@@ -292,8 +294,6 @@ class SignatureItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
     def __init__(self, pixmap_path, parent=None):
-        from PySide6.QtGui import QImageReader, QPixmap
-        
         reader = QImageReader(pixmap_path)
         reader.setAutoTransform(True) # Lê metadados EXIF e rotaciona corretamente
         size = reader.size()        
@@ -387,8 +387,6 @@ class ImageItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
     def __init__(self, pixmap_path, parent=None):
-        from PySide6.QtGui import QImageReader, QPixmap
-        
         reader = QImageReader(pixmap_path)
         reader.setAutoTransform(True)
         size = reader.size()        
@@ -491,7 +489,6 @@ class BackgroundItem(ImageItem):
     def paint(self, painter, option, widget=None):
         """MÁGICA VISUAL: Corta a pintura da imagem nas bordas exatas do documento."""
         if self.scene():
-            from PySide6.QtGui import QPainterPath
             path = QPainterPath()
             path.addRect(self.scene().sceneRect())
             local_path = self.mapFromScene(path) # Traduz as coordenadas do documento para as da imagem
@@ -505,7 +502,6 @@ class BackgroundItem(ImageItem):
         """MÁGICA DE UX: Impede que o usuário selecione a parte invisível da imagem clicando no nada."""
         base_shape = super().shape()
         if self.scene():
-            from PySide6.QtGui import QPainterPath
             path = QPainterPath()
             path.addRect(self.scene().sceneRect())
             local_path = self.mapFromScene(path)

@@ -1,13 +1,15 @@
 import json
-from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidget, 
-                               QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton, 
-                               QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
-                               QListWidgetItem, QDoubleSpinBox, QComboBox)
-from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, 
-                           QKeySequence, QTextCursor, QTextCharFormat)
-from PySide6.QtCore import Qt, Signal, QEvent
-from pathlib import Path
+import copy
 import shutil
+from pathlib import Path
+from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidget,
+                               QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton,
+                               QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
+                               QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
+                               QFileDialog, QGraphicsOpacityEffect)
+from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut,
+                           QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap)
+from PySide6.QtCore import Qt, Signal, QEvent, QRectF
 
 from .canvas_items import DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, ImageItem, BackgroundItem
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
@@ -371,7 +373,6 @@ class EditorWindow(QMainWindow):
                     return True
                 
                 elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
-                    from PySide6.QtWidgets import QGraphicsItem
                     step = 10 if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
                     dx = -step if key == Qt.Key.Key_Left else (step if key == Qt.Key.Key_Right else 0)
                     dy = -step if key == Qt.Key.Key_Up else (step if key == Qt.Key.Key_Down else 0)
@@ -507,7 +508,6 @@ class EditorWindow(QMainWindow):
         new_box = DesignerBox(new_x, new_y, rect.width(), rect.height(), "")
         new_box.layer_id = None 
         
-        import copy
         new_box.state = copy.deepcopy(original.state)
         new_box.setRotation(original.rotation())
         new_box.apply_state()
@@ -594,7 +594,6 @@ class EditorWindow(QMainWindow):
         
         item.setRotation(0)
         
-        from .canvas_items import ImageItem, SignatureItem, DesignerBox
         if isinstance(item, (ImageItem, SignatureItem)):
             if hasattr(item, '_original_pixmap') and not item._original_pixmap.isNull():
                 w_px = item._original_pixmap.width()
@@ -633,7 +632,6 @@ class EditorWindow(QMainWindow):
                 pos = item.pos()
                 r = item.rect()
 
-                from PySide6.QtWidgets import QGraphicsItem
                 boxes_data.append({
                     "custom_name": getattr(item, "custom_name", ""),
                     "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
@@ -657,7 +655,6 @@ class EditorWindow(QMainWindow):
             elif isinstance(item, SignatureItem):
                 pos = item.pos()
                 pix = item.pixmap()
-                from PySide6.QtWidgets import QGraphicsItem
                 signatures_data.append({
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
@@ -673,7 +670,6 @@ class EditorWindow(QMainWindow):
             elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
                 pos = item.pos()
                 pix = item.pixmap()
-                from PySide6.QtWidgets import QGraphicsItem
                 images_data.append({
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
@@ -704,7 +700,6 @@ class EditorWindow(QMainWindow):
         }
         
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
-            from PySide6.QtWidgets import QGraphicsItem
             data["bg_props"] = {
                 "x": int(self.bg_item.pos().x()),
                 "y": int(self.bg_item.pos().y()),
@@ -750,14 +745,11 @@ class EditorWindow(QMainWindow):
 
     
     def load_background_image(self, path, update_ui=True, props=None):
-        from PySide6.QtGui import QImageReader
         reader = QImageReader(path)
         reader.setAutoTransform(True)
         original_size = reader.size()
         
-        from PySide6.QtGui import QPixmap
         if not reader.canRead() and QPixmap(path).isNull():
-            from PySide6.QtWidgets import QMessageBox
             QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
             return
             
@@ -770,7 +762,6 @@ class EditorWindow(QMainWindow):
         self.background_path = path
         
         # Instancia o fundo livre em vez de um Pixmap cimentado
-        from .canvas_items import BackgroundItem
         self.bg_item = BackgroundItem(path)
         self.scene.addItem(self.bg_item)
         self.refresh_layer_list()
@@ -782,7 +773,6 @@ class EditorWindow(QMainWindow):
                 self.bg_item.resize_custom(props["w"], props["h"])
             self.bg_item.setVisible(props.get("visible", True))
             if props.get("locked", False):
-                from PySide6.QtWidgets import QGraphicsItem
                 self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
                 self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
                 self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
@@ -814,7 +804,6 @@ class EditorWindow(QMainWindow):
         w_px = mm_to_px(self.spin_phys_w.value())
         h_px = mm_to_px(self.spin_phys_h.value())
         
-        from PySide6.QtCore import QRectF
         rect = QRectF(0, 0, w_px, h_px)
         
         self.scene.setSceneRect(rect)
@@ -825,14 +814,12 @@ class EditorWindow(QMainWindow):
             self.fallback_bg.show() # Garante que o papel branco esteja visível como base
 
     def _on_click_load_bg(self):
-        from PySide6.QtWidgets import QFileDialog
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Fundo", "", "Imagens (*.png *.jpg *.jpeg)")
         if path:
             self.load_background_image(path)
 
 
     def _on_click_add_signature(self):
-        from PySide6.QtWidgets import QFileDialog
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Assinatura", "", "Imagens (*.png)")
         if path:
             sig = SignatureItem(path)
@@ -841,7 +828,6 @@ class EditorWindow(QMainWindow):
             self.scene.addItem(sig)
 
     def _on_click_add_image(self):
-        from PySide6.QtWidgets import QFileDialog
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg)")
         if path:
             img = ImageItem(path)
@@ -871,7 +857,6 @@ class EditorWindow(QMainWindow):
         self.refresh_layer_list()
 
     def load_from_json(self, file_path):
-        import json
         path = Path(file_path)
         if not path.exists():
             return
@@ -913,13 +898,11 @@ class EditorWindow(QMainWindow):
                 # Uma única chamada, passando as propriedades (bg_props) se existirem
                 self.load_background_image(str(bg_path), update_ui=False, props=data.get("bg_props"))
 
-        from .canvas_items import SignatureItem, ImageItem
         for sig_data in data.get("signatures", []):
             raw_path = sig_data["path"]
             sig_path = path.parent / raw_path if not Path(raw_path).is_absolute() else Path(raw_path)
 
             if sig_path.exists():
-                from PySide6.QtWidgets import QGraphicsItem
                 sig = SignatureItem(str(sig_path))
                 sig.custom_name = sig_data.get("custom_name", "")
                 sig.setPos(sig_data["x"], sig_data["y"])
@@ -945,7 +928,6 @@ class EditorWindow(QMainWindow):
                 else:
                     img.resize_by_longest_side(img_data.get("longest_side", 100))
                     
-                from PySide6.QtWidgets import QGraphicsItem
                 img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
                 img.setVisible(img_data.get("visible", True))
@@ -976,7 +958,6 @@ class EditorWindow(QMainWindow):
             box.state.line_height = b.get("line_height", 1.15)
 
             box.setRotation(b.get("rotation", 0))
-            from PySide6.QtWidgets import QGraphicsItem
             box.apply_state()
             box.update_center() 
 
@@ -1020,7 +1001,6 @@ class EditorWindow(QMainWindow):
             return f"{prefix}_Assinatura"
         elif isinstance(item, ImageItem):
             return f"{prefix}_Imagem"
-        from .canvas_items import BackgroundItem
         if isinstance(item, BackgroundItem):
             return f"{prefix}_Fundo"
         return f"{prefix}_Objeto"
@@ -1034,7 +1014,6 @@ class EditorWindow(QMainWindow):
         imagens = []
         fundo = None
         
-        from .canvas_items import BackgroundItem, SignatureItem, DesignerBox, ImageItem
         for item in self.scene.items():
             if isinstance(item, BackgroundItem): fundo = item
             elif isinstance(item, SignatureItem): assinaturas.append(item)
@@ -1047,8 +1026,6 @@ class EditorWindow(QMainWindow):
         assinaturas.sort(key=lambda x: x.zValue(), reverse=True)
         textos.sort(key=lambda x: x.zValue(), reverse=True)
         imagens.sort(key=lambda x: x.zValue(), reverse=True)
-
-        from PySide6.QtWidgets import QGraphicsItem, QPushButton, QGraphicsOpacityEffect
 
         def toggle_item_visibility(item, effect):
             new_vis = not item.isVisible()
@@ -1076,7 +1053,6 @@ class EditorWindow(QMainWindow):
             label.setStyleSheet("color: #888888; font-style: italic;" if new_locked else "")
 
         def add_header(title):
-            from PySide6.QtGui import QBrush, QColor
             header = QListWidgetItem(f"--- {title} ---")
             header.setFlags(Qt.ItemFlag.NoItemFlags)
             header.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -1180,7 +1156,6 @@ class EditorWindow(QMainWindow):
             if target:
                 items_in_order.append(target)
                 
-        from .canvas_items import SignatureItem, DesignerBox, ImageItem, BackgroundItem
         assinaturas = [i for i in items_in_order if isinstance(i, SignatureItem)]
         textos = [i for i in items_in_order if isinstance(i, DesignerBox)]
         imagens = [i for i in items_in_order if isinstance(i, ImageItem) and not isinstance(i, BackgroundItem)]
@@ -1204,7 +1179,6 @@ class EditorWindow(QMainWindow):
             return
             
         current_name = self._generate_layer_name(item.layer_id, item)
-        from PySide6.QtWidgets import QInputDialog
         new_name, ok = QInputDialog.getText(self, "Renomear Camada", "Novo nome para a camada:", text=current_name)
         
         if ok and new_name.strip():

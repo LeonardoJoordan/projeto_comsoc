@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QHBoxLayout, QFrame, QGridLayout, 
                                QDialogButtonBox, QCheckBox, QGroupBox, QDoubleSpinBox,
-                               QWidget)
+                               QWidget, QRadioButton, QButtonGroup)
 from PySide6.QtCore import Qt
 from .imposition import SheetAssembler
 
@@ -189,7 +189,6 @@ class NamingDialog(QDialog):
         layout.addWidget(btns)
 
         # --- Seção: Preferências do Sistema ---
-        from PySide6.QtWidgets import QRadioButton, QButtonGroup
         grp_system = QGroupBox("Preferências do Sistema (Global)")
         ly_system = QVBoxLayout(grp_system)
         

@@ -3,13 +3,14 @@ import zipfile
 import os
 import shutil
 import json
+import tempfile
 from datetime import datetime
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
                                   QInputDialog, QComboBox, QCheckBox, QTableWidgetItem)
 from PySide6.QtCore import Qt, QSettings
-from PySide6.QtGui import QPainter, QImage, QPageLayout
+from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 
 # --- Importações da Nova Arquitetura ---
@@ -21,6 +22,8 @@ from features.generator.renderer import NativeRenderer
 from features.editor.editor_window import EditorWindow
 from features.generator.manager import RenderManager
 from features.generator.export_dialog import NamingDialog
+from features.workspace.import_models_dialog import ImportModelsDialog
+from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 
@@ -183,7 +186,6 @@ class MainWindow(QMainWindow):
         self._apply_theme(is_dark)
 
     def _ensure_starter_pack(self):
-        from core.paths import get_models_dir
         models_dir = get_models_dir()
         
         # Se a pasta já contém algo, o usuário não é novo. Interrompe a criação.
@@ -226,10 +228,6 @@ class MainWindow(QMainWindow):
         if not file_path: return
 
         try:
-            import tempfile
-            from core.paths import get_models_dir
-            from features.workspace.import_models_dialog import ImportModelsDialog
-            
             models_dir = get_models_dir()
             
             # Etapa 1: Espionagem do ZIP (Leitura ultrarrápida de cabeçalhos sem extrair)
@@ -333,7 +331,6 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Atenção", "Nenhum modelo disponível para exportar.")
             return
             
-        from features.workspace.export_models_dialog import ExportModelsDialog
         dlg = ExportModelsDialog(self, all_models)
         if not dlg.exec():
             return
@@ -347,7 +344,6 @@ class MainWindow(QMainWindow):
         if not save_path: return
         
         try:
-            from core.paths import get_models_dir
             models_dir = get_models_dir()
             
             with zipfile.ZipFile(save_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -987,9 +983,6 @@ class MainWindow(QMainWindow):
             painter.end()
 
     def _apply_theme(self, is_dark: bool):
-        from PySide6.QtGui import QPalette, QColor
-        from PySide6.QtWidgets import QApplication
-        
         app = QApplication.instance()
         if not app: return
         

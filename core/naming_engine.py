@@ -1,5 +1,5 @@
 import re
-from typing import Dict, Iterable, Set
+from typing import Dict, Set
 
 _INVALID_WIN_CHARS = r'<>:"/\\|?*'
 _INVALID_WIN_RE = re.compile(f"[{re.escape(_INVALID_WIN_CHARS)}]")
