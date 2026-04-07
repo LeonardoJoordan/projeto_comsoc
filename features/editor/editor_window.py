@@ -91,6 +91,7 @@ class EditorWindow(QMainWindow):
 
         self.scene = QGraphicsScene(0, 0, 1000, 1000)
         self.view = QGraphicsView(self.scene)
+        self.view.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate) # <-- EXTIRPA OS FANTASMAS
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.view.setBackgroundBrush(QBrush(QColor("#e0e0e0")))
         self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
@@ -159,7 +160,7 @@ class EditorWindow(QMainWindow):
         grp_pos = QFrame()
         ly_pos = QVBoxLayout(grp_pos)
         ly_pos.setContentsMargins(0, 0, 0, 10)
-        lbl_pos = QLabel("<b>PROPRIEDADES DO ITEM</b>")
+        lbl_pos = QLabel("<b>POSIÇÃO DO ITEM</b>")
         ly_pos.addWidget(lbl_pos)
         
         row_pos = QHBoxLayout()
@@ -416,6 +417,7 @@ class EditorWindow(QMainWindow):
         self.scene.addItem(box)
         self.scene.clearSelection()
         box.setSelected(True)
+        self.sync_placeholders_list() # <--- Adicionado
         self.refresh_layer_list()
 
     def update_position_ui(self):
@@ -668,7 +670,7 @@ class EditorWindow(QMainWindow):
                     "longest_side": max(pix.width(), pix.height())
                 })
 
-            elif isinstance(item, ImageItem):
+            elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
                 pos = item.pos()
                 pix = item.pixmap()
                 from PySide6.QtWidgets import QGraphicsItem
@@ -701,7 +703,6 @@ class EditorWindow(QMainWindow):
             "boxes": boxes_data
         }
         
-        from .canvas_items import BackgroundItem
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
             from PySide6.QtWidgets import QGraphicsItem
             data["bg_props"] = {
@@ -754,8 +755,14 @@ class EditorWindow(QMainWindow):
         reader.setAutoTransform(True)
         original_size = reader.size()
         
-        if not reader.canRead() or original_size.isEmpty(): 
+        from PySide6.QtGui import QPixmap
+        if not reader.canRead() and QPixmap(path).isNull():
+            from PySide6.QtWidgets import QMessageBox
+            QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
             return
+            
+        if original_size.isEmpty():
+            original_size = QPixmap(path).size()
         
         if self.bg_item:
             self.scene.removeItem(self.bg_item)
@@ -766,6 +773,7 @@ class EditorWindow(QMainWindow):
         from .canvas_items import BackgroundItem
         self.bg_item = BackgroundItem(path)
         self.scene.addItem(self.bg_item)
+        self.refresh_layer_list()
         
         if props:
             # Se for carregado via JSON, recupera posições e bloqueios
@@ -872,8 +880,8 @@ class EditorWindow(QMainWindow):
             data = json.load(f)
 
         self.scene.clear()
-        self.background_path = None
         self.bg_item = None
+        self.background_path = None
         
         canvas_w = data.get("canvas_size", {}).get("w", 1000)
         canvas_h = data.get("canvas_size", {}).get("h", 1000)
@@ -902,10 +910,8 @@ class EditorWindow(QMainWindow):
             bg_path = path.parent / bg_path_raw if not Path(bg_path_raw).is_absolute() else Path(bg_path_raw)
             
             if bg_path.exists():
+                # Uma única chamada, passando as propriedades (bg_props) se existirem
                 self.load_background_image(str(bg_path), update_ui=False, props=data.get("bg_props"))
-            
-            if bg_path.exists():
-                self.load_background_image(str(bg_path), update_ui=False) # <- update_ui=False para respeitar as medidas salvas
 
         from .canvas_items import SignatureItem, ImageItem
         for sig_data in data.get("signatures", []):
