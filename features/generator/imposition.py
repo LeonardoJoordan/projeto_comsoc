@@ -38,8 +38,8 @@ class SheetAssembler:
         usable_w_px = full_sheet_w_px - reserve_px
         usable_h_px = full_sheet_h_px - reserve_px
 
-        cols_p = usable_w_px // self.card_w_px
-        rows_p = usable_h_px // self.card_h_px
+        cols_p = max(0, usable_w_px // self.card_w_px)
+        rows_p = max(0, usable_h_px // self.card_h_px)
         cap_p = cols_p * rows_p
         
         cols_l = usable_h_px // self.card_w_px

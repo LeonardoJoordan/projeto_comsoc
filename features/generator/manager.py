@@ -80,6 +80,10 @@ class RenderManager(QObject):
         temp_asm = SheetAssembler(w_mm, h_mm)
         capacity = temp_asm.capacity
         
+        if capacity <= 0:
+            self.error_occurred.emit("Erro: O modelo é grande demais para as margens da folha.")
+            return
+            
         total_pages = math.ceil(len(all_data) / capacity)
         self.log_updated.emit(f"📚 Modo Imposição: {len(all_data)} cartões cabem em {total_pages} folhas (Capacidade: {capacity}/fl).")
         self.log_updated.emit(f"🚀 Distribuindo trabalho para {num_threads} threads...")
