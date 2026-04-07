@@ -272,6 +272,8 @@ class EditorWindow(QMainWindow):
 
         self.shortcut_underline = QShortcut(QKeySequence("Ctrl+U"), self)
         self.shortcut_underline.activated.connect(lambda: self.editor_texto_panel.btn_underline.click() if self.editor_texto_panel.isEnabled() else None)
+        self.shortcut_delete = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
+        self.shortcut_delete.activated.connect(self.delete_selected_items)
 
         # --- FORÇA A SINCRONIA INICIAL ---
         # Faz o quadrado branco (1000x1000) se transformar no retângulo exato ditado pelas caixas (100x150mm) a 300 DPI
@@ -363,16 +365,7 @@ class EditorWindow(QMainWindow):
                     self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
                     return True
                 
-                if key == Qt.Key.Key_Delete:
-                    selected = self.scene.selectedItems()
-                    for item in selected: 
-                        self.scene.removeItem(item)
-                    self.on_selection_changed()
-                    self.sync_placeholders_list()
-                    self.refresh_layer_list() # Atualiza a lista para expurgar itens deletados
-                    return True
-                
-                elif key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
+                if key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
                     step = 10 if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
                     dx = -step if key == Qt.Key.Key_Left else (step if key == Qt.Key.Key_Right else 0)
                     dy = -step if key == Qt.Key.Key_Up else (step if key == Qt.Key.Key_Down else 0)
@@ -524,6 +517,17 @@ class EditorWindow(QMainWindow):
         sel = self.scene.selectedItems()
         valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
         return valid_items[0] if valid_items else None
+    
+    def delete_selected_items(self):
+        selected = self.scene.selectedItems()
+        if not selected: return
+        
+        for item in selected: 
+            self.scene.removeItem(item)
+            
+        self.on_selection_changed()
+        self.sync_placeholders_list()
+        self.refresh_layer_list()
 
     def update_text_html(self, html_content):
         box = self._get_selected()
