@@ -5,7 +5,7 @@ import math
 # Imports corrigidos para a nova arquitetura
 from core.naming_engine import build_output_filename
 from .imposition import SheetAssembler
-from .workers import PageRenderWorker, DirectRenderWorker
+from .workers import PageRenderWorker, DirectRenderWorker, HybridAssemblerWorker
 
 class RenderManager(QObject):
     progress_updated = Signal(int)
@@ -43,14 +43,6 @@ class RenderManager(QObject):
         
         self.log_updated.emit("📋 Planejando produção...")
         
-        all_tasks_data = []
-        used_names = set()
-        
-        for i in range(len(self.rows_plain)):
-            row = self.rows_plain[i]
-            fname = build_output_filename(self.pattern, row, used_names)
-            all_tasks_data.append( (self.rows_plain[i], self.rows_rich[i], fname) )
-
         cpu_count = os.cpu_count() or 4
         num_threads = max(1, cpu_count - 2)
         
@@ -62,6 +54,20 @@ class RenderManager(QObject):
         if self.is_hybrid:
             self.work_dir.mkdir(parents=True, exist_ok=True)
             self.log_updated.emit(f"⚡ Modo Híbrido: Gerando em cache ({num_threads} threads)...")
+
+        all_tasks_data = []
+        used_names = set()
+        
+        for i in range(len(self.rows_plain)):
+            row = self.rows_plain[i]
+            fname = build_output_filename(self.pattern, row, used_names)
+            
+            # Indexação oculta: Garante que mesmo processados fora de ordem,
+            # os arquivos sejam montados na sequência exata da planilha.
+            if self.is_hybrid and not self.is_imposition:
+                fname = f"{i:05d}_{fname}"
+                
+            all_tasks_data.append( (self.rows_plain[i], self.rows_rich[i], fname) )
 
         if self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
@@ -165,61 +171,29 @@ class RenderManager(QObject):
                 self._finish_emitted = True
                 self.progress_updated.emit(100)
                 
-                # Desvio Híbrido: Última thread chama a montagem em vez de encerrar.
                 if getattr(self, 'is_hybrid', False):
-                    self._assemble_hybrid_pdf()
+                    self._start_hybrid_assembly()
                 else:
                     self.finished_process.emit()
                     self.log_updated.emit("✅ Processo finalizado com sucesso!")
 
-    def _assemble_hybrid_pdf(self):
-        self.log_updated.emit("📦 Montando arquivo PDF Único final...")
-        try:
-            from PySide6.QtGui import QPainter, QPdfWriter, QPageLayout, QPageSize, QImage
-            from PySide6.QtCore import QSizeF, QMarginsF
-            import shutil
+    def _start_hybrid_assembly(self):
+        self.log_updated.emit("📦 Montando arquivo PDF Único final em segundo plano...")
+        self.assembler_worker = HybridAssemblerWorker(
+            self.generated_files, self.work_dir, self.output_dir, 
+            self.is_imposition, self.imposition_settings, 
+            self.target_w_mm, self.target_h_mm
+        )
+        self.assembler_worker.finished_assembly.connect(self._on_hybrid_assembly_finished)
+        self.assembler_worker.error_occurred.connect(self._on_hybrid_assembly_error)
+        self.assembler_worker.start()
 
-            out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
-            if self.is_imposition:
-                out_path_single = self.output_dir / f"{self.output_dir.name}_Imposicao.pdf"
+    def _on_hybrid_assembly_finished(self):
+        out_name = f"{self.output_dir.name}_Imposicao.pdf" if self.is_imposition else f"{self.output_dir.name}_Completo.pdf"
+        self.generated_files = [out_name]
+        self.finished_process.emit()
+        self.log_updated.emit("✅ Processo finalizado com sucesso!")
 
-            writer = QPdfWriter(str(out_path_single))
-            writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-            
-            layout = writer.pageLayout()
-            layout.setMargins(QMarginsF(0, 0, 0, 0))
-
-            if self.is_imposition:
-                sheet_w = self.imposition_settings.get("sheet_w_mm", 210.0)
-                sheet_h = self.imposition_settings.get("sheet_h_mm", 297.0)
-                layout.setPageSize(QPageSize(QSizeF(sheet_w, sheet_h), QPageSize.Unit.Millimeter))
-            else:
-                layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
-                
-            writer.setPageLayout(layout)
-            painter = QPainter(writer)
-
-            sorted_files = sorted(self.generated_files)
-
-            for i, filename in enumerate(sorted_files):
-                if i > 0:
-                    writer.newPage()
-                img_path = self.work_dir / filename
-                if not img_path.exists(): continue
-                
-                img = QImage(str(img_path))
-                painter.drawImage(layout.paintRectPixels(writer.resolution()), img)
-                del img # Evita vazamento de memória enquanto empilha
-            
-            painter.end()
-
-            # Limpa as evidências (cache) e atualiza os arquivos para impressão direta funcionar
-            shutil.rmtree(self.work_dir, ignore_errors=True)
-            self.generated_files = [out_path_single.name]
-
-            self.finished_process.emit()
-            self.log_updated.emit("✅ Processo finalizado com sucesso!")
-            
-        except Exception as e:
-            self.error_occurred.emit(f"Erro na montagem do PDF: {str(e)}")
-            self.finished_process.emit() # Libera a interface pra não travar no loading
+    def _on_hybrid_assembly_error(self, error_msg):
+        self.error_occurred.emit(f"Erro na montagem do PDF: {error_msg}")
+        self.finished_process.emit()

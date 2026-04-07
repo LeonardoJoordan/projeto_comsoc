@@ -176,3 +176,64 @@ class DirectRenderWorker(QThread):
 
         except Exception as e:
             self.error_occurred.emit(str(e))
+
+class HybridAssemblerWorker(QThread):
+    finished_assembly = Signal()
+    error_occurred = Signal(str)
+
+    def __init__(self, generated_files, work_dir, output_dir, is_imposition, imposition_settings, target_w_mm, target_h_mm):
+        super().__init__()
+        self.generated_files = generated_files
+        self.work_dir = work_dir
+        self.output_dir = output_dir
+        self.is_imposition = is_imposition
+        self.imposition_settings = imposition_settings
+        self.target_w_mm = target_w_mm
+        self.target_h_mm = target_h_mm
+
+    def run(self):
+        try:
+            from PySide6.QtGui import QPainter, QPdfWriter, QPageLayout, QPageSize, QImage
+            from PySide6.QtCore import QSizeF, QMarginsF
+            import shutil
+
+            out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
+            if self.is_imposition:
+                out_path_single = self.output_dir / f"{self.output_dir.name}_Imposicao.pdf"
+
+            writer = QPdfWriter(str(out_path_single))
+            writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
+            
+            layout = writer.pageLayout()
+            layout.setMargins(QMarginsF(0, 0, 0, 0))
+
+            if self.is_imposition:
+                sheet_w = self.imposition_settings.get("sheet_w_mm", 210.0)
+                sheet_h = self.imposition_settings.get("sheet_h_mm", 297.0)
+                layout.setPageSize(QPageSize(QSizeF(sheet_w, sheet_h), QPageSize.Unit.Millimeter))
+            else:
+                layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
+                
+            writer.setPageLayout(layout)
+            painter = QPainter(writer)
+
+            # Os arquivos já virão ordenados perfeitamente pelo índice
+            sorted_files = sorted(self.generated_files)
+
+            for i, filename in enumerate(sorted_files):
+                if i > 0:
+                    writer.newPage()
+                img_path = self.work_dir / filename
+                if not img_path.exists(): continue
+                
+                img = QImage(str(img_path))
+                painter.drawImage(layout.paintRectPixels(writer.resolution()), img)
+                del img 
+            
+            painter.end()
+
+            shutil.rmtree(self.work_dir, ignore_errors=True)
+            self.finished_assembly.emit()
+            
+        except Exception as e:
+            self.error_occurred.emit(str(e))
