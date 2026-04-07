@@ -830,6 +830,7 @@ class EditorWindow(QMainWindow):
             center = self.view.mapToScene(self.view.viewport().rect().center())
             sig.setPos(center)
             self.scene.addItem(sig)
+            self.refresh_layer_list()
 
     def _on_click_add_image(self):
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg)")

@@ -10,7 +10,7 @@ def build_app():
     # Define o ponto de entrada e caminhos
     base_dir = Path(__file__).parent.absolute()
     main_file = base_dir / "main.py"
-    exe_name = "COMSOC_OFICIAL"
+    exe_name = "Projeto ComSoc"
 
    # Base do comando Nuitka
     cmd = [
