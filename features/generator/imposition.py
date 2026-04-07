@@ -1,4 +1,4 @@
-from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPixmap
+from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPixmap, QPageLayout
 from PySide6.QtCore import Qt, QPointF
 
 DPI = 300
@@ -52,7 +52,14 @@ class SheetAssembler:
             self.cols = cols_l
             self.rows = rows_l
             self.capacity = cap_l
+            self.orientation = QPageLayout.Orientation.Landscape
         else:
+            self.sheet_w = full_sheet_w_px
+            self.sheet_h = full_sheet_h_px
+            self.cols = cols_p
+            self.rows = rows_p
+            self.capacity = cap_p
+            self.orientation = QPageLayout.Orientation.Portrait
             self.sheet_w = full_sheet_w_px
             self.sheet_h = full_sheet_h_px
             self.cols = cols_p

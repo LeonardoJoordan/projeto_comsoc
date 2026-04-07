@@ -47,6 +47,7 @@ class PageRenderWorker(QThread):
                 w_sheet_mm = (self.assembler.sheet_w * 25.4) / 300.0
                 h_sheet_mm = (self.assembler.sheet_h * 25.4) / 300.0
                 layout.setPageSize(QPageSize(QSizeF(w_sheet_mm, h_sheet_mm), QPageSize.Unit.Millimeter))
+                layout.setOrientation(self.assembler.orientation)
                 layout.setMargins(QMarginsF(0, 0, 0, 0))
                 writer.setPageLayout(layout)
                 painter = QPainter(writer)
@@ -201,7 +202,14 @@ class HybridAssemblerWorker(QThread):
             if self.is_imposition:
                 sheet_w = self.imposition_settings.get("sheet_w_mm", 210.0)
                 sheet_h = self.imposition_settings.get("sheet_h_mm", 297.0)
+                tw = self.imposition_settings.get("target_w_mm", 100.0)
+                th = self.imposition_settings.get("target_h_mm", 150.0)
+                marks = self.imposition_settings.get("crop_marks", True)
+                
+                # Recalcula a orientação vencedora para o PDF final
+                temp_asm = SheetAssembler(tw, th, sheet_w, sheet_h, marks)
                 layout.setPageSize(QPageSize(QSizeF(sheet_w, sheet_h), QPageSize.Unit.Millimeter))
+                layout.setOrientation(temp_asm.orientation)
             else:
                 layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
                 
