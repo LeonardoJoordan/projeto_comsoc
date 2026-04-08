@@ -50,3 +50,12 @@ def build_app():
 
 if __name__ == "__main__":
     build_app()
+
+
+#Assim que a instalação terminar, você pode retomar a sequência de compilação normalmente:
+
+#    flatpak-builder --repo=repo --force-clean build-dir com.leobelisario.ProjetoComSoc.yaml
+
+#    flatpak build-bundle repo ProjetoComSoc.flatpak com.leobelisario.ProjetoComSoc
+
+#    flatpak install --reinstall ProjetoComSoc.flatpak
