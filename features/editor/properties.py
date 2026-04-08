@@ -119,6 +119,7 @@ class CleanTextEdit(QTextEdit):
             clean = re.sub(r"color\s*:[^;\"]+;?", "", clean)
             clean = re.sub(r"background-color\s*:[^;\"]+;?", "", clean)
             clean = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"line-height\s*:[^;\"]+;?", "", clean)
             clean = re.sub(r"(?i)<a\b[^>]*>", "", clean)
             clean = re.sub(r"(?i)</a>", "", clean)
             clean = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean)
@@ -293,6 +294,7 @@ class EditorDeTextoPanel(QWidget):
         clean_html = re.sub(r"color\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"line-height\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
         clean_html = re.sub(r"(?i)</a>", "", clean_html)
         clean_html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean_html)
@@ -363,6 +365,7 @@ class EditorDeTextoPanel(QWidget):
         clean_html = re.sub(r"color\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"line-height\s*:[^;\"]+;?", "", clean_html)
         
         # Extermina Hiperlinks fantasmas (tags <a>) mantendo apenas o texto limpo
         clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
