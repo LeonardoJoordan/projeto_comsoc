@@ -21,6 +21,10 @@ dist/
 *.build/
 *.dist/
 *.bin
+.flatpak-builder/
+build-dir/
+repo/
+
 
 # Sistema Operacional / IDE
 .DS_Store

@@ -1,55 +1,62 @@
 app-id: com.leobelisario.ProjetoComSoc
 runtime: org.gnome.Platform
-runtime-version: '45'
+runtime-version: '47'
 sdk: org.gnome.Sdk
 command: projeto-comsoc
 
-# Libera o acesso à internet durante a compilação (necessário para o pip baixar o PySide6)
 build-options:
   build-args:
     - --share=network
 
 finish-args:
-  # --- Interface Gráfica ---
   - --socket=fallback-x11
   - --socket=wayland
-  - --device=dri            # Aceleração de hardware (GPU)
-  
-  # --- Sistema de Arquivos ---
-  # Permite salvar os materiais gerados na pasta Documentos do usuário
+  - --device=dri
   - --filesystem=xdg-documents/ProjetoComSoc_Saida:create
-  
-  # --- Impressão ---
-  # Dá acesso ao servidor de impressão (CUPS) para o QPrinter funcionar
   - --socket=cups
 
 modules:
   - name: dependencias
     buildsystem: simple
     build-commands:
-      # Instala o PySide6 puro diretamente na raiz do container (/app)
       - pip3 install --prefix=/app PySide6
     
   - name: projeto-comsoc
     buildsystem: simple
     build-commands:
-      # Prepara os diretórios internos
+      # Prepara os diretórios padrão do Linux
       - mkdir -p /app/share/projeto-comsoc
       - mkdir -p /app/bin
+      - mkdir -p /app/share/applications
+      - mkdir -p /app/share/icons/hicolor/512x512/apps
       
-      # Copia todo o código-fonte Python para a pasta do sistema
+      # VASSOURA: Apaga os ambientes virtuais e pastas de compilação antes de copiar
+      - rm -rf venv .venv .git build build-dir repo *.flatpak .flatpak-builder
       - cp -r * /app/share/projeto-comsoc/
+      - cp icone.png /app/share/icons/hicolor/512x512/apps/com.leobelisario.ProjetoComSoc.png
       
-      # Cria o script de inicialização (wrapper) que invoca o Python nativo
+      # Cria o executável
       - |
         cat << 'EOF' > /app/bin/projeto-comsoc
         #!/bin/sh
         export PYTHONPATH="/app/share/projeto-comsoc:$PYTHONPATH"
         exec python3 /app/share/projeto-comsoc/main.py "$@"
         EOF
-        
-      # Dá permissão de execução ao script
       - chmod +x /app/bin/projeto-comsoc
+      
+      # CRIA O ATALHO DO MENU INICIAR
+      - |
+        cat << 'EOF' > /app/share/applications/com.leobelisario.ProjetoComSoc.desktop
+        [Desktop Entry]
+        Name=Projeto COMSOC
+        Comment=Construtor Otimizado de Material Social
+        Exec=projeto-comsoc
+        Icon=com.leobelisario.ProjetoComSoc
+        Terminal=false
+        Type=Application
+        Categories=Office;Utility;Graphics;
+        EOF
+        
     sources:
       - type: dir
         path: .
