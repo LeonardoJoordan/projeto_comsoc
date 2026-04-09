@@ -473,6 +473,19 @@ class EditorWindow(QMainWindow):
         
         self.update_position_ui()
 
+        # Sincroniza a seleção na lista de camadas (UI)
+        if sel:
+            target_item = sel[0]
+            self.layer_list.blockSignals(True)
+            for i in range(self.layer_list.count()):
+                list_item = self.layer_list.item(i)
+                if list_item.data(Qt.ItemDataRole.UserRole) == target_item:
+                    self.layer_list.setCurrentItem(list_item)
+                    break
+            self.layer_list.blockSignals(False)
+        else:
+            self.layer_list.clearSelection()
+
         if boxes:
             target_box = boxes[0]
             self.editor_texto_panel.load_from_item(target_box)
