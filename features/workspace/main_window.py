@@ -385,19 +385,25 @@ class MainWindow(QMainWindow):
         old_dir = get_models_dir() / old_slug
         new_dir = get_models_dir() / new_slug
 
-        if new_dir.exists():
+        # Se os slugs forem diferentes e o destino já existe, há um conflito real.
+        if new_slug != old_slug and new_dir.exists():
             QMessageBox.warning(self, "Erro", f"Já existe um modelo com o slug '{new_slug}'.")
             return
 
         try:
-            old_dir.rename(new_dir)
+            # 1. Renomeia a pasta apenas se o slug mudou
+            if new_slug != old_slug:
+                old_dir.rename(new_dir)
             
-            json_path = new_dir / "template_v3.json"
+            # 2. Define o caminho correto do JSON para atualizar o nome visual
+            actual_dir = new_dir if new_slug != old_slug else old_dir
+            json_path = actual_dir / "template_v3.json"
+
             if json_path.exists():
                 with open(json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 
-                data["name"] = new_name
+                data["name"] = new_name # Salva com a capitalização nova
                 
                 with open(json_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=4, ensure_ascii=False)
