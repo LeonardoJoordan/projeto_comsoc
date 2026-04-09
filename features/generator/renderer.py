@@ -1,5 +1,5 @@
 from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont, 
-                           QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush)
+                           QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush, QFontMetrics)
 from PySide6.QtCore import Qt, QPointF
 import re
 from pathlib import Path
@@ -192,6 +192,13 @@ class NativeRenderer:
         fmt.setTextIndent(box_data.get("indent_px", 0.0))
         fmt.setLineHeight(box_data.get("line_height", 1.15) * 100.0, 1) # '1' = ProportionalHeight
         cursor.mergeBlockFormat(fmt)
+
+        # 5. Salvar os caracteres com descender (p, g, ç) injetando margem apenas na base do rootFrame
+        fm = QFontMetrics(font)
+        root_frame = doc.rootFrame()
+        frame_fmt = root_frame.frameFormat()
+        frame_fmt.setBottomMargin(fm.descent())
+        root_frame.setFrameFormat(frame_fmt)
         
         w = box_data.get("w", 300)
         h = box_data.get("h", 100)

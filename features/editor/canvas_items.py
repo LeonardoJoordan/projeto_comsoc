@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTe
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
-                           QImageReader, QPainterPath)
+                           QImageReader, QPainterPath, QFontMetrics)
 from core.text_state import TextState
 
 DPI = 300
@@ -214,6 +214,13 @@ class DesignerBox(QGraphicsRectItem):
         fmt.setTextIndent(self.state.indent_px)
         fmt.setLineHeight(self.state.line_height * 100.0, 1)
         cursor.mergeBlockFormat(fmt)
+
+        # 5. Salvar os caracteres com descender (p, g, ç) injetando margem apenas na base do rootFrame
+        fm = QFontMetrics(font)
+        root_frame = self.text_item.document().rootFrame()
+        frame_fmt = root_frame.frameFormat()
+        frame_fmt.setBottomMargin(fm.descent())
+        root_frame.setFrameFormat(frame_fmt)
         
         self.text_item.blockSignals(False)
         self.recalculate_text_position()
