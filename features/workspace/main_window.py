@@ -4,6 +4,7 @@ import os
 import shutil
 import json
 import tempfile
+import time
 from datetime import datetime
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
@@ -592,13 +593,25 @@ class MainWindow(QMainWindow):
         self.manager.finished_process.connect(self._on_generation_finished)
         self.manager.finished_process.connect(self._handle_printing_queue)
         
+        self.start_time = time.time()
         self.manager.start()
 
     def _on_generation_finished(self):
         self.btn_generate_cards.setEnabled(True)
         self.btn_generate_cards.setText("Gerar Material")
-        self.log_panel.append("=== Processo Finalizado ===")
+        end_time = time.time()
+        duration = end_time - getattr(self, 'start_time', end_time)
+        
+        if duration < 60:
+            time_str = f"{duration:.1f} segundos"
+        else:
+            minutes = int(duration // 60)
+            seconds = int(duration % 60)
+            time_str = f"{minutes} min {seconds}s"
 
+        self.log_panel.append("=== Processo Finalizado ===")    
+        self.log_panel.append(f"⏱️ Tempo total: {time_str}")
+        
     def _on_model_changed(self, name: str):
         self.preview_panel.set_preview_text(f"Prévia do modelo selecionado:\n{name}")
         self.log_panel.append(f"Modelo ativo: {name}")
