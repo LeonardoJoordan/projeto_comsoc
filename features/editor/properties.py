@@ -156,7 +156,7 @@ class EditorDeTextoPanel(QWidget):
         
         self.txt_content = CleanTextEdit()
         self.txt_content.setMinimumHeight(160)
-        self.txt_content.setStyleSheet("background-color: #FFFFFF; color: #000000; border: 1px solid #aaa;") 
+        self.txt_content.setStyleSheet("background-color: #FFFFFF; color: #000000; border: 1px solid #aaa; font-family: sans-serif; font-size: 11pt;")
         self.txt_content.textChanged.connect(self._emit_clean_html)
         
         # INSERE A CAIXA NO LAYOUT PARA ELA APARECER
@@ -302,7 +302,6 @@ class EditorDeTextoPanel(QWidget):
 
         # Carrega o conteúdo purificado no editor e força fonte padrão UI
         self.txt_content.setHtml(clean_html)
-        self.txt_content.setFont(QFont("Segoe UI", 11))
 
         cursor = self.txt_content.textCursor()
         cursor.movePosition(QTextCursor.MoveOperation.End)
