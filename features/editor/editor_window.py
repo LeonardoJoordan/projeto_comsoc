@@ -655,11 +655,11 @@ class EditorWindow(QMainWindow):
                     "html": item.state.html_content,
                     "visible": item.isVisible(),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": int(pos.x()),
-                    "y": int(pos.y()),
-                    "w": int(r.width()),
-                    "h": int(r.height()),
-                    "rotation": int(item.rotation()),
+                    "x": round(float(pos.x()), 2),
+                    "y": round(float(pos.y()), 2),
+                    "w": round(float(r.width()), 2),
+                    "h": round(float(r.height()), 2),
+                    "rotation": round(float(item.rotation()), 2),
                     "font_family": item.state.font_family,
                     "font_size": item.state.font_size,
                     "font_color": getattr(item.state, 'font_color', '#000000'),
@@ -677,11 +677,11 @@ class EditorWindow(QMainWindow):
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": int(pos.x()),
-                    "y": int(pos.y()),
-                    "width": int(pix.width()),
-                    "height": int(pix.height()),
-                    "longest_side": max(pix.width(), pix.height())
+                    "x": round(float(pos.x()), 2),
+                    "y": round(float(pos.y()), 2),
+                    "width": round(float(pix.width()), 2),
+                    "height": round(float(pix.height()), 2),
+                    "longest_side": round(float(max(pix.width(), pix.height())), 2)
                 })
 
             elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
@@ -692,12 +692,12 @@ class EditorWindow(QMainWindow):
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": int(pos.x()),
-                    "y": int(pos.y()),
-                    "width": int(pix.width()),
-                    "height": int(pix.height()),
-                    "longest_side": max(pix.width(), pix.height()),
-                    "rotation": int(item.rotation())
+                    "x": round(float(pos.x()), 2),
+                    "y": round(float(pos.y()), 2),
+                    "width": round(float(pix.width()), 2),
+                    "height": round(float(pix.height()), 2),
+                    "longest_side": round(float(max(pix.width(), pix.height())), 2),
+                    "rotation": round(float(item.rotation()), 2)
                 })
 
         ordered_placeholders = []
@@ -718,10 +718,10 @@ class EditorWindow(QMainWindow):
         
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
             data["bg_props"] = {
-                "x": int(self.bg_item.pos().x()),
-                "y": int(self.bg_item.pos().y()),
-                "w": int(self.bg_item.pixmap().width()),
-                "h": int(self.bg_item.pixmap().height()),
+                "x": round(float(self.bg_item.pos().x()), 2),
+                "y": round(float(self.bg_item.pos().y()), 2),
+                "w": round(float(self.bg_item.pixmap().width()), 2),
+                "h": round(float(self.bg_item.pixmap().height()), 2),
                 "visible": self.bg_item.isVisible(),
                 "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
             }

@@ -1,6 +1,6 @@
 from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont, 
                            QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QPointF
 import re
 from pathlib import Path
 
@@ -65,6 +65,12 @@ class NativeRenderer:
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
+        
+        # Criamos uma fonte base com estratégia de outline para evitar o "hinting" (ajuste de pixel da tela)
+        # Isso garante que o glifo seja desenhado exatamente onde as coordenadas flutuantes mandam.
+        base_font = QFont()
+        base_font.setStyleStrategy(QFont.StyleStrategy.ForceOutline)
+        painter.setFont(base_font)
 
         if self.tpl.get("background_path"):
             bg = QPixmap(self.tpl["background_path"])
@@ -91,7 +97,7 @@ class NativeRenderer:
                 # Blindagem contra corrompimento de QImage/QPixmap ou dimensões ausentes
                 if not pix.isNull() and w > 0 and h > 0:
                     scaled = pix.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                    painter.drawPixmap(int(img.get("x", 0)), int(img.get("y", 0)), scaled)
+                    painter.drawPixmap(QPointF(float(img.get("x", 0)), float(img.get("y", 0))), scaled)
 
         for box in self.tpl.get("boxes", []):
             if not box.get("visible", True):
@@ -129,7 +135,7 @@ class NativeRenderer:
                 scaled = pix.scaled(sig["width"], sig["height"], 
                                    Qt.AspectRatioMode.IgnoreAspectRatio, 
                                    Qt.TransformationMode.SmoothTransformation)
-                painter.drawPixmap(sig["x"], sig["y"], scaled)
+                painter.drawPixmap(QPointF(float(sig.get("x", 0)), float(sig.get("y", 0))), scaled)
 
     def resolve_html(self, html: str, row_rich: dict) -> str:
         def repl(match):
@@ -191,8 +197,11 @@ class NativeRenderer:
         h = box_data.get("h", 100)
         rotation = box_data.get("rotation", 0)
         doc.setTextWidth(w)
+                
+        # Força o recálculo do layout para obter a altura real do conteúdo
+        layout = doc.documentLayout()
+        content_h = layout.documentSize().height()
         
-        content_h = doc.size().height()
         y_offset = 0
         if box_data.get("vertical_align") == "center":
             y_offset = max(0, (h - content_h) / 2)

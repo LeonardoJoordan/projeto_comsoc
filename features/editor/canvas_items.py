@@ -187,6 +187,7 @@ class DesignerBox(QGraphicsRectItem):
         
         # 2. Aplicar Fonte Global e Cor NATIVA (SEMPRE após o setHtml, pois ele reseta o documento)
         font = QFont(self.state.font_family, self.state.font_size)
+        font.setStyleStrategy(QFont.StyleStrategy.ForceOutline)
         self.text_item.setFont(font)
         self.text_item.document().setDefaultFont(font)
         
