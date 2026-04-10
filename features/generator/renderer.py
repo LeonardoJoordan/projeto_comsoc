@@ -199,11 +199,10 @@ class NativeRenderer:
         fmt.setLineHeight(box_data.get("line_height", 1.15) * 100.0, 1) # '1' = ProportionalHeight
         cursor.mergeBlockFormat(fmt)
 
-        # 5. Salvar os caracteres com descender (p, g, ç) injetando margem apenas na base do rootFrame
-        fm = QFontMetrics(font)
+        # 5. Zerar margens para sistema de ancoragem livre
         root_frame = doc.rootFrame()
         frame_fmt = root_frame.frameFormat()
-        frame_fmt.setBottomMargin(fm.descent())
+        frame_fmt.setMargin(0)
         root_frame.setFrameFormat(frame_fmt)
         
         w = box_data.get("w", 300)
@@ -217,9 +216,9 @@ class NativeRenderer:
         
         y_offset = 0
         if box_data.get("vertical_align") == "center":
-            y_offset = max(0, (h - content_h) / 2)
+            y_offset = (h - content_h) / 2
         elif box_data.get("vertical_align") == "bottom":
-            y_offset = max(0, h - content_h)
+            y_offset = h - content_h
 
         center_x = box_data.get("x", 0) + (w / 2)
         center_y = box_data.get("y", 0) + (h / 2)
@@ -228,7 +227,7 @@ class NativeRenderer:
         painter.rotate(rotation)
         painter.translate(-w / 2, -h / 2)
         
-        painter.setClipRect(0, 0, w, h)
+        painter.setClipRect(0, -10000, w, 20000)
         painter.translate(0, y_offset)
         doc.drawContents(painter)
         painter.restore()
