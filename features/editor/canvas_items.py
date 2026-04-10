@@ -509,14 +509,52 @@ class DesignerBox(QGraphicsRectItem):
 
     def recalculate_text_position(self):
         self.text_item.setTextWidth(self.rect().width())
-        doc_h = self.text_item.document().size().height()
+        doc = self.text_item.document()
+        layout = doc.documentLayout()
+        logical_h = layout.documentSize().height()
         box_h = self.rect().height()
+        
+        # --- CÁLCULO DA TINTA REAL (Ignorando Ascender/Descender invisível) ---
+        font = self.text_item.font()
+        fm = QFontMetrics(font)
+        real_top = 0
+        real_bottom = logical_h
+        
+        first_block = doc.begin()
+        if first_block.isValid():
+            text_layout = first_block.layout()
+            if text_layout.lineCount() > 0:
+                first_line = text_layout.lineAt(0)
+                text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
+                if text_str.strip():
+                    tight_rect = fm.tightBoundingRect(text_str)
+                    real_top = first_line.y() + first_line.ascent() + tight_rect.top()
+
+        last_block = doc.begin()
+        last_valid_block = last_block
+        while last_block.isValid():
+            if last_block.text().strip(): last_valid_block = last_block
+            last_block = last_block.next()
+            
+        if last_valid_block.isValid():
+            text_layout = last_valid_block.layout()
+            if text_layout.lineCount() > 0:
+                last_line = text_layout.lineAt(text_layout.lineCount() - 1)
+                text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
+                if text_str.strip():
+                    tight_rect = fm.tightBoundingRect(text_str)
+                    block_y = layout.blockBoundingRect(last_valid_block).y()
+                    real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
+                    
+        content_h = real_bottom - real_top
         
         y = 0
         if self.state.vertical_align == "center":
-            y = (box_h - doc_h) / 2
+            y = (box_h - content_h) / 2 - real_top
         elif self.state.vertical_align == "bottom":
-            y = box_h - doc_h
+            y = box_h - content_h - real_top
+        else: # Top
+            y = -real_top
             
         self.text_item.setPos(0, y)
 

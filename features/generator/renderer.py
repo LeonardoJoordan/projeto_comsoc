@@ -210,15 +210,50 @@ class NativeRenderer:
         rotation = box_data.get("rotation", 0)
         doc.setTextWidth(w)
                 
-        # Força o recálculo do layout para obter a altura real do conteúdo
+        # Força o recálculo do layout e prepara a métrica exata da fonte
         layout = doc.documentLayout()
-        content_h = layout.documentSize().height()
+        logical_h = layout.documentSize().height()
+        fm = QFontMetrics(font)
+        
+        # --- CÁLCULO DA TINTA REAL (Ignorando Ascender/Descender invisível) ---
+        real_top = 0
+        real_bottom = logical_h
+        
+        first_block = doc.begin()
+        if first_block.isValid():
+            text_layout = first_block.layout()
+            if text_layout.lineCount() > 0:
+                first_line = text_layout.lineAt(0)
+                text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
+                if text_str.strip():
+                    tight_rect = fm.tightBoundingRect(text_str)
+                    real_top = first_line.y() + first_line.ascent() + tight_rect.top()
+
+        last_block = doc.begin()
+        last_valid_block = last_block
+        while last_block.isValid():
+            if last_block.text().strip(): last_valid_block = last_block
+            last_block = last_block.next()
+            
+        if last_valid_block.isValid():
+            text_layout = last_valid_block.layout()
+            if text_layout.lineCount() > 0:
+                last_line = text_layout.lineAt(text_layout.lineCount() - 1)
+                text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
+                if text_str.strip():
+                    tight_rect = fm.tightBoundingRect(text_str)
+                    block_y = layout.blockBoundingRect(last_valid_block).y()
+                    real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
+                    
+        content_h = real_bottom - real_top
         
         y_offset = 0
         if box_data.get("vertical_align") == "center":
-            y_offset = (h - content_h) / 2
+            y_offset = (h - content_h) / 2 - real_top
         elif box_data.get("vertical_align") == "bottom":
-            y_offset = h - content_h
+            y_offset = h - content_h - real_top
+        else: # Top
+            y_offset = -real_top
 
         center_x = box_data.get("x", 0) + (w / 2)
         center_y = box_data.get("y", 0) + (h / 2)
@@ -227,6 +262,7 @@ class NativeRenderer:
         painter.rotate(rotation)
         painter.translate(-w / 2, -h / 2)
         
+        # Clipping aberto no eixo Y para permitir vazamento da fonte massiva
         painter.setClipRect(0, -10000, w, 20000)
         painter.translate(0, y_offset)
         doc.drawContents(painter)
