@@ -339,6 +339,16 @@ class SignatureItem(QGraphicsPixmapItem):
         self.resize_custom(w, h)
 
 
+class BleedTextItem(QGraphicsTextItem):
+    """Subclasse para evitar o corte visual de letras massivas que vazam a caixa lógica (ex: perna do j)."""
+    def boundingRect(self):
+        rect = super().boundingRect()
+        # Expande a área de repintura em 200px para cima e para baixo. 
+        # Isso afeta apenas o motor de vídeo da tela, não altera posições ou exportações.
+        rect.adjust(0, -200, 0, 200)
+        return rect
+
+
 class DesignerBox(QGraphicsRectItem):
     SNAP_DISTANCE = 15
 
@@ -358,7 +368,7 @@ class DesignerBox(QGraphicsRectItem):
 
         self.state = TextState(html_content=text)
         
-        self.text_item = QGraphicsTextItem("", self)
+        self.text_item = BleedTextItem("", self)
         self.text_item.setDefaultTextColor(Qt.GlobalColor.black)
         
         # CORREÇÃO CRÍTICA: Zera a margem fantasma nativa do Editor para equiparar ao Gerador
@@ -527,7 +537,7 @@ class DesignerBox(QGraphicsRectItem):
                 first_line = text_layout.lineAt(0)
                 text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
                 if text_str.strip():
-                    tight_rect = fm.tightBoundingRect(text_str)
+                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
                     real_top = first_line.y() + first_line.ascent() + tight_rect.top()
 
         last_block = doc.begin()
@@ -542,7 +552,7 @@ class DesignerBox(QGraphicsRectItem):
                 last_line = text_layout.lineAt(text_layout.lineCount() - 1)
                 text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
                 if text_str.strip():
-                    tight_rect = fm.tightBoundingRect(text_str)
+                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
                     block_y = layout.blockBoundingRect(last_valid_block).y()
                     real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
                     

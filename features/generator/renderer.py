@@ -226,7 +226,7 @@ class NativeRenderer:
                 first_line = text_layout.lineAt(0)
                 text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
                 if text_str.strip():
-                    tight_rect = fm.tightBoundingRect(text_str)
+                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
                     real_top = first_line.y() + first_line.ascent() + tight_rect.top()
 
         last_block = doc.begin()
@@ -241,7 +241,7 @@ class NativeRenderer:
                 last_line = text_layout.lineAt(text_layout.lineCount() - 1)
                 text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
                 if text_str.strip():
-                    tight_rect = fm.tightBoundingRect(text_str)
+                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
                     block_y = layout.blockBoundingRect(last_valid_block).y()
                     real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
                     
