@@ -4,15 +4,10 @@ from typing import Dict, Set
 _INVALID_WIN_CHARS = r'<>:"/\\|?*'
 _INVALID_WIN_RE = re.compile(f"[{re.escape(_INVALID_WIN_CHARS)}]")
 
-def sanitize_filename(name: str, replacement: str = "_") -> str:
-    """
-    Remove caracteres inválidos (Windows) e normaliza espaços/pontos.
-    """
-    name = name.strip()
-    name = _INVALID_WIN_RE.sub(replacement, name)
-    name = re.sub(r"\s+", " ", name).strip()
-    name = name.rstrip(". ").strip()
-    return name or "arquivo"
+def build_output_filename(pattern: str, row: Dict[str, str], used: Set[str]) -> str:
+    raw = apply_pattern(pattern, row)
+    base = sanitize_filename(raw)
+    return unique_filename(base, used)
 
 def apply_pattern(pattern: str, row: Dict[str, str]) -> str:
     """
@@ -23,6 +18,16 @@ def apply_pattern(pattern: str, row: Dict[str, str]) -> str:
         return str(row.get(key, "")).strip()
 
     return re.sub(r"\{([^{}]+)\}", repl, pattern)
+
+def sanitize_filename(name: str, replacement: str = "_") -> str:
+    """
+    Remove caracteres inválidos (Windows) e normaliza espaços/pontos.
+    """
+    name = name.strip()
+    name = _INVALID_WIN_RE.sub(replacement, name)
+    name = re.sub(r"\s+", " ", name).strip()
+    name = name.rstrip(". ").strip()
+    return name or "arquivo"
 
 def unique_filename(base: str, used: Set[str]) -> str:
     """
@@ -39,8 +44,3 @@ def unique_filename(base: str, used: Set[str]) -> str:
             used.add(candidate)
             return candidate
         i += 1
-
-def build_output_filename(pattern: str, row: Dict[str, str], used: Set[str]) -> str:
-    raw = apply_pattern(pattern, row)
-    base = sanitize_filename(raw)
-    return unique_filename(base, used)

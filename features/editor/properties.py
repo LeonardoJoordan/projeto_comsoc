@@ -7,6 +7,31 @@ import re
 
 from .canvas_items import DesignerBox, SignatureItem, ImageItem, px_to_mm
 
+
+class CleanTextEdit(QTextEdit):
+    """Campo de texto customizado que intercepta o Ctrl+V e purifica o HTML."""
+    def insertFromMimeData(self, source: QMimeData):
+        if source.hasHtml():
+            raw = source.html()
+            # Exterminador no momento exato da colagem
+            clean = re.sub(r"font-family\s*:[^;\"]+;?", "", raw)
+            clean = re.sub(r"font-size\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"color\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"background-color\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"line-height\s*:[^;\"]+;?", "", clean)
+            clean = re.sub(r"(?i)<a\b[^>]*>", "", clean)
+            clean = re.sub(r"(?i)</a>", "", clean)
+            clean = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean)
+            clean = re.sub(r"(?i)</h[1-6]>", "</p>", clean)
+            
+            new_mime = QMimeData()
+            new_mime.setHtml(clean)
+            new_mime.setText(source.text())
+            super().insertFromMimeData(new_mime)
+        else:
+            super().insertFromMimeData(source)
+
 class CaixaDeTextoPanel(QWidget):
     widthChanged = Signal(int)
     heightChanged = Signal(int)
@@ -68,20 +93,6 @@ class CaixaDeTextoPanel(QWidget):
         layout.addLayout(form)
         layout.addStretch()
 
-    def _on_w_changed(self, val):
-        if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
-            self.spin_h.blockSignals(True)
-            self.spin_h.setValue(val / self._aspect_ratio)
-            self.spin_h.blockSignals(False)
-        self.widthChanged.emit(val)
-
-    def _on_h_changed(self, val):
-        if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
-            self.spin_w.blockSignals(True)
-            self.spin_w.setValue(val * self._aspect_ratio)
-            self.spin_w.blockSignals(False)
-        self.heightChanged.emit(val)
-
     def load_from_item(self, box: DesignerBox):
         self.blockSignals(True) 
         rect = box.rect()
@@ -108,30 +119,21 @@ class CaixaDeTextoPanel(QWidget):
         self.chk_proporcao.blockSignals(False)
         self.blockSignals(False)
 
-class CleanTextEdit(QTextEdit):
-    """Campo de texto customizado que intercepta o Ctrl+V e purifica o HTML."""
-    def insertFromMimeData(self, source: QMimeData):
-        if source.hasHtml():
-            raw = source.html()
-            # Exterminador no momento exato da colagem
-            clean = re.sub(r"font-family\s*:[^;\"]+;?", "", raw)
-            clean = re.sub(r"font-size\s*:[^;\"]+;?", "", clean)
-            clean = re.sub(r"color\s*:[^;\"]+;?", "", clean)
-            clean = re.sub(r"background-color\s*:[^;\"]+;?", "", clean)
-            clean = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean)
-            clean = re.sub(r"line-height\s*:[^;\"]+;?", "", clean)
-            clean = re.sub(r"(?i)<a\b[^>]*>", "", clean)
-            clean = re.sub(r"(?i)</a>", "", clean)
-            clean = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", clean)
-            clean = re.sub(r"(?i)</h[1-6]>", "</p>", clean)
-            
-            new_mime = QMimeData()
-            new_mime.setHtml(clean)
-            new_mime.setText(source.text())
-            super().insertFromMimeData(new_mime)
-        else:
-            super().insertFromMimeData(source)
+    def _on_w_changed(self, val):
+        if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
+            self.spin_h.blockSignals(True)
+            self.spin_h.setValue(val / self._aspect_ratio)
+            self.spin_h.blockSignals(False)
+        self.widthChanged.emit(val)
 
+    def _on_h_changed(self, val):
+        if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
+            self.spin_w.blockSignals(True)
+            self.spin_w.setValue(val * self._aspect_ratio)
+            self.spin_w.blockSignals(False)
+        self.heightChanged.emit(val)
+
+    
 class EditorDeTextoPanel(QWidget):
     htmlChanged = Signal(str)
     fontFamilyChanged = Signal(QFont)
@@ -237,51 +239,6 @@ class EditorDeTextoPanel(QWidget):
         layout.addStretch()
         self.txt_content.cursorPositionChanged.connect(self.update_buttons_state)
 
-    def update_buttons_state(self):
-        fmt = self.txt_content.currentCharFormat()
-        
-        self.btn_bold.blockSignals(True)
-        self.btn_italic.blockSignals(True)
-        self.btn_underline.blockSignals(True)
-
-        self.btn_bold.setChecked(fmt.fontWeight() == QFont.Weight.Bold)
-        self.btn_italic.setChecked(fmt.fontItalic())
-        self.btn_underline.setChecked(fmt.fontUnderline())
-
-        self.btn_bold.blockSignals(False)
-        self.btn_italic.blockSignals(False)
-        self.btn_underline.blockSignals(False)
-
-    def set_font_family(self, font):
-        self.fontFamilyChanged.emit(font)
-        self.txt_content.setFocus()
-
-    def set_font_size(self, size):
-        self.fontSizeChanged.emit(size)
-        self.txt_content.setFocus()
-
-    def set_format_attribute(self, attr_type):
-        cursor = self.txt_content.textCursor()
-
-        if not cursor.hasSelection():
-            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
-
-        fmt = QTextCharFormat()
-
-        if attr_type == "bold":
-            desired_on = self.btn_bold.isChecked()
-            fmt.setFontWeight(QFont.Weight.Bold if desired_on else QFont.Weight.Normal)
-        elif attr_type == "italic":
-            desired_on = self.btn_italic.isChecked()
-            fmt.setFontItalic(desired_on)
-        elif attr_type == "underline":
-            desired_on = self.btn_underline.isChecked()
-            fmt.setFontUnderline(desired_on)
-
-        cursor.mergeCharFormat(fmt)
-        self.txt_content.mergeCurrentCharFormat(fmt)
-        self.txt_content.setFocus()
-
     def load_from_item(self, box: DesignerBox):
         self.blockSignals(True)
         self.txt_content.blockSignals(True)
@@ -337,6 +294,51 @@ class EditorDeTextoPanel(QWidget):
 
         self.txt_content.blockSignals(False)
         self.blockSignals(False)
+    
+    def update_buttons_state(self):
+        fmt = self.txt_content.currentCharFormat()
+        
+        self.btn_bold.blockSignals(True)
+        self.btn_italic.blockSignals(True)
+        self.btn_underline.blockSignals(True)
+
+        self.btn_bold.setChecked(fmt.fontWeight() == QFont.Weight.Bold)
+        self.btn_italic.setChecked(fmt.fontItalic())
+        self.btn_underline.setChecked(fmt.fontUnderline())
+
+        self.btn_bold.blockSignals(False)
+        self.btn_italic.blockSignals(False)
+        self.btn_underline.blockSignals(False)
+
+    def set_font_family(self, font):
+        self.fontFamilyChanged.emit(font)
+        self.txt_content.setFocus()
+
+    def set_font_size(self, size):
+        self.fontSizeChanged.emit(size)
+        self.txt_content.setFocus()
+
+    def set_format_attribute(self, attr_type):
+        cursor = self.txt_content.textCursor()
+
+        if not cursor.hasSelection():
+            cursor.select(QTextCursor.SelectionType.WordUnderCursor)
+
+        fmt = QTextCharFormat()
+
+        if attr_type == "bold":
+            desired_on = self.btn_bold.isChecked()
+            fmt.setFontWeight(QFont.Weight.Bold if desired_on else QFont.Weight.Normal)
+        elif attr_type == "italic":
+            desired_on = self.btn_italic.isChecked()
+            fmt.setFontItalic(desired_on)
+        elif attr_type == "underline":
+            desired_on = self.btn_underline.isChecked()
+            fmt.setFontUnderline(desired_on)
+
+        cursor.mergeCharFormat(fmt)
+        self.txt_content.mergeCurrentCharFormat(fmt)
+        self.txt_content.setFocus()
 
     def _choose_color(self):
         color = QColorDialog.getColor()

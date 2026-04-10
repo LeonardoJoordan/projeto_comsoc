@@ -1,10 +1,77 @@
-from PySide6.QtCore import QThread, Signal, QSizeF, QMarginsF
-from PySide6.QtGui import QImage, QPainter, QPdfWriter, QPageLayout, QPageSize
 import traceback
 import shutil
+from PySide6.QtCore import QThread, Signal, QSizeF, QMarginsF
+from PySide6.QtGui import QImage, QPainter, QPdfWriter, QPageLayout, QPageSize
 
-# Imports relativos do novo domínio
 from .imposition import SheetAssembler
+
+
+class DirectRenderWorker(QThread):
+    card_finished = Signal(str)
+    error_occurred = Signal(str)
+
+    def __init__(self, chunk_data, renderer, output_dir, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0):
+        super().__init__()
+        self.chunk_data = chunk_data
+        self.renderer = renderer
+        self.output_dir = output_dir
+        self.export_format = export_format
+        self.single_pdf = single_pdf
+        self.target_w_mm = target_w_mm
+        self.target_h_mm = target_h_mm
+        self._is_running = True
+
+    def stop(self):
+        self._is_running = False
+
+    def run(self):
+        try:
+            writer = None
+            painter = None
+            layout = None
+            out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
+
+            if self.single_pdf and self.export_format == "PDF":
+                writer = QPdfWriter(str(out_path_single))
+                writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
+                layout = writer.pageLayout()
+                layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
+                layout.setMargins(QMarginsF(0, 0, 0, 0))
+                writer.setPageLayout(layout)
+                painter = QPainter(writer)
+
+            for i, (row_plain, row_rich, filename) in enumerate(self.chunk_data):
+                if not self._is_running: break
+                
+                if self.export_format == "PDF":
+                    img = self.renderer.render_to_qimage(row_plain, row_rich)
+                    if self.single_pdf:
+                        if i > 0:
+                            writer.newPage()
+                        painter.drawImage(layout.paintRectPixels(writer.resolution()), img)
+                        self.card_finished.emit(out_path_single.name)
+                    else:
+                        out_path = self.output_dir / f"{filename}.pdf"
+                        writer_single = QPdfWriter(str(out_path))
+                        writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
+                        layout_single = writer_single.pageLayout()
+                        layout_single.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
+                        layout_single.setMargins(QMarginsF(0, 0, 0, 0))
+                        writer_single.setPageLayout(layout_single)
+                        painter_single = QPainter(writer_single)
+                        painter_single.drawImage(layout_single.paintRectPixels(writer_single.resolution()), img)
+                        painter_single.end()
+                        self.card_finished.emit(out_path.name)
+                else:
+                    out_path = self.output_dir / f"{filename}.png"
+                    self.renderer.render_row(row_plain, row_rich, out_path)
+                    self.card_finished.emit(out_path.name)
+            
+            if painter:
+                painter.end()
+
+        except Exception as e:
+            self.error_occurred.emit(str(e))
 
 class PageRenderWorker(QThread):
     page_finished = Signal(int, str, str) 
@@ -104,75 +171,8 @@ class PageRenderWorker(QThread):
 
         except Exception as e:
             self.error_occurred.emit(f"Erro no Worker: {str(e)}\n{traceback.format_exc()}")
-
-
-class DirectRenderWorker(QThread):
-    card_finished = Signal(str)
-    error_occurred = Signal(str)
-
-    def __init__(self, chunk_data, renderer, output_dir, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0):
-        super().__init__()
-        self.chunk_data = chunk_data
-        self.renderer = renderer
-        self.output_dir = output_dir
-        self.export_format = export_format
-        self.single_pdf = single_pdf
-        self.target_w_mm = target_w_mm
-        self.target_h_mm = target_h_mm
-        self._is_running = True
-
-    def stop(self):
-        self._is_running = False
-
-    def run(self):
-        try:
-            writer = None
-            painter = None
-            layout = None
-            out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
-
-            if self.single_pdf and self.export_format == "PDF":
-                writer = QPdfWriter(str(out_path_single))
-                writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                layout = writer.pageLayout()
-                layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
-                layout.setMargins(QMarginsF(0, 0, 0, 0))
-                writer.setPageLayout(layout)
-                painter = QPainter(writer)
-
-            for i, (row_plain, row_rich, filename) in enumerate(self.chunk_data):
-                if not self._is_running: break
-                
-                if self.export_format == "PDF":
-                    img = self.renderer.render_to_qimage(row_plain, row_rich)
-                    if self.single_pdf:
-                        if i > 0:
-                            writer.newPage()
-                        painter.drawImage(layout.paintRectPixels(writer.resolution()), img)
-                        self.card_finished.emit(out_path_single.name)
-                    else:
-                        out_path = self.output_dir / f"{filename}.pdf"
-                        writer_single = QPdfWriter(str(out_path))
-                        writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                        layout_single = writer_single.pageLayout()
-                        layout_single.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
-                        layout_single.setMargins(QMarginsF(0, 0, 0, 0))
-                        writer_single.setPageLayout(layout_single)
-                        painter_single = QPainter(writer_single)
-                        painter_single.drawImage(layout_single.paintRectPixels(writer_single.resolution()), img)
-                        painter_single.end()
-                        self.card_finished.emit(out_path.name)
-                else:
-                    out_path = self.output_dir / f"{filename}.png"
-                    self.renderer.render_row(row_plain, row_rich, out_path)
-                    self.card_finished.emit(out_path.name)
             
-            if painter:
-                painter.end()
-
-        except Exception as e:
-            self.error_occurred.emit(str(e))
-
+            
 class HybridAssemblerWorker(QThread):
     finished_assembly = Signal()
     error_occurred = Signal(str)

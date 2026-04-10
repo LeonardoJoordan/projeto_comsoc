@@ -2,16 +2,15 @@ import os
 import sys
 import traceback
 from datetime import datetime
-from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QMessageBox, QApplication
 from core.paths import get_logs_dir
+from features.workspace.main_window import MainWindow
 
 # --- FIX teclado PT-BR no Qt (Linux) ---
 os.environ.setdefault("QT_IM_MODULE", "ibus")
 os.environ.setdefault("GTK_IM_MODULE", "ibus")
 os.environ.setdefault("XMODIFIERS", "@im=ibus")
 
-from PySide6.QtWidgets import QApplication
-from features.workspace.main_window import MainWindow
 
 def global_exception_handler(exc_type, exc_value, exc_traceback):
     if issubclass(exc_type, KeyboardInterrupt):

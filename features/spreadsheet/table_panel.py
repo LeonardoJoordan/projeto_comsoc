@@ -4,7 +4,6 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTable
 from PySide6.QtGui import QKeySequence, QFontMetrics, QAction
 from PySide6.QtCore import Qt, QTimer
 
-# Importações relativas ao domínio
 from .clipboard import parse_clipboard_html_table, parse_tsv
 from .delegates import HTMLDelegate
 
@@ -17,13 +16,6 @@ class RichTableWidget(QTableWidget):
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.itemChanged.connect(self._force_qty_alignment)
-
-    def _force_qty_alignment(self, item):
-        # Se a mudança foi na coluna 0, bloqueia sinais para evitar loop e centraliza
-        if item.column() == 0:
-            self.blockSignals(True)
-            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.blockSignals(False)
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -63,25 +55,6 @@ class RichTableWidget(QTableWidget):
             return
 
         super().keyPressEvent(event)
-
-    def _handle_delete(self):
-        sel_rows = self.selectionModel().selectedRows()
-        if sel_rows:
-            rows_to_del = sorted([idx.row() for idx in sel_rows], reverse=True)
-            for r in rows_to_del:
-                self.removeRow(r)
-            if self.rowCount() == 0:
-                self.insertRow(0)
-                has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Assinatura")
-                if has_sig_col:
-                    item = QTableWidgetItem("")
-                    item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                    item.setCheckState(Qt.CheckState.Checked)
-                    self.setItem(0, 0, item)
-        else:
-            for item in self.selectedItems():
-                item.setText("")
-                item.setData(self.RICH_ROLE, None)
 
     def _add_rows(self, count: int):
         # Detecta a presença das colunas funcionais pelos headers
@@ -148,18 +121,6 @@ class RichTableWidget(QTableWidget):
                         
                 self.setItem(new_row, c, new_item)
 
-    def _toggle_word_wrap(self, state: bool):
-        self.setWordWrap(state)
-        if state:
-            self.resizeRowsToContents()
-            # Adiciona 15px de "respiro" para evitar o scroll interno nas células
-            for r in range(self.rowCount()):
-                self.setRowHeight(r, self.rowHeight(r) + 15)
-        else:
-            # Força todas as linhas a voltarem ao tamanho compacto padrão
-            for r in range(self.rowCount()):
-                self.setRowHeight(r, 30)
-
     def _delete_selected_rows_action(self):
         # selectedIndexes pega as coordenadas visuais, mesmo se a célula estiver virgem/vazia
         indexes = self.selectionModel().selectedIndexes()
@@ -180,51 +141,24 @@ class RichTableWidget(QTableWidget):
                 item.setCheckState(Qt.CheckState.Checked)
                 self.setItem(0, 0, item)
 
-    def _toggle_format(self, tag: str):
-        items = self.selectedItems()
-        if not items: return
-
-        start_tag = f"<{tag}>"
-        end_tag = f"</{tag}>"
-
-        for item in items:
-            current_html = item.data(self.RICH_ROLE)
-            if not current_html:
-                current_html = item.text()
-
-            check = current_html.strip()
-            if check.startswith(start_tag) and check.endswith(end_tag):
-                new_html = check[len(start_tag):-len(end_tag)]
-            else:
-                new_html = f"{start_tag}{check}{end_tag}"
-
-            item.setData(self.RICH_ROLE, new_html)
-        self.viewport().update()
-
-    def _clear_formatting(self):
-        for item in self.selectedItems():
-            text = item.text()
-            item.setData(self.RICH_ROLE, None)
-            item.setText(text)
-
-    def _text_width_px(self, text: str) -> int:
-        fm = QFontMetrics(self.font())
-        lines = (text or "").splitlines() or [""]
-        return max(fm.horizontalAdvance(line) for line in lines)
-
-    def _autofit_columns_after_paste(self, cols_logical: set[int], row_start: int, row_end: int, padding_px: int = 20):
-        header = self.horizontalHeader()
-        for col in cols_logical:
-            header_item = self.horizontalHeaderItem(col)
-            best = self._text_width_px(header_item.text() if header_item else "")
-            for r in range(row_start, row_end + 1):
-                it = self.item(r, col)
-                if it is None: continue
-                w = self._text_width_px(it.text())
-                if w > best: best = w
-            desired = best + padding_px
-            if desired > self.columnWidth(col):
-                self.setColumnWidth(col, desired)
+    def _handle_delete(self):
+        sel_rows = self.selectionModel().selectedRows()
+        if sel_rows:
+            rows_to_del = sorted([idx.row() for idx in sel_rows], reverse=True)
+            for r in rows_to_del:
+                self.removeRow(r)
+            if self.rowCount() == 0:
+                self.insertRow(0)
+                has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Assinatura")
+                if has_sig_col:
+                    item = QTableWidgetItem("")
+                    item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+                    item.setCheckState(Qt.CheckState.Checked)
+                    self.setItem(0, 0, item)
+        else:
+            for item in self.selectedItems():
+                item.setText("")
+                item.setData(self.RICH_ROLE, None)
 
     def _paste_from_clipboard(self):
         md = QApplication.clipboard().mimeData()
@@ -366,6 +300,72 @@ class RichTableWidget(QTableWidget):
             QTimer.singleShot(0, lambda: self._autofit_columns_after_paste(
                 affected_cols_logical, start_row, row_end, padding_px=20
             ))
+
+    def _toggle_word_wrap(self, state: bool):
+        self.setWordWrap(state)
+        if state:
+            self.resizeRowsToContents()
+            # Adiciona 15px de "respiro" para evitar o scroll interno nas células
+            for r in range(self.rowCount()):
+                self.setRowHeight(r, self.rowHeight(r) + 15)
+        else:
+            # Força todas as linhas a voltarem ao tamanho compacto padrão
+            for r in range(self.rowCount()):
+                self.setRowHeight(r, 30)    
+
+    def _toggle_format(self, tag: str):
+        items = self.selectedItems()
+        if not items: return
+
+        start_tag = f"<{tag}>"
+        end_tag = f"</{tag}>"
+
+        for item in items:
+            current_html = item.data(self.RICH_ROLE)
+            if not current_html:
+                current_html = item.text()
+
+            check = current_html.strip()
+            if check.startswith(start_tag) and check.endswith(end_tag):
+                new_html = check[len(start_tag):-len(end_tag)]
+            else:
+                new_html = f"{start_tag}{check}{end_tag}"
+
+            item.setData(self.RICH_ROLE, new_html)
+        self.viewport().update()
+
+    def _clear_formatting(self):
+        for item in self.selectedItems():
+            text = item.text()
+            item.setData(self.RICH_ROLE, None)
+            item.setText(text)
+
+    def _force_qty_alignment(self, item):
+        # Se a mudança foi na coluna 0, bloqueia sinais para evitar loop e centraliza
+        if item.column() == 0:
+            self.blockSignals(True)
+            item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.blockSignals(False)    
+
+    def _text_width_px(self, text: str) -> int:
+        fm = QFontMetrics(self.font())
+        lines = (text or "").splitlines() or [""]
+        return max(fm.horizontalAdvance(line) for line in lines)
+
+    def _autofit_columns_after_paste(self, cols_logical: set[int], row_start: int, row_end: int, padding_px: int = 20):
+        header = self.horizontalHeader()
+        for col in cols_logical:
+            header_item = self.horizontalHeaderItem(col)
+            best = self._text_width_px(header_item.text() if header_item else "")
+            for r in range(row_start, row_end + 1):
+                it = self.item(r, col)
+                if it is None: continue
+                w = self._text_width_px(it.text())
+                if w > best: best = w
+            desired = best + padding_px
+            if desired > self.columnWidth(col):
+                self.setColumnWidth(col, desired)
+                    
 
 class TablePanel(QWidget):
     def __init__(self):

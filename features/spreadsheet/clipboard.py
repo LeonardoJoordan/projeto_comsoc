@@ -5,15 +5,34 @@ from typing import List
 
 ALLOWED_TAGS = {"b", "i", "u", "br"}
 
-def _clean_spaces(s: str) -> str:
-    s = s.replace("\xa0", " ")
-    s = re.sub(r"[ \t]+", " ", s)
-    return s.strip()
+@dataclass
+class CellValue:
+    plain: str
+    rich_html: str
 
-def _clean_spaces_keep_edges(s: str) -> str:
-    s = s.replace("\xa0", " ")
-    s = re.sub(r"[ \t]+", " ", s)
-    return s
+
+def parse_clipboard_html_table(html: str) -> List[List[CellValue]]:
+    parser = _HtmlTableParser()
+    parser.feed(html or "")
+    out: List[List[CellValue]] = []
+    for row in parser.grid:
+        out_row: List[CellValue] = []
+        for cell_html in row:
+            rich = sanitize_inline_html(cell_html)
+            plain = rich.replace("<br>", "\n")
+            plain = re.sub(r"<[^>]+>", "", plain)
+            plain = _clean_spaces(plain)
+            out_row.append(CellValue(plain=plain, rich_html=rich))
+        out.append(out_row)
+    return out
+
+def parse_tsv(text: str) -> List[List[CellValue]]:
+    rows = (text or "").splitlines()
+    grid: List[List[CellValue]] = []
+    for r in rows:
+        cols = r.split("\t")
+        grid.append([CellValue(plain=_clean_spaces(c), rich_html=_clean_spaces(c)) for c in cols])
+    return grid
 
 def sanitize_inline_html(html: str) -> str:
     html = re.sub(r"</?\s*strong\s*>", lambda m: "<b>" if m.group(0)[1] != "/" else "</b>", html, flags=re.I)
@@ -91,10 +110,6 @@ def sanitize_inline_html(html: str) -> str:
     p.feed(html or "")
     return p.get_html()
 
-@dataclass
-class CellValue:
-    plain: str
-    rich_html: str
 
 class _HtmlTableParser(HTMLParser):
     def __init__(self):
@@ -155,25 +170,19 @@ class _HtmlTableParser(HTMLParser):
         if self.in_td and data:
             self.current_cell_chunks.append(data)
 
-def parse_clipboard_html_table(html: str) -> List[List[CellValue]]:
-    parser = _HtmlTableParser()
-    parser.feed(html or "")
-    out: List[List[CellValue]] = []
-    for row in parser.grid:
-        out_row: List[CellValue] = []
-        for cell_html in row:
-            rich = sanitize_inline_html(cell_html)
-            plain = rich.replace("<br>", "\n")
-            plain = re.sub(r"<[^>]+>", "", plain)
-            plain = _clean_spaces(plain)
-            out_row.append(CellValue(plain=plain, rich_html=rich))
-        out.append(out_row)
-    return out
 
-def parse_tsv(text: str) -> List[List[CellValue]]:
-    rows = (text or "").splitlines()
-    grid: List[List[CellValue]] = []
-    for r in rows:
-        cols = r.split("\t")
-        grid.append([CellValue(plain=_clean_spaces(c), rich_html=_clean_spaces(c)) for c in cols])
-    return grid
+
+def _clean_spaces(s: str) -> str:
+    s = s.replace("\xa0", " ")
+    s = re.sub(r"[ \t]+", " ", s)
+    return s.strip()
+
+def _clean_spaces_keep_edges(s: str) -> str:
+    s = s.replace("\xa0", " ")
+    s = re.sub(r"[ \t]+", " ", s)
+    return s
+
+
+
+
+

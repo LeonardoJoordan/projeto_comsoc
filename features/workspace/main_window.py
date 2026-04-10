@@ -1,10 +1,10 @@
-from pathlib import Path
 import zipfile
 import os
 import shutil
 import json
 import tempfile
 import time
+from pathlib import Path
 from datetime import datetime
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
@@ -14,7 +14,6 @@ from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
 from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 
-# --- Importações da Nova Arquitetura ---
 from features.preview.preview_panel import PreviewPanel
 from features.workspace.controls_panel import ControlsPanel
 from shared.log_panel import LogPanel
@@ -224,6 +223,215 @@ class MainWindow(QMainWindow):
         with open(example_dir / "template_v3.json", "w", encoding="utf-8") as f:
             json.dump(example_data, f, indent=4, ensure_ascii=False)
 
+    def _apply_theme(self, is_dark: bool):
+        app = QApplication.instance()
+        if not app: return
+        
+        app.setStyle("Fusion")
+        
+        if is_dark:
+            palette = QPalette()
+            # Cores exatas extraídas do Mint-Y-Dark
+            bg_color = QColor("#2e2e33")
+            text_color = QColor("#DADADA")
+            alt_base_color = QColor("#222226")
+            button_color = QColor("#333338")
+            highlight_color = QColor("#35A854")
+            
+            palette.setColor(QPalette.ColorRole.Window, bg_color)
+            palette.setColor(QPalette.ColorRole.WindowText, text_color)
+            palette.setColor(QPalette.ColorRole.Base, bg_color)
+            palette.setColor(QPalette.ColorRole.AlternateBase, alt_base_color)
+            palette.setColor(QPalette.ColorRole.ToolTipBase, bg_color)
+            palette.setColor(QPalette.ColorRole.ToolTipText, text_color)
+            palette.setColor(QPalette.ColorRole.Text, text_color)
+            palette.setColor(QPalette.ColorRole.Button, button_color)
+            palette.setColor(QPalette.ColorRole.ButtonText, text_color)
+            palette.setColor(QPalette.ColorRole.BrightText, QColor("#FFFFFF"))
+            palette.setColor(QPalette.ColorRole.Link, QColor("#5294E2"))
+            palette.setColor(QPalette.ColorRole.Highlight, highlight_color)
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
+            
+            # Textos e botões desabilitados
+            disabled_color = QColor(255, 255, 255, 107)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled_color)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_color)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, disabled_color)
+
+            app.setPalette(palette)
+            # Reforço global para bordas finas (Fusion costuma ignorar na paleta)
+            app.setStyleSheet("QTableWidget, QLineEdit, QTextEdit { border: 1px solid #202023; }")
+        else:
+            # Restaura o estilo claro nativo
+            app.setPalette(app.style().standardPalette())
+            app.setStyleSheet("")
+            
+        if hasattr(self, 'settings'):
+            self.settings.setValue("dark_mode", is_dark)
+
+    def closeEvent(self, event):
+        """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
+        self.settings.setValue("geometry", self.saveGeometry())
+        self.settings.setValue("splitterState", self.splitter.saveState())
+        super().closeEvent(event)
+
+    def _reload_models_from_disk(self, select_name: str | None = None):
+        self.preview_panel.cbo_models.blockSignals(True)
+        self.preview_panel.cbo_models.clear()
+
+        models_dir = get_models_dir()
+        models_dir.mkdir(parents=True, exist_ok=True)
+
+        found = []
+        for folder in sorted(models_dir.iterdir()):
+            if not folder.is_dir(): continue
+            json_path = folder / "template_v3.json"
+            if json_path.exists():
+                try:
+                    data = json.loads(json_path.read_text(encoding="utf-8"))
+                    name = data.get("name", folder.name)
+                    found.append(name)
+                except Exception:
+                    continue
+
+        for name in found:
+            self.preview_panel.cbo_models.addItem(name)
+
+        self.preview_panel.cbo_models.blockSignals(False)
+
+        target_index = 0 
+        if select_name:
+            idx = self.preview_panel.cbo_models.findText(select_name)
+            if idx >= 0:
+                target_index = idx
+
+        if self.preview_panel.cbo_models.count() > 0:
+            self.preview_panel.cbo_models.setCurrentIndex(target_index)
+            current_text = self.preview_panel.cbo_models.itemText(target_index)
+            self._on_model_changed(current_text)
+        else:
+            self._on_model_changed("")
+
+    def _on_add_model(self):
+        self.editor_window = EditorWindow(self)
+        self.editor_window.modelSaved.connect(self._on_editor_saved)
+        self.editor_window.show()
+
+    def _on_duplicate_model(self):
+        original_name = self.preview_panel.cbo_models.currentText()
+        
+        if not original_name:
+            QMessageBox.warning(self, "Atenção", "Selecione um modelo para duplicar.")
+            return
+
+        original_slug = slugify_model_name(original_name)
+        original_dir = get_models_dir() / original_slug
+
+        if not original_dir.exists():
+            self.log_panel.append("ERRO: Pasta do modelo original não encontrada.")
+            return
+
+        counter = 1
+        while True:
+            suffix = " (Cópia)" if counter == 1 else f" (Cópia {counter})"
+            new_name = f"{original_name}{suffix}"
+            new_slug = slugify_model_name(new_name)
+            new_dir = get_models_dir() / new_slug
+            
+            if not new_dir.exists():
+                break
+            counter += 1
+
+        try:
+            shutil.copytree(original_dir, new_dir)
+            
+            json_path = new_dir / "template_v3.json"
+            if json_path.exists():
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                data["name"] = new_name
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+
+            self.log_panel.append(f"Modelo duplicado: '{new_name}'")
+            self._reload_models_from_disk(select_name=new_name)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Falha ao duplicar modelo:\n{e}")
+            if new_dir.exists():
+                shutil.rmtree(new_dir, ignore_errors=True)
+
+    def _on_rename_model(self):
+        old_name = self.preview_panel.cbo_models.currentText()
+        
+        if not old_name:
+            QMessageBox.warning(self, "Atenção", "Selecione um modelo para renomear.")
+            return
+
+        new_name, ok = QInputDialog.getText(self, "Renomear Modelo", "Novo nome:", text=old_name)
+        if not ok or not new_name.strip():
+            return
+        
+        new_name = new_name.strip()
+        if new_name == old_name:
+            return
+
+        old_slug = slugify_model_name(old_name)
+        new_slug = slugify_model_name(new_name)
+        
+        old_dir = get_models_dir() / old_slug
+        new_dir = get_models_dir() / new_slug
+
+        # Se os slugs forem diferentes e o destino já existe, há um conflito real.
+        if new_slug != old_slug and new_dir.exists():
+            QMessageBox.warning(self, "Erro", f"Já existe um modelo com o slug '{new_slug}'.")
+            return
+
+        try:
+            # 1. Renomeia a pasta apenas se o slug mudou
+            if new_slug != old_slug:
+                old_dir.rename(new_dir)
+            
+            # 2. Define o caminho correto do JSON para atualizar o nome visual
+            actual_dir = new_dir if new_slug != old_slug else old_dir
+            json_path = actual_dir / "template_v3.json"
+
+            if json_path.exists():
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                data["name"] = new_name # Salva com a capitalização nova
+                
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+            
+            self.log_panel.append(f"Modelo renomeado: '{old_name}' -> '{new_name}'")
+            self._reload_models_from_disk(select_name=new_name)
+
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Falha ao renomear: {e}")
+
+    def _on_remove_model(self):
+        model_name = (self.preview_panel.cbo_models.currentText() or "").strip()
+        if not model_name: return
+
+        slug = slugify_model_name(model_name)
+        model_dir = get_models_dir() / slug
+
+        if not model_dir.exists(): return
+
+        resp = QMessageBox.question(self, "Confirmar exclusão", f"Excluir '{model_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if resp != QMessageBox.StandardButton.Yes: return
+
+        try:
+            shutil.rmtree(model_dir)
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Falha ao excluir: {e}")
+            return
+
+        self.log_panel.append(f"Modelo excluído: {model_name}")
+        self._reload_models_from_disk()
+
     def _on_import_models(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Importar Lote", "", "Pacotes de Modelo ZIP (*.zip)")
         if not file_path: return
@@ -364,99 +572,144 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Erro na Exportação", f"Falha ao gerar o arquivo ZIP:\n{e}")
 
-    def _on_rename_model(self):
-        old_name = self.preview_panel.cbo_models.currentText()
-        
-        if not old_name:
-            QMessageBox.warning(self, "Atenção", "Selecione um modelo para renomear.")
-            return
+    def _on_model_changed(self, name: str):
+        self.preview_panel.set_preview_text(f"Prévia do modelo selecionado:\n{name}")
+        self.log_panel.append(f"Modelo ativo: {name}")
+        self.active_model_name = name
+        self.current_filename_suffix = ""
 
-        new_name, ok = QInputDialog.getText(self, "Renomear Modelo", "Novo nome:", text=old_name)
-        if not ok or not new_name.strip():
-            return
-        
-        new_name = new_name.strip()
-        if new_name == old_name:
-            return
+        if not name: return
 
-        old_slug = slugify_model_name(old_name)
-        new_slug = slugify_model_name(new_name)
-        
-        old_dir = get_models_dir() / old_slug
-        new_dir = get_models_dir() / new_slug
+        slug = slugify_model_name(name)
+        json_path = get_models_dir() / slug / "template_v3.json"
 
-        # Se os slugs forem diferentes e o destino já existe, há um conflito real.
-        if new_slug != old_slug and new_dir.exists():
-            QMessageBox.warning(self, "Erro", f"Já existe um modelo com o slug '{new_slug}'.")
-            return
-
-        try:
-            # 1. Renomeia a pasta apenas se o slug mudou
-            if new_slug != old_slug:
-                old_dir.rename(new_dir)
-            
-            # 2. Define o caminho correto do JSON para atualizar o nome visual
-            actual_dir = new_dir if new_slug != old_slug else old_dir
-            json_path = actual_dir / "template_v3.json"
-
-            if json_path.exists():
+        if json_path.exists():
+            try:
                 with open(json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                
-                data["name"] = new_name # Salva com a capitalização nova
-                
-                with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-            
-            self.log_panel.append(f"Modelo renomeado: '{old_name}' -> '{new_name}'")
-            self._reload_models_from_disk(select_name=new_name)
+                    
+                    self.current_filename_suffix = data.get("output_suffix", "")
 
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao renomear: {e}")
+                    # Recupera preferências salvas (Formato e Checkbox)
+                    last_fmt = data.get("last_export_format", "PNG")
+                    last_single = data.get("last_single_pdf", False)
 
-    def _on_duplicate_model(self):
-        original_name = self.preview_panel.cbo_models.currentText()
+                    # Bloqueia sinais para evitar salvamento redundante durante o carregamento
+                    self.cbo_export_format.blockSignals(True)
+                    self.chk_single_pdf.blockSignals(True)
+                    
+                    idx = self.cbo_export_format.findText(last_fmt)
+                    if idx >= 0:
+                        self.cbo_export_format.setCurrentIndex(idx)
+                    
+                    self.chk_single_pdf.setChecked(last_single)
+                    self._toggle_single_pdf_option(last_fmt)
+                    
+                    self.cbo_export_format.blockSignals(False)
+                    self.chk_single_pdf.blockSignals(False)
+
+                    model_dir = json_path.parent
+                    if data.get("background_path") and not Path(data["background_path"]).is_absolute():
+                        data["background_path"] = str(model_dir / data["background_path"])
+                    for sig in data.get("signatures", []):
+                        if not Path(sig["path"]).is_absolute():
+                            sig["path"] = str(model_dir / sig["path"])
+
+                    placeholders = data.get("placeholders", [])
+                    signatures = data.get("signatures", [])
+                    self._update_table_columns(placeholders, signatures)
+                    
+                    self.cached_model_data = data
+                    
+                    try:
+                        renderer = NativeRenderer(data)
+                        preview_pix = renderer.render_to_pixmap(row_rich=None)
+                        self.preview_panel.set_preview_pixmap(preview_pix)
+                    except Exception as e:
+                        self.log_panel.append(f"Erro ao gerar preview: {e}")
+                        self.preview_panel.set_preview_text("Erro ao gerar preview do modelo")
+            except Exception as e:
+                self.log_panel.append(f"Erro ao ler colunas do modelo: {e}")
+        else:
+            self.log_panel.append("Aviso: template_v3.json não encontrado.")
+
+    def _update_table_columns(self, placeholders, signatures=None):
+        self.table_panel.table.clearContents()
+        self.table_panel.table.setRowCount(0)
+        self.table_panel.table.setColumnCount(0)
         
-        if not original_name:
-            QMessageBox.warning(self, "Atenção", "Selecione um modelo para duplicar.")
-            return
-
-        original_slug = slugify_model_name(original_name)
-        original_dir = get_models_dir() / original_slug
-
-        if not original_dir.exists():
-            self.log_panel.append("ERRO: Pasta do modelo original não encontrada.")
-            return
-
-        counter = 1
-        while True:
-            suffix = " (Cópia)" if counter == 1 else f" (Cópia {counter})"
-            new_name = f"{original_name}{suffix}"
-            new_slug = slugify_model_name(new_name)
-            new_dir = get_models_dir() / new_slug
+        headers = ["🔢 Qtd"] # Coluna 0
+        has_sig = bool(signatures)
+        
+        if has_sig:
+            headers.append("✍️ Ass.") # Coluna 1
+        
+        headers.extend(placeholders)
             
-            if not new_dir.exists():
-                break
-            counter += 1
+        self.table_panel.table.setColumnCount(len(headers))
+        self.table_panel.table.setHorizontalHeaderLabels(headers)
+        
+        # Ajuste de larguras iniciais
+        self.table_panel.table.setColumnWidth(0, 50) # Qtd
+        if has_sig:
+            self.table_panel.table.setColumnWidth(1, 50) # Assinatura
+
+        self.table_panel.table.setRowCount(1)
+        
+        # 1. Configura a célula de Quantidade (Index 0)
+        qty_item = QTableWidgetItem("1")
+        qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.table_panel.table.setItem(0, 0, qty_item)
+        
+        # 2. Configura a célula de Assinatura (Index 1), se existir
+        if has_sig:
+            default_state = True
+            for sig in signatures:
+                if not sig.get("visible", True):
+                    default_state = False
+                    break
+            
+            chk_item = QTableWidgetItem("")
+            chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
+            chk_item.setCheckState(Qt.CheckState.Checked if default_state else Qt.CheckState.Unchecked)
+            chk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table_panel.table.setItem(0, 1, chk_item)
+
+    def _on_table_selection(self):
+        if not self.cached_model_data: return
+        row = self.table_panel.table.currentRow()
+        if row < 0: return
 
         try:
-            shutil.copytree(original_dir, new_dir)
-            
-            json_path = new_dir / "template_v3.json"
-            if json_path.exists():
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                data["name"] = new_name
-                with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-
-            self.log_panel.append(f"Modelo duplicado: '{new_name}'")
-            self._reload_models_from_disk(select_name=new_name)
-
+            row_rich = self._get_row_data_rich(row)
+            renderer = NativeRenderer(self.cached_model_data)
+            pix = renderer.render_to_pixmap(row_rich=row_rich)
+            self.preview_panel.set_preview_pixmap(pix)
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao duplicar modelo:\n{e}")
-            if new_dir.exists():
-                shutil.rmtree(new_dir, ignore_errors=True)
+            print(f"Erro no Live Preview: {e}")
+
+    def _open_model_dialog(self):
+        current_model_name = self.preview_panel.cbo_models.currentText()
+        if not current_model_name:
+            QMessageBox.warning(self, "Atenção", "Selecione um modelo na lista antes de configurar.")
+            return
+            
+        self.active_model_name = current_model_name
+
+        self.editor_window = EditorWindow(self)
+        self.editor_window.modelSaved.connect(self._on_editor_saved)
+
+        slug = slugify_model_name(current_model_name)
+        json_path = get_models_dir() / slug / "template_v3.json"
+
+        if json_path.exists():
+            self.editor_window.load_from_json(str(json_path))
+        
+        self.editor_window.show()
+
+    def _on_editor_saved(self, model_name, placeholders):
+        self.log_panel.append(f"Modelo '{model_name}' salvo. Atualizando lista...")
+        self._reload_models_from_disk(select_name=model_name)
 
     def _open_naming_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
@@ -519,6 +772,123 @@ class MainWindow(QMainWindow):
                 self.log_panel.append(f"Configuração salva: {slug}_{self.current_filename_suffix}.png{msg_imp}")
             else:
                 self.log_panel.append(f"Configuração salva: Sequencial automático{msg_imp}")
+
+    def _select_output_folder(self):
+        start_dir = self.txt_output_path.text() or ""
+        folder = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Saída", start_dir)
+        if folder:
+            self.txt_output_path.setText(folder)
+            self.settings.setValue("last_output_dir", folder)
+
+    def _update_template_json(self, new_data: dict):
+        """Método auxiliar para atualizar metadados no template_v3.json."""
+        if not self.active_model_name:
+            return
+        slug = slugify_model_name(self.active_model_name)
+        json_path = get_models_dir() / slug / "template_v3.json"
+        if json_path.exists():
+            try:
+                if self.cached_model_data:
+                    self.cached_model_data.update(new_data)
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                data.update(new_data)
+                with open(json_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4, ensure_ascii=False)
+            except Exception as e:
+                print(f"Erro ao atualizar JSON do modelo: {e}")
+
+    def _save_export_format_pref(self, fmt):
+        """Salva a escolha do formato (PNG/PDF) no JSON do modelo."""
+        self._update_template_json({"last_export_format": fmt})
+
+    def _save_single_pdf_pref(self, checked):
+        """Salva o estado da checkbox de Arquivo Único no JSON do modelo."""
+        self._update_template_json({"last_single_pdf": checked})
+
+    def _toggle_single_pdf_option(self, fmt):
+        """Gerencia a visibilidade do checkbox de PDF único."""
+        is_pdf = (fmt == "PDF")
+        self.chk_single_pdf.setVisible(is_pdf)
+        if not is_pdf:
+            self.chk_single_pdf.setChecked(False)
+
+    def _scrape_table_data(self):
+        table = self.table_panel.table
+        rows = table.rowCount()
+        cols = table.columnCount()
+        headers = [table.horizontalHeaderItem(c).text() for c in range(cols)]
+        data_plain, data_rich = [], []
+
+        for r in range(rows):
+            row_p, row_r = {}, {}
+            multiplier = 1
+            has_content = False
+            
+            for c in range(cols):
+                key = headers[c]
+                item = table.item(r, c)
+                
+                # 1. Trata a nova coluna de Quantidade
+                if key == "🔢 Qtd":
+                    try:
+                        val = int(item.text().strip()) if item else 1
+                        multiplier = max(0, val) # Impede números negativos
+                    except ValueError:
+                        multiplier = 1
+                    continue
+
+                # 2. Trata a coluna de Assinatura
+                if key == "✍️ Ass.":
+                    use_sig = (item.checkState() == Qt.CheckState.Checked) if item else True
+                    row_p["__use_signature__"] = use_sig
+                    row_r["__use_signature__"] = use_sig
+                    continue
+
+                # 3. Trata placeholders comuns
+                val_plain = item.text().strip() if item else ""
+                val_rich = item.data(Qt.ItemDataRole.UserRole) if item else ""
+                if not val_rich: val_rich = val_plain
+                
+                if val_plain: 
+                    has_content = True
+                
+                row_p[key] = val_plain
+                row_r[key] = val_rich
+
+            # Validação: Se a linha tiver conteúdo OU o multiplicador for > 0, 
+            # nós geramos (isso permite gerar cartões sem placeholders).
+            if multiplier > 0:
+                for _ in range(multiplier):
+                    data_plain.append(row_p.copy())
+                    data_rich.append(row_r.copy())
+                    
+        return data_plain, data_rich
+    
+    def _get_row_data_rich(self, row_idx):
+        table = self.table_panel.table
+        cols = table.columnCount()
+        headers = [table.horizontalHeaderItem(c).text() for c in range(cols)]
+        
+        row_data = {}
+        for c in range(cols):
+            key = headers[c]
+            item = table.item(row_idx, c)
+            
+            # Ignora a coluna de quantidade no preview técnico do cartão
+            if key == "🔢 Qtd":
+                continue
+                
+            if key == "✍️ Ass.":
+                row_data["__use_signature__"] = (item.checkState() == Qt.CheckState.Checked) if item else True
+                continue
+                
+            val = ""
+            if item:
+                val = item.data(Qt.ItemDataRole.UserRole)
+                if not val: val = item.text()
+            row_data[key] = val
+        return row_data
 
     def _generate_cards_async(self):
         rows_plain, rows_rich = self._scrape_table_data()
@@ -618,325 +988,6 @@ class MainWindow(QMainWindow):
         self.log_panel.append("=== Processo Finalizado ===")    
         self.log_panel.append(f"⏱️ Tempo total: {time_str}")
         
-    def _on_model_changed(self, name: str):
-        self.preview_panel.set_preview_text(f"Prévia do modelo selecionado:\n{name}")
-        self.log_panel.append(f"Modelo ativo: {name}")
-        self.active_model_name = name
-        self.current_filename_suffix = ""
-
-        if not name: return
-
-        slug = slugify_model_name(name)
-        json_path = get_models_dir() / slug / "template_v3.json"
-
-        if json_path.exists():
-            try:
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                    
-                    self.current_filename_suffix = data.get("output_suffix", "")
-
-                    # Recupera preferências salvas (Formato e Checkbox)
-                    last_fmt = data.get("last_export_format", "PNG")
-                    last_single = data.get("last_single_pdf", False)
-
-                    # Bloqueia sinais para evitar salvamento redundante durante o carregamento
-                    self.cbo_export_format.blockSignals(True)
-                    self.chk_single_pdf.blockSignals(True)
-                    
-                    idx = self.cbo_export_format.findText(last_fmt)
-                    if idx >= 0:
-                        self.cbo_export_format.setCurrentIndex(idx)
-                    
-                    self.chk_single_pdf.setChecked(last_single)
-                    self._toggle_single_pdf_option(last_fmt)
-                    
-                    self.cbo_export_format.blockSignals(False)
-                    self.chk_single_pdf.blockSignals(False)
-
-                    model_dir = json_path.parent
-                    if data.get("background_path") and not Path(data["background_path"]).is_absolute():
-                        data["background_path"] = str(model_dir / data["background_path"])
-                    for sig in data.get("signatures", []):
-                        if not Path(sig["path"]).is_absolute():
-                            sig["path"] = str(model_dir / sig["path"])
-
-                    placeholders = data.get("placeholders", [])
-                    signatures = data.get("signatures", [])
-                    self._update_table_columns(placeholders, signatures)
-                    
-                    self.cached_model_data = data
-                    
-                    try:
-                        renderer = NativeRenderer(data)
-                        preview_pix = renderer.render_to_pixmap(row_rich=None)
-                        self.preview_panel.set_preview_pixmap(preview_pix)
-                    except Exception as e:
-                        self.log_panel.append(f"Erro ao gerar preview: {e}")
-                        self.preview_panel.set_preview_text("Erro ao gerar preview do modelo")
-            except Exception as e:
-                self.log_panel.append(f"Erro ao ler colunas do modelo: {e}")
-        else:
-            self.log_panel.append("Aviso: template_v3.json não encontrado.")
-
-    def _on_editor_saved(self, model_name, placeholders):
-        self.log_panel.append(f"Modelo '{model_name}' salvo. Atualizando lista...")
-        self._reload_models_from_disk(select_name=model_name)
-    
-    def _update_table_columns(self, placeholders, signatures=None):
-        self.table_panel.table.clearContents()
-        self.table_panel.table.setRowCount(0)
-        self.table_panel.table.setColumnCount(0)
-        
-        headers = ["🔢 Qtd"] # Coluna 0
-        has_sig = bool(signatures)
-        
-        if has_sig:
-            headers.append("✍️ Ass.") # Coluna 1
-        
-        headers.extend(placeholders)
-            
-        self.table_panel.table.setColumnCount(len(headers))
-        self.table_panel.table.setHorizontalHeaderLabels(headers)
-        
-        # Ajuste de larguras iniciais
-        self.table_panel.table.setColumnWidth(0, 50) # Qtd
-        if has_sig:
-            self.table_panel.table.setColumnWidth(1, 50) # Assinatura
-
-        self.table_panel.table.setRowCount(1)
-        
-        # 1. Configura a célula de Quantidade (Index 0)
-        qty_item = QTableWidgetItem("1")
-        qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.table_panel.table.setItem(0, 0, qty_item)
-        
-        # 2. Configura a célula de Assinatura (Index 1), se existir
-        if has_sig:
-            default_state = True
-            for sig in signatures:
-                if not sig.get("visible", True):
-                    default_state = False
-                    break
-            
-            chk_item = QTableWidgetItem("")
-            chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            chk_item.setCheckState(Qt.CheckState.Checked if default_state else Qt.CheckState.Unchecked)
-            chk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table_panel.table.setItem(0, 1, chk_item)
-
-    def _open_model_dialog(self):
-        current_model_name = self.preview_panel.cbo_models.currentText()
-        if not current_model_name:
-            QMessageBox.warning(self, "Atenção", "Selecione um modelo na lista antes de configurar.")
-            return
-            
-        self.active_model_name = current_model_name
-
-        self.editor_window = EditorWindow(self)
-        self.editor_window.modelSaved.connect(self._on_editor_saved)
-
-        slug = slugify_model_name(current_model_name)
-        json_path = get_models_dir() / slug / "template_v3.json"
-
-        if json_path.exists():
-            self.editor_window.load_from_json(str(json_path))
-        
-        self.editor_window.show()
-
-    def _reload_models_from_disk(self, select_name: str | None = None):
-        self.preview_panel.cbo_models.blockSignals(True)
-        self.preview_panel.cbo_models.clear()
-
-        models_dir = get_models_dir()
-        models_dir.mkdir(parents=True, exist_ok=True)
-
-        found = []
-        for folder in sorted(models_dir.iterdir()):
-            if not folder.is_dir(): continue
-            json_path = folder / "template_v3.json"
-            if json_path.exists():
-                try:
-                    data = json.loads(json_path.read_text(encoding="utf-8"))
-                    name = data.get("name", folder.name)
-                    found.append(name)
-                except Exception:
-                    continue
-
-        for name in found:
-            self.preview_panel.cbo_models.addItem(name)
-
-        self.preview_panel.cbo_models.blockSignals(False)
-
-        target_index = 0 
-        if select_name:
-            idx = self.preview_panel.cbo_models.findText(select_name)
-            if idx >= 0:
-                target_index = idx
-
-        if self.preview_panel.cbo_models.count() > 0:
-            self.preview_panel.cbo_models.setCurrentIndex(target_index)
-            current_text = self.preview_panel.cbo_models.itemText(target_index)
-            self._on_model_changed(current_text)
-        else:
-            self._on_model_changed("")
-
-    def _on_add_model(self):
-        self.editor_window = EditorWindow(self)
-        self.editor_window.modelSaved.connect(self._on_editor_saved)
-        self.editor_window.show()
-
-    def _on_remove_model(self):
-        model_name = (self.preview_panel.cbo_models.currentText() or "").strip()
-        if not model_name: return
-
-        slug = slugify_model_name(model_name)
-        model_dir = get_models_dir() / slug
-
-        if not model_dir.exists(): return
-
-        resp = QMessageBox.question(self, "Confirmar exclusão", f"Excluir '{model_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        if resp != QMessageBox.StandardButton.Yes: return
-
-        try:
-            shutil.rmtree(model_dir)
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao excluir: {e}")
-            return
-
-        self.log_panel.append(f"Modelo excluído: {model_name}")
-        self._reload_models_from_disk()
-
-    def _get_row_data_rich(self, row_idx):
-        table = self.table_panel.table
-        cols = table.columnCount()
-        headers = [table.horizontalHeaderItem(c).text() for c in range(cols)]
-        
-        row_data = {}
-        for c in range(cols):
-            key = headers[c]
-            item = table.item(row_idx, c)
-            
-            # Ignora a coluna de quantidade no preview técnico do cartão
-            if key == "🔢 Qtd":
-                continue
-                
-            if key == "✍️ Ass.":
-                row_data["__use_signature__"] = (item.checkState() == Qt.CheckState.Checked) if item else True
-                continue
-                
-            val = ""
-            if item:
-                val = item.data(Qt.ItemDataRole.UserRole)
-                if not val: val = item.text()
-            row_data[key] = val
-        return row_data
-
-    def _on_table_selection(self):
-        if not self.cached_model_data: return
-        row = self.table_panel.table.currentRow()
-        if row < 0: return
-
-        try:
-            row_rich = self._get_row_data_rich(row)
-            renderer = NativeRenderer(self.cached_model_data)
-            pix = renderer.render_to_pixmap(row_rich=row_rich)
-            self.preview_panel.set_preview_pixmap(pix)
-        except Exception as e:
-            print(f"Erro no Live Preview: {e}")
-    
-    def _scrape_table_data(self):
-        table = self.table_panel.table
-        rows = table.rowCount()
-        cols = table.columnCount()
-        headers = [table.horizontalHeaderItem(c).text() for c in range(cols)]
-        data_plain, data_rich = [], []
-
-        for r in range(rows):
-            row_p, row_r = {}, {}
-            multiplier = 1
-            has_content = False
-            
-            for c in range(cols):
-                key = headers[c]
-                item = table.item(r, c)
-                
-                # 1. Trata a nova coluna de Quantidade
-                if key == "🔢 Qtd":
-                    try:
-                        val = int(item.text().strip()) if item else 1
-                        multiplier = max(0, val) # Impede números negativos
-                    except ValueError:
-                        multiplier = 1
-                    continue
-
-                # 2. Trata a coluna de Assinatura
-                if key == "✍️ Ass.":
-                    use_sig = (item.checkState() == Qt.CheckState.Checked) if item else True
-                    row_p["__use_signature__"] = use_sig
-                    row_r["__use_signature__"] = use_sig
-                    continue
-
-                # 3. Trata placeholders comuns
-                val_plain = item.text().strip() if item else ""
-                val_rich = item.data(Qt.ItemDataRole.UserRole) if item else ""
-                if not val_rich: val_rich = val_plain
-                
-                if val_plain: 
-                    has_content = True
-                
-                row_p[key] = val_plain
-                row_r[key] = val_rich
-
-            # Validação: Se a linha tiver conteúdo OU o multiplicador for > 0, 
-            # nós geramos (isso permite gerar cartões sem placeholders).
-            if multiplier > 0:
-                for _ in range(multiplier):
-                    data_plain.append(row_p.copy())
-                    data_rich.append(row_r.copy())
-                    
-        return data_plain, data_rich
-    
-    def _toggle_single_pdf_option(self, fmt):
-        """Gerencia a visibilidade do checkbox de PDF único."""
-        is_pdf = (fmt == "PDF")
-        self.chk_single_pdf.setVisible(is_pdf)
-        if not is_pdf:
-            self.chk_single_pdf.setChecked(False)
-
-    def _save_export_format_pref(self, fmt):
-        """Salva a escolha do formato (PNG/PDF) no JSON do modelo."""
-        self._update_template_json({"last_export_format": fmt})
-
-    def _save_single_pdf_pref(self, checked):
-        """Salva o estado da checkbox de Arquivo Único no JSON do modelo."""
-        self._update_template_json({"last_single_pdf": checked})
-
-    def _update_template_json(self, new_data: dict):
-        """Método auxiliar para atualizar metadados no template_v3.json."""
-        if not self.active_model_name:
-            return
-        slug = slugify_model_name(self.active_model_name)
-        json_path = get_models_dir() / slug / "template_v3.json"
-        if json_path.exists():
-            try:
-                if self.cached_model_data:
-                    self.cached_model_data.update(new_data)
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                data.update(new_data)
-                with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-            except Exception as e:
-                print(f"Erro ao atualizar JSON do modelo: {e}")
-    
-    def _select_output_folder(self):
-        start_dir = self.txt_output_path.text() or ""
-        folder = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Saída", start_dir)
-        if folder:
-            self.txt_output_path.setText(folder)
-            self.settings.setValue("last_output_dir", folder)
-
     def _handle_printing_queue(self):
         if not self.cached_model_data: return
         
@@ -1001,54 +1052,6 @@ class MainWindow(QMainWindow):
         finally:
             painter.end()
 
-    def _apply_theme(self, is_dark: bool):
-        app = QApplication.instance()
-        if not app: return
-        
-        app.setStyle("Fusion")
-        
-        if is_dark:
-            palette = QPalette()
-            # Cores exatas extraídas do Mint-Y-Dark
-            bg_color = QColor("#2e2e33")
-            text_color = QColor("#DADADA")
-            alt_base_color = QColor("#222226")
-            button_color = QColor("#333338")
-            highlight_color = QColor("#35A854")
-            
-            palette.setColor(QPalette.ColorRole.Window, bg_color)
-            palette.setColor(QPalette.ColorRole.WindowText, text_color)
-            palette.setColor(QPalette.ColorRole.Base, bg_color)
-            palette.setColor(QPalette.ColorRole.AlternateBase, alt_base_color)
-            palette.setColor(QPalette.ColorRole.ToolTipBase, bg_color)
-            palette.setColor(QPalette.ColorRole.ToolTipText, text_color)
-            palette.setColor(QPalette.ColorRole.Text, text_color)
-            palette.setColor(QPalette.ColorRole.Button, button_color)
-            palette.setColor(QPalette.ColorRole.ButtonText, text_color)
-            palette.setColor(QPalette.ColorRole.BrightText, QColor("#FFFFFF"))
-            palette.setColor(QPalette.ColorRole.Link, QColor("#5294E2"))
-            palette.setColor(QPalette.ColorRole.Highlight, highlight_color)
-            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
-            
-            # Textos e botões desabilitados
-            disabled_color = QColor(255, 255, 255, 107)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled_color)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_color)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, disabled_color)
+    
 
-            app.setPalette(palette)
-            # Reforço global para bordas finas (Fusion costuma ignorar na paleta)
-            app.setStyleSheet("QTableWidget, QLineEdit, QTextEdit { border: 1px solid #202023; }")
-        else:
-            # Restaura o estilo claro nativo
-            app.setPalette(app.style().standardPalette())
-            app.setStyleSheet("")
-            
-        if hasattr(self, 'settings'):
-            self.settings.setValue("dark_mode", is_dark)
-
-    def closeEvent(self, event):
-        """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
-        self.settings.setValue("geometry", self.saveGeometry())
-        self.settings.setValue("splitterState", self.splitter.saveState())
-        super().closeEvent(event)
+   

@@ -33,6 +33,14 @@ class ExportModelsDialog(QDialog):
 
         self._updating = False
 
+    def get_selected_models(self):
+        selected = []
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected.append(item.text())
+        return selected
+
     def _on_master_toggled(self, state):
         if self._updating: return
         self._updating = True
@@ -51,12 +59,4 @@ class ExportModelsDialog(QDialog):
                 break
         
         self.chk_master.setCheckState(Qt.CheckState.Checked if all_checked else Qt.CheckState.Unchecked)
-        self._updating = False
-
-    def get_selected_models(self):
-        selected = []
-        for i in range(self.list_widget.count()):
-            item = self.list_widget.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
-                selected.append(item.text())
-        return selected
+        self._updating = False   

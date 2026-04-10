@@ -211,22 +211,19 @@ class NamingDialog(QDialog):
         # Executa o cálculo inicial somente após toda a interface (incluindo botões) ser criada
         self._update_capacity_preview()
 
-    def _toggle_imposition_ui(self, enabled):
-        self.container_imposition.setVisible(enabled)
-
-    def _on_width_changed(self, new_w):
-        self.spin_h_mm.blockSignals(True)
-        self.spin_h_mm.setValue(new_w / self.ratio)
-        self.spin_h_mm.blockSignals(False)
-
-    def _on_height_changed(self, new_h):
-        self.spin_w_mm.blockSignals(True)
-        self.spin_w_mm.setValue(new_h * self.ratio)
-        self.spin_w_mm.blockSignals(False)
-
-    def _insert_variable(self, var_name):
-        self.txt_pattern.insert(f"{{{var_name}}}")
-        self.txt_pattern.setFocus()
+    def get_pattern(self):
+        return self.result_pattern
+    
+    def get_imposition_settings(self):
+        return {
+            "enabled": self.chk_imposition.isChecked(),
+            "sheet_w_mm": self.spin_sheet_w_mm.value(),
+            "sheet_h_mm": self.spin_sheet_h_mm.value(),
+            "crop_marks": self.chk_crop_marks.isChecked(),
+            "target_w_mm": self.spin_w_mm.value(),
+            "target_h_mm": self.spin_h_mm.value(),
+            "print_after_generation": self.chk_print_after.isChecked()
+        }
 
     def _update_capacity_preview(self):
         """Calcula dinamicamente quantos itens cabem e valida se o modelo cabe na folha."""
@@ -260,16 +257,23 @@ class NamingDialog(QDialog):
         self.result_pattern = self.txt_pattern.text().strip()
         self.accept()
 
-    def get_pattern(self):
-        return self.result_pattern
+    def _toggle_imposition_ui(self, enabled):
+        self.container_imposition.setVisible(enabled)
+
+    def _insert_variable(self, var_name):
+        self.txt_pattern.insert(f"{{{var_name}}}")
+        self.txt_pattern.setFocus()
+
+    def _on_width_changed(self, new_w):
+        self.spin_h_mm.blockSignals(True)
+        self.spin_h_mm.setValue(new_w / self.ratio)
+        self.spin_h_mm.blockSignals(False)
+
+    def _on_height_changed(self, new_h):
+        self.spin_w_mm.blockSignals(True)
+        self.spin_w_mm.setValue(new_h * self.ratio)
+        self.spin_w_mm.blockSignals(False)
+
     
-    def get_imposition_settings(self):
-        return {
-            "enabled": self.chk_imposition.isChecked(),
-            "sheet_w_mm": self.spin_sheet_w_mm.value(),
-            "sheet_h_mm": self.spin_sheet_h_mm.value(),
-            "crop_marks": self.chk_crop_marks.isChecked(),
-            "target_w_mm": self.spin_w_mm.value(),
-            "target_h_mm": self.spin_h_mm.value(),
-            "print_after_generation": self.chk_print_after.isChecked()
-        }
+    
+    

@@ -283,56 +283,6 @@ class EditorWindow(QMainWindow):
         super().showEvent(event)
         self._zoom_to_fit()
 
-    def _zoom_to_fit(self):
-        if not self.scene.sceneRect().isEmpty():
-            margin = 50
-            view_rect = self.scene.sceneRect().adjusted(-margin, -margin, margin, margin)
-            self.view.fitInView(view_rect, Qt.AspectRatioMode.KeepAspectRatio)
-    
-    def sync_placeholders_list(self):
-        current_vars = set(self.get_all_model_placeholders())
-        existing_items_map = {} 
-        for i in range(self.lst_placeholders.count()):
-            existing_items_map[self.lst_placeholders.item(i).text()] = i
-
-        for i in range(self.lst_placeholders.count() - 1, -1, -1):
-            txt = self.lst_placeholders.item(i).text()
-            if txt not in current_vars:
-                self.lst_placeholders.takeItem(i)
-
-        for var in sorted(list(current_vars)):
-            if var not in existing_items_map:
-                self.lst_placeholders.addItem(var)
-    
-    def _import_asset(self, source_path: str, model_dir: Path) -> str | None:
-        if not source_path: 
-            return None
-        
-        src = Path(source_path)
-        if not src.exists():
-            return None
-            
-        if "assets" in src.parts and model_dir in src.parents:
-            return f"assets/{src.name}"
-
-        assets_dir = model_dir / "assets"
-        assets_dir.mkdir(parents=True, exist_ok=True)
-        
-        dest = assets_dir / src.name
-        
-        try:
-            shutil.copy2(src, dest)
-            return f"assets/{src.name}"
-        except Exception as e:
-            print(f"Erro ao copiar asset: {e}")
-            return source_path 
-    
-    def _add_separator(self, layout):
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(sep)
-
     def eventFilter(self, source, event):
         # Escuta tanto a view principal quanto o viewport das barras de rolagem
         if source in (self.view, self.view.viewport()):
@@ -385,495 +335,7 @@ class EditorWindow(QMainWindow):
                     return True
         
         return super().eventFilter(source, event)
-
-    def add_guide(self, vertical):
-        rect = self.scene.sceneRect()
-        if vertical:
-            pos = rect.width() / 2
-        else:
-            pos = rect.height() / 2
-        self.scene.addItem(Guideline(pos, is_vertical=vertical))
-
-    def apply_position_x(self, val):
-        sel = self.scene.selectedItems()
-        if sel:
-            item = sel[0]
-            item.setPos(mm_to_px(val), item.pos().y())
-
-    def apply_position_y(self, val):
-        sel = self.scene.selectedItems()
-        if sel:
-            item = sel[0]
-            item.setPos(item.pos().x(), mm_to_px(val))
-
-    def add_new_box(self):
-        box = DesignerBox(350, 450, 300, 60, "{campo}")
-        self.scene.addItem(box)
-        self.scene.clearSelection()
-        box.setSelected(True)
-        self.sync_placeholders_list() # <--- Adicionado
-        self.refresh_layer_list()
-
-    def update_position_ui(self):
-        """Atualiza os campos X e Y no topo em tempo real."""
-        try:
-            sel = self.scene.selectedItems()
-        except RuntimeError:
-            return # Aborta silenciosamente se a cena já foi destruída (ao fechar o app)
-            
-        if not sel:
-            self.spin_pos_x.setEnabled(False)
-            self.spin_pos_y.setEnabled(False)
-            return
-
-        item = sel[0]
-        self.spin_pos_x.blockSignals(True)
-        self.spin_pos_y.blockSignals(True)
-        
-        self.spin_pos_x.setEnabled(True)
-        self.spin_pos_y.setEnabled(True)
-
-        if isinstance(item, Guideline):
-            if item.is_vertical:
-                self.spin_pos_x.setValue(px_to_mm(item.pos().x()))
-                self.spin_pos_y.setEnabled(False)
-            else:
-                self.spin_pos_y.setValue(px_to_mm(item.pos().y()))
-                self.spin_pos_x.setEnabled(False)
-        else:
-            self.spin_pos_x.setValue(px_to_mm(item.pos().x()))
-            self.spin_pos_y.setValue(px_to_mm(item.pos().y()))
-
-        # Sincroniza Largura e Altura no painel
-        if isinstance(item, DesignerBox):
-            self.caixa_texto_panel.blockSignals(True)
-            self.caixa_texto_panel.spin_w.setValue(px_to_mm(item.rect().width()))
-            self.caixa_texto_panel.spin_h.setValue(px_to_mm(item.rect().height()))
-            self.caixa_texto_panel.blockSignals(False)
-        elif isinstance(item, (ImageItem, SignatureItem)):
-            self.caixa_texto_panel.blockSignals(True)
-            rect = item.pixmap().rect()
-            self.caixa_texto_panel.spin_w.setValue(px_to_mm(rect.width()))
-            self.caixa_texto_panel.spin_h.setValue(px_to_mm(rect.height()))
-            self.caixa_texto_panel.blockSignals(False)
-
-        self.spin_pos_x.blockSignals(False)
-        self.spin_pos_y.blockSignals(False)
-
-    def on_selection_changed(self):
-        """Gerencia a troca de painéis laterais quando a seleção muda."""
-        try:
-            sel = self.scene.selectedItems()
-        except RuntimeError:
-            return 
-            
-        boxes = [i for i in sel if isinstance(i, DesignerBox)]
-        images = [i for i in sel if isinstance(i, ImageItem)]
-        signatures = [i for i in sel if isinstance(i, SignatureItem)]
-        
-        self.update_position_ui()
-
-        # Sincroniza a seleção na lista de camadas (UI)
-        if sel:
-            target_item = sel[0]
-            self.layer_list.blockSignals(True)
-            for i in range(self.layer_list.count()):
-                list_item = self.layer_list.item(i)
-                if list_item.data(Qt.ItemDataRole.UserRole) == target_item:
-                    self.layer_list.setCurrentItem(list_item)
-                    break
-            self.layer_list.blockSignals(False)
-        else:
-            self.layer_list.clearSelection()
-
-        if boxes:
-            target_box = boxes[0]
-            self.editor_texto_panel.load_from_item(target_box)
-            self.editor_texto_panel.setEnabled(True)
-            self.caixa_texto_panel.load_from_item(target_box)
-            self.caixa_texto_panel.setEnabled(True)
-        elif images or signatures:
-            target = images[0] if images else signatures[0]
-            self.editor_texto_panel.setEnabled(False)
-            self.caixa_texto_panel.load_from_image(target)
-            self.caixa_texto_panel.setEnabled(True)
-        else:
-            self.editor_texto_panel.setEnabled(False)
-            self.caixa_texto_panel.setEnabled(False)
-
-
-    def duplicate_selected(self):
-        original = self._get_selected()
-        if not original: return
-
-        offset = 20
-        new_x = original.x() + offset
-        new_y = original.y() + offset
-        rect = original.rect()
-        
-        new_box = DesignerBox(new_x, new_y, rect.width(), rect.height(), "")
-        new_box.layer_id = None 
-        
-        new_box.state = copy.deepcopy(original.state)
-        new_box.setRotation(original.rotation())
-        new_box.apply_state()
-        new_box.update_center()
-
-        self.scene.addItem(new_box)
-        self.refresh_layer_list()
-        
-        self.scene.clearSelection()
-        new_box.setSelected(True)
-        self.sync_placeholders_list()
-
-    def _get_selected(self):
-        sel = self.scene.selectedItems()
-        valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
-        return valid_items[0] if valid_items else None
     
-    def delete_selected_items(self):
-        selected = self.scene.selectedItems()
-        if not selected: return
-        
-        for item in selected: 
-            self.scene.removeItem(item)
-            
-        self.on_selection_changed()
-        self.sync_placeholders_list()
-        self.refresh_layer_list()
-
-    def update_text_html(self, html_content):
-        box = self._get_selected()
-        if box: 
-            box.state.html_content = html_content
-            box.apply_state()
-    
-    def update_font_family(self, font):
-        box = self._get_selected()
-        if box:
-            box.state.font_family = font.family()
-            box.apply_state()
-
-    def update_font_size(self, size):
-        box = self._get_selected()
-        if box:
-            box.state.font_size = size
-            box.apply_state()
-
-    def update_font_color(self, color_hex):
-        box = self._get_selected()
-        if box:
-            box.state.font_color = color_hex
-            box.apply_state()
-
-    def update_width(self, width_mm):
-        item = self._get_selected()
-        width_px = mm_to_px(width_mm)
-        if item:
-            if isinstance(item, DesignerBox):
-                r = item.rect()
-                item.setRect(0, 0, width_px, r.height())
-                item.recalculate_text_position()
-                item.update_center() 
-            elif isinstance(item, (ImageItem, SignatureItem)):
-                h_px = mm_to_px(self.caixa_texto_panel.spin_h.value())
-                item.resize_custom(width_px, h_px)
-
-    def update_height(self, height_mm):
-        item = self._get_selected()
-        height_px = mm_to_px(height_mm)
-        if item:
-            if isinstance(item, DesignerBox):
-                r = item.rect()
-                item.setRect(0, 0, r.width(), height_px)
-                item.recalculate_text_position()
-                item.update_center()
-            elif isinstance(item, (ImageItem, SignatureItem)):
-                w_px = mm_to_px(self.caixa_texto_panel.spin_w.value())
-                item.resize_custom(w_px, height_px)
-
-    def update_rotation(self, angle):
-        item = self._get_selected()
-        if item:
-            item.setRotation(angle)
-            if isinstance(item, (ImageItem, SignatureItem)):
-                rect = item.pixmap().rect()
-                item.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
-
-    def update_proportion_lock(self, locked):
-        item = self._get_selected()
-        if item:
-            item.keep_proportion = locked
-
-    def restore_item_state(self):
-        item = self._get_selected()
-        if not item: return
-        
-        item.setRotation(0)
-        
-        if isinstance(item, (ImageItem, SignatureItem)):
-            if hasattr(item, '_original_pixmap') and not item._original_pixmap.isNull():
-                w_px = item._original_pixmap.width()
-                h_px = item._original_pixmap.height()
-                item.resize_custom(w_px, h_px)
-                item.setTransformOriginPoint(w_px / 2, h_px / 2) # Corrige o pivô de giro
-            self.caixa_texto_panel.load_from_image(item) # Recarrega a UI com os dados puros
-            
-        elif isinstance(item, DesignerBox):
-            item.update_center()
-            self.caixa_texto_panel.load_from_item(item)
-
-    def update_align(self, align_str):
-        box = self._get_selected()
-        if box: box.set_alignment(align_str)
-
-    def update_vertical_align(self, align_str):
-        box = self._get_selected()
-        if box: box.set_vertical_alignment(align_str)
-
-    def update_indent(self, val):
-        box = self._get_selected()
-        if box: box.set_block_format(indent=val)
-
-    def update_line_height(self, val):
-        box = self._get_selected()
-        if box: box.set_block_format(line_height=val)
-
-    def export_to_json(self):
-        boxes_data = []
-        signatures_data = []
-        images_data = []
-        
-        for item in self.scene.items():
-            if isinstance(item, DesignerBox):
-                pos = item.pos()
-                r = item.rect()
-
-                boxes_data.append({
-                    "custom_name": getattr(item, "custom_name", ""),
-                    "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
-                    "html": item.state.html_content,
-                    "visible": item.isVisible(),
-                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": round(float(pos.x()), 2),
-                    "y": round(float(pos.y()), 2),
-                    "w": round(float(r.width()), 2),
-                    "h": round(float(r.height()), 2),
-                    "rotation": round(float(item.rotation()), 2),
-                    "font_family": item.state.font_family,
-                    "font_size": item.state.font_size,
-                    "font_color": getattr(item.state, 'font_color', '#000000'),
-                    "align": item.state.align,
-                    "vertical_align": item.state.vertical_align,
-                    "indent_px": item.state.indent_px,
-                    "line_height": item.state.line_height
-                })
-            
-            elif isinstance(item, SignatureItem):
-                pos = item.pos()
-                pix = item.pixmap()
-                signatures_data.append({
-                    "custom_name": getattr(item, "custom_name", ""),
-                    "path": getattr(item, "_original_path", ""), 
-                    "visible": item.isVisible(),
-                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": round(float(pos.x()), 2),
-                    "y": round(float(pos.y()), 2),
-                    "width": round(float(pix.width()), 2),
-                    "height": round(float(pix.height()), 2),
-                    "longest_side": round(float(max(pix.width(), pix.height())), 2)
-                })
-
-            elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
-                pos = item.pos()
-                pix = item.pixmap()
-                images_data.append({
-                    "custom_name": getattr(item, "custom_name", ""),
-                    "path": getattr(item, "_original_path", ""), 
-                    "visible": item.isVisible(),
-                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": round(float(pos.x()), 2),
-                    "y": round(float(pos.y()), 2),
-                    "width": round(float(pix.width()), 2),
-                    "height": round(float(pix.height()), 2),
-                    "longest_side": round(float(max(pix.width(), pix.height())), 2),
-                    "rotation": round(float(item.rotation()), 2)
-                })
-
-        ordered_placeholders = []
-        for i in range(self.lst_placeholders.count()):
-            ordered_placeholders.append(self.lst_placeholders.item(i).text())
-
-        data = {
-            "name": "modelo_v3_projeto",
-            "canvas_size": {"w": int(self.scene.width()), "h": int(self.scene.height())},
-            "target_w_mm": self.spin_phys_w.value(),
-            "target_h_mm": self.spin_phys_h.value(),
-            "background_path": self.background_path,
-            "placeholders": ordered_placeholders,
-            "signatures": signatures_data,
-            "images": images_data,
-            "boxes": boxes_data
-        }
-        
-        if self.bg_item and isinstance(self.bg_item, BackgroundItem):
-            data["bg_props"] = {
-                "x": round(float(self.bg_item.pos().x()), 2),
-                "y": round(float(self.bg_item.pos().y()), 2),
-                "w": round(float(self.bg_item.pixmap().width()), 2),
-                "h": round(float(self.bg_item.pixmap().height()), 2),
-                "visible": self.bg_item.isVisible(),
-                "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
-            }
-                
-        model_name = self.windowTitle().replace("Editor Visual de Modelo - ", "")
-        if not model_name or "Gerador de Cartões em Lote - GCL" in model_name:
-            model_name, ok = QInputDialog.getText(self, "Salvar Modelo", "Nome do Modelo:")
-            if not ok or not model_name: return
-            self.setWindowTitle(f"Editor Visual de Modelo - {model_name}")
-
-        slug = slugify_model_name(model_name)
-        model_dir = get_models_dir() / slug
-        model_dir.mkdir(parents=True, exist_ok=True)
-        
-        if self.background_path:
-            rel_bg = self._import_asset(self.background_path, model_dir)
-            data["background_path"] = rel_bg
-
-        for sig in data["signatures"]:
-            rel_sig = self._import_asset(sig["path"], model_dir)
-            if rel_sig:
-                sig["path"] = rel_sig
-
-        for img in data.get("images", []):
-            rel_img = self._import_asset(img["path"], model_dir)
-            if rel_img:
-                img["path"] = rel_img
-
-        file_path = model_dir / "template_v3.json"
-        
-        data["name"] = model_name
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
-            
-        self.modelSaved.emit(model_name, data["placeholders"])
-        
-        QMessageBox.information(self, "Sucesso", f"Modelo '{model_name}' salvo com sucesso em:\n{file_path}")
-
-    
-    def load_background_image(self, path, update_ui=True, props=None):
-        reader = QImageReader(path)
-        reader.setAutoTransform(True)
-        original_size = reader.size()
-        
-        if not reader.canRead() and QPixmap(path).isNull():
-            QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
-            return
-            
-        if original_size.isEmpty():
-            original_size = QPixmap(path).size()
-        
-        if self.bg_item:
-            self.scene.removeItem(self.bg_item)
-            
-        self.background_path = path
-        
-        # Instancia o fundo livre em vez de um Pixmap cimentado
-        self.bg_item = BackgroundItem(path)
-        self.scene.addItem(self.bg_item)
-        self.refresh_layer_list()
-        
-        if props:
-            # Se for carregado via JSON, recupera posições e bloqueios
-            self.bg_item.setPos(props.get("x", 0), props.get("y", 0))
-            if "w" in props and "h" in props:
-                self.bg_item.resize_custom(props["w"], props["h"])
-            self.bg_item.setVisible(props.get("visible", True))
-            if props.get("locked", False):
-                self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-                self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-                self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        elif not update_ui:
-            # Fallback para JSONs antigos: estica para o tamanho da tela para não quebrar layout
-            w_px = mm_to_px(self.spin_phys_w.value())
-            h_px = mm_to_px(self.spin_phys_h.value())
-            self.bg_item.resize_custom(w_px, h_px)
-
-        if update_ui:
-            # Lê o tamanho original da imagem ao importar manualmente e molda a "Prancheta"
-            w_mm = px_to_mm(original_size.width())
-            h_mm = px_to_mm(original_size.height())
-            
-            self.spin_phys_w.blockSignals(True)
-            self.spin_phys_h.blockSignals(True)
-            self.spin_phys_w.setValue(w_mm)
-            self.spin_phys_h.setValue(h_mm)
-            self.spin_phys_w.blockSignals(False)
-            self.spin_phys_h.blockSignals(False)
-            
-        self._on_physical_size_changed()
-        self._zoom_to_fit()
-
-    def _on_physical_size_changed(self, _=None):
-        """Redimensiona APENAS a prancheta (papel branco). A imagem de fundo agora é livre."""
-        if not hasattr(self, 'scene'): return
-        
-        w_px = mm_to_px(self.spin_phys_w.value())
-        h_px = mm_to_px(self.spin_phys_h.value())
-        
-        rect = QRectF(0, 0, w_px, h_px)
-        
-        self.scene.setSceneRect(rect)
-        self.view.setSceneRect(rect)
-        
-        if self.fallback_bg:
-            self.fallback_bg.setRect(rect)
-            self.fallback_bg.show() # Garante que o papel branco esteja visível como base
-
-    def _on_click_load_bg(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Fundo", "", "Imagens (*.png *.jpg *.jpeg)")
-        if path:
-            self.load_background_image(path)
-
-
-    def _on_click_add_signature(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Assinatura", "", "Imagens (*.png)")
-        if path:
-            sig = SignatureItem(path)
-            center = self.view.mapToScene(self.view.viewport().rect().center())
-            sig.setPos(center)
-            self.scene.addItem(sig)
-            self.refresh_layer_list()
-
-    def _on_click_add_image(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg)")
-        if path:
-            img = ImageItem(path)
-            center = self.view.mapToScene(self.view.viewport().rect().center())
-            img.setPos(center)
-            
-            # Trava automática no Z-Value topo da faixa de Imagens
-            base_z = 1
-            for item in self.scene.items():
-                if isinstance(item, ImageItem) and item.zValue() >= base_z:
-                    base_z = int(item.zValue()) + 1
-            img.setZValue(min(base_z, 100))
-            
-            self.scene.addItem(img)
-            self.refresh_layer_list()
-
-    def get_all_model_placeholders(self):
-        placeholders = set()
-        for item in self.scene.items():
-            if isinstance(item, DesignerBox):
-                placeholders.update(item.get_placeholders())
-        return sorted(list(placeholders))
-    
-    def _on_content_updated(self, html):
-        self.update_text_html(html)
-        self.sync_placeholders_list()
-        self.refresh_layer_list()
-
     def load_from_json(self, file_path):
         path = Path(file_path)
         if not path.exists():
@@ -996,32 +458,554 @@ class EditorWindow(QMainWindow):
         self.setWindowTitle(f"Editor Visual de Modelo - {data['name']}")
         self.refresh_layer_list()
 
-    def _get_next_layer_id(self):
-        used = set()
+    def export_to_json(self):
+        boxes_data = []
+        signatures_data = []
+        images_data = []
+        
         for item in self.scene.items():
-            if hasattr(item, 'layer_id') and item.layer_id is not None:
-                used.add(item.layer_id)
-        for i in range(100):
-            if i not in used: return i
-        return 99
+            if isinstance(item, DesignerBox):
+                pos = item.pos()
+                r = item.rect()
 
-    def _generate_layer_name(self, layer_id, item):
-        if hasattr(item, 'custom_name') and item.custom_name:
-            return item.custom_name
+                boxes_data.append({
+                    "custom_name": getattr(item, "custom_name", ""),
+                    "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
+                    "html": item.state.html_content,
+                    "visible": item.isVisible(),
+                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
+                    "x": round(float(pos.x()), 2),
+                    "y": round(float(pos.y()), 2),
+                    "w": round(float(r.width()), 2),
+                    "h": round(float(r.height()), 2),
+                    "rotation": round(float(item.rotation()), 2),
+                    "font_family": item.state.font_family,
+                    "font_size": item.state.font_size,
+                    "font_color": getattr(item.state, 'font_color', '#000000'),
+                    "align": item.state.align,
+                    "vertical_align": item.state.vertical_align,
+                    "indent_px": item.state.indent_px,
+                    "line_height": item.state.line_height
+                })
             
-        prefix = f"{layer_id:02d}"
+            elif isinstance(item, SignatureItem):
+                pos = item.pos()
+                pix = item.pixmap()
+                signatures_data.append({
+                    "custom_name": getattr(item, "custom_name", ""),
+                    "path": getattr(item, "_original_path", ""), 
+                    "visible": item.isVisible(),
+                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
+                    "x": round(float(pos.x()), 2),
+                    "y": round(float(pos.y()), 2),
+                    "width": round(float(pix.width()), 2),
+                    "height": round(float(pix.height()), 2),
+                    "longest_side": round(float(max(pix.width(), pix.height())), 2)
+                })
+
+            elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
+                pos = item.pos()
+                pix = item.pixmap()
+                images_data.append({
+                    "custom_name": getattr(item, "custom_name", ""),
+                    "path": getattr(item, "_original_path", ""), 
+                    "visible": item.isVisible(),
+                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
+                    "x": round(float(pos.x()), 2),
+                    "y": round(float(pos.y()), 2),
+                    "width": round(float(pix.width()), 2),
+                    "height": round(float(pix.height()), 2),
+                    "longest_side": round(float(max(pix.width(), pix.height())), 2),
+                    "rotation": round(float(item.rotation()), 2)
+                })
+
+        ordered_placeholders = []
+        for i in range(self.lst_placeholders.count()):
+            ordered_placeholders.append(self.lst_placeholders.item(i).text())
+
+        data = {
+            "name": "modelo_v3_projeto",
+            "canvas_size": {"w": int(self.scene.width()), "h": int(self.scene.height())},
+            "target_w_mm": self.spin_phys_w.value(),
+            "target_h_mm": self.spin_phys_h.value(),
+            "background_path": self.background_path,
+            "placeholders": ordered_placeholders,
+            "signatures": signatures_data,
+            "images": images_data,
+            "boxes": boxes_data
+        }
+        
+        if self.bg_item and isinstance(self.bg_item, BackgroundItem):
+            data["bg_props"] = {
+                "x": round(float(self.bg_item.pos().x()), 2),
+                "y": round(float(self.bg_item.pos().y()), 2),
+                "w": round(float(self.bg_item.pixmap().width()), 2),
+                "h": round(float(self.bg_item.pixmap().height()), 2),
+                "visible": self.bg_item.isVisible(),
+                "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
+            }
+                
+        model_name = self.windowTitle().replace("Editor Visual de Modelo - ", "")
+        if not model_name or "Gerador de Cartões em Lote - GCL" in model_name:
+            model_name, ok = QInputDialog.getText(self, "Salvar Modelo", "Nome do Modelo:")
+            if not ok or not model_name: return
+            self.setWindowTitle(f"Editor Visual de Modelo - {model_name}")
+
+        slug = slugify_model_name(model_name)
+        model_dir = get_models_dir() / slug
+        model_dir.mkdir(parents=True, exist_ok=True)
+        
+        if self.background_path:
+            rel_bg = self._import_asset(self.background_path, model_dir)
+            data["background_path"] = rel_bg
+
+        for sig in data["signatures"]:
+            rel_sig = self._import_asset(sig["path"], model_dir)
+            if rel_sig:
+                sig["path"] = rel_sig
+
+        for img in data.get("images", []):
+            rel_img = self._import_asset(img["path"], model_dir)
+            if rel_img:
+                img["path"] = rel_img
+
+        file_path = model_dir / "template_v3.json"
+        
+        data["name"] = model_name
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
+            
+        self.modelSaved.emit(model_name, data["placeholders"])
+        
+        QMessageBox.information(self, "Sucesso", f"Modelo '{model_name}' salvo com sucesso em:\n{file_path}")
+
+    def load_background_image(self, path, update_ui=True, props=None):
+        reader = QImageReader(path)
+        reader.setAutoTransform(True)
+        original_size = reader.size()
+        
+        if not reader.canRead() and QPixmap(path).isNull():
+            QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
+            return
+            
+        if original_size.isEmpty():
+            original_size = QPixmap(path).size()
+        
+        if self.bg_item:
+            self.scene.removeItem(self.bg_item)
+            
+        self.background_path = path
+        
+        # Instancia o fundo livre em vez de um Pixmap cimentado
+        self.bg_item = BackgroundItem(path)
+        self.scene.addItem(self.bg_item)
+        self.refresh_layer_list()
+        
+        if props:
+            # Se for carregado via JSON, recupera posições e bloqueios
+            self.bg_item.setPos(props.get("x", 0), props.get("y", 0))
+            if "w" in props and "h" in props:
+                self.bg_item.resize_custom(props["w"], props["h"])
+            self.bg_item.setVisible(props.get("visible", True))
+            if props.get("locked", False):
+                self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        elif not update_ui:
+            # Fallback para JSONs antigos: estica para o tamanho da tela para não quebrar layout
+            w_px = mm_to_px(self.spin_phys_w.value())
+            h_px = mm_to_px(self.spin_phys_h.value())
+            self.bg_item.resize_custom(w_px, h_px)
+
+        if update_ui:
+            # Lê o tamanho original da imagem ao importar manualmente e molda a "Prancheta"
+            w_mm = px_to_mm(original_size.width())
+            h_mm = px_to_mm(original_size.height())
+            
+            self.spin_phys_w.blockSignals(True)
+            self.spin_phys_h.blockSignals(True)
+            self.spin_phys_w.setValue(w_mm)
+            self.spin_phys_h.setValue(h_mm)
+            self.spin_phys_w.blockSignals(False)
+            self.spin_phys_h.blockSignals(False)
+            
+        self._on_physical_size_changed()
+        self._zoom_to_fit()
+
+    def get_all_model_placeholders(self):
+        placeholders = set()
+        for item in self.scene.items():
+            if isinstance(item, DesignerBox):
+                placeholders.update(item.get_placeholders())
+        return sorted(list(placeholders))
+    
+    def add_new_box(self):
+        box = DesignerBox(350, 450, 300, 60, "{campo}")
+        self.scene.addItem(box)
+        self.scene.clearSelection()
+        box.setSelected(True)
+        self.sync_placeholders_list() # <--- Adicionado
+        self.refresh_layer_list()
+
+    def add_guide(self, vertical):
+        rect = self.scene.sceneRect()
+        if vertical:
+            pos = rect.width() / 2
+        else:
+            pos = rect.height() / 2
+        self.scene.addItem(Guideline(pos, is_vertical=vertical))
+
+    def duplicate_selected(self):
+        original = self._get_selected()
+        if not original: return
+
+        offset = 20
+        new_x = original.x() + offset
+        new_y = original.y() + offset
+        rect = original.rect()
+        
+        new_box = DesignerBox(new_x, new_y, rect.width(), rect.height(), "")
+        new_box.layer_id = None 
+        
+        new_box.state = copy.deepcopy(original.state)
+        new_box.setRotation(original.rotation())
+        new_box.apply_state()
+        new_box.update_center()
+
+        self.scene.addItem(new_box)
+        self.refresh_layer_list()
+        
+        self.scene.clearSelection()
+        new_box.setSelected(True)
+        self.sync_placeholders_list()
+
+    def delete_selected_items(self):
+        selected = self.scene.selectedItems()
+        if not selected: return
+        
+        for item in selected: 
+            self.scene.removeItem(item)
+            
+        self.on_selection_changed()
+        self.sync_placeholders_list()
+        self.refresh_layer_list()
+
+    def apply_position_x(self, val):
+        sel = self.scene.selectedItems()
+        if sel:
+            item = sel[0]
+            item.setPos(mm_to_px(val), item.pos().y())
+
+    def apply_position_y(self, val):
+        sel = self.scene.selectedItems()
+        if sel:
+            item = sel[0]
+            item.setPos(item.pos().x(), mm_to_px(val))
+
+    def update_width(self, width_mm):
+        item = self._get_selected()
+        width_px = mm_to_px(width_mm)
+        if item:
+            if isinstance(item, DesignerBox):
+                r = item.rect()
+                item.setRect(0, 0, width_px, r.height())
+                item.recalculate_text_position()
+                item.update_center() 
+            elif isinstance(item, (ImageItem, SignatureItem)):
+                h_px = mm_to_px(self.caixa_texto_panel.spin_h.value())
+                item.resize_custom(width_px, h_px)
+
+    def update_height(self, height_mm):
+        item = self._get_selected()
+        height_px = mm_to_px(height_mm)
+        if item:
+            if isinstance(item, DesignerBox):
+                r = item.rect()
+                item.setRect(0, 0, r.width(), height_px)
+                item.recalculate_text_position()
+                item.update_center()
+            elif isinstance(item, (ImageItem, SignatureItem)):
+                w_px = mm_to_px(self.caixa_texto_panel.spin_w.value())
+                item.resize_custom(w_px, height_px)
+
+    def update_rotation(self, angle):
+        item = self._get_selected()
+        if item:
+            item.setRotation(angle)
+            if isinstance(item, (ImageItem, SignatureItem)):
+                rect = item.pixmap().rect()
+                item.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
+
+    def update_proportion_lock(self, locked):
+        item = self._get_selected()
+        if item:
+            item.keep_proportion = locked
+
+    def update_text_html(self, html_content):
+        box = self._get_selected()
+        if box: 
+            box.state.html_content = html_content
+            box.apply_state()
+    
+    def update_font_family(self, font):
+        box = self._get_selected()
+        if box:
+            box.state.font_family = font.family()
+            box.apply_state()
+
+    def update_font_size(self, size):
+        box = self._get_selected()
+        if box:
+            box.state.font_size = size
+            box.apply_state()
+
+    def update_font_color(self, color_hex):
+        box = self._get_selected()
+        if box:
+            box.state.font_color = color_hex
+            box.apply_state()
+
+    def update_align(self, align_str):
+        box = self._get_selected()
+        if box: box.set_alignment(align_str)
+
+    def update_vertical_align(self, align_str):
+        box = self._get_selected()
+        if box: box.set_vertical_alignment(align_str)
+
+    def update_indent(self, val):
+        box = self._get_selected()
+        if box: box.set_block_format(indent=val)
+
+    def update_line_height(self, val):
+        box = self._get_selected()
+        if box: box.set_block_format(line_height=val)
+
+    def restore_item_state(self):
+        item = self._get_selected()
+        if not item: return
+        
+        item.setRotation(0)
+        
+        if isinstance(item, (ImageItem, SignatureItem)):
+            if hasattr(item, '_original_pixmap') and not item._original_pixmap.isNull():
+                w_px = item._original_pixmap.width()
+                h_px = item._original_pixmap.height()
+                item.resize_custom(w_px, h_px)
+                item.setTransformOriginPoint(w_px / 2, h_px / 2) # Corrige o pivô de giro
+            self.caixa_texto_panel.load_from_image(item) # Recarrega a UI com os dados puros
+            
+        elif isinstance(item, DesignerBox):
+            item.update_center()
+            self.caixa_texto_panel.load_from_item(item)
+
+    def on_selection_changed(self):
+        """Gerencia a troca de painéis laterais quando a seleção muda."""
+        try:
+            sel = self.scene.selectedItems()
+        except RuntimeError:
+            return 
+            
+        boxes = [i for i in sel if isinstance(i, DesignerBox)]
+        images = [i for i in sel if isinstance(i, ImageItem)]
+        signatures = [i for i in sel if isinstance(i, SignatureItem)]
+        
+        self.update_position_ui()
+
+        # Sincroniza a seleção na lista de camadas (UI)
+        if sel:
+            target_item = sel[0]
+            self.layer_list.blockSignals(True)
+            for i in range(self.layer_list.count()):
+                list_item = self.layer_list.item(i)
+                if list_item.data(Qt.ItemDataRole.UserRole) == target_item:
+                    self.layer_list.setCurrentItem(list_item)
+                    break
+            self.layer_list.blockSignals(False)
+        else:
+            self.layer_list.clearSelection()
+
+        if boxes:
+            target_box = boxes[0]
+            self.editor_texto_panel.load_from_item(target_box)
+            self.editor_texto_panel.setEnabled(True)
+            self.caixa_texto_panel.load_from_item(target_box)
+            self.caixa_texto_panel.setEnabled(True)
+        elif images or signatures:
+            target = images[0] if images else signatures[0]
+            self.editor_texto_panel.setEnabled(False)
+            self.caixa_texto_panel.load_from_image(target)
+            self.caixa_texto_panel.setEnabled(True)
+        else:
+            self.editor_texto_panel.setEnabled(False)
+            self.caixa_texto_panel.setEnabled(False)
+
+    def _on_physical_size_changed(self, _=None):
+        """Redimensiona APENAS a prancheta (papel branco). A imagem de fundo agora é livre."""
+        if not hasattr(self, 'scene'): return
+        
+        w_px = mm_to_px(self.spin_phys_w.value())
+        h_px = mm_to_px(self.spin_phys_h.value())
+        
+        rect = QRectF(0, 0, w_px, h_px)
+        
+        self.scene.setSceneRect(rect)
+        self.view.setSceneRect(rect)
+        
+        if self.fallback_bg:
+            self.fallback_bg.setRect(rect)
+            self.fallback_bg.show() # Garante que o papel branco esteja visível como base
+
+    def _on_click_load_bg(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Fundo", "", "Imagens (*.png *.jpg *.jpeg)")
+        if path:
+            self.load_background_image(path)
+
+
+    def _on_click_add_signature(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Assinatura", "", "Imagens (*.png)")
+        if path:
+            sig = SignatureItem(path)
+            center = self.view.mapToScene(self.view.viewport().rect().center())
+            sig.setPos(center)
+            self.scene.addItem(sig)
+            self.refresh_layer_list()
+
+    def _on_click_add_image(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg)")
+        if path:
+            img = ImageItem(path)
+            center = self.view.mapToScene(self.view.viewport().rect().center())
+            img.setPos(center)
+            
+            # Trava automática no Z-Value topo da faixa de Imagens
+            base_z = 1
+            for item in self.scene.items():
+                if isinstance(item, ImageItem) and item.zValue() >= base_z:
+                    base_z = int(item.zValue()) + 1
+            img.setZValue(min(base_z, 100))
+            
+            self.scene.addItem(img)
+            self.refresh_layer_list()
+
+    def _on_content_updated(self, html):
+        self.update_text_html(html)
+        self.sync_placeholders_list()
+        self.refresh_layer_list()
+
+    def _on_layer_list_clicked(self, list_item):
+        target_item = list_item.data(Qt.ItemDataRole.UserRole)
+        if target_item:
+            self.scene.clearSelection()
+            target_item.setSelected(True)
+            self.view.ensureVisible(target_item)
+            self.view.setFocus()
+
+    def _on_layer_item_changed(self, list_item):
+        target_item = list_item.data(Qt.ItemDataRole.UserRole)
+        if target_item:
+            is_visible = (list_item.checkState() == Qt.CheckState.Checked)
+            target_item.setVisible(is_visible)
+
+    def _on_layer_reordered(self, parent, start, end, destination, row):
+        count = self.layer_list.count()
+        items_in_order = []
+        
+        for i in range(count):
+            list_item = self.layer_list.item(i)
+            target = list_item.data(Qt.ItemDataRole.UserRole)
+            if target:
+                items_in_order.append(target)
+                
+        assinaturas = [i for i in items_in_order if isinstance(i, SignatureItem)]
+        textos = [i for i in items_in_order if isinstance(i, DesignerBox)]
+        imagens = [i for i in items_in_order if isinstance(i, ImageItem) and not isinstance(i, BackgroundItem)]
+        fundos = [i for i in items_in_order if isinstance(i, BackgroundItem)]
+        
+        # Blinda o Z-Value matematicamente, não importa pra onde o usuário tentou arrastar
+        for i, item in enumerate(assinaturas): item.setZValue(250 - i)
+        for i, item in enumerate(textos): item.setZValue(200 - i)
+        for i, item in enumerate(imagens): item.setZValue(100 - i)
+        for i, item in enumerate(fundos): item.setZValue(-100 - i)
+        
+        # Redesenha forçadamente para que o item "pule" de volta para a sua seção correta caso tenha sido arrastado pra fora dela
+        self.refresh_layer_list()
+
+    def rename_layer(self, list_item):
+        """Abre um popup para renomear a camada com duplo clique."""
+        item = list_item.data(Qt.ItemDataRole.UserRole)
+        
+        # Ignora se for cabeçalho vazio
+        if not item:
+            return
+            
+        current_name = self._generate_layer_name(item.layer_id, item)
+        new_name, ok = QInputDialog.getText(self, "Renomear Camada", "Novo nome para a camada:", text=current_name)
+        
+        if ok and new_name.strip():
+            item.custom_name = new_name.strip()
+            self.refresh_layer_list()
+
+    def update_position_ui(self):
+        """Atualiza os campos X e Y no topo em tempo real."""
+        try:
+            sel = self.scene.selectedItems()
+        except RuntimeError:
+            return # Aborta silenciosamente se a cena já foi destruída (ao fechar o app)
+            
+        if not sel:
+            self.spin_pos_x.setEnabled(False)
+            self.spin_pos_y.setEnabled(False)
+            return
+
+        item = sel[0]
+        self.spin_pos_x.blockSignals(True)
+        self.spin_pos_y.blockSignals(True)
+        
+        self.spin_pos_x.setEnabled(True)
+        self.spin_pos_y.setEnabled(True)
+
+        if isinstance(item, Guideline):
+            if item.is_vertical:
+                self.spin_pos_x.setValue(px_to_mm(item.pos().x()))
+                self.spin_pos_y.setEnabled(False)
+            else:
+                self.spin_pos_y.setValue(px_to_mm(item.pos().y()))
+                self.spin_pos_x.setEnabled(False)
+        else:
+            self.spin_pos_x.setValue(px_to_mm(item.pos().x()))
+            self.spin_pos_y.setValue(px_to_mm(item.pos().y()))
+
+        # Sincroniza Largura e Altura no painel
         if isinstance(item, DesignerBox):
-            raw = item.text_item.toPlainText().strip().replace("\n", " ")
-            if len(raw) > 15: raw = raw[:12] + "..."
-            if not raw: raw = "{vazio}"
-            return f"{prefix}_{raw}"
-        elif isinstance(item, SignatureItem):
-            return f"{prefix}_Assinatura"
-        elif isinstance(item, ImageItem):
-            return f"{prefix}_Imagem"
-        if isinstance(item, BackgroundItem):
-            return f"{prefix}_Fundo"
-        return f"{prefix}_Objeto"
+            self.caixa_texto_panel.blockSignals(True)
+            self.caixa_texto_panel.spin_w.setValue(px_to_mm(item.rect().width()))
+            self.caixa_texto_panel.spin_h.setValue(px_to_mm(item.rect().height()))
+            self.caixa_texto_panel.blockSignals(False)
+        elif isinstance(item, (ImageItem, SignatureItem)):
+            self.caixa_texto_panel.blockSignals(True)
+            rect = item.pixmap().rect()
+            self.caixa_texto_panel.spin_w.setValue(px_to_mm(rect.width()))
+            self.caixa_texto_panel.spin_h.setValue(px_to_mm(rect.height()))
+            self.caixa_texto_panel.blockSignals(False)
+
+        self.spin_pos_x.blockSignals(False)
+        self.spin_pos_y.blockSignals(False)
+
+    def sync_placeholders_list(self):
+        current_vars = set(self.get_all_model_placeholders())
+        existing_items_map = {} 
+        for i in range(self.lst_placeholders.count()):
+            existing_items_map[self.lst_placeholders.item(i).text()] = i
+
+        for i in range(self.lst_placeholders.count() - 1, -1, -1):
+            txt = self.lst_placeholders.item(i).text()
+            if txt not in current_vars:
+                self.lst_placeholders.takeItem(i)
+
+        for var in sorted(list(current_vars)):
+            if var not in existing_items_map:
+                self.lst_placeholders.addItem(var)
 
     def refresh_layer_list(self):
         self.layer_list.blockSignals(True)
@@ -1150,55 +1134,114 @@ class EditorWindow(QMainWindow):
 
         self.layer_list.blockSignals(False)
 
-    def _on_layer_list_clicked(self, list_item):
-        target_item = list_item.data(Qt.ItemDataRole.UserRole)
-        if target_item:
-            self.scene.clearSelection()
-            target_item.setSelected(True)
-            self.view.ensureVisible(target_item)
-            self.view.setFocus()
+    def _get_selected(self):
+        sel = self.scene.selectedItems()
+        valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
+        return valid_items[0] if valid_items else None
 
-    def _on_layer_item_changed(self, list_item):
-        target_item = list_item.data(Qt.ItemDataRole.UserRole)
-        if target_item:
-            is_visible = (list_item.checkState() == Qt.CheckState.Checked)
-            target_item.setVisible(is_visible)
+    def _zoom_to_fit(self):
+        if not self.scene.sceneRect().isEmpty():
+            margin = 50
+            view_rect = self.scene.sceneRect().adjusted(-margin, -margin, margin, margin)
+            self.view.fitInView(view_rect, Qt.AspectRatioMode.KeepAspectRatio)
 
-    def _on_layer_reordered(self, parent, start, end, destination, row):
-        count = self.layer_list.count()
-        items_in_order = []
+    def _import_asset(self, source_path: str, model_dir: Path) -> str | None:
+        if not source_path: 
+            return None
         
-        for i in range(count):
-            list_item = self.layer_list.item(i)
-            target = list_item.data(Qt.ItemDataRole.UserRole)
-            if target:
-                items_in_order.append(target)
-                
-        assinaturas = [i for i in items_in_order if isinstance(i, SignatureItem)]
-        textos = [i for i in items_in_order if isinstance(i, DesignerBox)]
-        imagens = [i for i in items_in_order if isinstance(i, ImageItem) and not isinstance(i, BackgroundItem)]
-        fundos = [i for i in items_in_order if isinstance(i, BackgroundItem)]
-        
-        # Blinda o Z-Value matematicamente, não importa pra onde o usuário tentou arrastar
-        for i, item in enumerate(assinaturas): item.setZValue(250 - i)
-        for i, item in enumerate(textos): item.setZValue(200 - i)
-        for i, item in enumerate(imagens): item.setZValue(100 - i)
-        for i, item in enumerate(fundos): item.setZValue(-100 - i)
-        
-        # Redesenha forçadamente para que o item "pule" de volta para a sua seção correta caso tenha sido arrastado pra fora dela
-        self.refresh_layer_list()
-
-    def rename_layer(self, list_item):
-        """Abre um popup para renomear a camada com duplo clique."""
-        item = list_item.data(Qt.ItemDataRole.UserRole)
-        
-        # Ignora se for cabeçalho vazio
-        if not item:
-            return
+        src = Path(source_path)
+        if not src.exists():
+            return None
             
-        current_name = self._generate_layer_name(item.layer_id, item)
-        new_name, ok = QInputDialog.getText(self, "Renomear Camada", "Novo nome para a camada:", text=current_name)
+        if "assets" in src.parts and model_dir in src.parents:
+            return f"assets/{src.name}"
+
+        assets_dir = model_dir / "assets"
+        assets_dir.mkdir(parents=True, exist_ok=True)
         
-        if ok and new_name.strip():
-            item.custom_name = new_name.strip()
-            self.refresh_layer_list()
+        dest = assets_dir / src.name
+        
+        try:
+            shutil.copy2(src, dest)
+            return f"assets/{src.name}"
+        except Exception as e:
+            print(f"Erro ao copiar asset: {e}")
+            return source_path 
+    
+    def _get_next_layer_id(self):
+        used = set()
+        for item in self.scene.items():
+            if hasattr(item, 'layer_id') and item.layer_id is not None:
+                used.add(item.layer_id)
+        for i in range(100):
+            if i not in used: return i
+        return 99
+
+    def _generate_layer_name(self, layer_id, item):
+        if hasattr(item, 'custom_name') and item.custom_name:
+            return item.custom_name
+            
+        prefix = f"{layer_id:02d}"
+        if isinstance(item, DesignerBox):
+            raw = item.text_item.toPlainText().strip().replace("\n", " ")
+            if len(raw) > 15: raw = raw[:12] + "..."
+            if not raw: raw = "{vazio}"
+            return f"{prefix}_{raw}"
+        elif isinstance(item, SignatureItem):
+            return f"{prefix}_Assinatura"
+        elif isinstance(item, ImageItem):
+            return f"{prefix}_Imagem"
+        if isinstance(item, BackgroundItem):
+            return f"{prefix}_Fundo"
+        return f"{prefix}_Objeto"
+    
+    def _add_separator(self, layout):
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(sep)
+
+    
+    
+
+    
+
+    
+
+    
+
+    
+
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    
+    
+
+    
+    
+    
+
+    
+
+    
+    
+    
+
+    
+
+    
+
+    
+
+    

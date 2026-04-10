@@ -57,6 +57,22 @@ class ImportModelsDialog(QDialog):
         self.button_box.rejected.connect(self.reject)
         layout.addWidget(self.button_box)
 
+    def get_decisions(self):
+        results = {}
+        for row, model_name in enumerate(self.zip_models):
+            is_checked = self.checkboxes[row].isChecked()
+            action = "new"
+            if row in self.button_groups:
+                checked_id = self.button_groups[row].checkedId()
+                if checked_id == 1: action = "replace"
+                elif checked_id == 2: action = "rename"
+            
+            results[model_name] = {
+                "import": is_checked,
+                "action": action
+            }
+        return results
+
     def _populate_table(self):
         for row, model_name in enumerate(self.zip_models):
             # 1. Coluna Importar (Checkbox)
@@ -117,6 +133,11 @@ class ImportModelsDialog(QDialog):
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
 
+    def _apply_global_conflict(self, action):
+        idx = {"replace": 1, "rename": 2}[action]
+        for bg in self.button_groups.values():
+            bg.button(idx).setChecked(True)
+
     def _on_master_toggled(self, state):
         if self._updating: return
         self._updating = True
@@ -130,25 +151,4 @@ class ImportModelsDialog(QDialog):
         self._updating = True
         all_checked = all(chk.isChecked() for chk in self.checkboxes.values())
         self.chk_master.setChecked(all_checked)
-        self._updating = False
-
-    def _apply_global_conflict(self, action):
-        idx = {"replace": 1, "rename": 2}[action]
-        for bg in self.button_groups.values():
-            bg.button(idx).setChecked(True)
-
-    def get_decisions(self):
-        results = {}
-        for row, model_name in enumerate(self.zip_models):
-            is_checked = self.checkboxes[row].isChecked()
-            action = "new"
-            if row in self.button_groups:
-                checked_id = self.button_groups[row].checkedId()
-                if checked_id == 1: action = "replace"
-                elif checked_id == 2: action = "rename"
-            
-            results[model_name] = {
-                "import": is_checked,
-                "action": action
-            }
-        return results
+        self._updating = False 

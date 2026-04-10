@@ -74,6 +74,14 @@ class RenderManager(QObject):
         else:
             self._start_direct_mode(all_tasks_data, num_threads)
 
+    def stop(self):
+        self._is_running = False
+        self.log_updated.emit("🛑 Parando threads...")
+        for w in self.workers:
+            w.stop()
+            w.quit()
+            w.wait()
+
     def _start_imposition_mode(self, all_data, num_threads):
         w_mm = self.imposition_settings.get("target_w_mm", 100)
         h_mm = self.imposition_settings.get("target_h_mm", 150)
@@ -142,13 +150,16 @@ class RenderManager(QObject):
             self.workers.append(w)
             w.start()
 
-    def stop(self):
-        self._is_running = False
-        self.log_updated.emit("🛑 Parando threads...")
-        for w in self.workers:
-            w.stop()
-            w.quit()
-            w.wait()
+    def _start_hybrid_assembly(self):
+        self.log_updated.emit("📦 Montando arquivo PDF Único final em segundo plano...")
+        self.assembler_worker = HybridAssemblerWorker(
+            self.generated_files, self.work_dir, self.output_dir, 
+            self.is_imposition, self.imposition_settings, 
+            self.target_w_mm, self.target_h_mm
+        )
+        self.assembler_worker.finished_assembly.connect(self._on_hybrid_assembly_finished)
+        self.assembler_worker.error_occurred.connect(self._on_hybrid_assembly_error)
+        self.assembler_worker.start()    
 
     def _on_page_finished(self, num_cards, filename, msg):
         if not self._is_running: return
@@ -164,10 +175,15 @@ class RenderManager(QObject):
         self.generated_files.append(filename)
         self._update_progress()
 
-    def _update_progress(self):
-        done = min(self.cards_done, self.total_cards)
-        percent = int((done / self.total_cards) * 100)
-        self.progress_updated.emit(percent)
+    def _on_hybrid_assembly_finished(self):
+        out_name = f"{self.output_dir.name}_Imposicao.pdf" if self.is_imposition else f"{self.output_dir.name}_Completo.pdf"
+        self.generated_files = [out_name]
+        self.finished_process.emit()
+        self.log_updated.emit("✅ Processo finalizado com sucesso!")
+
+    def _on_hybrid_assembly_error(self, error_msg):
+        self.error_occurred.emit(f"Erro na montagem do PDF: {error_msg}")
+        self.finished_process.emit()
 
     def _check_all_finished(self):
         if all(w.isFinished() for w in self.workers):
@@ -180,24 +196,8 @@ class RenderManager(QObject):
                 else:
                     self.finished_process.emit()
                     self.log_updated.emit("✅ Processo finalizado com sucesso!")
-
-    def _start_hybrid_assembly(self):
-        self.log_updated.emit("📦 Montando arquivo PDF Único final em segundo plano...")
-        self.assembler_worker = HybridAssemblerWorker(
-            self.generated_files, self.work_dir, self.output_dir, 
-            self.is_imposition, self.imposition_settings, 
-            self.target_w_mm, self.target_h_mm
-        )
-        self.assembler_worker.finished_assembly.connect(self._on_hybrid_assembly_finished)
-        self.assembler_worker.error_occurred.connect(self._on_hybrid_assembly_error)
-        self.assembler_worker.start()
-
-    def _on_hybrid_assembly_finished(self):
-        out_name = f"{self.output_dir.name}_Imposicao.pdf" if self.is_imposition else f"{self.output_dir.name}_Completo.pdf"
-        self.generated_files = [out_name]
-        self.finished_process.emit()
-        self.log_updated.emit("✅ Processo finalizado com sucesso!")
-
-    def _on_hybrid_assembly_error(self, error_msg):
-        self.error_occurred.emit(f"Erro na montagem do PDF: {error_msg}")
-        self.finished_process.emit()
+    
+    def _update_progress(self):
+        done = min(self.cards_done, self.total_cards)
+        percent = int((done / self.total_cards) * 100)
+        self.progress_updated.emit(percent)

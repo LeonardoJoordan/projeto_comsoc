@@ -2,8 +2,6 @@ import re
 from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QApplication, QTextEdit)
 from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont)
 from PySide6.QtCore import Qt
-
-# Caminho relativo atualizado para o novo módulo
 from .clipboard import sanitize_inline_html
 
 class RichTextEditor(QTextEdit):
@@ -84,6 +82,9 @@ class HTMLDelegate(QStyledItemDelegate):
         if index.column() == 0:
             editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         return editor
+    
+    def updateEditorGeometry(self, editor, option, index):
+        editor.setGeometry(option.rect)
 
     def setEditorData(self, editor, index):
         html = index.data(Qt.ItemDataRole.UserRole)
@@ -105,7 +106,4 @@ class HTMLDelegate(QStyledItemDelegate):
         
         # Garante que o alinhamento central persista no modelo após a edição na coluna 0
         if index.column() == 0:
-            model.setData(index, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)
-
-    def updateEditorGeometry(self, editor, option, index):
-        editor.setGeometry(option.rect)
+            model.setData(index, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)    

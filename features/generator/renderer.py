@@ -8,6 +8,25 @@ class NativeRenderer:
     def __init__(self, template_data: dict):
         self.tpl = template_data
 
+
+    def render_row(self, row_plain: dict, row_rich: dict, out_path: Path):
+        w = self.tpl["canvas_size"]["w"]
+        h = self.tpl["canvas_size"]["h"]
+        
+        image = QImage(w, h, QImage.Format_ARGB32)
+        image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
+        image.setDotsPerMeterY(3780)
+        image.fill(Qt.GlobalColor.white)
+
+        painter = QPainter(image)
+        try:
+            self._paint_card(painter, row_rich)
+        finally:
+            painter.end()
+
+        image.save(str(out_path), "PNG")
+
+    
     def render_to_pixmap(self, row_rich: dict = None) -> QPixmap:
         w = self.tpl["canvas_size"]["w"]
         h = self.tpl["canvas_size"]["h"]
@@ -27,23 +46,7 @@ class NativeRenderer:
             painter.end()
         
         return QPixmap.fromImage(image)
-
-    def render_row(self, row_plain: dict, row_rich: dict, out_path: Path):
-        w = self.tpl["canvas_size"]["w"]
-        h = self.tpl["canvas_size"]["h"]
-        
-        image = QImage(w, h, QImage.Format_ARGB32)
-        image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
-        image.setDotsPerMeterY(3780)
-        image.fill(Qt.GlobalColor.white)
-
-        painter = QPainter(image)
-        try:
-            self._paint_card(painter, row_rich)
-        finally:
-            painter.end()
-
-        image.save(str(out_path), "PNG")
+    
 
     def render_to_qimage(self, row_plain: dict, row_rich: dict) -> QImage:
         w = self.tpl["canvas_size"]["w"]
@@ -60,6 +63,14 @@ class NativeRenderer:
         finally:
             painter.end()
         return image
+    
+
+    def resolve_html(self, html: str, row_rich: dict) -> str:
+        def repl(match):
+            key = match.group(1)
+            return str(row_rich.get(key, ""))
+        return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
+    
 
     def _paint_card(self, painter: QPainter, row_rich: dict):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -137,12 +148,7 @@ class NativeRenderer:
                                    Qt.TransformationMode.SmoothTransformation)
                 painter.drawPixmap(QPointF(float(sig.get("x", 0)), float(sig.get("y", 0))), scaled)
 
-    def resolve_html(self, html: str, row_rich: dict) -> str:
-        def repl(match):
-            key = match.group(1)
-            return str(row_rich.get(key, ""))
-        return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
-
+    
     def _draw_html_box(self, painter, box_data, html_text):
         painter.save()
         doc = QTextDocument()

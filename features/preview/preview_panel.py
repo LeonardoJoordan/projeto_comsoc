@@ -20,6 +20,14 @@ class ResizingLabel(QLabel):
         self._pixmap = QPixmap(path)
         self._update_view()
 
+    def set_pixmap_direct(self, pixmap: QPixmap):
+        if not pixmap or pixmap.isNull():
+            self.setText("Erro na prévia")
+            self._pixmap = None
+        else:
+            self._pixmap = pixmap
+            self._update_view()
+
     def resizeEvent(self, event: QResizeEvent):
         self._update_view()
         super().resizeEvent(event)
@@ -33,14 +41,7 @@ class ResizingLabel(QLabel):
         elif not self.text():
             self.setText("Sem prévia")
 
-    def set_pixmap_direct(self, pixmap: QPixmap):
-        if not pixmap or pixmap.isNull():
-            self.setText("Erro na prévia")
-            self._pixmap = None
-        else:
-            self._pixmap = pixmap
-            self._update_view()
-
+    
 class PreviewPanel(QWidget):
     def __init__(self):
         super().__init__()
