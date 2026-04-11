@@ -15,7 +15,7 @@ def build_app():
    # Base do comando Nuitka
     cmd = [
         sys.executable, "-m", "nuitka",
-        "--onefile",
+        "--standalone",  # <-- Alteração 1: Troca de --onefile para --standalone
         f"--output-filename={exe_name}",
         "--output-dir=build",
         "--plugin-enable=pyside6",
@@ -51,11 +51,7 @@ def build_app():
 if __name__ == "__main__":
     build_app()
 
-
-#Assim que a instalação terminar, você pode retomar a sequência de compilação normalmente:
-
+# Assim que a instalação terminar, você pode retomar a sequência de compilação normalmente:
 #    flatpak-builder --repo=repo --force-clean build-dir com.leobelisario.ProjetoComSoc.yaml
-
 #    flatpak build-bundle repo ProjetoComSoc.flatpak com.leobelisario.ProjetoComSoc
-
 #    flatpak install --reinstall ProjetoComSoc.flatpak
