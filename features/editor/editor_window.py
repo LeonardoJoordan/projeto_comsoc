@@ -247,7 +247,7 @@ class EditorWindow(QMainWindow):
         self._add_separator(right_layout)
 
         right_layout.addStretch()
-        self.btn_save = QPushButton("Salvar Modelo (JSON)")
+        self.btn_save = QPushButton("Salvar Modelo")
         self.btn_save.setMinimumHeight(50)
         self.btn_save.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; font-size: 14px;")
         self.btn_save.clicked.connect(self.export_to_json)
