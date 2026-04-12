@@ -154,10 +154,12 @@ class NativeRenderer:
         doc = QTextDocument()
         doc.setDocumentMargin(0) 
         
-        # 0. Limpeza Retroativa: Remove cores e links para que o gerador não imprima azul
+        # 0. Limpeza Retroativa: Remove cores, links e estilos de fonte para que o gerador respeite as propriedades globais
         clean_html = re.sub(r"color\s*:[^;\"]+;?", "", html_text)
         clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
+        clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
         clean_html = re.sub(r"(?i)</a>", "", clean_html)
         
