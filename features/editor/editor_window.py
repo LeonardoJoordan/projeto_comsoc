@@ -202,6 +202,7 @@ class EditorWindow(QMainWindow):
         self.caixa_texto_panel.rotationChanged.connect(self.update_rotation)
         self.caixa_texto_panel.proportionToggled.connect(self.update_proportion_lock)
         self.caixa_texto_panel.restoreRequested.connect(self.restore_item_state)
+        self.caixa_texto_panel.opacityChanged.connect(self.update_opacity)
         layout_misto.addWidget(self.caixa_texto_panel, 1)
 
         v_sep = QFrame()
@@ -389,6 +390,7 @@ class EditorWindow(QMainWindow):
                 sig.resize_by_longest_side(sig_data["longest_side"])
                 self.scene.addItem(sig)
                 sig.setVisible(sig_data.get("visible", True))
+                sig.setOpacity(sig_data.get("opacity", 1.0))
                 if sig_data.get("locked", False):
                     sig.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
                     sig.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
@@ -411,6 +413,7 @@ class EditorWindow(QMainWindow):
                 img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
                 img.setVisible(img_data.get("visible", True))
+                img.setOpacity(img_data.get("opacity", 1.0))
                 if img_data.get("locked", False):
                     img.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
                     img.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
@@ -443,6 +446,7 @@ class EditorWindow(QMainWindow):
 
             self.scene.addItem(box)
             box.setVisible(b.get("visible", True))
+            box.setOpacity(b.get("opacity", 1.0))
             if b.get("locked", False):
                 box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
                 box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
@@ -473,6 +477,7 @@ class EditorWindow(QMainWindow):
                     "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
                     "html": item.state.html_content,
                     "visible": item.isVisible(),
+                    "opacity": round(float(item.opacity()), 2),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": round(float(pos.x()), 2),
                     "y": round(float(pos.y()), 2),
@@ -495,6 +500,7 @@ class EditorWindow(QMainWindow):
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
+                    "opacity": round(float(item.opacity()), 2),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": round(float(pos.x()), 2),
                     "y": round(float(pos.y()), 2),
@@ -510,6 +516,7 @@ class EditorWindow(QMainWindow):
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
+                    "opacity": round(float(item.opacity()), 2),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": round(float(pos.x()), 2),
                     "y": round(float(pos.y()), 2),
@@ -542,6 +549,7 @@ class EditorWindow(QMainWindow):
                 "w": round(float(self.bg_item.pixmap().width()), 2),
                 "h": round(float(self.bg_item.pixmap().height()), 2),
                 "visible": self.bg_item.isVisible(),
+                "opacity": round(float(self.bg_item.opacity()), 2),
                 "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
             }
                 
@@ -607,6 +615,7 @@ class EditorWindow(QMainWindow):
             if "w" in props and "h" in props:
                 self.bg_item.resize_custom(props["w"], props["h"])
             self.bg_item.setVisible(props.get("visible", True))
+            self.bg_item.setOpacity(props.get("opacity", 1.0))
             if props.get("locked", False):
                 self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
                 self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
@@ -740,6 +749,11 @@ class EditorWindow(QMainWindow):
         item = self._get_selected()
         if item:
             item.keep_proportion = locked
+
+    def update_opacity(self, value):
+        item = self._get_selected()
+        if item:
+            item.setOpacity(value)
 
     def update_text_html(self, html_content):
         box = self._get_selected()

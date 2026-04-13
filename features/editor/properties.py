@@ -38,6 +38,7 @@ class CaixaDeTextoPanel(QWidget):
     rotationChanged = Signal(int)
     proportionToggled = Signal(bool) # Novo sinal para a Checkbox
     restoreRequested = Signal()
+    opacityChanged = Signal(float)
 
     def __init__(self):
         super().__init__()
@@ -84,6 +85,13 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_rot.setWrapping(True) 
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
         form.addRow("Rot:", self.spin_rot)
+        self.spin_opacity = QDoubleSpinBox()
+        self.spin_opacity.setRange(0.0, 100.0)
+        self.spin_opacity.setDecimals(0)
+        self.spin_opacity.setSuffix(" %")
+        self.spin_opacity.setValue(100.0)
+        self.spin_opacity.valueChanged.connect(lambda v: self.opacityChanged.emit(v / 100.0))
+        form.addRow("Opac:", self.spin_opacity)
 
         self.btn_restore = QPushButton("🔄 Restaurar Original")
         self.btn_restore.setToolTip("Restaura as dimensões originais e zera a rotação")
@@ -100,6 +108,7 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(int(box.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
+        self.spin_opacity.setValue(box.opacity() * 100.0)
         
         self.chk_proporcao.blockSignals(True)
         self.chk_proporcao.setChecked(getattr(box, 'keep_proportion', True))
@@ -113,6 +122,7 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(int(img.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
+        self.spin_opacity.setValue(img.opacity() * 100.0)
         
         self.chk_proporcao.blockSignals(True)
         self.chk_proporcao.setChecked(getattr(img, 'keep_proportion', True))

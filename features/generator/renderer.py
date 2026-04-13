@@ -86,7 +86,10 @@ class NativeRenderer:
         if self.tpl.get("background_path"):
             bg = QPixmap(self.tpl["background_path"])
             if not bg.isNull():
+                bg_props = self.tpl.get("bg_props", {})
+                painter.setOpacity(bg_props.get("opacity", 1.0))
                 painter.drawPixmap(0, 0, bg)
+                painter.setOpacity(1.0)
 
         for img in self.tpl.get("images", []):
             if not img.get("visible", True): continue
@@ -108,7 +111,9 @@ class NativeRenderer:
                 # Blindagem contra corrompimento de QImage/QPixmap ou dimensões ausentes
                 if not pix.isNull() and w > 0 and h > 0:
                     scaled = pix.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    painter.setOpacity(img.get("opacity", 1.0))
                     painter.drawPixmap(QPointF(float(img.get("x", 0)), float(img.get("y", 0))), scaled)
+                    painter.setOpacity(1.0)
 
         for box in self.tpl.get("boxes", []):
             if not box.get("visible", True):
@@ -126,7 +131,9 @@ class NativeRenderer:
                 continue
             try:
                 html_resolved = self.resolve_html(box["html"], row_rich)
+                painter.setOpacity(box.get("opacity", 1.0))
                 self._draw_html_box(painter, box, html_resolved)
+                painter.setOpacity(1.0)
             except Exception as e:
                 print(f"[WARN] Erro ao desenhar caixa de texto: {e}")
                 continue
@@ -146,7 +153,9 @@ class NativeRenderer:
                 scaled = pix.scaled(sig["width"], sig["height"], 
                                    Qt.AspectRatioMode.IgnoreAspectRatio, 
                                    Qt.TransformationMode.SmoothTransformation)
+                painter.setOpacity(sig.get("opacity", 1.0))
                 painter.drawPixmap(QPointF(float(sig.get("x", 0)), float(sig.get("y", 0))), scaled)
+                painter.setOpacity(1.0)
 
     
     def _draw_html_box(self, painter, box_data, html_text):
