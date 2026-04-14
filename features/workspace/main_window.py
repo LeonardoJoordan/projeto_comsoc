@@ -21,7 +21,7 @@ from features.spreadsheet.table_panel import TablePanel
 from features.generator.renderer import NativeRenderer
 from features.editor.editor_window import EditorWindow
 from features.generator.manager import RenderManager
-from features.generator.export_dialog import NamingDialog
+from features.generator.export_dialog import ConfigDialog
 from features.workspace.import_models_dialog import ImportModelsDialog
 from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
@@ -122,7 +122,7 @@ class MainWindow(QMainWindow):
         self.btn_config_name = QPushButton("⚙️")
         self.btn_config_name.setFixedWidth(40)
         self.btn_config_name.setToolTip("Configurar padrão de nome dos arquivos e impressão")
-        self.btn_config_name.clicked.connect(self._open_naming_dialog)
+        self.btn_config_name.clicked.connect(self._open_config_dialog)
         ly_out.addWidget(self.btn_config_name)
 
         left_stack.addWidget(grp_out, 0)
@@ -262,9 +262,37 @@ class MainWindow(QMainWindow):
             # Reforço global para bordas finas (Fusion costuma ignorar na paleta)
             app.setStyleSheet("QTableWidget, QLineEdit, QTextEdit { border: 1px solid #202023; }")
         else:
-            # Restaura o estilo claro nativo
-            app.setPalette(app.style().standardPalette())
-            app.setStyleSheet("")
+            palette = QPalette()
+            # Paleta Clara Fixa (Independente de SO)
+            window_color = QColor("#F5F5F5")
+            text_color = QColor("#1A1A1A")
+            base_color = QColor("#FFFFFF")
+            btn_color = QColor("#E0E0E0")
+            highlight_green = QColor("#35A854")
+
+            palette.setColor(QPalette.ColorRole.Window, window_color)
+            palette.setColor(QPalette.ColorRole.WindowText, text_color)
+            palette.setColor(QPalette.ColorRole.Base, base_color)
+            palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#EBEBEB"))
+            palette.setColor(QPalette.ColorRole.ToolTipBase, base_color)
+            palette.setColor(QPalette.ColorRole.ToolTipText, text_color)
+            palette.setColor(QPalette.ColorRole.Text, text_color)
+            palette.setColor(QPalette.ColorRole.Button, btn_color)
+            palette.setColor(QPalette.ColorRole.ButtonText, text_color)
+            palette.setColor(QPalette.ColorRole.BrightText, QColor("#FFFFFF"))
+            palette.setColor(QPalette.ColorRole.Link, QColor("#0000EE"))
+            palette.setColor(QPalette.ColorRole.Highlight, highlight_green)
+            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
+
+            # Estados desabilitados para o modo claro
+            disabled_text = QColor(0, 0, 0, 110)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled_text)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_text)
+            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, disabled_text)
+
+            app.setPalette(palette)
+            # Bordas sutis para manter profundidade visual no modo claro
+            app.setStyleSheet("QTableWidget, QLineEdit, QTextEdit { border: 1px solid #C0C0C0; }")
             
         if hasattr(self, 'settings'):
             self.settings.setValue("dark_mode", is_dark)
@@ -711,7 +739,7 @@ class MainWindow(QMainWindow):
         self.log_panel.append(f"Modelo '{model_name}' salvo. Atualizando lista...")
         self._reload_models_from_disk(select_name=model_name)
 
-    def _open_naming_dialog(self):
+    def _open_config_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
         if not current_model_name:
             QMessageBox.warning(self, "Atenção", "Selecione um modelo primeiro.")
@@ -733,7 +761,7 @@ class MainWindow(QMainWindow):
         # Lê o tema atual e envia para a janela de configurações
         is_dark_now = self.settings.value("dark_mode", True, type=bool)
         
-        dlg = NamingDialog(self, slug, vars_available, self.current_filename_suffix, 
+        dlg = ConfigDialog(self, slug, vars_available, self.current_filename_suffix, 
                            model_size_px=model_size, 
                            current_imposition=current_imposition,
                            is_dark=is_dark_now)

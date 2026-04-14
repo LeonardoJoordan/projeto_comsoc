@@ -1,17 +1,17 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QHBoxLayout, QFrame, QGridLayout, 
                                QDialogButtonBox, QCheckBox, QGroupBox, QDoubleSpinBox,
-                               QWidget, QRadioButton, QButtonGroup)
+                               QWidget, QRadioButton, QButtonGroup, QTabWidget)
 from PySide6.QtCore import Qt
 from .imposition import SheetAssembler
 
-class NamingDialog(QDialog):
+class ConfigDialog(QDialog):
     def __init__(self, parent, model_slug: str, available_vars: list[str], 
                  current_pattern: str = "", model_size_px: tuple[int, int] = (1000, 1000),
                  current_imposition: dict = None, is_dark: bool = True):
         super().__init__(parent)
-        self.setWindowTitle("Configurar Saída e Impressão")
-        self.resize(500, 450)
+        self.setWindowTitle("Configurações Gerais")
+        self.resize(550, 450)
         
         self.model_slug = model_slug
         self.result_pattern = current_pattern
@@ -19,50 +19,43 @@ class NamingDialog(QDialog):
         self.ratio = self.model_w / self.model_h if self.model_h > 0 else 1.0
         
         self.imposition_settings = current_imposition or {
-            "enabled": False, 
-            "sheet_w_mm": 210.0,
-            "sheet_h_mm": 297.0,
-            "crop_marks": True,
-            "target_w_mm": 0, 
-            "target_h_mm": 0,
-            "print_after_generation": False
+            "enabled": False, "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
+            "crop_marks": True, "target_w_mm": 0, "target_h_mm": 0, "print_after_generation": False
         }
-
-        # Captura o estado atual do tema recebido da MainWindow
         self.current_is_dark = is_dark
 
-        layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(10, 10, 10, 10)
 
-        layout.addWidget(QLabel("<b>1. Padrão de Nomenclatura:</b>"))
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
 
-        ly_preview = QHBoxLayout()
-        ly_preview.setSpacing(5)
+        # --- ABA 1: Nomenclatura ---
+        tab_naming = QWidget()
+        ly_naming = QVBoxLayout(tab_naming)
+        ly_naming.setSpacing(15)
+        ly_naming.setContentsMargins(15, 15, 15, 15)
         
+        ly_naming.addWidget(QLabel("<b>Padrão de Nomenclatura:</b>"))
+        ly_preview = QHBoxLayout()
         lbl_prefix = QLabel(f"{self.model_slug}_")
         lbl_prefix.setStyleSheet("font-weight: bold; font-size: 14px;") 
-        
         self.txt_pattern = QLineEdit()
         self.txt_pattern.setPlaceholderText("padrão (sequencial)")
         self.txt_pattern.setText(current_pattern)
         self.txt_pattern.setMinimumHeight(34) 
-        
         lbl_ext = QLabel(".png")
         lbl_ext.setStyleSheet("font-size: 14px; opacity: 0.7;") 
-
         ly_preview.addWidget(lbl_prefix)
         ly_preview.addWidget(self.txt_pattern)
         ly_preview.addWidget(lbl_ext)
-        layout.addLayout(ly_preview)
+        ly_naming.addLayout(ly_preview)
 
-        layout.addWidget(QLabel("Variáveis disponíveis:"))
+        ly_naming.addWidget(QLabel("Variáveis disponíveis:"))
         grid_vars = QGridLayout()
-        grid_vars.setSpacing(8)
         col, row = 0, 0
-        
         if not available_vars:
-            layout.addWidget(QLabel("<i>(Nenhuma coluna encontrada)</i>"))
+            ly_naming.addWidget(QLabel("<i>(Nenhuma coluna encontrada)</i>"))
         else:
             for var in available_vars:
                 btn = QPushButton(f"{{{var}}}")
@@ -71,20 +64,17 @@ class NamingDialog(QDialog):
                 btn.clicked.connect(lambda checked, v=var: self._insert_variable(v))
                 grid_vars.addWidget(btn, row, col)
                 col += 1
-                if col > 3: 
-                    col = 0
-                    row += 1
-            layout.addLayout(grid_vars)
+                if col > 3: col, row = 0, row + 1
+            ly_naming.addLayout(grid_vars)
+        ly_naming.addStretch()
+        self.tabs.addTab(tab_naming, "Nomenclatura")
 
-        line = QFrame()
-        line.setFrameShape(QFrame.Shape.HLine)
-        line.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(line)
-
-        layout.addWidget(QLabel("<b>2. Saída e Impressão:</b>"))
+        # --- ABA 2: Impressão e Imposição ---
+        tab_print = QWidget()
+        ly_print = QVBoxLayout(tab_print)
+        ly_print.setSpacing(10)
         
-        # -- Folha de Saída (Independente da imposição) --
-        layout.addWidget(QLabel("Folha de saída (Largura x Altura):"))
+        ly_print.addWidget(QLabel("<b>Folha de saída (Largura x Altura):</b>"))
         ly_sheet = QHBoxLayout()
         self.spin_sheet_w_mm = QDoubleSpinBox()
         self.spin_sheet_w_mm.setRange(50, 2000)
@@ -102,27 +92,23 @@ class NamingDialog(QDialog):
         ly_sheet.addWidget(QLabel("x"))
         ly_sheet.addWidget(self.spin_sheet_h_mm)
         ly_sheet.addStretch()
-        layout.addLayout(ly_sheet)
+        ly_print.addLayout(ly_sheet)
 
         self.chk_imposition = QCheckBox("Habilitar Imposição (Agrupamento na folha)")
         self.chk_imposition.setChecked(self.imposition_settings.get("enabled", False))
         self.chk_imposition.toggled.connect(self._toggle_imposition_ui)
-        layout.addWidget(self.chk_imposition)
+        ly_print.addWidget(self.chk_imposition)
 
-        # Container para agrupar os controles de imposição e facilitar o ocultamento
         self.container_imposition = QWidget()
         self.container_imposition.setVisible(self.chk_imposition.isChecked())
         ly_imp = QVBoxLayout(self.container_imposition)
-        ly_imp.setContentsMargins(10, 0, 0, 0) # Recuo à esquerda para hierarquia
-
-        # -- Dimensões do Modelo --
-        ly_imp.addWidget(QLabel("Dimensões do modelo final (Largura x Altura):"))
+        ly_imp.setContentsMargins(10, 0, 0, 0)
         
+        ly_imp.addWidget(QLabel("Dimensões do modelo final (Largura x Altura):"))
         self.spin_w_mm = QDoubleSpinBox()
         self.spin_w_mm.setRange(10, 2000)
         self.spin_w_mm.setSuffix(" mm")
         self.spin_w_mm.setDecimals(1)
-        
         self.spin_h_mm = QDoubleSpinBox()
         self.spin_h_mm.setRange(10, 2000)
         self.spin_h_mm.setSuffix(" mm")
@@ -146,52 +132,28 @@ class NamingDialog(QDialog):
         ly_model_dims.addStretch()
         ly_imp.addLayout(ly_model_dims)
 
-        # -- Indicador de Capacidade --
         self.lbl_capacity = QLabel("Calculando capacidade...")
-        self.lbl_capacity.setContentsMargins(0, 5, 0, 5) # Recuo alinhado aos inputs
         self.lbl_capacity.setStyleSheet("font-weight: bold; color: #2ecc71;")
         ly_imp.addWidget(self.lbl_capacity)
 
-        # -- Linha Divisória --
-        line_imp = QFrame()
-        line_imp.setFrameShape(QFrame.Shape.HLine)
-        line_imp.setFrameShadow(QFrame.Shadow.Sunken)
-        ly_imp.addWidget(line_imp)
-
-        # -- Marcas de Corte --
         self.chk_crop_marks = QCheckBox("Habilitar marcas de corte")
         self.chk_crop_marks.setChecked(self.imposition_settings.get("crop_marks", True))
         ly_imp.addWidget(self.chk_crop_marks)
 
-        # -- Imprimir automaticamente --
         self.chk_print_after = QCheckBox("Imprimir automaticamente após gerar")
-        self.chk_print_after.setToolTip("Gera os arquivos na pasta e envia para a impressora ao final.")
         self.chk_print_after.setChecked(self.imposition_settings.get("print_after_generation", False))
         ly_imp.addWidget(self.chk_print_after)
-
-        # Adiciona o container ao layout principal da janela
-        layout.addWidget(self.container_imposition)
-
-        # Conectar todos os inputs que afetam o cálculo
-        self.spin_sheet_w_mm.valueChanged.connect(self._update_capacity_preview)
-        self.spin_sheet_h_mm.valueChanged.connect(self._update_capacity_preview)
-        self.spin_w_mm.valueChanged.connect(self._update_capacity_preview)
-        self.spin_h_mm.valueChanged.connect(self._update_capacity_preview)
-        self.chk_crop_marks.toggled.connect(self._update_capacity_preview)
-        self.chk_imposition.toggled.connect(self._update_capacity_preview)
-
-        layout.addStretch()
-
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        btns = self.buttonBox
-        btns.accepted.connect(self._on_accept)
-        btns.rejected.connect(self.reject)
-        layout.addWidget(btns)
-
-        # --- Seção: Preferências do Sistema ---
-        grp_system = QGroupBox("Preferências do Sistema (Global)")
-        ly_system = QVBoxLayout(grp_system)
         
+        ly_print.addWidget(self.container_imposition)
+        ly_print.addStretch()
+        self.tabs.addTab(tab_print, "Impressão")
+
+        # --- ABA 3: Tema do Sistema ---
+        tab_theme = QWidget()
+        ly_theme = QVBoxLayout(tab_theme)
+        ly_theme.setSpacing(10)
+        
+        ly_theme.addWidget(QLabel("<b>Preferências do Sistema (Global)</b>"))
         self.radio_light = QRadioButton("☀️ Tema Claro")
         self.radio_dark = QRadioButton("🌙 Tema Escuro (Mint-Y)")
         
@@ -199,18 +161,29 @@ class NamingDialog(QDialog):
         self.theme_group.addButton(self.radio_light)
         self.theme_group.addButton(self.radio_dark)
         
-        if self.current_is_dark:
-            self.radio_dark.setChecked(True)
-        else:
-            self.radio_light.setChecked(True)
+        if self.current_is_dark: self.radio_dark.setChecked(True)
+        else: self.radio_light.setChecked(True)
             
-        ly_system.addWidget(self.radio_dark)
-        ly_system.addWidget(self.radio_light)
-        layout.addWidget(grp_system)
+        ly_theme.addWidget(self.radio_dark)
+        ly_theme.addWidget(self.radio_light)
+        ly_theme.addStretch()
+        self.tabs.addTab(tab_theme, "Tema do Sistema")
 
-        # Executa o cálculo inicial somente após toda a interface (incluindo botões) ser criada
+        # Conexões de Cálculo
+        self.spin_sheet_w_mm.valueChanged.connect(self._update_capacity_preview)
+        self.spin_sheet_h_mm.valueChanged.connect(self._update_capacity_preview)
+        self.spin_w_mm.valueChanged.connect(self._update_capacity_preview)
+        self.spin_h_mm.valueChanged.connect(self._update_capacity_preview)
+        self.chk_crop_marks.toggled.connect(self._update_capacity_preview)
+        self.chk_imposition.toggled.connect(self._update_capacity_preview)
+
+        # Botões
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        self.buttonBox.accepted.connect(self._on_accept)
+        self.buttonBox.rejected.connect(self.reject)
+        main_layout.addWidget(self.buttonBox)
+
         self._update_capacity_preview()
-
     def get_pattern(self):
         return self.result_pattern
     
