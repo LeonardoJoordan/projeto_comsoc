@@ -38,15 +38,15 @@ class ConfigDialog(QDialog):
         
         ly_naming.addWidget(QLabel("<b>Padrão de Nomenclatura:</b>"))
         ly_preview = QHBoxLayout()
-        lbl_prefix = QLabel(f"{self.model_slug}_")
-        lbl_prefix.setStyleSheet("font-weight: bold; font-size: 14px;") 
+        
         self.txt_pattern = QLineEdit()
-        self.txt_pattern.setPlaceholderText("padrão (sequencial)")
+        self.txt_pattern.setPlaceholderText("Ex: {modelo}_{nome}")
         self.txt_pattern.setText(current_pattern)
         self.txt_pattern.setMinimumHeight(34) 
+        
         lbl_ext = QLabel(".png")
         lbl_ext.setStyleSheet("font-size: 14px; opacity: 0.7;") 
-        ly_preview.addWidget(lbl_prefix)
+
         ly_preview.addWidget(self.txt_pattern)
         ly_preview.addWidget(lbl_ext)
         ly_naming.addLayout(ly_preview)

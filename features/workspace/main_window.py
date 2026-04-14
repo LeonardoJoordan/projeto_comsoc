@@ -747,7 +747,8 @@ class MainWindow(QMainWindow):
             
         self.active_model_name = current_model_name
         cols = self.table_panel.table.columnCount()
-        vars_available = [self.table_panel.table.horizontalHeaderItem(c).text() for c in range(cols)]
+        # Adiciona 'modelo' explicitamente como uma variável disponível no diálogo
+        vars_available = ["modelo"] + [self.table_panel.table.horizontalHeaderItem(c).text() for c in range(cols)]
         slug = slugify_model_name(self.active_model_name)
         
         current_imposition = None
@@ -850,6 +851,10 @@ class MainWindow(QMainWindow):
 
         for r in range(rows):
             row_p, row_r = {}, {}
+            # Injeta o slug do modelo atual para permitir substituição dinâmica {modelo}
+            current_slug = slugify_model_name(self.active_model_name)
+            row_p["modelo"] = current_slug
+            row_r["modelo"] = current_slug
             multiplier = 1
             has_content = False
             
@@ -969,10 +974,9 @@ class MainWindow(QMainWindow):
         self.progress_bar.setValue(0)
         self.log_panel.append(f"--- Iniciando lote de {len(rows_plain)} itens ---")
 
-        if self.current_filename_suffix:
-            full_pattern = f"{slug}_{self.current_filename_suffix}"
-        else:
-            full_pattern = slug
+        # O padrão agora é 100% o que o usuário definiu. 
+        # Se estiver vazio, usamos {modelo} como fallback padrão.
+        full_pattern = self.current_filename_suffix if self.current_filename_suffix else "{modelo}"
 
         imposition_cfg = self.cached_model_data.get("imposition_settings", None)
         export_format = self.cbo_export_format.currentText()
