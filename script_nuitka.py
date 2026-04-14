@@ -32,17 +32,26 @@ def build_app():
     sistema = platform.system()
     if sistema == "Windows":
         cmd.insert(cmd.index("--plugin-enable=pyside6") + 1, "--windows-console-mode=disable")
-        # Se possuir um ícone no futuro, descomente e ajuste: 
-        # cmd.append("--windows-icon-from-ico=assets/icone.ico")
+        
+        # Verifica se o arquivo .ico existe na raiz
+        icon_path = base_dir / "icone.ico"
+        if icon_path.exists():
+            cmd.append(f"--windows-icon-from-ico={icon_path}")
+            print("🎨 Ícone do Windows (.ico) detectado e adicionado.")
+
     elif sistema == "Darwin": # macOS
         cmd.append("--macos-create-app-bundle")
-        # cmd.append("--macos-app-icon=assets/icone.icns")
+        
+        # Verifica se o arquivo .icns existe na raiz
+        icon_path = base_dir / "icone.icns"
+        if icon_path.exists():
+            cmd.append(f"--macos-app-icon={icon_path}")
+            print("🎨 Ícone do macOS (.icns) detectado e adicionado.")
     
     cmd.append(str(main_file))
     
     try:
         os.makedirs("build", exist_ok=True)
-        # Executa o processo
         subprocess.run(cmd, check=True)
         print(f"\n✅ Missão Cumprida! O executável '{exe_name}' está pronto na pasta 'build'.")
     except subprocess.CalledProcessError as e:
