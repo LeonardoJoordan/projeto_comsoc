@@ -20,7 +20,7 @@ class ConfigDialog(QDialog):
         
         self.imposition_settings = current_imposition or {
             "enabled": False, "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
-            "crop_marks": True, "target_w_mm": 0, "target_h_mm": 0, "print_after_generation": False
+            "crop_marks": True, "target_w_mm": 0, "target_h_mm": 0
         }
         self.current_is_dark = is_dark
 
@@ -139,10 +139,6 @@ class ConfigDialog(QDialog):
         self.chk_crop_marks = QCheckBox("Habilitar marcas de corte")
         self.chk_crop_marks.setChecked(self.imposition_settings.get("crop_marks", True))
         ly_imp.addWidget(self.chk_crop_marks)
-
-        self.chk_print_after = QCheckBox("Imprimir automaticamente após gerar")
-        self.chk_print_after.setChecked(self.imposition_settings.get("print_after_generation", False))
-        ly_imp.addWidget(self.chk_print_after)
         
         ly_print.addWidget(self.container_imposition)
         ly_print.addStretch()
@@ -194,8 +190,7 @@ class ConfigDialog(QDialog):
             "sheet_h_mm": self.spin_sheet_h_mm.value(),
             "crop_marks": self.chk_crop_marks.isChecked(),
             "target_w_mm": self.spin_w_mm.value(),
-            "target_h_mm": self.spin_h_mm.value(),
-            "print_after_generation": self.chk_print_after.isChecked()
+            "target_h_mm": self.spin_h_mm.value()
         }
 
     def _update_capacity_preview(self):

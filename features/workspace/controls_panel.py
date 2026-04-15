@@ -18,7 +18,7 @@ class ControlsPanel(QWidget):
         self.btn_remove_model.setMinimumHeight(40)
         self.btn_rename_model = QPushButton("✏️ Renomear")
         self.btn_rename_model.setMinimumHeight(40)
-        self.btn_config_model = QPushButton("⚙️ Configurar")
+        self.btn_config_model = QPushButton("📝 Editar")
         self.btn_config_model.setMinimumHeight(40)
         
         self.btn_import_models = QPushButton("📥 Importar")

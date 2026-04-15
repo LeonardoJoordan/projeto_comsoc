@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidg
                                QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton,
                                QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
-                               QFileDialog, QGraphicsOpacityEffect)
+                               QFileDialog, QGraphicsOpacityEffect, QFormLayout)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap)
 from PySide6.QtCore import Qt, Signal, QEvent, QRectF
@@ -123,71 +123,80 @@ class EditorWindow(QMainWindow):
         right_container.setFixedWidth(400)
         right_layout = QVBoxLayout(right_container)
 
-        # --- Grupo: Dimensões do Documento ---
-        grp_doc = QFrame()
-        ly_doc = QVBoxLayout(grp_doc)
-        ly_doc.setContentsMargins(0, 0, 0, 10)
-        lbl_physical = QLabel("<b>DIMENSÕES DO DOCUMENTO</b>")
-        ly_doc.addWidget(lbl_physical)
+        # --- Container Superior Misto (Dimensões e Posição) ---
+        container_sup = QWidget()
+        layout_sup = QHBoxLayout(container_sup)
+        layout_sup.setContentsMargins(0, 0, 0, 0)
+        layout_sup.setSpacing(10)
+
+        # Coluna 1: Posição do Item (Agora na esquerda)
+        col_pos = QWidget()
+        ly_pos = QVBoxLayout(col_pos)
+        ly_pos.setContentsMargins(0, 0, 0, 0)
+        ly_pos.setSpacing(5)
+        ly_pos.addWidget(QLabel("<b>POSIÇÃO (mm)</b>"))
         
-        row_phys = QHBoxLayout()
+        form_pos = QFormLayout()
+        form_pos.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        
+        self.spin_pos_x = QDoubleSpinBox()
+        self.spin_pos_x.setRange(-5000, 20000)
+        self.spin_pos_x.setDecimals(1)
+        self.spin_pos_x.setKeyboardTracking(False)
+        self.spin_pos_x.setEnabled(False)
+        
+        self.spin_pos_y = QDoubleSpinBox()
+        self.spin_pos_y.setRange(-5000, 20000)
+        self.spin_pos_y.setDecimals(1)
+        self.spin_pos_y.setKeyboardTracking(False)
+        self.spin_pos_y.setEnabled(False)
+        
+        form_pos.addRow("X:", self.spin_pos_x)
+        form_pos.addRow("Y:", self.spin_pos_y)
+        ly_pos.addLayout(form_pos)
+        layout_sup.addWidget(col_pos, 1)
+
+        # Separador Vertical (VLine)
+        v_sep_sup = QFrame()
+        v_sep_sup.setFrameShape(QFrame.Shape.VLine)
+        v_sep_sup.setFrameShadow(QFrame.Shadow.Sunken)
+        v_sep_sup.setStyleSheet("color: #ccc;") 
+        layout_sup.addWidget(v_sep_sup)
+
+        # Coluna 2: Dimensões do Documento (Agora na direita)
+        col_dim = QWidget()
+        ly_dim = QVBoxLayout(col_dim)
+        ly_dim.setContentsMargins(0, 0, 0, 0)
+        ly_dim.setSpacing(5)
+        ly_dim.addWidget(QLabel("<b>DOCUMENTO (mm)</b>"))
+        
+        form_dim = QFormLayout()
+        form_dim.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+        
         self.spin_phys_w = QDoubleSpinBox()
         self.spin_phys_w.setRange(10, 2000)
-        self.spin_phys_w.setSuffix(" mm")
-        self.spin_phys_w.setPrefix("Larg: ")
         self.spin_phys_w.setDecimals(1)
         self.spin_phys_w.setKeyboardTracking(False)
         self.spin_phys_w.setValue(100.0) 
         
         self.spin_phys_h = QDoubleSpinBox()
         self.spin_phys_h.setRange(10, 2000)
-        self.spin_phys_h.setSuffix(" mm")
-        self.spin_phys_h.setPrefix("Alt: ")
         self.spin_phys_h.setDecimals(1)
         self.spin_phys_h.setKeyboardTracking(False)
         self.spin_phys_h.setValue(150.0) 
         
-        row_phys.addWidget(self.spin_phys_w)
-        row_phys.addWidget(self.spin_phys_h)
-        
-        # Conecta as caixas de texto à função dinâmica
+        form_dim.addRow("Larg:", self.spin_phys_w)
+        form_dim.addRow("Alt:", self.spin_phys_h)
+        ly_dim.addLayout(form_dim)
+        layout_sup.addWidget(col_dim, 1)
+
+        right_layout.addWidget(container_sup)
+
+        # Conexões de Sinais
         self.spin_phys_w.valueChanged.connect(self._on_physical_size_changed)
         self.spin_phys_h.valueChanged.connect(self._on_physical_size_changed)
-        
-        ly_doc.addLayout(row_phys)
-        right_layout.addWidget(grp_doc)
-        self._add_separator(right_layout)
-
-        # --- Grupo: Propriedades do Item (Posição X, Y) ---
-        grp_pos = QFrame()
-        ly_pos = QVBoxLayout(grp_pos)
-        ly_pos.setContentsMargins(0, 0, 0, 10)
-        lbl_pos = QLabel("<b>POSIÇÃO DO ITEM</b>")
-        ly_pos.addWidget(lbl_pos)
-        
-        row_pos = QHBoxLayout()
-        self.spin_pos_x = QDoubleSpinBox()
-        self.spin_pos_x.setRange(-5000, 20000)
-        self.spin_pos_x.setDecimals(1)
-        self.spin_pos_x.setPrefix("X: ")
-        self.spin_pos_x.setSuffix(" mm")
-        self.spin_pos_x.setKeyboardTracking(False)
-        self.spin_pos_x.setEnabled(False)
         self.spin_pos_x.valueChanged.connect(self.apply_position_x)
-        
-        self.spin_pos_y = QDoubleSpinBox()
-        self.spin_pos_y.setRange(-5000, 20000)
-        self.spin_pos_y.setDecimals(1)
-        self.spin_pos_y.setPrefix("Y: ")
-        self.spin_pos_y.setSuffix(" mm")
-        self.spin_pos_y.setKeyboardTracking(False)
-        self.spin_pos_y.setEnabled(False)
         self.spin_pos_y.valueChanged.connect(self.apply_position_y)
-        
-        row_pos.addWidget(self.spin_pos_x)
-        row_pos.addWidget(self.spin_pos_y)
-        ly_pos.addLayout(row_pos)
-        right_layout.addWidget(grp_pos)
         self._add_separator(right_layout)
 
         container_misto = QWidget()

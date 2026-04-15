@@ -45,7 +45,7 @@ class CaixaDeTextoPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        lbl = QLabel("<b>DIMENSÕES E ROTAÇÃO</b>")
+        lbl = QLabel("<b>Propriedades do Objeto</b>")
         layout.addWidget(lbl)
         self._aspect_ratio = 1.0
         

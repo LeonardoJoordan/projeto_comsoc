@@ -12,7 +12,6 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                   QInputDialog, QComboBox, QCheckBox, QTableWidgetItem)
 from PySide6.QtCore import Qt, QSettings
 from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
-from PySide6.QtPrintSupport import QPrinter, QPrintDialog
 
 from features.preview.preview_panel import PreviewPanel
 from features.workspace.controls_panel import ControlsPanel
@@ -119,8 +118,8 @@ class MainWindow(QMainWindow):
         self.chk_single_pdf.setVisible(False)
         ly_out.addWidget(self.chk_single_pdf)
 
-        self.btn_config_name = QPushButton("⚙️")
-        self.btn_config_name.setFixedWidth(40)
+        self.btn_config_name = QPushButton("Configurações")
+        self.btn_config_name.setFixedWidth(100)
         self.btn_config_name.setToolTip("Configurar padrão de nome dos arquivos e impressão")
         self.btn_config_name.clicked.connect(self._open_config_dialog)
         ly_out.addWidget(self.btn_config_name)
@@ -999,7 +998,6 @@ class MainWindow(QMainWindow):
         self.manager.log_updated.connect(self.log_panel.append)
         self.manager.error_occurred.connect(lambda msg: self.log_panel.append(f"[ERRO] {msg}"))
         self.manager.finished_process.connect(self._on_generation_finished)
-        self.manager.finished_process.connect(self._handle_printing_queue)
         
         self.start_time = time.time()
         self.manager.start()
@@ -1020,69 +1018,6 @@ class MainWindow(QMainWindow):
         self.log_panel.append("=== Processo Finalizado ===")    
         self.log_panel.append(f"⏱️ Tempo total: {time_str}")
         
-    def _handle_printing_queue(self):
-        if not self.cached_model_data: return
-        
-        imp_settings = self.cached_model_data.get("imposition_settings", {})
-        should_print = imp_settings.get("print_after_generation", False)
-        
-        if not should_print:
-            return
-
-        files_to_print = getattr(self.manager, "generated_files", [])
-        if not files_to_print:
-            self.log_panel.append("⚠️ Nenhum arquivo gerado para impressão.")
-            return
-
-        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-        
-        if files_to_print:
-            first_img_path = self.manager.output_dir / files_to_print[0]
-            if first_img_path.exists():
-                img_check = QImage(str(first_img_path))
-                if not img_check.isNull():
-                    if img_check.width() > img_check.height():
-                        printer.setPageOrientation(QPageLayout.Orientation.Landscape)
-                    else:
-                        printer.setPageOrientation(QPageLayout.Orientation.Portrait)
-
-        printer.setFullPage(True)
-        dialog = QPrintDialog(printer, self)
-        
-        if dialog.exec() != QPrintDialog.DialogCode.Accepted:
-            self.log_panel.append("🖨️ Impressão cancelada pelo usuário.")
-            return
-
-        self.log_panel.append(f"🖨️ Enviando {len(files_to_print)} páginas para a impressora...")
-        
-        painter = QPainter()
-        if not painter.begin(printer):
-            self.log_panel.append("❌ Erro ao iniciar comunicação com a impressora.")
-            return
-
-        try:
-            output_dir = self.manager.output_dir
-            for i, filename in enumerate(files_to_print):
-                if i > 0:
-                    printer.newPage()
-                
-                full_path = output_dir / filename
-                if not full_path.exists():
-                    continue
-                
-                img = QImage(str(full_path))
-                if img.isNull():
-                    continue
-
-                paper_rect = printer.paperRect(QPrinter.Unit.DevicePixel)
-                painter.drawImage(paper_rect, img)
-                
-            self.log_panel.append("✅ Envio para impressão concluído!")
-            
-        except Exception as e:
-            self.log_panel.append(f"❌ Erro durante impressão: {e}")
-        finally:
-            painter.end()
 
     
 
