@@ -326,7 +326,6 @@ class EditorDeTextoPanel(QWidget):
 
     def set_font_size(self, size):
         self.fontSizeChanged.emit(size)
-        self.txt_content.setFocus()
 
     def set_format_attribute(self, attr_type):
         cursor = self.txt_content.textCursor()

@@ -87,8 +87,16 @@ class NativeRenderer:
             bg = QPixmap(self.tpl["background_path"])
             if not bg.isNull():
                 bg_props = self.tpl.get("bg_props", {})
+                
+                w = bg_props.get("w", self.tpl["canvas_size"]["w"])
+                h = bg_props.get("h", self.tpl["canvas_size"]["h"])
+                x = bg_props.get("x", 0)
+                y = bg_props.get("y", 0)
+                
+                scaled_bg = bg.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                
                 painter.setOpacity(bg_props.get("opacity", 1.0))
-                painter.drawPixmap(0, 0, bg)
+                painter.drawPixmap(QPointF(float(x), float(y)), scaled_bg)
                 painter.setOpacity(1.0)
 
         for img in self.tpl.get("images", []):
