@@ -19,7 +19,7 @@ modules:
   - name: dependencias
     buildsystem: simple
     build-commands:
-      - pip3 install --prefix=/app PySide6
+      - pip3 install --prefix=/app PySide6 PyMuPDF
     
   - name: projeto-comsoc
     buildsystem: simple

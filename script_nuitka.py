@@ -25,6 +25,7 @@ def build_app():
         "--include-package=features",
         "--include-package=core",
         "--include-package=shared",
+        "--include-package=fitz",
         "--follow-imports"
     ]
 
