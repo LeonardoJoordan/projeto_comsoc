@@ -138,6 +138,7 @@ class ImageItem(QGraphicsPixmapItem):
         self.setZValue(1) 
         
         self.keep_proportion = True
+        self.has_link = False
         self.handle_br = ResizeHandle(self)
         rect = self.pixmap().rect()
         self.handle_br.setPos(rect.width(), rect.height())

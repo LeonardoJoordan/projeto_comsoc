@@ -37,6 +37,7 @@ class CaixaDeTextoPanel(QWidget):
     heightChanged = Signal(int)
     rotationChanged = Signal(int)
     proportionToggled = Signal(bool) # Novo sinal para a Checkbox
+    linkToggled = Signal(bool)
     restoreRequested = Signal()
     opacityChanged = Signal(float)
 
@@ -74,6 +75,11 @@ class CaixaDeTextoPanel(QWidget):
         self.chk_proporcao.setChecked(True)
         self.chk_proporcao.toggled.connect(self.proportionToggled.emit)
         form.addRow("", self.chk_proporcao)
+
+        self.chk_link = QCheckBox("Habilitar Link (PDF)")
+        self.chk_link.setToolTip("Gera uma área clicável no arquivo PDF")
+        self.chk_link.toggled.connect(self.linkToggled.emit)
+        form.addRow("", self.chk_link)
 
         # Intercepta os sinais para calcular a proporção antes de emitir para a cena
         self.spin_w.valueChanged.disconnect(self.widthChanged.emit)
@@ -113,6 +119,9 @@ class CaixaDeTextoPanel(QWidget):
         self.chk_proporcao.blockSignals(True)
         self.chk_proporcao.setChecked(getattr(box, 'keep_proportion', True))
         self.chk_proporcao.blockSignals(False)
+        self.chk_link.blockSignals(True)
+        self.chk_link.setChecked(getattr(box.state, 'has_link', False))
+        self.chk_link.blockSignals(False)
         self.blockSignals(False)
 
     def load_from_image(self, img):
@@ -127,6 +136,9 @@ class CaixaDeTextoPanel(QWidget):
         self.chk_proporcao.blockSignals(True)
         self.chk_proporcao.setChecked(getattr(img, 'keep_proportion', True))
         self.chk_proporcao.blockSignals(False)
+        self.chk_link.blockSignals(True)
+        self.chk_link.setChecked(getattr(img, 'has_link', False))
+        self.chk_link.blockSignals(False)
         self.blockSignals(False)
 
     def _on_w_changed(self, val):

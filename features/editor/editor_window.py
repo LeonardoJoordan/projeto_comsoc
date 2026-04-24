@@ -210,6 +210,7 @@ class EditorWindow(QMainWindow):
         self.caixa_texto_panel.heightChanged.connect(self.update_height)
         self.caixa_texto_panel.rotationChanged.connect(self.update_rotation)
         self.caixa_texto_panel.proportionToggled.connect(self.update_proportion_lock)
+        self.caixa_texto_panel.linkToggled.connect(self.update_link_state)
         self.caixa_texto_panel.restoreRequested.connect(self.restore_item_state)
         self.caixa_texto_panel.opacityChanged.connect(self.update_opacity)
         layout_misto.addWidget(self.caixa_texto_panel, 1)
@@ -421,6 +422,7 @@ class EditorWindow(QMainWindow):
                     
                 img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
+                img.has_link = img_data.get("has_link", False)
                 img.setVisible(img_data.get("visible", True))
                 img.setOpacity(img_data.get("opacity", 1.0))
                 if img_data.get("locked", False):
@@ -448,6 +450,7 @@ class EditorWindow(QMainWindow):
             box.state.align = b.get("align", "left")
             box.state.indent_px = b.get("indent_px", 0)
             box.state.line_height = b.get("line_height", 1.15)
+            box.state.has_link = b.get("has_link", False)
 
             box.setRotation(b.get("rotation", 0))
             box.apply_state()
@@ -496,6 +499,8 @@ class EditorWindow(QMainWindow):
                     "font_family": item.state.font_family,
                     "font_size": item.state.font_size,
                     "font_color": getattr(item.state, 'font_color', '#000000'),
+                    "has_link": getattr(item.state, 'has_link', False),
+                    "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
                     "align": item.state.align,
                     "vertical_align": item.state.vertical_align,
                     "indent_px": item.state.indent_px,
@@ -532,7 +537,9 @@ class EditorWindow(QMainWindow):
                     "width": round(float(pix.width()), 2),
                     "height": round(float(pix.height()), 2),
                     "longest_side": round(float(max(pix.width(), pix.height())), 2),
-                    "rotation": round(float(item.rotation()), 2)
+                    "rotation": round(float(item.rotation()), 2),
+                    "has_link": getattr(item, "has_link", False),
+                    "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}"
                 })
 
         ordered_placeholders = []
@@ -655,6 +662,13 @@ class EditorWindow(QMainWindow):
         for item in self.scene.items():
             if isinstance(item, DesignerBox):
                 placeholders.update(item.get_placeholders())
+                if getattr(item.state, 'has_link', False):
+                    name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
+                    placeholders.add(f"Link - {name}")
+            elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
+                if getattr(item, 'has_link', False):
+                    name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
+                    placeholders.add(f"Link - {name}")
         return sorted(list(placeholders))
     
     def add_new_box(self):
@@ -758,6 +772,16 @@ class EditorWindow(QMainWindow):
         item = self._get_selected()
         if item:
             item.keep_proportion = locked
+
+    def update_link_state(self, has_link):
+        item = self._get_selected()
+        if item:
+            if isinstance(item, DesignerBox):
+                item.state.has_link = has_link
+            elif isinstance(item, ImageItem):
+                item.has_link = has_link
+            self.sync_placeholders_list()
+            self.refresh_layer_list()
 
     def update_opacity(self, value):
         item = self._get_selected()
@@ -968,6 +992,7 @@ class EditorWindow(QMainWindow):
         if ok and new_name.strip():
             item.custom_name = new_name.strip()
             self.refresh_layer_list()
+            self.sync_placeholders_list()
 
     def update_position_ui(self):
         """Atualiza os campos X e Y no topo em tempo real."""

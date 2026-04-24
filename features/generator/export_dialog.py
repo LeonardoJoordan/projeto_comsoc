@@ -69,6 +69,12 @@ class ConfigDialog(QDialog):
         ly_naming.addStretch()
         self.tabs.addTab(tab_naming, "Nomenclatura")
 
+        # Banner de Aviso para Hiperlinks
+        self.lbl_link_warning = QLabel("⚠️ Hiperlinks ativos detetados. Use PDF (Arquivo Individual) para os manter.")
+        self.lbl_link_warning.setStyleSheet("color: #e67e22; font-weight: bold; padding: 5px; border: 1px solid #e67e22; border-radius: 4px;")
+        self.lbl_link_warning.setVisible(False)
+        ly_naming.insertWidget(0, self.lbl_link_warning)
+
         # --- ABA 2: Impressão e Imposição ---
         tab_print = QWidget()
         ly_print = QVBoxLayout(tab_print)
@@ -242,6 +248,7 @@ class ConfigDialog(QDialog):
         self.spin_w_mm.setValue(new_h * self.ratio)
         self.spin_w_mm.blockSignals(False)
 
-    
+    def set_link_warning_visible(self, visible):
+        self.lbl_link_warning.setVisible(visible)
     
     

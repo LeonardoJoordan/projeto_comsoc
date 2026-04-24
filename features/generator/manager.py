@@ -32,6 +32,7 @@ class RenderManager(QObject):
         self.total_cards = len(rows_plain)
         self.cards_done = 0
         self.generated_files = []
+        self.all_cards_links = {} # Mapeia o índice do cartão para os seus links
         self._is_running = False
 
     def start(self):
@@ -67,7 +68,7 @@ class RenderManager(QObject):
             if self.is_hybrid and not self.is_imposition:
                 fname = f"{i:05d}_{fname}"
                 
-            all_tasks_data.append( (self.rows_plain[i], self.rows_rich[i], fname) )
+            all_tasks_data.append( (i, self.rows_plain[i], self.rows_rich[i], fname) )
 
         if self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
@@ -152,10 +153,15 @@ class RenderManager(QObject):
 
     def _start_hybrid_assembly(self):
         self.log_updated.emit("📦 Montando arquivo PDF Único final em segundo plano...")
+        canvas_w = self.renderer.tpl.get("canvas_size", {}).get("w", 1000)
+        canvas_h = self.renderer.tpl.get("canvas_size", {}).get("h", 1000)
         self.assembler_worker = HybridAssemblerWorker(
             self.generated_files, self.work_dir, self.output_dir, 
             self.is_imposition, self.imposition_settings, 
-            self.target_w_mm, self.target_h_mm
+            self.target_w_mm, self.target_h_mm,
+            all_links=self.all_cards_links,
+            canvas_w=canvas_w,
+            canvas_h=canvas_h
         )
         self.assembler_worker.finished_assembly.connect(self._on_hybrid_assembly_finished)
         self.assembler_worker.error_occurred.connect(self._on_hybrid_assembly_error)
@@ -168,8 +174,12 @@ class RenderManager(QObject):
         self.generated_files.append(filename)
         self._update_progress()
 
-    def _on_direct_card_finished(self, filename):
+    def _on_direct_card_finished(self, filename, original_idx, local_links):
         if not self._is_running: return
+        
+        if local_links:
+            self.all_cards_links[original_idx] = local_links
+            
         self.cards_done += 1
         self.log_updated.emit(f"[{self.cards_done}/{self.total_cards}] Salvo: {filename}")
         self.generated_files.append(filename)

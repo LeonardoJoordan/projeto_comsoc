@@ -14,3 +14,4 @@ class TextState:
     indent_px: float = 0.0
     line_height: float = 1.15
     font_color: str = "#000000"
+    has_link: bool = False

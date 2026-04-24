@@ -1,6 +1,6 @@
 from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont, 
                            QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush, QFontMetrics)
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, QRectF
 import re
 from pathlib import Path
 
@@ -9,7 +9,8 @@ class NativeRenderer:
         self.tpl = template_data
 
 
-    def render_row(self, row_plain: dict, row_rich: dict, out_path: Path):
+    def render_row(self, row_plain: dict, row_rich: dict, out_path: Path, out_links: list = None):
+        
         w = self.tpl["canvas_size"]["w"]
         h = self.tpl["canvas_size"]["h"]
         
@@ -20,7 +21,7 @@ class NativeRenderer:
 
         painter = QPainter(image)
         try:
-            self._paint_card(painter, row_rich)
+            self._paint_card(painter, row_rich, out_links)
         finally:
             painter.end()
 
@@ -48,7 +49,8 @@ class NativeRenderer:
         return QPixmap.fromImage(image)
     
 
-    def render_to_qimage(self, row_plain: dict, row_rich: dict) -> QImage:
+    def render_to_qimage(self, row_plain: dict, row_rich: dict, out_links: list = None) -> QImage:
+        
         w = self.tpl["canvas_size"]["w"]
         h = self.tpl["canvas_size"]["h"]
         
@@ -59,7 +61,7 @@ class NativeRenderer:
 
         painter = QPainter(image)
         try:
-            self._paint_card(painter, row_rich)
+            self._paint_card(painter, row_rich, out_links)
         finally:
             painter.end()
         return image
@@ -72,7 +74,7 @@ class NativeRenderer:
         return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
     
 
-    def _paint_card(self, painter: QPainter, row_rich: dict):
+    def _paint_card(self, painter: QPainter, row_rich: dict, out_links: list = None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
@@ -123,6 +125,14 @@ class NativeRenderer:
                     painter.drawPixmap(QPointF(float(img.get("x", 0)), float(img.get("y", 0))), scaled)
                     painter.setOpacity(1.0)
 
+                    if img.get("has_link") and img.get("link_key"):
+                        url = row_rich.get(img["link_key"], "").strip()
+                        if url and out_links is not None:
+                            if not url.startswith(("http://", "https://", "mailto:", "tel:")):
+                                url = "https://" + url
+                            rect = QRectF(float(img.get("x", 0)), float(img.get("y", 0)), w, h)
+                            out_links.append({"url": url, "rect": rect})
+
         for box in self.tpl.get("boxes", []):
             if not box.get("visible", True):
                 continue
@@ -140,7 +150,7 @@ class NativeRenderer:
             try:
                 html_resolved = self.resolve_html(box["html"], row_rich)
                 painter.setOpacity(box.get("opacity", 1.0))
-                self._draw_html_box(painter, box, html_resolved)
+                self._draw_html_box(painter, box, html_resolved, row_rich, out_links)
                 painter.setOpacity(1.0)
             except Exception as e:
                 print(f"[WARN] Erro ao desenhar caixa de texto: {e}")
@@ -166,123 +176,141 @@ class NativeRenderer:
                 painter.setOpacity(1.0)
 
     
-    def _draw_html_box(self, painter, box_data, html_text):
+    def _draw_html_box(self, painter, box_data, html_text, row_rich=None, out_links=None):
         painter.save()
-        doc = QTextDocument()
-        doc.setDocumentMargin(0) 
-        
-        # 0. Limpeza Retroativa: Remove cores, links e estilos de fonte para que o gerador respeite as propriedades globais
-        clean_html = re.sub(r"color\s*:[^;\"]+;?", "", html_text)
-        clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
-        clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
-        clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
-        clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", clean_html)
-        clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
-        clean_html = re.sub(r"(?i)</a>", "", clean_html)
-        
-        # 1. Injetar o HTML limpo
-        doc.setHtml(clean_html)
-
-        # 2. Aplicar a mesma Fonte Global nativa usada no DesignerBox
-        font_family = box_data.get("font_family", "Arial")
-        font_size = box_data.get("font_size", 16)
-        font = QFont(font_family, font_size)
-        doc.setDefaultFont(font)
-        
-        font_color = box_data.get("font_color", "#000000")
-        
-        cursor_color = QTextCursor(doc)
-        cursor_color.select(QTextCursor.SelectionType.Document)
-        char_fmt = QTextCharFormat()
-        char_fmt.setForeground(QBrush(QColor(font_color)))
-        cursor_color.mergeCharFormat(char_fmt)
-
-        # 3. Aplicar Alinhamento Horizontal
-        align_str = box_data.get("align", "left")
-        opts = doc.defaultTextOption()
-        if align_str == "center":
-            opts.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        elif align_str == "right":
-            opts.setAlignment(Qt.AlignmentFlag.AlignRight)
-        elif align_str == "justify":
-            opts.setAlignment(Qt.AlignmentFlag.AlignJustify)
-        else:
-            opts.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        doc.setDefaultTextOption(opts)
-        
-        # 4. Clonar as exatas propriedades de Margem e Entrelinha do Editor
-        cursor = QTextCursor(doc)
-        cursor.select(QTextCursor.SelectionType.Document)
-        fmt = QTextBlockFormat()
-        fmt.setTextIndent(box_data.get("indent_px", 0.0))
-        fmt.setLineHeight(box_data.get("line_height", 1.15) * 100.0, 1) # '1' = ProportionalHeight
-        cursor.mergeBlockFormat(fmt)
-
-        # 5. Zerar margens para sistema de ancoragem livre
-        root_frame = doc.rootFrame()
-        frame_fmt = root_frame.frameFormat()
-        frame_fmt.setMargin(0)
-        root_frame.setFrameFormat(frame_fmt)
-        
-        w = box_data.get("w", 300)
-        h = box_data.get("h", 100)
-        rotation = box_data.get("rotation", 0)
-        doc.setTextWidth(w)
-                
-        # Força o recálculo do layout e prepara a métrica exata da fonte
-        layout = doc.documentLayout()
-        logical_h = layout.documentSize().height()
-        fm = QFontMetrics(font)
-        
-        # --- CÁLCULO DA TINTA REAL (Ignorando Ascender/Descender invisível) ---
-        real_top = 0
-        real_bottom = logical_h
-        
-        first_block = doc.begin()
-        if first_block.isValid():
-            text_layout = first_block.layout()
-            if text_layout.lineCount() > 0:
-                first_line = text_layout.lineAt(0)
-                text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
-                if text_str.strip():
-                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
-                    real_top = first_line.y() + first_line.ascent() + tight_rect.top()
-
-        last_block = doc.begin()
-        last_valid_block = last_block
-        while last_block.isValid():
-            if last_block.text().strip(): last_valid_block = last_block
-            last_block = last_block.next()
+        try:
+            doc = QTextDocument()
+            doc.setDocumentMargin(0) 
             
-        if last_valid_block.isValid():
-            text_layout = last_valid_block.layout()
-            if text_layout.lineCount() > 0:
-                last_line = text_layout.lineAt(text_layout.lineCount() - 1)
-                text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
-                if text_str.strip():
-                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
-                    block_y = layout.blockBoundingRect(last_valid_block).y()
-                    real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
-                    
-        content_h = real_bottom - real_top
-        
-        y_offset = 0
-        if box_data.get("vertical_align") == "center":
-            y_offset = (h - content_h) / 2 - real_top
-        elif box_data.get("vertical_align") == "bottom":
-            y_offset = h - content_h - real_top
-        else: # Top
-            y_offset = -real_top
+            # Limpeza Retroativa
+            clean_html = re.sub(r"color\s*:[^;\"]+;?", "", html_text)
+            clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
+            clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+            clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
+            clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", clean_html)
+            clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
+            clean_html = re.sub(r"(?i)</a>", "", clean_html)
+            
+            doc.setHtml(clean_html)
 
-        center_x = box_data.get("x", 0) + (w / 2)
-        center_y = box_data.get("y", 0) + (h / 2)
-        
-        painter.translate(center_x, center_y)
-        painter.rotate(rotation)
-        painter.translate(-w / 2, -h / 2)
-        
-        # Clipping aberto no eixo Y para permitir vazamento da fonte massiva
-        painter.setClipRect(0, -10000, w, 20000)
-        painter.translate(0, y_offset)
-        doc.drawContents(painter)
-        painter.restore()
+            font_family = box_data.get("font_family", "Arial")
+            font_size = box_data.get("font_size", 16)
+            font = QFont(font_family, font_size)
+            doc.setDefaultFont(font)
+            
+            font_color = box_data.get("font_color", "#000000")
+            
+            cursor_color = QTextCursor(doc)
+            cursor_color.select(QTextCursor.SelectionType.Document)
+            char_fmt = QTextCharFormat()
+            char_fmt.setForeground(QBrush(QColor(font_color)))
+            cursor_color.mergeCharFormat(char_fmt)
+
+            align_str = box_data.get("align", "left")
+            opts = doc.defaultTextOption()
+            if align_str == "center":
+                opts.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            elif align_str == "right":
+                opts.setAlignment(Qt.AlignmentFlag.AlignRight)
+            elif align_str == "justify":
+                opts.setAlignment(Qt.AlignmentFlag.AlignJustify)
+            else:
+                opts.setAlignment(Qt.AlignmentFlag.AlignLeft)
+            doc.setDefaultTextOption(opts)
+            
+            cursor = QTextCursor(doc)
+            cursor.select(QTextCursor.SelectionType.Document)
+            fmt = QTextBlockFormat()
+            fmt.setTextIndent(box_data.get("indent_px", 0.0))
+            fmt.setLineHeight(box_data.get("line_height", 1.15) * 100.0, 1)
+            cursor.mergeBlockFormat(fmt)
+
+            root_frame = doc.rootFrame()
+            frame_fmt = root_frame.frameFormat()
+            frame_fmt.setMargin(0)
+            root_frame.setFrameFormat(frame_fmt)
+            
+            w = box_data.get("w", 300)
+            h = box_data.get("h", 100)
+            rotation = box_data.get("rotation", 0)
+            doc.setTextWidth(w)
+                    
+            layout = doc.documentLayout()
+            logical_h = layout.documentSize().height()
+            fm = QFontMetrics(font)
+            
+            real_top = 0
+            real_bottom = logical_h
+            
+            first_block = doc.begin()
+            if first_block.isValid():
+                text_layout = first_block.layout()
+                if text_layout.lineCount() > 0:
+                    first_line = text_layout.lineAt(0)
+                    text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
+                    if text_str.strip():
+                        tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
+                        real_top = first_line.y() + first_line.ascent() + tight_rect.top()
+
+            last_block = doc.begin()
+            last_valid_block = last_block
+            while last_block.isValid():
+                if last_block.text().strip(): last_valid_block = last_block
+                last_block = last_block.next()
+                
+            if last_valid_block.isValid():
+                text_layout = last_valid_block.layout()
+                if text_layout.lineCount() > 0:
+                    last_line = text_layout.lineAt(text_layout.lineCount() - 1)
+                    text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
+                    if text_str.strip():
+                        tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
+                        block_y = layout.blockBoundingRect(last_valid_block).y()
+                        real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
+                        
+            content_h = real_bottom - real_top
+            
+            y_offset = 0
+            if box_data.get("vertical_align") == "center":
+                y_offset = (h - content_h) / 2 - real_top
+            elif box_data.get("vertical_align") == "bottom":
+                y_offset = h - content_h - real_top
+            else: 
+                y_offset = -real_top
+
+            center_x = box_data.get("x", 0) + (w / 2)
+            center_y = box_data.get("y", 0) + (h / 2)
+            
+            painter.translate(center_x, center_y)
+            painter.rotate(rotation)
+            painter.translate(-w / 2, -h / 2)
+            
+            painter.setClipRect(0, -10000, w, 20000)
+            painter.translate(0, y_offset)
+            doc.drawContents(painter)
+            
+            # Mapeamento do Hiperlink isolado
+            if box_data.get("has_link") and box_data.get("link_key") and row_rich and out_links is not None:
+                url = row_rich.get(box_data["link_key"], "").strip()
+                if url:
+                    if not url.startswith(("http://", "https://", "mailto:", "tel:")):
+                        url = "https://" + url
+                    ideal_w = min(doc.idealWidth(), w)
+                    # Calcula x_start baseado no alinhamento horizontal
+                    if align_str == "center":
+                        x_start = (w - ideal_w) / 2
+                    elif align_str == "right":
+                        x_start = w - ideal_w
+                    else:
+                        x_start = 0
+                    # real_top é o topo da tinta no espaço local do doc (antes do y_offset)
+                    # y_offset desloca o doc inteiro; o topo real no espaço da caixa é real_top + y_offset
+                    local_rect = QRectF(x_start, real_top + y_offset, ideal_w, content_h)
+                    mapped_rect = painter.transform().mapRect(local_rect)
+                    out_links.append({"url": url, "rect": mapped_rect})
+
+        except Exception as e:
+            print(f"[WARN] Falha interna no layout do texto: {e}")
+        finally:
+            # ESTA LINHA É A CURA DO EFEITO CASCATA. Sempre será executada!
+            painter.restore()

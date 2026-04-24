@@ -752,11 +752,13 @@ class MainWindow(QMainWindow):
         
         current_imposition = None
         model_size = (1000, 1000) 
+        has_any_link = False
 
         if self.cached_model_data:
             sz = self.cached_model_data.get("canvas_size", {})
             model_size = (sz.get("w", 1000), sz.get("h", 1000))
             current_imposition = self.cached_model_data.get("imposition_settings") 
+            has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", [])))
 
         # Lê o tema atual e envia para a janela de configurações
         is_dark_now = self.settings.value("dark_mode", True, type=bool)
@@ -765,6 +767,8 @@ class MainWindow(QMainWindow):
                            model_size_px=model_size, 
                            current_imposition=current_imposition,
                            is_dark=is_dark_now)
+        
+        dlg.set_link_warning_visible(has_any_link)
         
         if dlg.exec():
             # 1. Verifica e aplica o tema IMEDIATAMENTE caso o usuário tenha alterado
@@ -932,6 +936,24 @@ class MainWindow(QMainWindow):
         if not current_name:
             self.log_panel.append("ERRO: Nenhum modelo selecionado.")
             return
+        
+        export_format = self.cbo_export_format.currentText()
+        has_any_link = False
+        if self.cached_model_data:
+            has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", [])))
+
+        if export_format == "PNG" and has_any_link:
+            resp = QMessageBox.question(
+                self, 
+                "Aviso: Hiperlinks desativados em PNG",
+                "Este modelo possui hiperlinks ativos, mas o formato de saída atual é PNG.\n\n"
+                "Os hiperlinks SÓ funcionam em formato PDF. Deseja continuar mesmo assim e gerar as imagens sem links?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No
+            )
+            if resp == QMessageBox.StandardButton.No:
+                self.log_panel.append("🛑 Geração cancelada para alteração de formato.")
+                return
             
         slug = slugify_model_name(current_name)
         template_path = get_models_dir() / slug / "template_v3.json"
