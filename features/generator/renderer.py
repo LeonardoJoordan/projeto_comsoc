@@ -108,11 +108,25 @@ class NativeRenderer:
             img_path = Path(raw_path)
             
             # Fallback de resolução de caminho (resolve assets relativos quando acionado via gerador)
-            if not img_path.exists() and self.tpl.get("background_path"):
-                bg_path = Path(self.tpl["background_path"])
-                if bg_path.is_absolute():
-                    alt_path = bg_path.parent.parent / raw_path
-                    if alt_path.exists(): img_path = alt_path
+            if not img_path.exists():
+                # 1. Tenta achar matematicamente pelo nome do modelo (Pareto)
+                try:
+                    from core.template_manager import slugify_model_name
+                    from core.paths import get_models_dir
+                    if "name" in self.tpl:
+                        alt_path = get_models_dir() / slugify_model_name(self.tpl["name"]) / raw_path
+                        if alt_path.exists(): 
+                            img_path = alt_path
+                except ImportError:
+                    pass
+                
+                # 2. Hack antigo via background (mantido como segurança extra)
+                if not img_path.exists() and self.tpl.get("background_path"):
+                    bg_path = Path(self.tpl["background_path"])
+                    if bg_path.is_absolute():
+                        alt_path = bg_path.parent.parent / raw_path
+                        if alt_path.exists(): 
+                            img_path = alt_path
 
             if img_path.exists():
                 pix = QPixmap(str(img_path))

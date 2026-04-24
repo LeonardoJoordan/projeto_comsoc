@@ -111,6 +111,10 @@ class EditorWindow(QMainWindow):
         self.fallback_bg = self.scene.addRect(0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
         self.fallback_bg.setZValue(-200) # Afundado para -200 para ficar atrás do BackgroundItem (-100)
         
+        # Inicializa o fundo vazio para garantir a existência da camada desde o início
+        self.bg_item = BackgroundItem(None)
+        self.scene.addItem(self.bg_item)
+
         center_container = QWidget()
         center_layout = QVBoxLayout(center_container)
         center_layout.setContentsMargins(0, 0, 0, 0)
@@ -386,8 +390,11 @@ class EditorWindow(QMainWindow):
             bg_path = path.parent / bg_path_raw if not Path(bg_path_raw).is_absolute() else Path(bg_path_raw)
             
             if bg_path.exists():
-                # Uma única chamada, passando as propriedades (bg_props) se existirem
                 self.load_background_image(str(bg_path), update_ui=False, props=data.get("bg_props"))
+            else:
+                self.load_background_image(None, update_ui=False, props=data.get("bg_props"))
+        else:
+            self.load_background_image(None, update_ui=False, props=data.get("bg_props"))
 
         for sig_data in data.get("signatures", []):
             raw_path = sig_data["path"]
@@ -604,16 +611,18 @@ class EditorWindow(QMainWindow):
         QMessageBox.information(self, "Sucesso", f"Modelo '{model_name}' salvo com sucesso em:\n{file_path}")
 
     def load_background_image(self, path, update_ui=True, props=None):
-        reader = QImageReader(path)
-        reader.setAutoTransform(True)
-        original_size = reader.size()
-        
-        if not reader.canRead() and QPixmap(path).isNull():
-            QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
-            return
+        original_size = None
+        if path:
+            reader = QImageReader(path)
+            reader.setAutoTransform(True)
+            original_size = reader.size()
             
-        if original_size.isEmpty():
-            original_size = QPixmap(path).size()
+            if not reader.canRead() and QPixmap(path).isNull():
+                QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
+                return
+                
+            if original_size.isEmpty():
+                original_size = QPixmap(path).size()
         
         if self.bg_item:
             self.scene.removeItem(self.bg_item)
@@ -642,7 +651,7 @@ class EditorWindow(QMainWindow):
             h_px = mm_to_px(self.spin_phys_h.value())
             self.bg_item.resize_custom(w_px, h_px)
 
-        if update_ui:
+        if update_ui and original_size:
             # Lê o tamanho original da imagem ao importar manualmente e molda a "Prancheta"
             w_mm = px_to_mm(original_size.width())
             h_mm = px_to_mm(original_size.height())

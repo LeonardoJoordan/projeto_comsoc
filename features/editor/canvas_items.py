@@ -120,15 +120,19 @@ class Guideline(QGraphicsLineItem):
 class ImageItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
-    def __init__(self, pixmap_path, parent=None):
-        reader = QImageReader(pixmap_path)
-        reader.setAutoTransform(True)
-        size = reader.size()        
-        img = reader.read()
-        pixmap = QPixmap.fromImage(img) if not img.isNull() else QPixmap(pixmap_path)
-        
+    def __init__(self, pixmap_path=None, parent=None):
+        if pixmap_path:
+            reader = QImageReader(pixmap_path)
+            reader.setAutoTransform(True)
+            size = reader.size()        
+            img = reader.read()
+            pixmap = QPixmap.fromImage(img) if not img.isNull() else QPixmap(pixmap_path)
+        else:
+            pixmap = QPixmap(1000, 1000)
+            pixmap.fill(Qt.GlobalColor.transparent)
+            
         super().__init__(pixmap)
-        self._original_path = pixmap_path
+        self._original_path = pixmap_path or ""
         self.setFlags(
             QGraphicsItem.GraphicsItemFlag.ItemIsMovable |
             QGraphicsItem.GraphicsItemFlag.ItemIsSelectable |
@@ -217,7 +221,7 @@ class BackgroundItem(ImageItem):
     Ele ganha alças de redimensionamento e vira uma camada livre (Z-Value -100), 
     mas é renderizado estritamente dentro da área da prancheta.
     """
-    def __init__(self, pixmap_path, parent=None):
+    def __init__(self, pixmap_path=None, parent=None):
         super().__init__(pixmap_path, parent)
         self.setZValue(-100)
 
