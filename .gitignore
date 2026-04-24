@@ -9,6 +9,7 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+*.flatpak
 
 # Artefatos do Projeto ComSoc
 output/
