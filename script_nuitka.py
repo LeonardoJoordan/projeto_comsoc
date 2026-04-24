@@ -12,10 +12,10 @@ def build_app():
     main_file = base_dir / "main.py"
     exe_name = "Projeto ComSoc"
 
-   # Base do comando Nuitka
+   # Base do comando Nuitka com Clang
     cmd = [
         sys.executable, "-m", "nuitka",
-        "--standalone",  # <-- Alteração 1: Troca de --onefile para --standalone
+        "--standalone", 
         f"--output-filename={exe_name}",
         "--output-dir=build",
         "--plugin-enable=pyside6",
@@ -26,6 +26,11 @@ def build_app():
         "--include-package=core",
         "--include-package=shared",
         "--include-package=fitz",
+        "--include-package=pymupdf",
+        "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
+        "--lto=no",                     
+        "--jobs=32",                    # Deixa o Ryzen 9 brilhar
+        "--show-progress",              # Mostra o que está acontecendo no terminal
         "--follow-imports"
     ]
 
