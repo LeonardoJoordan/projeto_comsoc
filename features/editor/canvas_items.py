@@ -60,8 +60,14 @@ class ResizeHandle(QGraphicsRectItem):
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        self._is_resizing = False
         super().mouseReleaseEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_resizing = False
+            # Gatilho do Undo/Redo
+            if self.scene() and self.scene().views():
+                win = self.scene().views()[0].window()
+                if hasattr(win, 'save_snapshot'):
+                    win.save_snapshot()
 
 
 class Guideline(QGraphicsLineItem):
@@ -215,6 +221,14 @@ class ImageItem(QGraphicsPixmapItem):
     def resize_from_handle(self, w, h):
         self.resize_custom(w, h)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        # Gatilho do Undo/Redo
+        if self.scene() and self.scene().views():
+            win = self.scene().views()[0].window()
+            if hasattr(win, 'save_snapshot'):
+                win.save_snapshot()
+
 class BackgroundItem(ImageItem):
     """
     Herdando de ImageItem, o fundo atua como um PowerClip (Máscara de Corte).
@@ -342,6 +356,14 @@ class SignatureItem(QGraphicsPixmapItem):
 
     def resize_from_handle(self, w, h):
         self.resize_custom(w, h)
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        # Gatilho do Undo/Redo
+        if self.scene() and self.scene().views():
+            win = self.scene().views()[0].window()
+            if hasattr(win, 'save_snapshot'):
+                win.save_snapshot()
 
 
 class BleedTextItem(QGraphicsTextItem):
@@ -576,3 +598,11 @@ class DesignerBox(QGraphicsRectItem):
     def update_center(self):
         rect = self.rect()
         self.setTransformOriginPoint(rect.center())
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        # Gatilho do Undo/Redo
+        if self.scene() and self.scene().views():
+            win = self.scene().views()[0].window()
+            if hasattr(win, 'save_snapshot'):
+                win.save_snapshot()

@@ -10,6 +10,12 @@ from .canvas_items import DesignerBox, SignatureItem, ImageItem, px_to_mm
 
 class CleanTextEdit(QTextEdit):
     """Campo de texto customizado que intercepta o Ctrl+V e purifica o HTML."""
+    editingFinished = Signal()
+    
+    def focusOutEvent(self, event):
+        super().focusOutEvent(event)
+        self.editingFinished.emit()
+
     def insertFromMimeData(self, source: QMimeData):
         if source.hasHtml():
             raw = source.html()
@@ -40,6 +46,7 @@ class CaixaDeTextoPanel(QWidget):
     linkToggled = Signal(bool)
     restoreRequested = Signal()
     opacityChanged = Signal(float)
+    snapshotRequested = Signal()
 
     def __init__(self):
         super().__init__()
@@ -104,6 +111,13 @@ class CaixaDeTextoPanel(QWidget):
         self.btn_restore.clicked.connect(self.restoreRequested.emit)
         form.addRow("", self.btn_restore)
 
+        self.spin_w.editingFinished.connect(self.snapshotRequested.emit)
+        self.spin_h.editingFinished.connect(self.snapshotRequested.emit)
+        self.spin_rot.editingFinished.connect(self.snapshotRequested.emit)
+        self.spin_opacity.editingFinished.connect(self.snapshotRequested.emit)
+        self.chk_proporcao.clicked.connect(self.snapshotRequested.emit)
+        self.chk_link.clicked.connect(self.snapshotRequested.emit)
+
         layout.addLayout(form)
         layout.addStretch()
 
@@ -166,6 +180,7 @@ class EditorDeTextoPanel(QWidget):
     verticalAlignChanged = Signal(str)
     indentChanged = Signal(float)
     lineHeightChanged = Signal(float)
+    snapshotRequested = Signal()
 
     def __init__(self):
         super().__init__()
@@ -260,6 +275,18 @@ class EditorDeTextoPanel(QWidget):
         layout.addLayout(form_space)
         layout.addStretch()
         self.txt_content.cursorPositionChanged.connect(self.update_buttons_state)
+
+        # Gatilhos de Snapshot da UI
+        self.txt_content.editingFinished.connect(self.snapshotRequested.emit)
+        self.cbo_font.activated.connect(lambda _: self.snapshotRequested.emit())
+        self.spin_size.editingFinished.connect(self.snapshotRequested.emit)
+        self.btn_bold.clicked.connect(self.snapshotRequested.emit)
+        self.btn_italic.clicked.connect(self.snapshotRequested.emit)
+        self.btn_underline.clicked.connect(self.snapshotRequested.emit)
+        self.cbo_align.activated.connect(lambda _: self.snapshotRequested.emit())
+        self.cbo_valign.activated.connect(lambda _: self.snapshotRequested.emit())
+        self.spin_indent.editingFinished.connect(self.snapshotRequested.emit)
+        self.spin_lh.editingFinished.connect(self.snapshotRequested.emit)
 
     def load_from_item(self, box: DesignerBox):
         self.blockSignals(True)
@@ -367,6 +394,7 @@ class EditorDeTextoPanel(QWidget):
             hex_color = color.name()
             self.btn_color.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #aaa; border-radius: 3px;")
             self.fontColorChanged.emit(hex_color)
+            self.snapshotRequested.emit()
             self.txt_content.setFocus()
 
     def _on_indent_changed(self, val):
