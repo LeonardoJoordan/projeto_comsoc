@@ -126,7 +126,6 @@ class RenderManager(QObject):
             w = PageRenderWorker(worker_tasks, self.renderer, self.work_dir, self.imposition_settings, self.worker_format, False)
             w.page_finished.connect(self._on_page_finished)
             w.error_occurred.connect(self.error_occurred)
-            w.finished.connect(self._check_all_finished)
             
             self.workers.append(w)
             w.start()
@@ -146,7 +145,6 @@ class RenderManager(QObject):
             w = DirectRenderWorker(chunk, self.renderer, self.work_dir, self.worker_format, False, self.target_w_mm, self.target_h_mm)
             w.card_finished.connect(self._on_direct_card_finished)
             w.error_occurred.connect(self.error_occurred)
-            w.finished.connect(self._check_all_finished)
             
             self.workers.append(w)
             w.start()
@@ -195,8 +193,9 @@ class RenderManager(QObject):
         self.error_occurred.emit(f"Erro na montagem do PDF: {error_msg}")
         self.finished_process.emit()
 
-    def _check_all_finished(self):
-        if all(w.isFinished() for w in self.workers):
+    def _check_completion(self):
+        # A nova trava absoluta: Só finaliza se a matemática bater 100%
+        if self.cards_done >= self.total_cards:
             if self._is_running and not getattr(self, '_finish_emitted', False):
                 self._finish_emitted = True
                 self.progress_updated.emit(100)
@@ -211,3 +210,7 @@ class RenderManager(QObject):
         done = min(self.cards_done, self.total_cards)
         percent = int((done / self.total_cards) * 100)
         self.progress_updated.emit(percent)
+        
+        # Como o _update_progress é chamado SEMPRE no final do log_updated.emit,
+        # isso garante que o log foi impresso antes de validarmos o fim do processo.
+        self._check_completion()
