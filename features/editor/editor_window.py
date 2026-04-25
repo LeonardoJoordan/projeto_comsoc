@@ -82,6 +82,10 @@ class EditorWindow(QMainWindow):
         lbl_layers = QLabel("<b>CAMADAS</b>")
         left_layout.addWidget(lbl_layers)
 
+        # Barra de Ferramentas Auxiliar de Camadas (Undo, Redo, Dup, Del)
+        self.layer_toolbar = self._setup_layer_toolbar()
+        left_layout.addWidget(self.layer_toolbar)
+
         self.layer_list = QListWidget()
         self.layer_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.layer_list.itemClicked.connect(self._on_layer_list_clicked)
@@ -299,6 +303,10 @@ class EditorWindow(QMainWindow):
 
         # --- SISTEMA DE UNDO/REDO ---
         self.history = HistoryManager(max_steps=30)
+        
+        # Conecta o estado da pilha aos novos botões da UI
+        self.history.canUndoChanged.connect(self.btn_undo.setEnabled)
+        self.history.canRedoChanged.connect(self.btn_redo.setEnabled)
         
         self.shortcut_undo = QShortcut(QKeySequence("Ctrl+Z"), self)
         self.shortcut_undo.activated.connect(self.undo)
@@ -1524,6 +1532,60 @@ class EditorWindow(QMainWindow):
         state = self.history.redo()
         if state:
             self.apply_scene_state(state, is_undo_redo=True)
+
+    def _setup_layer_toolbar(self) -> QWidget:
+        """Cria a barra de ferramentas compacta acima da lista de camadas."""
+        container = QWidget()
+        layout = QHBoxLayout(container)
+        layout.setContentsMargins(0, 2, 0, 5)
+        layout.setSpacing(4)
+
+        # Estilo comum para os botões da toolbar
+        btn_style = """
+            QPushButton { 
+                background-color: #333333; 
+                border: 1px solid #555555; 
+                border-radius: 4px; 
+                font-size: 14px;
+            }
+            QPushButton:hover { background-color: #444444; border-color: #777777; }
+            QPushButton:pressed { background-color: #222222; }
+            QPushButton:disabled { background-color: #222222; color: #555555; border-color: #333333; }
+        """
+
+        self.btn_undo = QPushButton("↩️")
+        self.btn_undo.setToolTip("Desfazer (Ctrl+Z)")
+        self.btn_undo.setFixedSize(32, 30)
+        self.btn_undo.setStyleSheet(btn_style)
+        self.btn_undo.setEnabled(False)
+        self.btn_undo.clicked.connect(self.undo)
+
+        self.btn_redo = QPushButton("↪️")
+        self.btn_redo.setToolTip("Refazer (Ctrl+Y)")
+        self.btn_redo.setFixedSize(32, 30)
+        self.btn_redo.setStyleSheet(btn_style)
+        self.btn_redo.setEnabled(False)
+        self.btn_redo.clicked.connect(self.redo)
+
+        self.btn_dup_layer = QPushButton("📑")
+        self.btn_dup_layer.setToolTip("Duplicar Selecionado (Ctrl+J)")
+        self.btn_dup_layer.setFixedSize(32, 30)
+        self.btn_dup_layer.setStyleSheet(btn_style)
+        self.btn_dup_layer.clicked.connect(self.duplicate_selected)
+
+        self.btn_del_layer = QPushButton("🗑️")
+        self.btn_del_layer.setToolTip("Excluir Selecionado (Del)")
+        self.btn_del_layer.setFixedSize(32, 30)
+        self.btn_del_layer.setStyleSheet(btn_style)
+        self.btn_del_layer.clicked.connect(self.delete_selected_items)
+
+        layout.addWidget(self.btn_undo)
+        layout.addWidget(self.btn_redo)
+        layout.addStretch() # Empurra os próximos botões para a direita
+        layout.addWidget(self.btn_dup_layer)
+        layout.addWidget(self.btn_del_layer)
+
+        return container
 
     def _get_selected(self):
         sel = self.scene.selectedItems()

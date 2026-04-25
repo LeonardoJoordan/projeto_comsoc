@@ -3,6 +3,7 @@ import sys
 import traceback
 from datetime import datetime
 from PySide6.QtWidgets import QMessageBox, QApplication
+from core.custom_tooltip import CustomTooltipManager
 from core.paths import get_logs_dir
 from features.workspace.main_window import MainWindow
 
@@ -45,6 +46,10 @@ sys.excepthook = global_exception_handler
 
 def main():
     app = QApplication(sys.argv)
+    
+    # Ativa o motor global de Tooltips Customizados (Substitui os nativos do Linux/Windows)
+    CustomTooltipManager.install(delay_ms=1500)
+    
     w = MainWindow()
     w.show()
     sys.exit(app.exec())
