@@ -310,12 +310,23 @@ class EditorWindow(QMainWindow):
         
         self.shortcut_undo = QShortcut(QKeySequence("Ctrl+Z"), self)
         self.shortcut_undo.activated.connect(self.undo)
+
+        # Atalho para renomear camada
+        self.shortcut_rename = QShortcut(QKeySequence("F2"), self)
+        # Só executa se houver um item atual na lista
+        self.shortcut_rename.activated.connect(
+            lambda: self.rename_layer() if self.layer_list.currentItem() else None
+        )
         
         self.shortcut_redo = QShortcut(QKeySequence("Ctrl+Y"), self)
         self.shortcut_redo.activated.connect(self.redo)
         self.shortcut_redo_alt = QShortcut(QKeySequence("Ctrl+Shift+Z"), self)
         self.shortcut_redo_alt.activated.connect(self.redo)
-        
+
+        # Ativa/Desativa o botão de renomear conforme a seleção na lista
+        self.layer_list.itemSelectionChanged.connect(
+            lambda: self.btn_ren_layer.setEnabled(self.layer_list.currentItem() is not None)
+        )        
 
         # --- FORÇA A SINCRONIA INICIAL ---
         # Faz o quadrado branco (1000x1000) se transformar no retângulo exato ditado pelas caixas (100x150mm) a 300 DPI
@@ -1070,20 +1081,43 @@ class EditorWindow(QMainWindow):
         self.refresh_layer_list()
         self.save_snapshot()
 
-    def rename_layer(self, list_item):
-        """Abre um popup para renomear a camada com duplo clique."""
+    def rename_layer(self, list_item=None):
+        """Abre a janela de renomeação e preserva a seleção após o refresh."""
+        if list_item is None or isinstance(list_item, bool):
+            list_item = self.layer_list.currentItem()
+            
+        if not list_item:
+            return
+
         item = list_item.data(Qt.ItemDataRole.UserRole)
-        
-        # Ignora se for cabeçalho vazio
         if not item:
             return
-            
-        current_name = self._generate_layer_name(item.layer_id, item)
-        new_name, ok = QInputDialog.getText(self, "Renomear Camada", "Novo nome para a camada:", text=current_name)
+
+        # 1. Guardar o ID da camada selecionada para recuperar depois
+        selected_id = getattr(item, 'layer_id', None)
+
+        current_name = self._generate_layer_name(selected_id, item)
+        new_name, ok = QInputDialog.getText(
+            self, "Renomear Camada", 
+            "Novo nome para a camada:", 
+            text=current_name
+        )
         
         if ok and new_name.strip():
             item.custom_name = new_name.strip()
+            
+            # 2. Atualizar a lista (isso limpa a seleção)
             self.refresh_layer_list()
+            
+            # 3. Recuperar a seleção automaticamente
+            if selected_id is not None:
+                for i in range(self.layer_list.count()):
+                    li = self.layer_list.item(i)
+                    obj = li.data(Qt.ItemDataRole.UserRole)
+                    if obj and getattr(obj, 'layer_id', None) == selected_id:
+                        self.layer_list.setCurrentItem(li)
+                        break
+            
             self.sync_placeholders_list()
             self.save_snapshot()
 
@@ -1567,6 +1601,13 @@ class EditorWindow(QMainWindow):
         self.btn_redo.setEnabled(False)
         self.btn_redo.clicked.connect(self.redo)
 
+        self.btn_ren_layer = QPushButton("✏️")
+        self.btn_ren_layer.setToolTip("Renomear Selecionado (F2)")
+        self.btn_ren_layer.setFixedSize(32, 30)
+        self.btn_ren_layer.setStyleSheet(btn_style)
+        self.btn_ren_layer.setEnabled(False) # <--- Começa desativado
+        self.btn_ren_layer.clicked.connect(lambda: self.rename_layer())
+
         self.btn_dup_layer = QPushButton("📑")
         self.btn_dup_layer.setToolTip("Duplicar Selecionado (Ctrl+J)")
         self.btn_dup_layer.setFixedSize(32, 30)
@@ -1582,6 +1623,7 @@ class EditorWindow(QMainWindow):
         layout.addWidget(self.btn_undo)
         layout.addWidget(self.btn_redo)
         layout.addStretch() # Empurra os próximos botões para a direita
+        layout.addWidget(self.btn_ren_layer) # <- NOVO BOTÃO AQUI
         layout.addWidget(self.btn_dup_layer)
         layout.addWidget(self.btn_del_layer)
 
