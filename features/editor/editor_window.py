@@ -17,8 +17,18 @@ from core.template_manager import slugify_model_name
 from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 
+
+
+
 class EditorWindow(QMainWindow):
     modelSaved = Signal(str, list)
+
+    def _apply_tooltip(self, widget, text):
+        """Aplica tooltip e garante que labels estáticos capturem o evento no motor customizado."""
+        if isinstance(widget, QLabel):
+            widget.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        widget.setToolTip(text)
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Editor Visual de Modelo (Gerador de Cartões em Lote - GCL)")
@@ -37,6 +47,10 @@ class EditorWindow(QMainWindow):
         ly_guides = QVBoxLayout(grp_guides)
         ly_guides.setContentsMargins(0, 0, 0, 10)
         lbl_guides = QLabel("<b>LINHAS GUIA</b> <small style='color:gray'>(Duplo clique p/ editar)</small>")
+        self._apply_tooltip(lbl_guides, 
+            "- Estas linhas ajudam a alinhar elementos na tela e possuem magnetismo (atraem o centro dos objetos).<br>"
+            "- Elas aparecem apenas no editor como auxílio e <b>não saem no modelo final</b>.<br>"
+            "- Todas as guias desaparecem ao fechar esta janela.")
         ly_guides.addWidget(lbl_guides)
         
         row_guides = QHBoxLayout()
@@ -55,7 +69,9 @@ class EditorWindow(QMainWindow):
         grp_boxes = QFrame()
         ly_boxes = QVBoxLayout(grp_boxes)
         ly_boxes.setContentsMargins(0, 0, 0, 10)
-        ly_boxes.addWidget(QLabel("<b>ELEMENTOS</b>"))
+        lbl_elements = QLabel("<b>ELEMENTOS</b>")
+        self._apply_tooltip(lbl_elements, "Botões para adicionar novos componentes (Textos, Imagens, Assinaturas ou Fundo) ao seu modelo.")
+        ly_boxes.addWidget(lbl_elements)
         
         self.btn_add_sig = QPushButton("✍️ Assinatura")
         self.btn_add_sig.setMinimumHeight(35)
@@ -80,6 +96,7 @@ class EditorWindow(QMainWindow):
         self._add_separator(left_layout)
 
         lbl_layers = QLabel("<b>CAMADAS</b>")
+        self._apply_tooltip(lbl_layers, "Lista de todos os objetos na tela. A ordem define a sobreposição (quem fica na frente de quem).")
         left_layout.addWidget(lbl_layers)
 
         # Barra de Ferramentas Auxiliar de Camadas (Undo, Redo, Dup, Del)
@@ -143,7 +160,9 @@ class EditorWindow(QMainWindow):
         ly_pos = QVBoxLayout(col_pos)
         ly_pos.setContentsMargins(0, 0, 0, 0)
         ly_pos.setSpacing(5)
-        ly_pos.addWidget(QLabel("<b>POSIÇÃO (mm)</b>"))
+        lbl_pos = QLabel("<b>POSIÇÃO (mm)</b>")
+        self._apply_tooltip(lbl_pos, "Coordenadas exatas do elemento no papel. X é a distância da borda esquerda e Y é a distância do topo.")
+        ly_pos.addWidget(lbl_pos)
         
         form_pos = QFormLayout()
         form_pos.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
@@ -177,7 +196,9 @@ class EditorWindow(QMainWindow):
         ly_dim = QVBoxLayout(col_dim)
         ly_dim.setContentsMargins(0, 0, 0, 0)
         ly_dim.setSpacing(5)
-        ly_dim.addWidget(QLabel("<b>DOCUMENTO (mm)</b>"))
+        lbl_dim = QLabel("<b>DOCUMENTO (mm)</b>")
+        self._apply_tooltip(lbl_dim, "Aqui você define o tamanho nativo do arquivo gerado. Os arquivos individuais serão gerados nesta exata dimensão a 300 DPI.")
+        ly_dim.addWidget(lbl_dim)
         
         form_dim = QFormLayout()
         form_dim.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
@@ -237,6 +258,7 @@ class EditorWindow(QMainWindow):
         ly_cols_compact.setSpacing(2)
         
         lbl_cols = QLabel("<b>ORDEM NA TABELA</b>")
+        self._apply_tooltip(lbl_cols, "Arraste os itens para definir em qual ordem as colunas de preenchimento aparecerão na tabela da janela principal.")
         ly_cols_compact.addWidget(lbl_cols)
 
         self.lst_placeholders = QListWidget()
@@ -1259,6 +1281,7 @@ class EditorWindow(QMainWindow):
                 btn_vis.setFixedSize(24, 24)
                 btn_vis.setStyleSheet("border: none; background: transparent; font-size: 14px;")
                 btn_vis.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn_vis.setToolTip("Exibe ou oculta o elemento no canvas. Itens ocultos permanecem no projeto, mas não serão renderizados na geração final.")
                 
                 effect_vis = QGraphicsOpacityEffect()
                 is_visible = item.isVisible()
@@ -1280,6 +1303,7 @@ class EditorWindow(QMainWindow):
                 btn_lock.setFixedSize(24, 24)
                 btn_lock.setStyleSheet("border: none; background: transparent; font-size: 14px;")
                 btn_lock.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn_lock.setToolTip("Tranca o elemento na posição atual, impedindo que ele seja movido ou selecionado acidentalmente.")
                 
                 effect_lock = QGraphicsOpacityEffect()
                 effect_lock.setOpacity(1.0 if is_locked else 0.15) # Sincroniza com sua personalização

@@ -79,11 +79,14 @@ class CaixaDeTextoPanel(QWidget):
 
         self.spin_rot = QSpinBox()
         self.chk_proporcao = QCheckBox("Manter proporção")
+        self.chk_proporcao.setToolTip("Mantém a relação entre largura e altura ao redimensionar o objeto manualmente.")
         self.chk_proporcao.setChecked(True)
         self.chk_proporcao.toggled.connect(self.proportionToggled.emit)
         form.addRow("", self.chk_proporcao)
 
         self.chk_link = QCheckBox("Habilitar Link (PDF)")
+        self.chk_link.setToolTip("Transforma este elemento em uma área clicável no PDF final. "
+                                 "Ao clicar, o usuário será redirecionado para o link definido na tabela.")
         self.chk_link.setToolTip("Gera uma área clicável no arquivo PDF")
         self.chk_link.toggled.connect(self.linkToggled.emit)
         form.addRow("", self.chk_link)
@@ -99,6 +102,7 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
         form.addRow("Rot:", self.spin_rot)
         self.spin_opacity = QDoubleSpinBox()
+        self.spin_opacity.setToolTip("Define o nível de transparência do objeto (0 = invisível, 100 = totalmente opaco).")
         self.spin_opacity.setRange(0.0, 100.0)
         self.spin_opacity.setDecimals(0)
         self.spin_opacity.setSuffix(" %")
@@ -249,6 +253,7 @@ class EditorDeTextoPanel(QWidget):
         self.cbo_align.currentIndexChanged.connect(lambda idx: self.alignChanged.emit(self._align_map[idx]))
 
         self.cbo_valign = QComboBox()
+        self.cbo_valign.setToolTip("Define o alinhamento vertical do texto dentro da caixa (Topo, Centro ou Base).")
         self.cbo_valign.addItems(["Topo", "Meio", "Base"])
         self.cbo_valign.setToolTip("Alinhamento Vertical")
         self._valign_map = ["top", "center", "bottom"]
@@ -260,12 +265,16 @@ class EditorDeTextoPanel(QWidget):
 
         form_space = QFormLayout()
         self.spin_indent = QDoubleSpinBox()
+        self.spin_indent.setToolTip("Define o recuo da primeira linha do parágrafo. "
+                                    "Útil para criar margens internas sem mover a caixa de texto.")
         self.spin_indent.setRange(0, 500)
         self.spin_indent.setSuffix(" px")
         self.spin_indent.valueChanged.connect(self._on_indent_changed)
         form_space.addRow("Recuo 1ª:", self.spin_indent)
         
         self.spin_lh = QDoubleSpinBox()
+        self.spin_lh.setToolTip("Ajusta o espaçamento vertical entre as linhas (Entrelinha). "
+                                "Valores maiores aumentam o respiro entre os textos.")
         self.spin_lh.setRange(0.5, 5.0)
         self.spin_lh.setSingleStep(0.1)
         self.spin_lh.setValue(1.15)
