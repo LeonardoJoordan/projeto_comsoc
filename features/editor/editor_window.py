@@ -1376,6 +1376,8 @@ class EditorWindow(QMainWindow):
     def apply_scene_state(self, data: dict, is_undo_redo: bool = False):
         """Limpa a cena e recria tudo com base no dicionário fornecido."""
         # Salva qual layer estava selecionada antes de limpar
+        # Identifica o fundo atual antes de limpar a cena
+        old_bg = self.background_path
         selected_layer_id = None
         sel = self.scene.selectedItems()
         if sel and hasattr(sel[0], 'layer_id'):
@@ -1388,20 +1390,19 @@ class EditorWindow(QMainWindow):
         canvas_h = data.get("canvas_size", {}).get("h", 1000)
         self.scene.setSceneRect(0, 0, canvas_w, canvas_h)
 
-        # Se não for uma ação de undo/redo (ex: abrindo modelo novo), ajusta as pranchetas
-        if not is_undo_redo:
-            self.spin_phys_w.blockSignals(True)
-            self.spin_phys_h.blockSignals(True)
-            self.spin_phys_w.setValue(data.get("target_w_mm", 100.0))
-            self.spin_phys_h.setValue(data.get("target_h_mm", 150.0))
-            self.spin_phys_w.blockSignals(False)
-            self.spin_phys_h.blockSignals(False)
+        # Sincroniza os valores de milímetros na UI (Sempre ocorre, mesmo no Undo/Redo)
+        self.spin_phys_w.blockSignals(True)
+        self.spin_phys_h.blockSignals(True)
+        self.spin_phys_w.setValue(data.get("target_w_mm", 100.0))
+        self.spin_phys_h.setValue(data.get("target_h_mm", 150.0))
+        self.spin_phys_w.blockSignals(False)
+        self.spin_phys_h.blockSignals(False)
         
         self.fallback_bg = self.scene.addRect(0, 0, canvas_w, canvas_h, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
         self.fallback_bg.setZValue(-200)
         
-        if not is_undo_redo:
-            self._on_physical_size_changed()
+        # Atualiza as labels informativas e o rect de fundo
+        self._on_physical_size_changed()
 
         # Fundo
         bg_path_raw = data.get("background_path")
@@ -1554,6 +1555,10 @@ class EditorWindow(QMainWindow):
                 if getattr(item, 'layer_id', None) == selected_layer_id:
                     item.setSelected(True)
                     break
+
+        # Se for um Undo/Redo e o fundo mudou, reaplica o enquadramento (Zoom to Fit)
+        if is_undo_redo and old_bg != data.get("background_path"):
+            self._zoom_to_fit()
 
     def save_snapshot(self):
         """Dispara um salvamento na memória (chamado ao soltar o mouse ou terminar uma edição)."""
