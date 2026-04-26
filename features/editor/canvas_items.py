@@ -124,6 +124,15 @@ class Guideline(QGraphicsLineItem):
                         y = c
                         break
                 return QPointF(0, y)
+            
+        # --- Feedback visual: Muda apenas a cor quando selecionada ---
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            is_selected = bool(value)
+            color = "#ff9800" if is_selected else "#00bcd4"
+            
+            pen = QPen(QColor(color), 1, Qt.PenStyle.DashLine)
+            pen.setCosmetic(True)
+            self.setPen(pen)
                 
         return super().itemChange(change, value)
 

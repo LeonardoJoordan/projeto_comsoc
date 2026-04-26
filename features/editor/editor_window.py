@@ -55,7 +55,6 @@ class EditorWindow(QMainWindow):
         self._apply_tooltip(lbl_guides, 
             "<b>LINHAS GUIA</b><br><br>"
             "Ferramentas de apoio visual projetadas para auxiliar no posicionamento e simetria dos elementos na prancheta.<br><br>"
-            "<b>Como funcionam:</b><br>"
             "• <b>Apenas Referência:</b> São guias exclusivas do editor e <b>não aparecem na arte final</b> impressa.<br>"
             "• <b>Atração (Snap):</b> Possuem magnetismo automático para o centro e para as bordas do canvas.<br>"
             "• <b>Controle Total:</b> Podem ser ocultadas (👁️) ou bloqueadas (🔒) para não atrapalhar a edição de outros itens.<br><br>"
