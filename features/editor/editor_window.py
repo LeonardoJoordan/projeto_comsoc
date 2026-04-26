@@ -50,8 +50,17 @@ class EditorWindow(QMainWindow):
         row_title_guides = QHBoxLayout()
         row_title_guides.setContentsMargins(0, 10, 0, 0)
         
-        lbl_guides = QLabel("<b>LINHAS GUIA</b>")
+        lbl_guides = QLabel("LINHAS GUIA")
         lbl_guides.setStyleSheet("font-weight: bold; font-size: 12px;")
+        self._apply_tooltip(lbl_guides, 
+            "<b>LINHAS GUIA</b><br><br>"
+            "Ferramentas de apoio visual projetadas para auxiliar no posicionamento e simetria dos elementos na prancheta.<br><br>"
+            "<b>Como funcionam:</b><br>"
+            "• <b>Apenas Referência:</b> São guias exclusivas do editor e <b>não aparecem na arte final</b> impressa.<br>"
+            "• <b>Atração (Snap):</b> Possuem magnetismo automático para o centro e para as bordas do canvas.<br>"
+            "• <b>Controle Total:</b> Podem ser ocultadas (👁️) ou bloqueadas (🔒) para não atrapalhar a edição de outros itens.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Selecione uma linha guia e digite o valor exato no painel 'POSIÇÃO (mm)' para obter um alinhamento milimétrico perfeito.</small>"
+        )
         
         # Estilo minimalista para os botões do título (sem borda, fundo transparente)
         btn_icon_style = """
@@ -65,7 +74,11 @@ class EditorWindow(QMainWindow):
         self.btn_toggle_guides.setStyleSheet(btn_icon_style)
         self.btn_toggle_guides.setCheckable(True)
         self.btn_toggle_guides.setChecked(True)
-        self._apply_tooltip(self.btn_toggle_guides, "<b>MOSTRAR/OCULTAR GUIAS</b><br><br>Alterna a visibilidade de todas as linhas guia.")
+        self._apply_tooltip(self.btn_toggle_guides, 
+            "<b>MOSTRAR/OCULTAR GUIAS</b><br><br>"
+            "Alterna temporariamente a visibilidade de todas as linhas guia.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Desligue as guias rapidamente para ter uma visão limpa da arte e conferir o design sem poluição visual.</small>"
+        )
         self.btn_toggle_guides.toggled.connect(self.toggle_guides_visibility)
         # Efeito de opacidade para o olho
         self.op_eye = QGraphicsOpacityEffect(self.btn_toggle_guides)
@@ -75,14 +88,22 @@ class EditorWindow(QMainWindow):
         self.btn_clear_guides = QPushButton("🗑️")
         self.btn_clear_guides.setFixedSize(26, 26)
         self.btn_clear_guides.setStyleSheet(btn_icon_style)
-        self._apply_tooltip(self.btn_clear_guides, "<b>LIMPAR TODAS AS GUIAS</b><br><br>Remove permanentemente todas as linhas guia do modelo atual.")
+        self._apply_tooltip(self.btn_clear_guides, 
+            "<b>LIMPAR TODAS AS GUIAS</b><br><br>"
+            "Remove permanentemente todas as linhas guia do modelo atual.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Excelente para fazer uma limpeza rápida quando você decide mudar o design completamente.</small>"
+        )
         self.btn_clear_guides.clicked.connect(self.clear_all_guides)
 
         self.btn_lock_guides = QPushButton("🔓")
         self.btn_lock_guides.setFixedSize(26, 26)
         self.btn_lock_guides.setStyleSheet(btn_icon_style)
         self.btn_lock_guides.setCheckable(True)
-        self._apply_tooltip(self.btn_lock_guides, "<b>BLOQUEAR/DESBLOQUEAR GUIAS</b><br><br>Impede que as linhas guia sejam movidas ou selecionadas acidentalmente.")
+        self._apply_tooltip(self.btn_lock_guides, 
+            "<b>BLOQUEAR/DESBLOQUEAR GUIAS</b><br><br>"
+            "Impede que as linhas guia sejam movidas ou selecionadas acidentalmente.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Ative o cadeado após posicionar suas linhas para evitar esbarrões enquanto edita os textos e imagens.</small>"
+        )
         self.btn_lock_guides.toggled.connect(self.toggle_guides_lock)
         # Efeito de opacidade para o cadeado
         self.op_lock = QGraphicsOpacityEffect(self.btn_lock_guides)
