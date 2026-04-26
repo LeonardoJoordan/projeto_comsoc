@@ -47,10 +47,14 @@ class EditorWindow(QMainWindow):
         ly_guides = QVBoxLayout(grp_guides)
         ly_guides.setContentsMargins(0, 0, 0, 10)
         lbl_guides = QLabel("<b>LINHAS GUIA</b> <small style='color:gray'>(Duplo clique p/ editar)</small>")
+        # Teste de implementação: Linha Guia
         self._apply_tooltip(lbl_guides, 
-            "- Estas linhas ajudam a alinhar elementos na tela e possuem magnetismo (atraem o centro dos objetos).<br>"
-            "- Elas aparecem apenas no editor como auxílio e <b>não saem no modelo final</b>.<br>"
-            "- Todas as guias desaparecem ao fechar esta janela.")
+            "<b>LINHAS GUIA</b><br><br>"
+            "Linhas de suporte visual que auxiliam na estruturação do design:<br>"
+            "• <b>Magnetismo:</b> Atrai o centro dos objetos para garantir um alinhamento simétrico.<br>"
+            "• <b>Privacidade:</b> Servem apenas como guia e não aparecem na exportação final (PNG/PDF).<br>"
+            "• <b>Temporárias:</b> São descartadas automaticamente ao fechar o editor.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Para um ajuste milimétrico, selecione a linha guia e digite o valor exato no painel de POSIÇÃO (mm).</small>")
         ly_guides.addWidget(lbl_guides)
         
         row_guides = QHBoxLayout()
@@ -70,33 +74,66 @@ class EditorWindow(QMainWindow):
         ly_boxes = QVBoxLayout(grp_boxes)
         ly_boxes.setContentsMargins(0, 0, 0, 10)
         lbl_elements = QLabel("<b>ELEMENTOS</b>")
-        self._apply_tooltip(lbl_elements, "Botões para adicionar novos componentes (Textos, Imagens, Assinaturas ou Fundo) ao seu modelo.")
+        self._apply_tooltip(lbl_elements, 
+            "<b>CONSTRUTOR DE LAYOUT</b><br><br>"
+            "Conjunto de ferramentas essenciais para estruturar o design do seu modelo.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Todo elemento adicionado surge inicialmente centralizado na prancheta. Arraste-os para compor sua arte.</small>")
         ly_boxes.addWidget(lbl_elements)
         
         self.btn_add_sig = QPushButton("✍️ Assinatura")
         self.btn_add_sig.setMinimumHeight(35)
         self.btn_add_sig.clicked.connect(self._on_click_add_signature)
+        self.btn_add_sig.setToolTip(
+            "<b>ASSINATURA DIGITAL</b><br><br>"
+            "Adiciona uma assinatura para documentos ou cartões destinados ao envio por mídias digitais:<br>"
+            "• <b>Recomendação:</b> Utilize arquivos .PNG com fundo transparente para garantir que a assinatura flutue naturalmente sobre o design do cartão.<br>"
+            "• <b>Tabela Inteligente:</b> Modelos com este elemento ganham uma coluna especial ('✍️ Ass.') na tabela de dados.<br>"
+            "• <b>Controle Seletivo:</b> Permite indicar, linha por linha, se o documento final receberá ou não a assinatura carimbada.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Utilize para carimbar mensagens manuscritas digitalizadas (com fundo transparente) em destinatários específicos. Isso permite que o Comandante/Chefe/Diretor inclua notas pessoais e exclusivas em meio a um lote padrão de cartões, sem precisar alterar o modelo original.</small>")
         ly_boxes.addWidget(self.btn_add_sig)
 
         self.btn_add = QPushButton("📝 Caixa de Texto")
         self.btn_add.setMinimumHeight(35)
         self.btn_add.clicked.connect(self.add_new_box)
+        self.btn_add.setToolTip(
+            "<b>TEXTO DINÂMICO</b><br><br>"
+            "Cria áreas que serão preenchidas automaticamente com as informações da sua tabela (ex: {Nome}):<br>"
+            "• <b>Delimitação:</b> A largura da caixa trava o alinhamento, mas o conteúdo pode expandir verticalmente caso o texto seja muito longo.<br>"
+            "• <b>Formatação:</b> Suporta estilos individuais de fontes, cores e recuos por caixa.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Configure o alinhamento vertical como 'Meio' para que nomes curtos ou longos fiquem sempre bem centralizados na moldura.</small>")
         ly_boxes.addWidget(self.btn_add)
 
         self.btn_add_img = QPushButton("📸 Imagem")
         self.btn_add_img.setMinimumHeight(35)
         self.btn_add_img.clicked.connect(self._on_click_add_image)
+        self.btn_add_img.setToolTip(
+            "<b>ELEMENTOS VISUAIS</b><br><br>"
+            "Insere ícones, fotos, selos ou mapas para personalização e identidade visual:<br>"
+            "• <b>Interatividade:</b> É possível ativar links clicáveis para criar cartões interativos no formato PDF.<br>"
+            "• <b>Versatilidade:</b> Ideal para incluir botões de ação, logotipos ou QR Codes estáticos.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Transforme logos de redes sociais em links diretos para criar cartões de visita digitais interativos.</small>")
         ly_boxes.addWidget(self.btn_add_img)
 
         self.btn_add_bg = QPushButton("🖼️ Fundo")
         self.btn_add_bg.setMinimumHeight(35)
         self.btn_add_bg.clicked.connect(self._on_click_load_bg)
+        self.btn_add_bg.setToolTip(
+            "<b>IMAGEM DE FUNDO</b><br><br>"
+            "Define a base gráfica e as dimensões estruturais (alma) do seu documento:<br>"
+            "• <b>Criação Externa:</b> Recomenda-se criar a base em programas especializados (Photoshop, Corel, Gimp ou Inkscape).<br>"
+            "• <b>Auto-ajuste:</b> As dimensões da imagem importada definem automaticamente o tamanho do documento (cartão, diploma, prisma ou etiquetas).<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Exporte seu fundo em 300 DPI para garantir que a impressão saia com nitidez máxima e cores fiéis ao design original.</small>")
         ly_boxes.addWidget(self.btn_add_bg)
         left_layout.addWidget(grp_boxes)
         self._add_separator(left_layout)
 
         lbl_layers = QLabel("<b>CAMADAS</b>")
-        self._apply_tooltip(lbl_layers, "Lista de todos os objetos na tela. A ordem define a sobreposição (quem fica na frente de quem).")
+        self._apply_tooltip(lbl_layers, 
+            "<b>PAINEL DE CAMADAS</b><br><br>"
+            "Gerencia a sobreposição e o estado de todos os objetos do modelo:<br>"
+            "• <b>Hierarquia:</b> Itens no topo da lista cobrem visualmente os que estão abaixo.<br>"
+            "• <b>Categorias:</b> Assinaturas sempre sobrepõem Textos, que sobrepõem Imagens.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Você pode arrastar os itens na lista para reordená-los dentro da sua própria categoria.</small>")
         left_layout.addWidget(lbl_layers)
 
         # Barra de Ferramentas Auxiliar de Camadas (Undo, Redo, Dup, Del)
@@ -161,7 +198,12 @@ class EditorWindow(QMainWindow):
         ly_pos.setContentsMargins(0, 0, 0, 0)
         ly_pos.setSpacing(5)
         lbl_pos = QLabel("<b>POSIÇÃO (mm)</b>")
-        self._apply_tooltip(lbl_pos, "Coordenadas exatas do elemento no papel. X é a distância da borda esquerda e Y é a distância do topo.")
+        self._apply_tooltip(lbl_pos, 
+            "<b>COORDENADAS DO OBJETO</b><br><br>"
+            "Mostra e ajusta a posição exata do elemento selecionado no papel:<br>"
+            "• <b>Eixo X:</b> Distância horizontal a partir da borda esquerda.<br>"
+            "• <b>Eixo Y:</b> Distância vertical a partir do topo.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Utilize estes campos numéricos para fazer alinhamentos com precisão cirúrgica em vez de arrastar com o mouse.</small>")
         ly_pos.addWidget(lbl_pos)
         
         form_pos = QFormLayout()
@@ -197,7 +239,12 @@ class EditorWindow(QMainWindow):
         ly_dim.setContentsMargins(0, 0, 0, 0)
         ly_dim.setSpacing(5)
         lbl_dim = QLabel("<b>DOCUMENTO (mm)</b>")
-        self._apply_tooltip(lbl_dim, "Aqui você define o tamanho nativo do arquivo gerado. Os arquivos individuais serão gerados nesta exata dimensão a 300 DPI.")
+        self._apply_tooltip(lbl_dim, 
+            "<b>DIMENSÕES DO DOCUMENTO</b><br><br>"
+            "Define o tamanho físico real da arte final impressa ou exportada:<br>"
+            "• <b>Fidelidade:</b> O sistema gera os cartões mantendo 300 DPI exatos nesta medida.<br>"
+            "• <b>Prancheta:</b> Ajusta automaticamente a área branca de trabalho no editor.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Ao carregar uma imagem de fundo (Background), o documento se ajustará sozinho às proporções dela.</small>")
         ly_dim.addWidget(lbl_dim)
         
         form_dim = QFormLayout()
@@ -258,7 +305,12 @@ class EditorWindow(QMainWindow):
         ly_cols_compact.setSpacing(2)
         
         lbl_cols = QLabel("<b>ORDEM NA TABELA</b>")
-        self._apply_tooltip(lbl_cols, "Arraste os itens para definir em qual ordem as colunas de preenchimento aparecerão na tabela da janela principal.")
+        self._apply_tooltip(lbl_cols, 
+            "<b>ESTRUTURA DA PLANILHA</b><br><br>"
+            "Define a sequência visual das colunas na tela principal de geração:<br>"
+            "• <b>Mapeamento:</b> Lê as variáveis criadas nas caixas de texto e gera a lista.<br>"
+            "• <b>Reordenação:</b> Arraste os itens aqui para mudar a ordem de digitação depois.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Coloque as informações mais importantes (como Nome e Cargo) no topo da lista para acelerar o preenchimento.</small>")
         ly_cols_compact.addWidget(lbl_cols)
 
         self.lst_placeholders = QListWidget()
@@ -1281,7 +1333,11 @@ class EditorWindow(QMainWindow):
                 btn_vis.setFixedSize(24, 24)
                 btn_vis.setStyleSheet("border: none; background: transparent; font-size: 14px;")
                 btn_vis.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_vis.setToolTip("Exibe ou oculta o elemento no canvas. Itens ocultos permanecem no projeto, mas não serão renderizados na geração final.")
+                btn_vis.setToolTip(
+                    "<b>VISIBILIDADE DA CAMADA</b><br><br>"
+                    "Alterna a exibição do objeto atual no editor e na impressão:<br>"
+                    "• <b>Oculto:</b> O elemento fica transparente e NÃO sai no arquivo final.<br><br>"
+                    "<small style='color: #A0A0A0;'>Dica: Útil para esconder temporariamente elementos muito grandes enquanto você ajusta pequenos detalhes embaixo deles.</small>")
                 
                 effect_vis = QGraphicsOpacityEffect()
                 is_visible = item.isVisible()
@@ -1303,7 +1359,11 @@ class EditorWindow(QMainWindow):
                 btn_lock.setFixedSize(24, 24)
                 btn_lock.setStyleSheet("border: none; background: transparent; font-size: 14px;")
                 btn_lock.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn_lock.setToolTip("Tranca o elemento na posição atual, impedindo que ele seja movido ou selecionado acidentalmente.")
+                btn_lock.setToolTip(
+                    "<b>BLOQUEIO DE CAMADA</b><br><br>"
+                    "Protege o elemento selecionado contra edições acidentais:<br>"
+                    "• <b>Travado:</b> O item não pode ser clicado, movido ou apagado na tela.<br><br>"
+                    "<small style='color: #A0A0A0;'>Dica: Tranque o Fundo e as Imagens decorativas assim que posicioná-los. Isso facilita muito a seleção dos textos.</small>")
                 
                 effect_lock = QGraphicsOpacityEffect()
                 effect_lock.setOpacity(1.0 if is_locked else 0.15) # Sincroniza com sua personalização
@@ -1612,34 +1672,59 @@ class EditorWindow(QMainWindow):
         """
 
         self.btn_undo = QPushButton("↩️")
-        self.btn_undo.setToolTip("Desfazer (Ctrl+Z)")
+        self._apply_tooltip(self.btn_undo, 
+            "<b>DESFAZER</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: Ctrl + Z</small>"
+            "<br><br>"
+            "Reverte a última alteração realizada no seu modelo.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: O sistema armazena as últimas 30 ações, permitindo que você explore ideias sem medo de errar.</small>")
         self.btn_undo.setFixedSize(32, 30)
         self.btn_undo.setStyleSheet(btn_style)
         self.btn_undo.setEnabled(False)
         self.btn_undo.clicked.connect(self.undo)
 
         self.btn_redo = QPushButton("↪️")
-        self.btn_redo.setToolTip("Refazer (Ctrl+Y)")
+        self._apply_tooltip(self.btn_redo, 
+            "<b>REFAZER</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: Ctrl + Y</small>"
+            "<br><br>"
+            "Reaplica a última ação que foi desfeita anteriormente.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Útil para comparar rapidamente o 'antes e depois' de um ajuste fino no layout.</small>")
         self.btn_redo.setFixedSize(32, 30)
         self.btn_redo.setStyleSheet(btn_style)
         self.btn_redo.setEnabled(False)
         self.btn_redo.clicked.connect(self.redo)
 
         self.btn_ren_layer = QPushButton("✏️")
-        self.btn_ren_layer.setToolTip("Renomear Selecionado (F2)")
+        self._apply_tooltip(self.btn_ren_layer, 
+            "<b>RENOMEAR CAMADA</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: F2</small>"
+            "<br><br>"
+            "Altera o nome de identificação do objeto selecionado na lista de camadas.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Use nomes descritivos (ex: 'Logo Fundo') para organizar melhor projetos que possuem muitos elementos sobrepostos.</small>")
         self.btn_ren_layer.setFixedSize(32, 30)
         self.btn_ren_layer.setStyleSheet(btn_style)
         self.btn_ren_layer.setEnabled(False) # <--- Começa desativado
         self.btn_ren_layer.clicked.connect(lambda: self.rename_layer())
 
         self.btn_dup_layer = QPushButton("📑")
-        self.btn_dup_layer.setToolTip("Duplicar Selecionado (Ctrl+J)")
+        self._apply_tooltip(self.btn_dup_layer, 
+            "<b>DUPLICAR CAMADA</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: Ctrl + J</small>"
+            "<br><br>"
+            "Cria uma cópia exata do elemento selecionado, preservando todas as cores, fontes e tamanhos.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: A cópia é criada com um pequeno deslocamento. Ótimo para criar padrões repetitivos ou variações de uma mesma base.</small>")
         self.btn_dup_layer.setFixedSize(32, 30)
         self.btn_dup_layer.setStyleSheet(btn_style)
         self.btn_dup_layer.clicked.connect(self.duplicate_selected)
 
         self.btn_del_layer = QPushButton("🗑️")
-        self.btn_del_layer.setToolTip("Excluir Selecionado (Del)")
+        self._apply_tooltip(self.btn_del_layer, 
+            "<b>EXCLUIR CAMADA</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: Delete</small>"
+            "<br><br>"
+            "Remove permanentemente o objeto selecionado do seu modelo.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Se apagar algo por engano, utilize o botão DESFAZER ou Ctrl+Z imediatamente para recuperar o item.</small>")
         self.btn_del_layer.setFixedSize(32, 30)
         self.btn_del_layer.setStyleSheet(btn_style)
         self.btn_del_layer.clicked.connect(self.delete_selected_items)

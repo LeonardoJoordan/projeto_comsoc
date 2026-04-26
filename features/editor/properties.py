@@ -83,11 +83,20 @@ class CaixaDeTextoPanel(QWidget):
         self.chk_proporcao.setChecked(True)
         self.chk_proporcao.toggled.connect(self.proportionToggled.emit)
         form.addRow("", self.chk_proporcao)
+        self.chk_proporcao.setToolTip(
+            "<b>MANTER PROPORÇÃO</b><br><br>"
+            "Preserva a relação entre largura e altura durante o redimensionamento:<br>"
+            "• <b>Vínculo:</b> Ao alterar um valor, o outro é ajustado automaticamente.<br>"
+            "• <b>Integridade:</b> Evita que imagens e textos fiquem esticados ou deformados.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Desative apenas se precisar forçar uma dimensão específica ignorando o aspeto original.</small>")
 
         self.chk_link = QCheckBox("Habilitar Link (PDF)")
-        self.chk_link.setToolTip("Transforma este elemento em uma área clicável no PDF final. "
-                                 "Ao clicar, o usuário será redirecionado para o link definido na tabela.")
-        self.chk_link.setToolTip("Gera uma área clicável no arquivo PDF")
+        self.chk_link.setToolTip(
+            "<b>VÍNCULO ELETRÓNICO (URL)</b><br><br>"
+            "Cria uma área de interação no ficheiro exportado:<br>"
+            "• <b>Redirecionamento:</b> O PDF gerado terá um link clicável para o endereço da tabela.<br>"
+            "• <b>Exclusividade:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>")
         self.chk_link.toggled.connect(self.linkToggled.emit)
         form.addRow("", self.chk_link)
 
@@ -109,9 +118,18 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_opacity.setValue(100.0)
         self.spin_opacity.valueChanged.connect(lambda v: self.opacityChanged.emit(v / 100.0))
         form.addRow("Opac:", self.spin_opacity)
+        self.spin_opacity.setToolTip(
+            "<b>OPACIDADE</b><br><br>"
+            "Ajusta o nível de transparência do elemento (0% a 100%):<br>"
+            "• <b>Visibilidade:</b> Valores baixos tornam o objeto semitransparente.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Excelente para criar marcas d'água sutis ou sobrepor elementos sem esconder totalmente o fundo.</small>")
 
         self.btn_restore = QPushButton("🔄 Restaurar Original")
-        self.btn_restore.setToolTip("Restaura as dimensões originais e zera a rotação")
+        self.btn_restore.setToolTip(
+            "<b>RESTAURAR ORIGINAL</b><br><br>"
+            "Reverte o objeto ao seu estado inicial de importação:<br>"
+            "• <b>Reset:</b> Redefine o tamanho nativo e remove qualquer rotação aplicada.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>")
         self.btn_restore.clicked.connect(self.restoreRequested.emit)
         form.addRow("", self.btn_restore)
 
@@ -237,7 +255,10 @@ class EditorDeTextoPanel(QWidget):
 
         self.btn_color = QPushButton("")
         self.btn_color.setFixedWidth(30)
-        self.btn_color.setToolTip("Cor do Texto")
+        self.btn_color.setToolTip(
+            "<b>COR DO TEXTO</b><br><br>"
+            "Abre a paleta de cores para personalizar o texto ou a seleção atual.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Procure manter um alto contraste com o fundo para garantir a legibilidade após a impressão.</small>")
         self.btn_color.setStyleSheet("background-color: #000000; border: 1px solid #aaa; border-radius: 3px;")
         self.btn_color.clicked.connect(self._choose_color)
 
@@ -248,14 +269,21 @@ class EditorDeTextoPanel(QWidget):
         
         self.cbo_align = QComboBox()
         self.cbo_align.addItems(["Esq", "Cen", "Dir", "Just"])
-        self.cbo_align.setToolTip("Alinhamento Horizontal")
+        self.cbo_align.setToolTip(
+            "<b>ALINHAMENTO HORIZONTAL</b><br><br>"
+            "Define a posição do texto em relação às laterais da caixa:<br>"
+            "• <b>Justificado:</b> Distribui o texto para preencher toda a largura da moldura.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: O alinhamento justificado cria margens retas e profissionais em blocos de texto mais densos.</small>")
         self._align_map = ["left", "center", "right", "justify"]
         self.cbo_align.currentIndexChanged.connect(lambda idx: self.alignChanged.emit(self._align_map[idx]))
 
         self.cbo_valign = QComboBox()
-        self.cbo_valign.setToolTip("Define o alinhamento vertical do texto dentro da caixa (Topo, Centro ou Base).")
         self.cbo_valign.addItems(["Topo", "Meio", "Base"])
-        self.cbo_valign.setToolTip("Alinhamento Vertical")
+        self.cbo_valign.setToolTip(
+            "<b>ALINHAMENTO VERTICAL</b><br><br>"
+            "Posiciona o conteúdo verticalmente dentro da moldura da caixa:<br>"
+            "• <b>Ancoragem:</b> Fixa o texto no Topo, no Meio ou na Base da caixa.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Combine o alinhamento 'Meio' com uma caixa alta para garantir que nomes e cargos fiquem sempre centralizados.</small>")
         self._valign_map = ["top", "center", "bottom"]
         self.cbo_valign.currentIndexChanged.connect(lambda idx: self.verticalAlignChanged.emit(self._valign_map[idx]))
 
@@ -265,21 +293,27 @@ class EditorDeTextoPanel(QWidget):
 
         form_space = QFormLayout()
         self.spin_indent = QDoubleSpinBox()
-        self.spin_indent.setToolTip("Define o recuo da primeira linha do parágrafo. "
-                                    "Útil para criar margens internas sem mover a caixa de texto.")
         self.spin_indent.setRange(0, 500)
         self.spin_indent.setSuffix(" px")
         self.spin_indent.valueChanged.connect(self._on_indent_changed)
         form_space.addRow("Recuo 1ª:", self.spin_indent)
+        self.spin_indent.setToolTip(
+            "<b>RECUO DA PRIMEIRA LINHA</b><br><br>"
+            "Define o recuo horizontal inicial do bloco de texto:<br>"
+            "• <b>Organização:</b> Cria o efeito visual de parágrafo sem a necessidade de espaços manuais.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Um recuo entre 20 e 40px costuma ser o ideal para dar um aspeto elegante a convites e documentos.</small>")
         
         self.spin_lh = QDoubleSpinBox()
-        self.spin_lh.setToolTip("Ajusta o espaçamento vertical entre as linhas (Entrelinha). "
-                                "Valores maiores aumentam o respiro entre os textos.")
         self.spin_lh.setRange(0.5, 5.0)
         self.spin_lh.setSingleStep(0.1)
         self.spin_lh.setValue(1.15)
         self.spin_lh.valueChanged.connect(lambda val: self.lineHeightChanged.emit(val))
         form_space.addRow("Entrelinha:", self.spin_lh)
+        self.spin_lh.setToolTip(
+            "<b>ENTRELINHA (LINE HEIGHT)</b><br><br>"
+            "Controla a distância vertical entre as linhas de um parágrafo:<br>"
+            "• <b>Legibilidade:</b> Valores maiores facilitam a leitura; valores menores compactam o texto.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: O valor 1.15 é o padrão para leitura confortável. Use 1.0 para listas compactas ou 1.5 para designs artísticos.</small>")
         
         layout.addLayout(form_space)
         layout.addStretch()
@@ -451,7 +485,11 @@ class AssinaturaPanel(QWidget):
         self.spin_size = QSpinBox()
         self.spin_size.setRange(10, 2000)
         self.spin_size.setSuffix(" px")
-        self.spin_size.setToolTip("Define o tamanho do maior lado (largura ou altura)")
+        self.spin_size.setToolTip(
+            "<b>DIMENSIONAMENTO PROPORCIONAL</b><br><br>"
+            "Ajusta o tamanho do objeto baseando-se no seu lado mais comprido:<br>"
+            "• <b>Automático:</b> A largura e altura são calculadas para evitar distorções na imagem.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Utilize este campo para garantir que todas as assinaturas do projeto mantenham uma escala uniforme.</small>")
         self.spin_size.valueChanged.connect(self.sideChanged.emit)
         
         form.addRow("Lado Maior:", self.spin_size)
