@@ -63,8 +63,23 @@ class EditorWindow(QMainWindow):
         btn_guide_v.clicked.connect(lambda: self.add_guide(vertical=True))
         btn_guide_h = QPushButton("Horizontal (—)")
         btn_guide_h.clicked.connect(lambda: self.add_guide(vertical=False))
+        
+        self.btn_toggle_guides = QPushButton("👁️")
+        self.btn_toggle_guides.setFixedWidth(35)
+        self.btn_toggle_guides.setCheckable(True)
+        self.btn_toggle_guides.setChecked(True)
+        self._apply_tooltip(self.btn_toggle_guides, "<b>MOSTRAR/OCULTAR GUIAS</b><br><br>Alterna a visibilidade de todas as linhas guia da cena simultaneamente.")
+        self.btn_toggle_guides.toggled.connect(self.toggle_guides_visibility)
+        
+        self.btn_clear_guides = QPushButton("🗑️")
+        self.btn_clear_guides.setFixedWidth(35)
+        self._apply_tooltip(self.btn_clear_guides, "<b>LIMPAR TODAS AS GUIAS</b><br><br>Remove permanentemente todas as linhas guia do modelo atual.")
+        self.btn_clear_guides.clicked.connect(self.clear_all_guides)
+
         row_guides.addWidget(btn_guide_v)
         row_guides.addWidget(btn_guide_h)
+        row_guides.addWidget(self.btn_toggle_guides)
+        row_guides.addWidget(self.btn_clear_guides)
         ly_guides.addLayout(row_guides)
         left_layout.addWidget(grp_guides)
         self._add_separator(left_layout)
@@ -605,7 +620,26 @@ class EditorWindow(QMainWindow):
             pos = rect.width() / 2
         else:
             pos = rect.height() / 2
-        self.scene.addItem(Guideline(pos, is_vertical=vertical))
+        guide = Guideline(pos, is_vertical=vertical)
+        # Respeita o estado atual do botão de visibilidade ao criar nova guia
+        guide.setVisible(self.btn_toggle_guides.isChecked())
+        self.scene.addItem(guide)
+        self.save_snapshot()
+
+    def toggle_guides_visibility(self, checked):
+        for item in self.scene.items():
+            if isinstance(item, Guideline):
+                item.setVisible(checked)
+        self.save_snapshot()
+
+    def clear_all_guides(self):
+        removed = False
+        for item in self.scene.items():
+            if isinstance(item, Guideline):
+                self.scene.removeItem(item)
+                removed = True
+        if removed:
+            self.save_snapshot()
 
     def duplicate_selected(self):
         original = self._get_selected()
@@ -1150,9 +1184,17 @@ class EditorWindow(QMainWindow):
         boxes_data = []
         signatures_data = []
         images_data = []
+        guidelines_data = []
         
         for item in self.scene.items():
-            if isinstance(item, DesignerBox):
+            if isinstance(item, Guideline):
+                guidelines_data.append({
+                    "pos": round(float(item.pos().x() if item.is_vertical else item.pos().y()), 2),
+                    "vertical": item.is_vertical,
+                    "visible": item.isVisible()
+                })
+            
+            elif isinstance(item, DesignerBox):
                 pos = item.pos()
                 r = item.rect()
                 boxes_data.append({
@@ -1230,7 +1272,8 @@ class EditorWindow(QMainWindow):
             "placeholders": ordered_placeholders,
             "signatures": signatures_data,
             "images": images_data,
-            "boxes": boxes_data
+            "boxes": boxes_data,
+            "guidelines": guidelines_data
         }
         
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
@@ -1385,10 +1428,18 @@ class EditorWindow(QMainWindow):
             box.setZValue(b.get("z_value", 101))
             box.setVisible(b.get("visible", True))
             box.setOpacity(b.get("opacity", 1.0))
-            if b.get("locked", False):
-                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-                box.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            # Linhas Guia
+            guides_data = data.get("guidelines", [])
+            for g in guides_data:
+                guide = Guideline(g["pos"], is_vertical=g.get("vertical", True))
+                guide.setVisible(g.get("visible", True))
+                self.scene.addItem(guide)
+                
+            if guides_data:
+                # Sincroniza o botão visual com o estado da primeira guia carregada
+                self.btn_toggle_guides.blockSignals(True)
+                self.btn_toggle_guides.setChecked(guides_data[0].get("visible", True))
+                self.btn_toggle_guides.blockSignals(False)
 
         # Atualiza Placeholders e Lista de Camadas
         saved_placeholders = data.get("placeholders", [])
