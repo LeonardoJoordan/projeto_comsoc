@@ -1,7 +1,8 @@
 import re
 from pathlib import Path
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem,
-                               QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem)
+                               QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem,
+                               QStyle)
 from PySide6.QtCore import Qt, QPointF
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
@@ -96,6 +97,10 @@ class Guideline(QGraphicsLineItem):
         stroker = QPainterPathStroker()
         stroker.setWidth(10) 
         return stroker.createStroke(path)
+    
+    def paint(self, painter, option, widget=None):
+        option.state &= ~QStyle.StateFlag.State_Selected
+        super().paint(painter, option, widget)
     
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
