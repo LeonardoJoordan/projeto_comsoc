@@ -46,7 +46,7 @@ class EditorWindow(QMainWindow):
         grp_guides = QFrame()
         ly_guides = QVBoxLayout(grp_guides)
         ly_guides.setContentsMargins(0, 0, 0, 10)
-        lbl_guides = QLabel("<b>LINHAS GUIA</b> <small style='color:gray'>(Duplo clique p/ editar)</small>")
+        lbl_guides = QLabel("<b>LINHAS GUIA</b>")
         # Teste de implementação: Linha Guia
         self._apply_tooltip(lbl_guides, 
             "<b>LINHAS GUIA</b><br><br>"
