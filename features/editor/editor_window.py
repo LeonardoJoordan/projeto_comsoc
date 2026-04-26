@@ -16,6 +16,7 @@ from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
 from core.template_manager import slugify_model_name
 from core.history_manager import HistoryManager
 from core.paths import get_models_dir
+from core.custom_widgets import MathDoubleSpinBox
 
 
 
@@ -158,7 +159,7 @@ class EditorWindow(QMainWindow):
         self.btn_add_sig.clicked.connect(self._on_click_add_signature)
         self.btn_add_sig.setToolTip(
             "<b>ASSINATURA DIGITAL</b><br><br>"
-            "Adiciona uma assinatura para documentos ou cartões destinados ao envio por mídias digitais:<br>"
+            "Adiciona uma assinatura para documentos ou cartões destinados ao envio por mídias digitais:<br><br>"
             "• <b>Recomendação:</b> Utilize arquivos .PNG com fundo transparente para garantir que a assinatura flutue naturalmente sobre o design do cartão.<br>"
             "• <b>Tabela Inteligente:</b> Modelos com este elemento ganham uma coluna especial ('✍️ Ass.') na tabela de dados.<br>"
             "• <b>Controle Seletivo:</b> Permite indicar, linha por linha, se o documento final receberá ou não a assinatura carimbada.<br><br>"
@@ -170,7 +171,7 @@ class EditorWindow(QMainWindow):
         self.btn_add.clicked.connect(self.add_new_box)
         self.btn_add.setToolTip(
             "<b>TEXTO DINÂMICO</b><br><br>"
-            "Cria áreas que serão preenchidas automaticamente com as informações da sua tabela (ex: {Nome}):<br>"
+            "Cria áreas que serão preenchidas automaticamente com os dados da sua tabela (ex: {Nome}):<br><br>"
             "• <b>Delimitação:</b> A largura da caixa trava o alinhamento, mas o conteúdo pode expandir verticalmente caso o texto seja muito longo.<br>"
             "• <b>Formatação:</b> Suporta estilos individuais de fontes, cores e recuos por caixa.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Configure o alinhamento vertical como 'Meio' para que nomes curtos ou longos fiquem sempre bem centralizados na moldura.</small>")
@@ -181,7 +182,7 @@ class EditorWindow(QMainWindow):
         self.btn_add_img.clicked.connect(self._on_click_add_image)
         self.btn_add_img.setToolTip(
             "<b>ELEMENTOS VISUAIS</b><br><br>"
-            "Insere ícones, fotos, selos ou mapas para personalização e identidade visual:<br>"
+            "Insere ícones, fotos, selos ou mapas para personalização e identidade visual:<br><br>"
             "• <b>Interatividade:</b> É possível ativar links clicáveis para criar cartões interativos no formato PDF.<br>"
             "• <b>Versatilidade:</b> Ideal para incluir botões de ação, logotipos ou QR Codes estáticos.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Transforme logos de redes sociais em links diretos para criar cartões de visita digitais interativos.</small>")
@@ -192,7 +193,7 @@ class EditorWindow(QMainWindow):
         self.btn_add_bg.clicked.connect(self._on_click_load_bg)
         self.btn_add_bg.setToolTip(
             "<b>IMAGEM DE FUNDO</b><br><br>"
-            "Define a base gráfica e as dimensões estruturais (alma) do seu documento:<br>"
+            "Define a base gráfica e as dimensões estruturais (alma) do seu documento:<br><br>"
             "• <b>Criação Externa:</b> Recomenda-se criar a base em programas especializados (Photoshop, Corel, Gimp ou Inkscape).<br>"
             "• <b>Auto-ajuste:</b> As dimensões da imagem importada definem automaticamente o tamanho do documento (cartão, diploma, prisma ou etiquetas).<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Exporte seu fundo em 300 DPI para garantir que a impressão saia com nitidez máxima e cores fiéis ao design original.</small>")
@@ -203,7 +204,7 @@ class EditorWindow(QMainWindow):
         lbl_layers = QLabel("<b>CAMADAS</b>")
         self._apply_tooltip(lbl_layers, 
             "<b>PAINEL DE CAMADAS</b><br><br>"
-            "Gerencia a sobreposição e o estado de todos os objetos do modelo:<br>"
+            "Gerencia a sobreposição e o estado de todos os objetos do modelo:<br><br>"
             "• <b>Hierarquia:</b> Itens no topo da lista cobrem visualmente os que estão abaixo.<br>"
             "• <b>Categorias:</b> Assinaturas sempre sobrepõem Textos, que sobrepõem Imagens.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Você pode arrastar os itens na lista para reordená-los dentro da sua própria categoria.</small>")
@@ -273,7 +274,7 @@ class EditorWindow(QMainWindow):
         lbl_pos = QLabel("<b>POSIÇÃO (mm)</b>")
         self._apply_tooltip(lbl_pos, 
             "<b>COORDENADAS DO OBJETO</b><br><br>"
-            "Mostra e ajusta a posição exata do elemento selecionado no papel:<br>"
+            "Mostra e ajusta a posição exata do elemento selecionado no papel:<br><br>"
             "• <b>Eixo X:</b> Distância horizontal a partir da borda esquerda.<br>"
             "• <b>Eixo Y:</b> Distância vertical a partir do topo.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Utilize estes campos numéricos para fazer alinhamentos com precisão cirúrgica em vez de arrastar com o mouse.</small>")
@@ -282,13 +283,13 @@ class EditorWindow(QMainWindow):
         form_pos = QFormLayout()
         form_pos.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
-        self.spin_pos_x = QDoubleSpinBox()
+        self.spin_pos_x = MathDoubleSpinBox()
         self.spin_pos_x.setRange(-5000, 20000)
         self.spin_pos_x.setDecimals(1)
         self.spin_pos_x.setKeyboardTracking(False)
         self.spin_pos_x.setEnabled(False)
         
-        self.spin_pos_y = QDoubleSpinBox()
+        self.spin_pos_y = MathDoubleSpinBox()
         self.spin_pos_y.setRange(-5000, 20000)
         self.spin_pos_y.setDecimals(1)
         self.spin_pos_y.setKeyboardTracking(False)
@@ -314,7 +315,7 @@ class EditorWindow(QMainWindow):
         lbl_dim = QLabel("<b>DOCUMENTO (mm)</b>")
         self._apply_tooltip(lbl_dim, 
             "<b>DIMENSÕES DO DOCUMENTO</b><br><br>"
-            "Define o tamanho físico real da arte final impressa ou exportada:<br>"
+            "Define o tamanho físico real da arte final impressa ou exportada:<br><br>"
             "• <b>Fidelidade:</b> O sistema gera os cartões mantendo 300 DPI exatos nesta medida.<br>"
             "• <b>Prancheta:</b> Ajusta automaticamente a área branca de trabalho no editor.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Ao carregar uma imagem de fundo (Background), o documento se ajustará sozinho às proporções dela.</small>")
@@ -323,13 +324,13 @@ class EditorWindow(QMainWindow):
         form_dim = QFormLayout()
         form_dim.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
-        self.spin_phys_w = QDoubleSpinBox()
+        self.spin_phys_w = MathDoubleSpinBox()
         self.spin_phys_w.setRange(10, 2000)
         self.spin_phys_w.setDecimals(1)
         self.spin_phys_w.setKeyboardTracking(False)
         self.spin_phys_w.setValue(100.0) 
         
-        self.spin_phys_h = QDoubleSpinBox()
+        self.spin_phys_h = MathDoubleSpinBox()
         self.spin_phys_h.setRange(10, 2000)
         self.spin_phys_h.setDecimals(1)
         self.spin_phys_h.setKeyboardTracking(False)
@@ -380,7 +381,7 @@ class EditorWindow(QMainWindow):
         lbl_cols = QLabel("<b>ORDEM NA TABELA</b>")
         self._apply_tooltip(lbl_cols, 
             "<b>ESTRUTURA DA PLANILHA</b><br><br>"
-            "Define a sequência visual das colunas na tela principal de geração:<br>"
+            "Define a sequência visual das colunas na tela principal de geração:<br><br>"
             "• <b>Mapeamento:</b> Lê as variáveis criadas nas caixas de texto e gera a lista.<br>"
             "• <b>Reordenação:</b> Arraste os itens aqui para mudar a ordem de digitação depois.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Coloque as informações mais importantes (como Nome e Cargo) no topo da lista para acelerar o preenchimento.</small>")
@@ -1199,7 +1200,7 @@ class EditorWindow(QMainWindow):
                 btn_vis.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_vis.setToolTip(
                     "<b>VISIBILIDADE DA CAMADA</b><br><br>"
-                    "Alterna a exibição do objeto atual no editor e na impressão:<br>"
+                    "Alterna a exibição do objeto atual no editor e na impressão:<br><br>"
                     "• <b>Oculto:</b> O elemento fica transparente e NÃO sai no arquivo final.<br><br>"
                     "<small style='color: #A0A0A0;'>Dica: Útil para esconder temporariamente elementos muito grandes enquanto você ajusta pequenos detalhes embaixo deles.</small>")
                 
@@ -1225,7 +1226,7 @@ class EditorWindow(QMainWindow):
                 btn_lock.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_lock.setToolTip(
                     "<b>BLOQUEIO DE CAMADA</b><br><br>"
-                    "Protege o elemento selecionado contra edições acidentais:<br>"
+                    "Protege o elemento selecionado contra edições acidentais:<br><br>"
                     "• <b>Travado:</b> O item não pode ser clicado, movido ou apagado na tela.<br><br>"
                     "<small style='color: #A0A0A0;'>Dica: Tranque o Fundo e as Imagens decorativas assim que posicioná-los. Isso facilita muito a seleção dos textos.</small>")
                 

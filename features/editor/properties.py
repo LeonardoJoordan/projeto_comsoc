@@ -6,6 +6,7 @@ from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
 
 from .canvas_items import DesignerBox, SignatureItem, ImageItem, px_to_mm
+from core.custom_widgets import MathDoubleSpinBox
 
 
 class CleanTextEdit(QTextEdit):
@@ -53,7 +54,7 @@ class CaixaDeTextoPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        lbl = QLabel("<b>Propriedades do Objeto</b>")
+        lbl = QLabel("<b>PPROPRIEDADES DO OBJETO</b>")
         layout.addWidget(lbl)
         self._aspect_ratio = 1.0
         
@@ -61,21 +62,19 @@ class CaixaDeTextoPanel(QWidget):
         form.setSpacing(4)
         form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
 
-        self.spin_w = QDoubleSpinBox()
+        self.spin_w = MathDoubleSpinBox()
         self.spin_w.setRange(1.0, 5000.0)
         self.spin_w.setDecimals(1)
-        self.spin_w.setSuffix(" mm")
         self.spin_w.setKeyboardTracking(False)
         self.spin_w.valueChanged.connect(self.widthChanged.emit)
-        form.addRow("Larg:", self.spin_w)
+        form.addRow("Larg (mm):", self.spin_w)
 
-        self.spin_h = QDoubleSpinBox()
+        self.spin_h = MathDoubleSpinBox()
         self.spin_h.setRange(1.0, 5000.0)
         self.spin_h.setDecimals(1)
-        self.spin_h.setSuffix(" mm")
         self.spin_h.setKeyboardTracking(False)
         self.spin_h.valueChanged.connect(self.heightChanged.emit)
-        form.addRow("Alt:", self.spin_h)
+        form.addRow("Alt (mm):", self.spin_h)
 
         self.spin_rot = QSpinBox()
         self.chk_proporcao = QCheckBox("Manter proporção")
@@ -90,34 +89,25 @@ class CaixaDeTextoPanel(QWidget):
             "• <b>Integridade:</b> Evita que imagens e textos fiquem esticados ou deformados.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Desative apenas se precisar forçar uma dimensão específica ignorando o aspeto original.</small>")
 
-        self.chk_link = QCheckBox("Habilitar Link (PDF)")
-        self.chk_link.setToolTip(
-            "<b>VÍNCULO ELETRÓNICO (URL)</b><br><br>"
-            "Cria uma área de interação no ficheiro exportado:<br>"
-            "• <b>Redirecionamento:</b> O PDF gerado terá um link clicável para o endereço da tabela.<br>"
-            "• <b>Exclusividade:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>")
-        self.chk_link.toggled.connect(self.linkToggled.emit)
-        form.addRow("", self.chk_link)
-
         # Intercepta os sinais para calcular a proporção antes de emitir para a cena
         self.spin_w.valueChanged.disconnect(self.widthChanged.emit)
         self.spin_h.valueChanged.disconnect(self.heightChanged.emit)
         self.spin_w.valueChanged.connect(self._on_w_changed)
         self.spin_h.valueChanged.connect(self._on_h_changed)
+        self.spin_rot = MathDoubleSpinBox()
         self.spin_rot.setRange(-360, 360)
-        self.spin_rot.setSuffix(" °")
+        self.spin_rot.setDecimals(0)
         self.spin_rot.setWrapping(True) 
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
-        form.addRow("Rot:", self.spin_rot)
-        self.spin_opacity = QDoubleSpinBox()
+        form.addRow("Rot (°):", self.spin_rot)
+
+        self.spin_opacity = MathDoubleSpinBox()
         self.spin_opacity.setToolTip("Define o nível de transparência do objeto (0 = invisível, 100 = totalmente opaco).")
         self.spin_opacity.setRange(0.0, 100.0)
         self.spin_opacity.setDecimals(0)
-        self.spin_opacity.setSuffix(" %")
         self.spin_opacity.setValue(100.0)
         self.spin_opacity.valueChanged.connect(lambda v: self.opacityChanged.emit(v / 100.0))
-        form.addRow("Opac:", self.spin_opacity)
+        form.addRow("Opac (%):", self.spin_opacity)
         self.spin_opacity.setToolTip(
             "<b>OPACIDADE</b><br><br>"
             "Ajusta o nível de transparência do elemento (0% a 100%):<br>"
@@ -132,6 +122,16 @@ class CaixaDeTextoPanel(QWidget):
             "<small style='color: #A0A0A0;'>Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>")
         self.btn_restore.clicked.connect(self.restoreRequested.emit)
         form.addRow("", self.btn_restore)
+
+        self.chk_link = QCheckBox("Habilitar Link (PDF)")
+        self.chk_link.setToolTip(
+            "<b>VÍNCULO ELETRÔNICO (URL)</b><br><br>"
+            "Cria uma área de interação no ficheiro exportado:<br><br>"
+            "• <b>Redirecionamento:</b> O PDF gerado terá um link clicável para o endereço da tabela.<br>"
+            "• <b>Exclusividade:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>")
+        self.chk_link.toggled.connect(self.linkToggled.emit)
+        form.addRow("", self.chk_link)
 
         self.spin_w.editingFinished.connect(self.snapshotRequested.emit)
         self.spin_h.editingFinished.connect(self.snapshotRequested.emit)
@@ -292,18 +292,17 @@ class EditorDeTextoPanel(QWidget):
         layout.addLayout(row_style)
 
         form_space = QFormLayout()
-        self.spin_indent = QDoubleSpinBox()
+        self.spin_indent = MathDoubleSpinBox()
         self.spin_indent.setRange(0, 500)
-        self.spin_indent.setSuffix(" px")
         self.spin_indent.valueChanged.connect(self._on_indent_changed)
-        form_space.addRow("Recuo 1ª:", self.spin_indent)
+        form_space.addRow("Recuo 1ª (px):", self.spin_indent)
         self.spin_indent.setToolTip(
             "<b>RECUO DA PRIMEIRA LINHA</b><br><br>"
             "Define o recuo horizontal inicial do bloco de texto:<br>"
             "• <b>Organização:</b> Cria o efeito visual de parágrafo sem a necessidade de espaços manuais.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Um recuo entre 20 e 40px costuma ser o ideal para dar um aspeto elegante a convites e documentos.</small>")
         
-        self.spin_lh = QDoubleSpinBox()
+        self.spin_lh = MathDoubleSpinBox()
         self.spin_lh.setRange(0.5, 5.0)
         self.spin_lh.setSingleStep(0.1)
         self.spin_lh.setValue(1.15)
