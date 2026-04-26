@@ -376,6 +376,17 @@ class TablePanel(QWidget):
         title = QLabel("Tabela de dados")
         title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         title.setStyleSheet("font-size: 16px; font-weight: 600;")
+        
+        # Habilita a captura de mouse nativa para Tooltips em QLabels
+        title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        title.setToolTip(
+            "<b>TABELA DE DADOS</b><br><br>"
+            "Área central de produção. Cada linha preenchida nesta grade resultará em um documento/cartão individual.<br>"
+            "• <b>Ocultação Inteligente:</b> Células deixadas em branco farão com que o respectivo elemento seja ocultado no arquivo final.<br>"
+            "• <b>Formatação Rápida:</b> Utilize atalhos como Ctrl+B, Ctrl+I ou Ctrl+U dentro das células para formatar textos específicos.<br><br>"
+            "<small style='color: #A0A0A0;'>Recomendação: Otimize seu tempo organizando os dados previamente no Excel ou planilhas externas. Selecione toda a grade original, copie, clique na primeira célula desta tabela e aperte Ctrl+V. Os dados serão preenchidos instantaneamente.</small>"
+        )
+        
         layout.addWidget(title)
 
         # --- Barra de Ferramentas da Tabela ---

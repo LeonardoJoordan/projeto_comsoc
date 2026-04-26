@@ -26,7 +26,16 @@ from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 
+
+
+
 class MainWindow(QMainWindow):
+    def _apply_tooltip(self, widget, text):
+            """Aplica tooltip e garante que labels estáticos capturem o evento no motor customizado."""
+            if isinstance(widget, QLabel):
+                widget.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+            widget.setToolTip(text)
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Projeto COMSOC - Construtor Otimizado de Material Social Oficial e Cerimonial")
@@ -103,24 +112,40 @@ class MainWindow(QMainWindow):
 
         self.btn_sel_out = QPushButton("...")
         self.btn_sel_out.setFixedWidth(40)
-        self.btn_sel_out.setToolTip("Selecionar pasta de destino")
+        self._apply_tooltip(self.btn_sel_out, 
+            "<b>PASTA DE DESTINO</b><br><br>"
+            "Define em qual local do computador os arquivos gerados serão salvos.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: O sistema criará automaticamente uma subpasta com a data e hora atual dentro do local escolhido para manter seus lotes organizados.</small>")
         self.btn_sel_out.clicked.connect(self._select_output_folder)
         ly_out.addWidget(self.btn_sel_out)
 
         self.cbo_export_format = QComboBox()
         self.cbo_export_format.addItems(["PNG", "PDF"])
         self.cbo_export_format.setFixedWidth(60)
-        self.cbo_export_format.setToolTip("Formato de saída da geração")
+        self._apply_tooltip(self.cbo_export_format, 
+            "<b>FORMATO DE SAÍDA</b><br><br>"
+            "Escolha o tipo de arquivo final:<br>"
+            "• <b>PNG:</b> Ideal para imagens estáticas de alta qualidade.<br>"
+            "• <b>PDF:</b> Formato padrão para documentos e impressões, permitindo o uso de links interativos.")
         ly_out.addWidget(self.cbo_export_format)
 
         self.chk_single_pdf = QCheckBox("Arquivo Único")
-        self.chk_single_pdf.setToolTip("Agrupa todos os cartões num único arquivo PDF.")
+        self._apply_tooltip(self.chk_single_pdf, 
+            "<b>ARQUIVO ÚNICO (PDF)</b><br><br>"
+            "Agrupa todo o lote gerado em um único documento de múltiplas páginas, em vez de criar arquivos separados.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Ideal para impressões em massa. Você abre apenas um arquivo e envia todas as páginas para a impressora de uma só vez, economizando tempo.</small>")
         self.chk_single_pdf.setVisible(False)
         ly_out.addWidget(self.chk_single_pdf)
 
         self.btn_config_name = QPushButton("Configurações")
         self.btn_config_name.setFixedWidth(100)
-        self.btn_config_name.setToolTip("Configurar padrão de nome dos arquivos e impressão")
+        self._apply_tooltip(self.btn_config_name, 
+            "<b>CONFIGURAÇÕES GERAIS</b><br><br>"
+            "Acesso aos ajustes avançados do projeto e do sistema:<br>"
+            "• <b>Nomenclatura:</b> Define o padrão de nome dos arquivos gerados usando as variáveis da tabela.<br>"
+            "• <b>Impressão:</b> Configura o agrupamento de vários cartões em uma folha e ativa marcas de corte.<br>"
+            "• <b>Tema:</b> Alterna a interface do programa entre os modos Claro e Escuro.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Na aba de Impressão, o sistema calcula automaticamente quantos cartões cabem na folha assim que você digita as dimensões.</small>")
         self.btn_config_name.clicked.connect(self._open_config_dialog)
         ly_out.addWidget(self.btn_config_name)
 
@@ -128,6 +153,10 @@ class MainWindow(QMainWindow):
 
         self.btn_generate_cards = QPushButton("Gerar Material")
         self.btn_generate_cards.setMinimumHeight(44)
+        self._apply_tooltip(self.btn_generate_cards, 
+            "<b>GERAR MATERIAL</b><br><br>"
+            "Inicia o processamento da tabela e a construção dos arquivos finais na pasta de saída.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Faça uma checagem rápida nas colunas de Quantidade e Assinatura antes de iniciar a geração de lotes muito grandes para evitar desperdícios.</small>")
         self.btn_generate_cards.clicked.connect(self._generate_cards_async)
         left_stack.addWidget(self.btn_generate_cards, 0)
 
