@@ -46,66 +46,62 @@ class EditorWindow(QMainWindow):
         grp_guides = QFrame()
         ly_guides = QVBoxLayout(grp_guides)
         ly_guides.setContentsMargins(0, 0, 0, 10)
-        lbl_guides = QLabel("<b>LINHAS GUIA</b>")
-        # Teste de implementação: Linha Guia
-        self._apply_tooltip(lbl_guides, 
-            "<b>LINHAS GUIA</b><br><br>"
-            "Linhas de suporte visual que auxiliam na estruturação do design:<br>"
-            "• <b>Magnetismo:</b> Atrai o centro dos objetos para garantir um alinhamento simétrico.<br>"
-            "• <b>Privacidade:</b> Servem apenas como guia e não aparecem na exportação final (PNG/PDF).<br>"
-            "• <b>Temporárias:</b> São descartadas automaticamente ao fechar o editor.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Para um ajuste milimétrico, selecione a linha guia e digite o valor exato no painel de POSIÇÃO (mm).</small>")
-        ly_guides.addWidget(lbl_guides)
+        # --- Cabecalho das Linhas Guia com Botões de Controle ---
+        row_title_guides = QHBoxLayout()
+        row_title_guides.setContentsMargins(0, 10, 0, 0)
         
-        row_guides = QHBoxLayout()
-        row_guides.setContentsMargins(0, 2, 0, 5)
-        row_guides.setSpacing(4)
-
-        # Padronização de estilo (Mesmo das Camadas)
-        btn_style = """
-            QPushButton { 
-                background-color: #333333; 
-                border: 1px solid #555555; 
-                border-radius: 4px; 
-                font-size: 14px;
-            }
-            QPushButton:hover { background-color: #444444; border-color: #777777; }
+        lbl_guides = QLabel("<b>LINHAS GUIA</b>")
+        lbl_guides.setStyleSheet("font-weight: bold; font-size: 12px;")
+        
+        # Estilo minimalista para os botões do título (sem borda, fundo transparente)
+        btn_icon_style = """
+            QPushButton { background-color: transparent; border: none; font-size: 14px; }
+            QPushButton:hover { background-color: #444444; border-radius: 4px; }
             QPushButton:pressed { background-color: #222222; }
-            QPushButton:disabled { background-color: #222222; color: #555555; border-color: #333333; }
         """
-
-        btn_guide_v = QPushButton("⫿") # Símbolo de barras verticais
-        btn_guide_v.setFixedSize(32, 30)
-        btn_guide_v.setStyleSheet(btn_style)
-        self._apply_tooltip(btn_guide_v, "<b>ADICIONAR GUIA VERTICAL</b><br><br>Insere uma linha de alinhamento vertical no centro da prancheta.")
-        btn_guide_v.clicked.connect(lambda: self.add_guide(vertical=True))
-
-        btn_guide_h = QPushButton("≡") # Símbolo de barras horizontais
-        btn_guide_h.setFixedSize(32, 30)
-        btn_guide_h.setStyleSheet(btn_style)
-        self._apply_tooltip(btn_guide_h, "<b>ADICIONAR GUIA HORIZONTAL</b><br><br>Insere uma linha de alinhamento horizontal no centro da prancheta.")
-        btn_guide_h.clicked.connect(lambda: self.add_guide(vertical=False))
         
         self.btn_toggle_guides = QPushButton("👁️")
-        self.btn_toggle_guides.setFixedSize(32, 30)
-        self.btn_toggle_guides.setStyleSheet(btn_style)
+        self.btn_toggle_guides.setFixedSize(26, 26)
+        self.btn_toggle_guides.setStyleSheet(btn_icon_style)
         self.btn_toggle_guides.setCheckable(True)
         self.btn_toggle_guides.setChecked(True)
         self._apply_tooltip(self.btn_toggle_guides, "<b>MOSTRAR/OCULTAR GUIAS</b><br><br>Alterna a visibilidade de todas as linhas guia.")
         self.btn_toggle_guides.toggled.connect(self.toggle_guides_visibility)
         
         self.btn_clear_guides = QPushButton("🗑️")
-        self.btn_clear_guides.setFixedSize(32, 30)
-        self.btn_clear_guides.setStyleSheet(btn_style)
-        self._apply_tooltip(self.btn_clear_guides, "<b>LIMPAR TODAS AS GUIAS</b><br><br>Remove permanentemente todas as linhas guia.")
+        self.btn_clear_guides.setFixedSize(26, 26)
+        self.btn_clear_guides.setStyleSheet(btn_icon_style)
+        self._apply_tooltip(self.btn_clear_guides, "<b>LIMPAR TODAS AS GUIAS</b><br><br>Remove permanentemente todas as linhas guia do modelo atual.")
         self.btn_clear_guides.clicked.connect(self.clear_all_guides)
 
+        row_title_guides.addWidget(lbl_guides)
+        row_title_guides.addStretch()
+        row_title_guides.addWidget(self.btn_toggle_guides)
+        row_title_guides.addWidget(self.btn_clear_guides)
+        
+        ly_guides.addLayout(row_title_guides)
+
+        # --- Botões de Criação ---
+        lbl_add_info = QLabel("Adicionar linhas")
+        lbl_add_info.setStyleSheet("font-size: 10px; color: #888888; margin-top: 5px;")
+        lbl_add_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        ly_guides.addWidget(lbl_add_info)
+
+        row_guides = QHBoxLayout()
+        row_guides.setSpacing(10)
+        
+        btn_guide_v = QPushButton("Vertical")
+        btn_guide_v.setMinimumHeight(30)
+        self._apply_tooltip(btn_guide_v, "<b>ADICIONAR GUIA VERTICAL</b><br><br>Insere uma linha de alinhamento vertical no centro da prancheta.")
+        btn_guide_v.clicked.connect(lambda: self.add_guide(vertical=True))
+
+        btn_guide_h = QPushButton("Horizontal")
+        btn_guide_h.setMinimumHeight(30)
+        self._apply_tooltip(btn_guide_h, "<b>ADICIONAR GUIA HORIZONTAL</b><br><br>Insere uma linha de alinhamento horizontal no centro da prancheta.")
+        btn_guide_h.clicked.connect(lambda: self.add_guide(vertical=False))
+        
         row_guides.addWidget(btn_guide_v)
         row_guides.addWidget(btn_guide_h)
-        row_guides.addSpacing(10) # Separação lógica entre adicionar e gerenciar
-        row_guides.addWidget(self.btn_toggle_guides)
-        row_guides.addWidget(self.btn_clear_guides)
-        row_guides.addStretch() # Empurra tudo para a esquerda (visual de toolbar)
         ly_guides.addLayout(row_guides)
         left_layout.addWidget(grp_guides)
         self._add_separator(left_layout)
