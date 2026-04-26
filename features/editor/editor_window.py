@@ -516,256 +516,6 @@ class EditorWindow(QMainWindow):
         self.modelSaved.emit(model_name, data["placeholders"])
         
         QMessageBox.information(self, "Sucesso", f"Modelo '{model_name}' salvo com sucesso em:\n{file_path}")
-
-    def get_current_scene_state(self) -> dict:
-        """Captura uma 'foto' de tudo o que está na cena agora e retorna como um dicionário."""
-        boxes_data = []
-        signatures_data = []
-        images_data = []
-        
-        for item in self.scene.items():
-            if isinstance(item, DesignerBox):
-                pos = item.pos()
-                r = item.rect()
-                boxes_data.append({
-                    "custom_name": getattr(item, "custom_name", ""),
-                    "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
-                    "html": item.state.html_content,
-                    "visible": item.isVisible(),
-                    "opacity": round(float(item.opacity()), 2),
-                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": round(float(pos.x()), 2),
-                    "y": round(float(pos.y()), 2),
-                    "w": round(float(r.width()), 2),
-                    "h": round(float(r.height()), 2),
-                    "rotation": round(float(item.rotation()), 2),
-                    "font_family": item.state.font_family,
-                    "font_size": item.state.font_size,
-                    "font_color": getattr(item.state, 'font_color', '#000000'),
-                    "has_link": getattr(item.state, 'has_link', False),
-                    "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
-                    "align": item.state.align,
-                    "vertical_align": item.state.vertical_align,
-                    "indent_px": item.state.indent_px,
-                    "line_height": item.state.line_height,
-                    "layer_id": getattr(item, 'layer_id', None) # IMPORTANTE PARA O UNDO
-                })
-            
-            elif isinstance(item, SignatureItem):
-                pos = item.pos()
-                pix = item.pixmap()
-                signatures_data.append({
-                    "custom_name": getattr(item, "custom_name", ""),
-                    "path": getattr(item, "_original_path", ""), 
-                    "visible": item.isVisible(),
-                    "opacity": round(float(item.opacity()), 2),
-                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": round(float(pos.x()), 2),
-                    "y": round(float(pos.y()), 2),
-                    "width": round(float(pix.width()), 2),
-                    "height": round(float(pix.height()), 2),
-                    "longest_side": round(float(max(pix.width(), pix.height())), 2),
-                    "layer_id": getattr(item, 'layer_id', None) # IMPORTANTE PARA O UNDO
-                })
-
-            elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
-                pos = item.pos()
-                pix = item.pixmap()
-                images_data.append({
-                    "custom_name": getattr(item, "custom_name", ""),
-                    "path": getattr(item, "_original_path", ""), 
-                    "visible": item.isVisible(),
-                    "opacity": round(float(item.opacity()), 2),
-                    "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                    "x": round(float(pos.x()), 2),
-                    "y": round(float(pos.y()), 2),
-                    "width": round(float(pix.width()), 2),
-                    "height": round(float(pix.height()), 2),
-                    "longest_side": round(float(max(pix.width(), pix.height())), 2),
-                    "rotation": round(float(item.rotation()), 2),
-                    "has_link": getattr(item, "has_link", False),
-                    "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
-                    "layer_id": getattr(item, 'layer_id', None) # IMPORTANTE PARA O UNDO
-                })
-
-        ordered_placeholders = [self.lst_placeholders.item(i).text() for i in range(self.lst_placeholders.count())]
-
-        data = {
-            "name": self.windowTitle().replace("Editor Visual de Modelo - ", "").replace(" (Gerador de Cartões em Lote - GCL)", ""),
-            "canvas_size": {"w": int(self.scene.width()), "h": int(self.scene.height())},
-            "target_w_mm": self.spin_phys_w.value(),
-            "target_h_mm": self.spin_phys_h.value(),
-            "background_path": self.background_path,
-            "placeholders": ordered_placeholders,
-            "signatures": signatures_data,
-            "images": images_data,
-            "boxes": boxes_data
-        }
-        
-        if self.bg_item and isinstance(self.bg_item, BackgroundItem):
-            data["bg_props"] = {
-                "x": round(float(self.bg_item.pos().x()), 2),
-                "y": round(float(self.bg_item.pos().y()), 2),
-                "w": round(float(self.bg_item.pixmap().width()), 2),
-                "h": round(float(self.bg_item.pixmap().height()), 2),
-                "visible": self.bg_item.isVisible(),
-                "opacity": round(float(self.bg_item.opacity()), 2),
-                "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                "layer_id": getattr(self.bg_item, 'layer_id', None)
-            }
-            
-        return data
-    
-    def apply_scene_state(self, data: dict, is_undo_redo: bool = False):
-        """Limpa a cena e recria tudo com base no dicionário fornecido."""
-        # Salva qual layer estava selecionada antes de limpar
-        selected_layer_id = None
-        sel = self.scene.selectedItems()
-        if sel and hasattr(sel[0], 'layer_id'):
-            selected_layer_id = sel[0].layer_id
-
-        self.scene.clear()
-        self.bg_item = None
-        
-        canvas_w = data.get("canvas_size", {}).get("w", 1000)
-        canvas_h = data.get("canvas_size", {}).get("h", 1000)
-        self.scene.setSceneRect(0, 0, canvas_w, canvas_h)
-
-        # Se não for uma ação de undo/redo (ex: abrindo modelo novo), ajusta as pranchetas
-        if not is_undo_redo:
-            self.spin_phys_w.blockSignals(True)
-            self.spin_phys_h.blockSignals(True)
-            self.spin_phys_w.setValue(data.get("target_w_mm", 100.0))
-            self.spin_phys_h.setValue(data.get("target_h_mm", 150.0))
-            self.spin_phys_w.blockSignals(False)
-            self.spin_phys_h.blockSignals(False)
-        
-        self.fallback_bg = self.scene.addRect(0, 0, canvas_w, canvas_h, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
-        self.fallback_bg.setZValue(-200)
-        
-        if not is_undo_redo:
-            self._on_physical_size_changed()
-
-        # Fundo
-        bg_path_raw = data.get("background_path")
-        if bg_path_raw:
-            bg_path = Path(bg_path_raw)
-            # Tenta resolver o caminho se não for absoluto (procura no próprio modelo)
-            if not bg_path.is_absolute():
-                slug = slugify_model_name(data.get("name", ""))
-                bg_path = get_models_dir() / slug / bg_path_raw
-            
-            if bg_path.exists():
-                self.load_background_image(str(bg_path), update_ui=not is_undo_redo, props=data.get("bg_props"))
-            else:
-                self.load_background_image(None, update_ui=not is_undo_redo, props=data.get("bg_props"))
-        else:
-            self.load_background_image(None, update_ui=not is_undo_redo, props=data.get("bg_props"))
-
-        if self.bg_item and "bg_props" in data:
-            self.bg_item.layer_id = data["bg_props"].get("layer_id")
-
-        # Assinaturas
-        for sig_data in data.get("signatures", []):
-            raw_path = sig_data["path"]
-            sig_path = Path(raw_path)
-            if not sig_path.is_absolute():
-                slug = slugify_model_name(data.get("name", ""))
-                sig_path = get_models_dir() / slug / raw_path
-
-            if sig_path.exists():
-                sig = SignatureItem(str(sig_path))
-                sig.custom_name = sig_data.get("custom_name", "")
-                sig.layer_id = sig_data.get("layer_id")
-                sig.setPos(sig_data["x"], sig_data["y"])
-                sig.resize_by_longest_side(sig_data["longest_side"])
-                self.scene.addItem(sig)
-                sig.setVisible(sig_data.get("visible", True))
-                sig.setOpacity(sig_data.get("opacity", 1.0))
-                if sig_data.get("locked", False):
-                    sig.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-                    sig.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-                    sig.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-
-        # Imagens
-        for img_data in data.get("images", []):
-            raw_path = img_data["path"]
-            img_path = Path(raw_path)
-            if not img_path.is_absolute():
-                slug = slugify_model_name(data.get("name", ""))
-                img_path = get_models_dir() / slug / raw_path
-
-            if img_path.exists():
-                img = ImageItem(str(img_path))
-                img.custom_name = img_data.get("custom_name", "")
-                img.layer_id = img_data.get("layer_id")
-                img.setPos(img_data["x"], img_data["y"])
-                
-                if "width" in img_data and "height" in img_data:
-                    img.resize_custom(img_data["width"], img_data["height"])
-                else:
-                    img.resize_by_longest_side(img_data.get("longest_side", 100))
-                    
-                img.setRotation(img_data.get("rotation", 0))
-                self.scene.addItem(img)
-                img.has_link = img_data.get("has_link", False)
-                img.setVisible(img_data.get("visible", True))
-                img.setOpacity(img_data.get("opacity", 1.0))
-                if img_data.get("locked", False):
-                    img.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-                    img.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-                    img.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-
-        # Caixas de Texto
-        for b in data.get("boxes", []):
-            box = DesignerBox(
-                x=b.get("x", 0), 
-                y=b.get("y", 0), 
-                w=b.get("w", 300), 
-                h=b.get("h", 60), 
-                text=b.get("id", "Placeholder") 
-            )
-            box.custom_name = b.get("custom_name", "")
-            box.layer_id = b.get("layer_id")
-            
-            if "html" in b:
-                box.state.html_content = b["html"]
-                
-            box.state.font_family = b.get("font_family", "Arial")
-            box.state.font_size = b.get("font_size", 16)
-            box.state.font_color = b.get("font_color", "#000000")
-            box.state.vertical_align = b.get("vertical_align", "top")
-            box.state.align = b.get("align", "left")
-            box.state.indent_px = b.get("indent_px", 0)
-            box.state.line_height = b.get("line_height", 1.15)
-            box.state.has_link = b.get("has_link", False)
-
-            box.setRotation(b.get("rotation", 0))
-            box.apply_state()
-            box.update_center() 
-
-            self.scene.addItem(box)
-            box.setVisible(b.get("visible", True))
-            box.setOpacity(b.get("opacity", 1.0))
-            if b.get("locked", False):
-                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-                box.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-
-        # Atualiza Placeholders e Lista de Camadas
-        saved_placeholders = data.get("placeholders", [])
-        self.lst_placeholders.clear()
-        for p in saved_placeholders:
-            self.lst_placeholders.addItem(p)
-        self.sync_placeholders_list()
-        self.refresh_layer_list()
-
-        # Restaura a seleção do item que estava ativo
-        if selected_layer_id is not None:
-            for item in self.scene.items():
-                if getattr(item, 'layer_id', None) == selected_layer_id:
-                    item.setSelected(True)
-                    break
     
     def load_background_image(self, path, update_ui=True, props=None):
         original_size = None
@@ -1426,7 +1176,8 @@ class EditorWindow(QMainWindow):
                     "vertical_align": item.state.vertical_align,
                     "indent_px": item.state.indent_px,
                     "line_height": item.state.line_height,
-                    "layer_id": getattr(item, 'layer_id', None)
+                    "layer_id": getattr(item, 'layer_id', None),
+                    "z_value": round(float(item.zValue()), 2)
                 })
             
             elif isinstance(item, SignatureItem):
@@ -1443,7 +1194,8 @@ class EditorWindow(QMainWindow):
                     "width": round(float(pix.width()), 2),
                     "height": round(float(pix.height()), 2),
                     "longest_side": round(float(max(pix.width(), pix.height())), 2),
-                    "layer_id": getattr(item, 'layer_id', None)
+                    "layer_id": getattr(item, 'layer_id', None),
+                    "z_value": round(float(item.zValue()), 2)
                 })
 
             elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
@@ -1463,7 +1215,8 @@ class EditorWindow(QMainWindow):
                     "rotation": round(float(item.rotation()), 2),
                     "has_link": getattr(item, "has_link", False),
                     "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
-                    "layer_id": getattr(item, 'layer_id', None)
+                    "layer_id": getattr(item, 'layer_id', None),
+                    "z_value": round(float(item.zValue()), 2)
                 })
 
         ordered_placeholders = [self.lst_placeholders.item(i).text() for i in range(self.lst_placeholders.count())]
@@ -1489,13 +1242,15 @@ class EditorWindow(QMainWindow):
                 "visible": self.bg_item.isVisible(),
                 "opacity": round(float(self.bg_item.opacity()), 2),
                 "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
-                "layer_id": getattr(self.bg_item, 'layer_id', None)
+                "layer_id": getattr(self.bg_item, 'layer_id', None),
+                "z_value": round(float(self.bg_item.zValue()), 2)
             }
             
         return data
 
     def apply_scene_state(self, data: dict, is_undo_redo: bool = False):
         """Limpa a cena e recria tudo com base no dicionário fornecido."""
+        # Salva qual layer estava selecionada antes de limpar
         selected_layer_id = None
         sel = self.scene.selectedItems()
         if sel and hasattr(sel[0], 'layer_id'):
@@ -1508,6 +1263,7 @@ class EditorWindow(QMainWindow):
         canvas_h = data.get("canvas_size", {}).get("h", 1000)
         self.scene.setSceneRect(0, 0, canvas_w, canvas_h)
 
+        # Se não for uma ação de undo/redo (ex: abrindo modelo novo), ajusta as pranchetas
         if not is_undo_redo:
             self.spin_phys_w.blockSignals(True)
             self.spin_phys_h.blockSignals(True)
@@ -1522,15 +1278,19 @@ class EditorWindow(QMainWindow):
         if not is_undo_redo:
             self._on_physical_size_changed()
 
+        # Fundo
         bg_path_raw = data.get("background_path")
         if bg_path_raw:
             bg_path = Path(bg_path_raw)
+            # Tenta resolver o caminho se não for absoluto (procura no próprio modelo)
             if not bg_path.is_absolute():
                 slug = slugify_model_name(data.get("name", ""))
                 bg_path = get_models_dir() / slug / bg_path_raw
             
             if bg_path.exists():
                 self.load_background_image(str(bg_path), update_ui=not is_undo_redo, props=data.get("bg_props"))
+                if self.bg_item and "bg_props" in data:
+                    self.bg_item.setZValue(data["bg_props"].get("z_value", -100))
             else:
                 self.load_background_image(None, update_ui=not is_undo_redo, props=data.get("bg_props"))
         else:
@@ -1538,7 +1298,9 @@ class EditorWindow(QMainWindow):
 
         if self.bg_item and "bg_props" in data:
             self.bg_item.layer_id = data["bg_props"].get("layer_id")
+            self.bg_item.setZValue(data["bg_props"].get("z_value", -100))
 
+        # Assinaturas
         for sig_data in data.get("signatures", []):
             raw_path = sig_data["path"]
             sig_path = Path(raw_path)
@@ -1553,6 +1315,7 @@ class EditorWindow(QMainWindow):
                 sig.setPos(sig_data["x"], sig_data["y"])
                 sig.resize_by_longest_side(sig_data["longest_side"])
                 self.scene.addItem(sig)
+                sig.setZValue(sig_data.get("z_value", 201))
                 sig.setVisible(sig_data.get("visible", True))
                 sig.setOpacity(sig_data.get("opacity", 1.0))
                 if sig_data.get("locked", False):
@@ -1560,6 +1323,7 @@ class EditorWindow(QMainWindow):
                     sig.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
                     sig.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
+        # Imagens
         for img_data in data.get("images", []):
             raw_path = img_data["path"]
             img_path = Path(raw_path)
@@ -1580,6 +1344,7 @@ class EditorWindow(QMainWindow):
                     
                 img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
+                img.setZValue(img_data.get("z_value", 1))
                 img.has_link = img_data.get("has_link", False)
                 img.setVisible(img_data.get("visible", True))
                 img.setOpacity(img_data.get("opacity", 1.0))
@@ -1588,6 +1353,7 @@ class EditorWindow(QMainWindow):
                     img.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
                     img.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
+        # Caixas de Texto
         for b in data.get("boxes", []):
             box = DesignerBox(
                 x=b.get("x", 0), 
@@ -1616,6 +1382,7 @@ class EditorWindow(QMainWindow):
             box.update_center() 
 
             self.scene.addItem(box)
+            box.setZValue(b.get("z_value", 101))
             box.setVisible(b.get("visible", True))
             box.setOpacity(b.get("opacity", 1.0))
             if b.get("locked", False):
@@ -1623,6 +1390,7 @@ class EditorWindow(QMainWindow):
                 box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
                 box.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
+        # Atualiza Placeholders e Lista de Camadas
         saved_placeholders = data.get("placeholders", [])
         self.lst_placeholders.clear()
         for p in saved_placeholders:
@@ -1630,6 +1398,7 @@ class EditorWindow(QMainWindow):
         self.sync_placeholders_list()
         self.refresh_layer_list()
 
+        # Restaura a seleção do item que estava ativo
         if selected_layer_id is not None:
             for item in self.scene.items():
                 if getattr(item, 'layer_id', None) == selected_layer_id:
