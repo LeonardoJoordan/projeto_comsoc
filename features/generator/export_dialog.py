@@ -36,13 +36,20 @@ class ConfigDialog(QDialog):
         ly_naming.setSpacing(15)
         ly_naming.setContentsMargins(15, 15, 15, 15)
         
-        ly_naming.addWidget(QLabel("<b>Padrão de Nomenclatura:</b>"))
+        lbl_patern_title = QLabel("<b>Padrão de Nomenclatura:</b>")
+        lbl_patern_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        lbl_patern_title.setToolTip(
+            "<b>PADRÃO DE NOME</b><br><br>"
+            "Define como cada ficheiro gerado será batizado automaticamente pelo sistema.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Utilize as tags (ex: {Nome}) para que cada ficheiro saia com o nome do destinatário, facilitando a identificação e entrega do material.</small>"
+        )
+        ly_naming.addWidget(lbl_patern_title)
         ly_preview = QHBoxLayout()
         
         self.txt_pattern = QLineEdit()
         self.txt_pattern.setPlaceholderText("Ex: {modelo}_{nome}")
         self.txt_pattern.setText(current_pattern)
-        self.txt_pattern.setMinimumHeight(34) 
+        self.txt_pattern.setMinimumHeight(34)
         
         lbl_ext = QLabel(".png")
         lbl_ext.setStyleSheet("font-size: 14px; opacity: 0.7;") 
@@ -51,7 +58,17 @@ class ConfigDialog(QDialog):
         ly_preview.addWidget(lbl_ext)
         ly_naming.addLayout(ly_preview)
 
-        ly_naming.addWidget(QLabel("Variáveis disponíveis:"))
+        lbl_vars_title = QLabel("Variáveis disponíveis:")
+        lbl_vars_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        lbl_vars_title.setToolTip(
+            "<b>VARIÁVEIS DINÂMICAS</b><br><br>"
+            "Estes são os campos detetados no seu modelo. Ao clicar neles, a 'tag' é inserida no nome do ficheiro.<br><br>"
+            "<b>Exemplo:</b> Se definir como <i>Cartão de {Nome}</i>, o sistema gerará:<br>"
+            "• Cartão de Leonardo.pdf<br>"
+            "• Cartão de Lilia.pdf<br><br>"
+            "<small style='color: #A0A0A0;'>O sistema utiliza o dado exato que estiver preenchido na tabela para cada linha.</small>"
+        )
+        ly_naming.addWidget(lbl_vars_title)
         grid_vars = QGridLayout()
         col, row = 0, 0
         if not available_vars:
@@ -61,6 +78,10 @@ class ConfigDialog(QDialog):
                 btn = QPushButton(f"{{{var}}}")
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn.setMinimumHeight(30)
+                btn.setToolTip(
+                    "<b>INSERIR VARIÁVEL</b><br><br>"
+                    "Clique para adicionar esta tag ao padrão de nome. Durante a geração, o sistema substituirá o texto entre chaves pelo dado real da tabela."
+                )
                 btn.clicked.connect(lambda checked, v=var: self._insert_variable(v))
                 grid_vars.addWidget(btn, row, col)
                 col += 1
@@ -80,7 +101,14 @@ class ConfigDialog(QDialog):
         ly_print = QVBoxLayout(tab_print)
         ly_print.setSpacing(10)
         
-        ly_print.addWidget(QLabel("<b>Folha de saída (Largura x Altura):</b>"))
+        lbl_sheet_title = QLabel("<b>Folha de saída (Largura x Altura):</b>")
+        lbl_sheet_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        lbl_sheet_title.setToolTip(
+            "<b>FOLHA DE SAÍDA (DOCUMENTO FINAL)</b><br><br>"
+            "Define o tamanho real do papel que será colocado na impressora (ex: A4, A3 ou formatos personalizados).<br><br>"
+            "<small style='color: #A0A0A0;'>Importante: Esta configuração dita a área útil de trabalho. Uma folha maior (A3) permite agrupar muito mais exemplares no mesmo documento do que uma folha A4.</small>"
+        )
+        ly_print.addWidget(lbl_sheet_title)
         ly_sheet = QHBoxLayout()
         self.spin_sheet_w_mm = QDoubleSpinBox()
         self.spin_sheet_w_mm.setRange(50, 2000)
@@ -102,6 +130,11 @@ class ConfigDialog(QDialog):
 
         self.chk_imposition = QCheckBox("Habilitar Imposição (Agrupamento na folha)")
         self.chk_imposition.setChecked(self.imposition_settings.get("enabled", False))
+        self.chk_imposition.setToolTip(
+            "<b>IMPOSIÇÃO GRÁFICA (AGRUPAMENTO)</b><br><br>"
+            "Organiza automaticamente vários exemplares do seu modelo dentro da mesma folha de saída.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Além de economizar papel, este recurso otimiza o corte manual. Os itens são alinhados para que você possa usar régua e estilete e destacar vários cartões com poucos cortes retos, sem rebarbas.</small>"
+        )
         self.chk_imposition.toggled.connect(self._toggle_imposition_ui)
         ly_print.addWidget(self.chk_imposition)
 
@@ -110,15 +143,24 @@ class ConfigDialog(QDialog):
         ly_imp = QVBoxLayout(self.container_imposition)
         ly_imp.setContentsMargins(10, 0, 0, 0)
         
-        ly_imp.addWidget(QLabel("Dimensões do modelo final (Largura x Altura):"))
+        lbl_model_dims_title = QLabel("Dimensões do modelo final (Largura x Altura):")
+        lbl_model_dims_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        lbl_model_dims_title.setToolTip(
+            "<b>DIMENSÕES REAIS DO MODELO</b><br><br>"
+            "Define o tamanho exato (em milímetros) que o seu cartão/documento terá após ser impresso e cortado.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica Smart: Essencial para materiais que precisam encaixar em suportes físicos, como displays de acrílico, crachás ou etiquetas. Meça o suporte com uma régua e digite os valores exatos aqui para um ajuste milimétrico.</small>"
+        )
+        ly_imp.addWidget(lbl_model_dims_title)
         self.spin_w_mm = QDoubleSpinBox()
         self.spin_w_mm.setRange(10, 2000)
         self.spin_w_mm.setSuffix(" mm")
         self.spin_w_mm.setDecimals(1)
+
         self.spin_h_mm = QDoubleSpinBox()
         self.spin_h_mm.setRange(10, 2000)
         self.spin_h_mm.setSuffix(" mm")
         self.spin_h_mm.setDecimals(1)
+
 
         saved_w = self.imposition_settings.get("target_w_mm", 0)
         if saved_w > 0:
@@ -144,6 +186,11 @@ class ConfigDialog(QDialog):
 
         self.chk_crop_marks = QCheckBox("Habilitar marcas de corte")
         self.chk_crop_marks.setChecked(self.imposition_settings.get("crop_marks", True))
+        self.chk_crop_marks.setToolTip(
+            "<b>MARCAS DE CORTE</b><br><br>"
+            "Adiciona pequenas guias visuais nos cantos de cada item na folha impressa.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Estas marcas indicam o caminho exato para a lâmina do estilete ou da guilhotina, garantindo um acabamento profissional e uniforme em todo o lote.</small>"
+        )
         ly_imp.addWidget(self.chk_crop_marks)
         
         ly_print.addWidget(self.container_imposition)
@@ -155,9 +202,17 @@ class ConfigDialog(QDialog):
         ly_theme = QVBoxLayout(tab_theme)
         ly_theme.setSpacing(10)
         
-        ly_theme.addWidget(QLabel("<b>Preferências do Sistema (Global)</b>"))
+        lbl_theme_title = QLabel("<b>Preferências do Sistema (Global)</b>")
+        lbl_theme_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        lbl_theme_title.setToolTip(
+            "<b>PREFERÊNCIA VISUAL</b><br><br>"
+            "Alterna a aparência de todo o software entre o Modo Claro e o Modo Escuro.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: O Modo Escuro (Mint-Y) é ideal para reduzir o cansaço visual durante longas jornadas de trabalho.</small>"
+        )
+        ly_theme.addWidget(lbl_theme_title)
         self.radio_light = QRadioButton("☀️ Tema Claro")
-        self.radio_dark = QRadioButton("🌙 Tema Escuro (Mint-Y)")
+        self.radio_dark = QRadioButton("🌙 Tema Escuro")
+
         
         self.theme_group = QButtonGroup(self)
         self.theme_group.addButton(self.radio_light)
