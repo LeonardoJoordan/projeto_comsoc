@@ -67,6 +67,10 @@ class EditorWindow(QMainWindow):
         self.btn_toggle_guides.setChecked(True)
         self._apply_tooltip(self.btn_toggle_guides, "<b>MOSTRAR/OCULTAR GUIAS</b><br><br>Alterna a visibilidade de todas as linhas guia.")
         self.btn_toggle_guides.toggled.connect(self.toggle_guides_visibility)
+        # Efeito de opacidade para o olho
+        self.op_eye = QGraphicsOpacityEffect(self.btn_toggle_guides)
+        self.btn_toggle_guides.setGraphicsEffect(self.op_eye)
+        self.op_eye.setOpacity(1.0 if self.btn_toggle_guides.isChecked() else 0.2)
         
         self.btn_clear_guides = QPushButton("🗑️")
         self.btn_clear_guides.setFixedSize(26, 26)
@@ -74,9 +78,21 @@ class EditorWindow(QMainWindow):
         self._apply_tooltip(self.btn_clear_guides, "<b>LIMPAR TODAS AS GUIAS</b><br><br>Remove permanentemente todas as linhas guia do modelo atual.")
         self.btn_clear_guides.clicked.connect(self.clear_all_guides)
 
+        self.btn_lock_guides = QPushButton("🔓")
+        self.btn_lock_guides.setFixedSize(26, 26)
+        self.btn_lock_guides.setStyleSheet(btn_icon_style)
+        self.btn_lock_guides.setCheckable(True)
+        self._apply_tooltip(self.btn_lock_guides, "<b>BLOQUEAR/DESBLOQUEAR GUIAS</b><br><br>Impede que as linhas guia sejam movidas ou selecionadas acidentalmente.")
+        self.btn_lock_guides.toggled.connect(self.toggle_guides_lock)
+        # Efeito de opacidade para o cadeado
+        self.op_lock = QGraphicsOpacityEffect(self.btn_lock_guides)
+        self.btn_lock_guides.setGraphicsEffect(self.op_lock)
+        self.op_lock.setOpacity(1.0 if self.btn_lock_guides.isChecked() else 0.2)
+
         row_title_guides.addWidget(lbl_guides)
         row_title_guides.addStretch()
         row_title_guides.addWidget(self.btn_toggle_guides)
+        row_title_guides.addWidget(self.btn_lock_guides)
         row_title_guides.addWidget(self.btn_clear_guides)
         
         ly_guides.addLayout(row_title_guides)
@@ -643,18 +659,40 @@ class EditorWindow(QMainWindow):
         else:
             pos = rect.height() / 2
         guide = Guideline(pos, is_vertical=vertical)
-        # Respeita o estado atual do botão de visibilidade ao criar nova guia
+        # Respeita o estado de visibilidade e bloqueio ao criar
+        is_locked = self.btn_lock_guides.isChecked()
         guide.setVisible(self.btn_toggle_guides.isChecked())
+        guide.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, not is_locked)
+        guide.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, not is_locked)
+        guide.setOpacity(0.4 if is_locked else 1.0)
+        
         self.scene.addItem(guide)
         self.save_snapshot()
 
     def toggle_guides_visibility(self, checked):
+        self.op_eye.setOpacity(1.0 if checked else 0.2)
         for item in self.scene.items():
             if isinstance(item, Guideline):
                 item.setVisible(checked)
         self.save_snapshot()
 
+    def toggle_guides_lock(self, locked):
+        self.btn_lock_guides.setText("🔒" if locked else "🔓")
+        self.op_lock.setOpacity(1.0 if locked else 0.2)
+        self.btn_clear_guides.setEnabled(not locked)
+        for item in self.scene.items():
+            if isinstance(item, Guideline):
+                item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, not locked)
+                item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, not locked)
+                # Feedback visual: reduz a opacidade quando bloqueado
+                item.setOpacity(0.4 if locked else 1.0)
+        self.save_snapshot()
+
     def clear_all_guides(self):
+        # Proteção contra exclusão acidental: ignora se o cadeado estiver fechado
+        if self.btn_lock_guides.isChecked():
+            return
+
         removed = False
         for item in self.scene.items():
             if isinstance(item, Guideline):
@@ -1295,7 +1333,8 @@ class EditorWindow(QMainWindow):
             "signatures": signatures_data,
             "images": images_data,
             "boxes": boxes_data,
-            "guidelines": guidelines_data
+            "guidelines": guidelines_data,
+            "guidelines_locked": self.btn_lock_guides.isChecked()
         }
         
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
@@ -1459,9 +1498,26 @@ class EditorWindow(QMainWindow):
             
         if guides_data:
             # Sincroniza o botão visual com o estado da primeira guia carregada
+            is_visible = guides_data[0].get("visible", True)
             self.btn_toggle_guides.blockSignals(True)
-            self.btn_toggle_guides.setChecked(guides_data[0].get("visible", True))
+            self.btn_toggle_guides.setChecked(is_visible)
+            self.op_eye.setOpacity(1.0 if is_visible else 0.2)
             self.btn_toggle_guides.blockSignals(False)
+
+        # Restaura o estado do cadeado das guias
+        is_locked = data.get("guidelines_locked", False)
+        self.btn_lock_guides.blockSignals(True)
+        self.btn_lock_guides.setChecked(is_locked)
+        self.btn_lock_guides.setText("🔒" if is_locked else "🔓")
+        self.op_lock.setOpacity(1.0 if is_locked else 0.2)
+        self.btn_lock_guides.blockSignals(False)
+        
+        # Reaplica o bloqueio nos itens recém-criados
+        for item in self.scene.items():
+            if isinstance(item, Guideline):
+                item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, not is_locked)
+                item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, not is_locked)
+                item.setOpacity(0.4 if is_locked else 1.0)
 
         # Atualiza Placeholders e Lista de Camadas
         saved_placeholders = data.get("placeholders", [])
