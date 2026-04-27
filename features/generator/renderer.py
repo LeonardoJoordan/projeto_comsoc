@@ -319,7 +319,7 @@ class NativeRenderer:
                         x_start = 0
                     # real_top é o topo da tinta no espaço local do doc (antes do y_offset)
                     # y_offset desloca o doc inteiro; o topo real no espaço da caixa é real_top + y_offset
-                    local_rect = QRectF(x_start, real_top + y_offset, ideal_w, content_h)
+                    local_rect = QRectF(x_start, real_top, ideal_w, content_h)
                     mapped_rect = painter.transform().mapRect(local_rect)
                     out_links.append({"url": url, "rect": mapped_rect})
 
