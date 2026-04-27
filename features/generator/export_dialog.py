@@ -20,7 +20,7 @@ class ConfigDialog(QDialog):
         
         self.imposition_settings = current_imposition or {
             "enabled": False, "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
-            "crop_marks": True, "target_w_mm": 0, "target_h_mm": 0
+            "crop_marks": True, "bleed_margin": False, "target_w_mm": 0, "target_h_mm": 0
         }
         self.current_is_dark = is_dark
 
@@ -192,6 +192,14 @@ class ConfigDialog(QDialog):
             "<small style='color: #A0A0A0;'>Dica: Estas marcas indicam o caminho exato para a lâmina do estilete ou da guilhotina, garantindo um acabamento profissional e uniforme em todo o lote.</small>"
         )
         ly_imp.addWidget(self.chk_crop_marks)
+        self.chk_bleed = QCheckBox("Habilitar margem de sangria")
+        self.chk_bleed.setChecked(self.imposition_settings.get("bleed_margin", False))
+        self.chk_bleed.setToolTip(
+            "<b>MARGEM DE SANGRIA</b><br><br>"
+            "Reserva um espaço extra (5mm) ao redor dos itens na folha.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Ative para garantir que artes com fundo contínuo não criem filetes brancos durante o corte manual.</small>"
+        )
+        ly_imp.addWidget(self.chk_bleed)
         
         ly_print.addWidget(self.container_imposition)
         ly_print.addStretch()
@@ -232,6 +240,7 @@ class ConfigDialog(QDialog):
         self.spin_w_mm.valueChanged.connect(self._update_capacity_preview)
         self.spin_h_mm.valueChanged.connect(self._update_capacity_preview)
         self.chk_crop_marks.toggled.connect(self._update_capacity_preview)
+        self.chk_bleed.toggled.connect(self._update_capacity_preview)
         self.chk_imposition.toggled.connect(self._update_capacity_preview)
 
         # Botões
@@ -250,6 +259,7 @@ class ConfigDialog(QDialog):
             "sheet_w_mm": self.spin_sheet_w_mm.value(),
             "sheet_h_mm": self.spin_sheet_h_mm.value(),
             "crop_marks": self.chk_crop_marks.isChecked(),
+            "bleed_margin": self.chk_bleed.isChecked(),
             "target_w_mm": self.spin_w_mm.value(),
             "target_h_mm": self.spin_h_mm.value()
         }
@@ -267,9 +277,10 @@ class ConfigDialog(QDialog):
         tw = self.spin_w_mm.value()
         th = self.spin_h_mm.value()
         marks = self.chk_crop_marks.isChecked()
+        bleed = self.chk_bleed.isChecked()
 
         # Instancia o assembler (o mesmo motor que gera as imagens)
-        assembler = SheetAssembler(tw, th, sw, sh, marks)
+        assembler = SheetAssembler(tw, th, sw, sh, marks, bleed)
         
         ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
 

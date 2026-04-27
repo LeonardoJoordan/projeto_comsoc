@@ -7,24 +7,28 @@ def mm_to_px_300(mm):
     return int((mm * DPI) / 25.4)
 
 class SheetAssembler:
-    def __init__(self, target_w_mm: float, target_h_mm: float, sheet_w_mm: float = 210.0, sheet_h_mm: float = 297.0, crop_marks: bool = True):
+    def __init__(self, target_w_mm: float, target_h_mm: float, sheet_w_mm: float = 210.0, sheet_h_mm: float = 297.0, crop_marks: bool = True, bleed_margin: bool = False):
         self.target_w_mm = target_w_mm
         self.target_h_mm = target_h_mm
         self.crop_marks = crop_marks
+        self.bleed_margin = bleed_margin
         
-        # Conforme solicitado: 5mm de margem técnica da impressora
-        self.printer_margin_mm = 5.0 
-        
+        # Configuração das linhas de corte e seus tamanhos
         if self.crop_marks:
-            # 5mm adicionais reservados para a área das marcas (gap + linha)
             self.mark_gap_mm = 2.0  
             self.mark_len_mm = 3.0  
-            self.edge_reserve_mm = self.printer_margin_mm + 5.0 # Total 10mm por lado
         else:
-            # Sem marcas, apenas a margem de segurança da impressora
             self.mark_gap_mm = 0.0
             self.mark_len_mm = 0.0
-            self.edge_reserve_mm = self.printer_margin_mm
+
+        # Cálculo cumulativo da reserva de borda (reduz a área útil da folha)
+        self.edge_reserve_mm = 0.0
+        
+        if self.bleed_margin:
+            self.edge_reserve_mm += 5.0 # Adiciona 5mm de proteção
+            
+        if self.crop_marks:
+            self.edge_reserve_mm += (self.mark_gap_mm + self.mark_len_mm) # Adiciona 5mm para as marcas
 
         self.card_w_px = mm_to_px_300(target_w_mm)
         self.card_h_px = mm_to_px_300(target_h_mm)
