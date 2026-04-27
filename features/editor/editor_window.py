@@ -376,7 +376,9 @@ class EditorWindow(QMainWindow):
         grp_cols_compact = QWidget()
         ly_cols_compact = QVBoxLayout(grp_cols_compact)
         ly_cols_compact.setContentsMargins(0, 0, 0, 0)
-        ly_cols_compact.setSpacing(2)
+        
+        # Ajuste de espaçamento (12px) para alinhar o topo da lista com o primeiro campo (Larg mm)
+        ly_cols_compact.setSpacing(12) 
         
         lbl_cols = QLabel("<b>ORDEM NA TABELA</b>")
         self._apply_tooltip(lbl_cols, 
@@ -391,8 +393,11 @@ class EditorWindow(QMainWindow):
         self.lst_placeholders.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.lst_placeholders.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.lst_placeholders.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.lst_placeholders.setFixedHeight(150) 
+        self.lst_placeholders.setFixedHeight(170) 
         ly_cols_compact.addWidget(self.lst_placeholders)
+        
+        # Adiciona uma "mola" no final para empurrar tudo para cima
+        ly_cols_compact.addStretch() 
         
         layout_misto.addWidget(grp_cols_compact, 1)
 

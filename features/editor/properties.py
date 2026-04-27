@@ -58,14 +58,14 @@ class CaixaDeTextoPanel(QWidget):
         lbl.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
         tooltip_propriedades = (
             "<b>PROPRIEDADES DO OBJETO</b><br><br>"
-            "Ajustes técnicos de dimensionamento, visualização e comportamento do elemento selecionado.<br><br>"
-            "• <b>Largura e Altura:</b> Define a dimensão física exata do objeto em milímetros (mm).<br>"
-            "• <b>Manter proporção:</b> Trava a relação entre os eixos para evitar deformações no redimensionamento.<br>"
-            "• <b>Rotação:</b> Gira o objeto em graus (°) em torno do seu próprio eixo central.<br>"
-            "• <b>Opacidade:</b> Controla a transparência do item. Útil para marcas d'água ou sobreposições sutis.<br>"
-            "• <b>Restaurar original:</b> Reseta a escala e rotação para os valores nativos do arquivo importado.<br>"
-            "• <b>Habilitar link:</b> Transforma o objeto em um botão clicável no PDF (requer campo de URL na tabela).<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Use 'Manter proporção' ativado para garantir que logotipos e fotos não percam a integridade visual ao serem ajustados.</small>"
+            "Gestão técnica de dimensões, orientação e comportamento do elemento selecionado.<br><br>"
+            "• <b>Largura e Altura:</b> Define as dimensões físicas horizontais e verticais em milímetros (mm).<br>"
+            "• <b>Manter proporção:</b> Trava a relação entre os eixos para evitar distorções no redimensionamento.<br>"
+            "• <b>Rotação:</b> Gira o objeto selecionado em graus (°) ao redor do seu ponto central.<br>"
+            "• <b>Opacidade:</b> Controla o nível de transparência do elemento (0% a 100%).<br>"
+            "• <b>Restaurar original:</b> Reseta a escala e rotação para os valores nativos do arquivo.<br>"
+            "• <b>Habilitar link:</b> Cria uma área de interação para redirecionamento em arquivos PDF.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Utilize a função 'Restaurar original' para recuperar instantaneamente a proporção e nitidez nativa de imagens que foram deformadas.</small>"
         )
         lbl.setToolTip(tooltip_propriedades)
         layout.addWidget(lbl)
@@ -160,10 +160,10 @@ class CaixaDeTextoPanel(QWidget):
 
         self.chk_link = QCheckBox("Habilitar Link (PDF)")
         self.chk_link.setToolTip(
-            "<b>VÍNCULO ELETRÔNICO (URL)</b><br><br>"
-            "Cria uma área de interação no ficheiro exportado:<br><br>"
-            "• <b>Redirecionamento:</b> O PDF gerado terá um link clicável para o endereço da tabela.<br>"
-            "• <b>Exclusividade:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
+            "<b>HABILITAR LINK (URL)</b><br><br>"
+            "Cria uma área de interação (clicável) no PDF exportado:<br><br>"
+            "• <b>Cartões interativos:</b> O PDF gerado terá um link clicável para redirecionar ao endereço configurado na tabela.<br>"
+            "• <b>Somente em PDF:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>")
         self.chk_link.toggled.connect(self.linkToggled.emit)
         form.addRow("", self.chk_link)
