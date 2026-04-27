@@ -168,7 +168,7 @@ class PageRenderWorker(QThread):
                 cards_data = page_task["cards"]
                 
                 card_images = []
-                for (r_plain, r_rich, fname) in cards_data:
+                for (original_idx, r_plain, r_rich, fname) in cards_data:
                     img = self.renderer.render_to_qimage(r_plain, r_rich)
                     card_images.append(img)
                 
