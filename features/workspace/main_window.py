@@ -763,8 +763,10 @@ class MainWindow(QMainWindow):
         
         self.editor_window.show()
 
-    def _on_editor_saved(self, model_name, placeholders):
-        self.log_panel.append(f"Modelo '{model_name}' salvo. Atualizando lista...")
+    def _on_editor_saved(self, model_name, placeholders, file_path):
+        # Formata o log conforme o seu novo padrão
+        self.log_panel.append(f"<b>Modelo '{model_name}' salvo com sucesso em:</b> {file_path}")
+        self.log_panel.append("Atualizando lista...")
         self._reload_models_from_disk(select_name=model_name)
 
     def _open_config_dialog(self):

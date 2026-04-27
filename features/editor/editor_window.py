@@ -22,7 +22,7 @@ from core.custom_widgets import MathDoubleSpinBox
 
 
 class EditorWindow(QMainWindow):
-    modelSaved = Signal(str, list)
+    modelSaved = Signal(str, list, str)
 
     def _apply_tooltip(self, widget, text):
         """Aplica tooltip e garante que labels estáticos capturem o evento no motor customizado."""
@@ -587,9 +587,23 @@ class EditorWindow(QMainWindow):
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
             
-        self.modelSaved.emit(model_name, data["placeholders"])
+        # Emite o sinal agora contendo também o caminho do arquivo para o Log da MainWindow
+        self.modelSaved.emit(model_name, data["placeholders"], str(file_path))
         
-        QMessageBox.information(self, "Sucesso", f"Modelo '{model_name}' salvo com sucesso em:\n{file_path}")
+        # Criação do Diálogo de Decisão Customizado
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Sucesso")
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setText("<b>Seu modelo foi salvo com sucesso!</b><br><br>Deseja sair do editor?")
+        
+        btn_exit = msg_box.addButton("Encerrar edição", QMessageBox.ButtonRole.AcceptRole)
+        btn_stay = msg_box.addButton("Continuar editando", QMessageBox.ButtonRole.RejectRole)
+        msg_box.setDefaultButton(btn_stay)
+
+        msg_box.exec()
+
+        if msg_box.clickedButton() == btn_exit:
+            self.close() # Fecha a janela do editor
     
     def load_background_image(self, path, update_ui=True, props=None):
         original_size = None
