@@ -1555,6 +1555,12 @@ class EditorWindow(QMainWindow):
             box.setZValue(b.get("z_value", 101))
             box.setVisible(b.get("visible", True))
             box.setOpacity(b.get("opacity", 1.0))
+            if b.get("locked", False):
+                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+                box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+                box.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+                if hasattr(box, 'handle_br'):
+                    box.handle_br.hide()
         # Linhas Guia
         guides_data = data.get("guidelines", [])
         for g in guides_data:
