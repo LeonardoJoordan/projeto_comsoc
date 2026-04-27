@@ -1183,9 +1183,9 @@ class EditorWindow(QMainWindow):
             if not hasattr(item, 'layer_id') or item.layer_id is None:
                 item.layer_id = self._get_next_layer_id()
 
-        assinaturas.sort(key=lambda x: x.zValue(), reverse=True)
-        textos.sort(key=lambda x: x.zValue(), reverse=True)
-        imagens.sort(key=lambda x: x.zValue(), reverse=True)
+        assinaturas.sort(key=lambda x: (x.zValue(), -(x.layer_id or 0)), reverse=True)
+        textos.sort(key=lambda x: (x.zValue(), -(x.layer_id or 0)), reverse=True)
+        imagens.sort(key=lambda x: (x.zValue(), -(x.layer_id or 0)), reverse=True)
 
         def toggle_item_visibility(item, effect):
             new_vis = not item.isVisible()
