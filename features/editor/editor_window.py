@@ -542,6 +542,30 @@ class EditorWindow(QMainWindow):
         
         return super().eventFilter(source, event)
     
+    def _migrate_model_data(self, data: dict) -> dict:
+        """Corrige apenas campos que causam quebra em modelos antigos.
+        Não preenche campos que o apply_scene_state já trata com .get()."""
+
+        # Garante layer_id em bg_props (acesso direto sem padrão)
+        if "bg_props" in data:
+            data["bg_props"].setdefault("layer_id", None)
+
+        # Garante layer_id e html nas caixas (html é lido com b["html"] sem .get())
+        for box in data.get("boxes", []):
+            box.setdefault("layer_id", None)
+            if "html" not in box:
+                texto = box.get("id", "Placeholder")
+                box["html"] = f"<p>{texto}</p>"
+
+        # Garante layer_id em assinaturas e imagens
+        for sig in data.get("signatures", []):
+            sig.setdefault("layer_id", None)
+
+        for img in data.get("images", []):
+            img.setdefault("layer_id", None)
+
+        return data
+    
     def load_from_json(self, file_path):
         path = Path(file_path)
         if not path.exists():
@@ -550,6 +574,7 @@ class EditorWindow(QMainWindow):
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
+        data = self._migrate_model_data(data)
         self.setWindowTitle(f"Editor Visual de Modelo - {data['name']}")
         
         # O apply_scene_state faz todo o trabalho duro de desenhar
@@ -1565,6 +1590,10 @@ class EditorWindow(QMainWindow):
         self.lst_placeholders.clear()
         for p in saved_placeholders:
             self.lst_placeholders.addItem(p)
+        # Retrocompatibilidade: garante layer_id em itens de modelos antigos
+        for item in self.scene.items():
+            if hasattr(item, 'layer_id') and item.layer_id is None:
+                item.layer_id = self._get_next_layer_id()
         self.sync_placeholders_list()
         self.refresh_layer_list()
 
@@ -1727,7 +1756,12 @@ class EditorWindow(QMainWindow):
     def _generate_layer_name(self, layer_id, item):
         if hasattr(item, 'custom_name') and item.custom_name:
             return item.custom_name
-            
+
+        if layer_id is None:
+            layer_id = self._get_next_layer_id()
+            if hasattr(item, 'layer_id'):
+                item.layer_id = layer_id
+
         prefix = f"{layer_id:02d}"
         if isinstance(item, DesignerBox):
             raw = item.text_item.toPlainText().strip().replace("\n", " ")
