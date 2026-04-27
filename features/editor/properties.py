@@ -80,14 +80,28 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_w.setDecimals(1)
         self.spin_w.setKeyboardTracking(False)
         self.spin_w.valueChanged.connect(self.widthChanged.emit)
-        form.addRow("Larg (mm):", self.spin_w)
+        
+        lbl_w = QLabel("Larg (mm):")
+        lbl_w.setToolTip(
+            "<b>LARGURA</b><br><br>"
+            "Define a dimensão física horizontal exata do objeto.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Valores inseridos aqui refletem o tamanho real (em milímetros) na impressão final.</small>"
+        )
+        form.addRow(lbl_w, self.spin_w)
 
         self.spin_h = MathDoubleSpinBox()
         self.spin_h.setRange(1.0, 5000.0)
         self.spin_h.setDecimals(1)
         self.spin_h.setKeyboardTracking(False)
         self.spin_h.valueChanged.connect(self.heightChanged.emit)
-        form.addRow("Alt (mm):", self.spin_h)
+        
+        lbl_h = QLabel("Alt (mm):")
+        lbl_h.setToolTip(
+            "<b>ALTURA</b><br><br>"
+            "Define a dimensão física vertical exata do objeto.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Se a opção 'Manter proporção' estiver ativa, a largura será ajustada automaticamente.</small>"
+        )
+        form.addRow(lbl_h, self.spin_h)
 
         self.spin_rot = QSpinBox()
         self.chk_proporcao = QCheckBox("Manter proporção")
@@ -112,25 +126,33 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_rot.setDecimals(0)
         self.spin_rot.setWrapping(True) 
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
-        form.addRow("Rot (°):", self.spin_rot)
+        
+        lbl_rot = QLabel("Rot (°):")
+        lbl_rot.setToolTip(
+            "<b>ROTAÇÃO</b><br><br>"
+            "Gira o objeto selecionado em graus (°) ao redor do seu ponto central.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Use valores positivos para girar no sentido horário ou negativos para o sentido anti-horário.</small>"
+        )
+        form.addRow(lbl_rot, self.spin_rot)
 
         self.spin_opacity = MathDoubleSpinBox()
-        self.spin_opacity.setToolTip("Define o nível de transparência do objeto (0 = invisível, 100 = totalmente opaco).")
         self.spin_opacity.setRange(0.0, 100.0)
         self.spin_opacity.setDecimals(0)
         self.spin_opacity.setValue(100.0)
         self.spin_opacity.valueChanged.connect(lambda v: self.opacityChanged.emit(v / 100.0))
-        form.addRow("Opac (%):", self.spin_opacity)
-        self.spin_opacity.setToolTip(
+        
+        lbl_opac = QLabel("Opac (%):")
+        lbl_opac.setToolTip(
             "<b>OPACIDADE</b><br><br>"
-            "Ajusta o nível de transparência do elemento (0% a 100%):<br>"
-            "• <b>Visibilidade:</b> Valores baixos tornam o objeto semitransparente.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Excelente para criar marcas d'água sutis ou sobrepor elementos sem esconder totalmente o fundo.</small>")
+            "Controla o nível de transparência do elemento (0% a 100%).<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Valores baixos são excelentes para criar marcas d'água sutis que não interferem na leitura de outros dados.</small>"
+        )
+        form.addRow(lbl_opac, self.spin_opacity)
 
         self.btn_restore = QPushButton("🔄 Restaurar Original")
         self.btn_restore.setToolTip(
             "<b>RESTAURAR ORIGINAL</b><br><br>"
-            "Reverte o objeto ao seu estado inicial de importação:<br>"
+            "Reverte o objeto ao seu estado inicial de importação:<br><br>"
             "• <b>Reset:</b> Redefine o tamanho nativo e remove qualquer rotação aplicada.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>")
         self.btn_restore.clicked.connect(self.restoreRequested.emit)
