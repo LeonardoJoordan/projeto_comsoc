@@ -136,6 +136,15 @@ class Guideline(QGraphicsLineItem):
                 
         return super().itemChange(change, value)
 
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        # Salva snapshot após mover a guia, igual aos outros itens
+        scene = self.scene()
+        if scene and scene.views():
+            win = scene.views()[0].window()
+            if hasattr(win, 'save_snapshot'):
+                win.save_snapshot()
+
 
 class ImageItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
