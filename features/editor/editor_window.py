@@ -216,7 +216,8 @@ class EditorWindow(QMainWindow):
 
         self.layer_list = QListWidget()
         self.layer_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        self.layer_list.itemClicked.connect(self._on_layer_list_clicked)
+        self.layer_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.layer_list.itemSelectionChanged.connect(self._on_layer_selection_changed)
         self.layer_list.itemChanged.connect(self._on_layer_item_changed)
         self.layer_list.itemDoubleClicked.connect(self.rename_layer)
         self.layer_list.model().rowsMoved.connect(self._on_layer_reordered)
@@ -613,6 +614,17 @@ class EditorWindow(QMainWindow):
 
         file_path = model_dir / "template_v3.json"
         
+        if file_path.exists():
+            try:
+                with open(file_path, "r", encoding="utf-8") as f:
+                    old_data = json.load(f)
+                
+                for key in ["last_export_format", "last_single_pdf", "output_suffix", "imposition_settings"]:
+                    if key in old_data:
+                        data[key] = old_data[key]
+            except Exception as e:
+                print(f"Aviso: Não foi possível preservar os metadados antigos. {e}")
+                
         data["name"] = model_name
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
@@ -941,18 +953,17 @@ class EditorWindow(QMainWindow):
         
         self.update_position_ui()
 
-        # Sincroniza a seleção na lista de camadas (UI)
+        # Sincroniza a seleção na lista de camadas (UI) — suporta múltipla seleção
+        self.layer_list.blockSignals(True)
         if sel:
-            target_item = sel[0]
-            self.layer_list.blockSignals(True)
+            sel_set = set(sel)
             for i in range(self.layer_list.count()):
                 list_item = self.layer_list.item(i)
-                if list_item.data(Qt.ItemDataRole.UserRole) == target_item:
-                    self.layer_list.setCurrentItem(list_item)
-                    break
-            self.layer_list.blockSignals(False)
+                is_selected = list_item.data(Qt.ItemDataRole.UserRole) in sel_set
+                list_item.setSelected(is_selected)
         else:
             self.layer_list.clearSelection()
+        self.layer_list.blockSignals(False)
 
         if boxes:
             target_box = boxes[0]
@@ -1024,13 +1035,26 @@ class EditorWindow(QMainWindow):
         self.sync_placeholders_list()
         self.refresh_layer_list()
 
-    def _on_layer_list_clicked(self, list_item):
-        target_item = list_item.data(Qt.ItemDataRole.UserRole)
-        if target_item:
-            self.scene.clearSelection()
-            target_item.setSelected(True)
-            self.view.ensureVisible(target_item)
-            self.view.setFocus()
+    def _on_layer_selection_changed(self):
+        selected_list_items = self.layer_list.selectedItems()
+        if not selected_list_items:
+            return
+
+        self.scene.blockSignals(True)
+        self.scene.clearSelection()
+        for list_item in selected_list_items:
+            target_item = list_item.data(Qt.ItemDataRole.UserRole)
+            if target_item:
+                target_item.setSelected(True)
+        self.scene.blockSignals(False)
+
+        # Dispara manualmente para atualizar os painéis laterais
+        self.on_selection_changed()
+
+        last = selected_list_items[-1].data(Qt.ItemDataRole.UserRole)
+        if last:
+            self.view.ensureVisible(last)
+        self.view.setFocus()
 
     def _on_layer_item_changed(self, list_item):
         target_item = list_item.data(Qt.ItemDataRole.UserRole)
@@ -1422,11 +1446,13 @@ class EditorWindow(QMainWindow):
         # Salva qual layer estava selecionada antes de limpar
         # Identifica o fundo atual antes de limpar a cena
         old_bg = self.background_path
-        selected_layer_id = None
+        selected_layer_ids = set()
         sel = self.scene.selectedItems()
-        if sel and hasattr(sel[0], 'layer_id'):
-            selected_layer_id = sel[0].layer_id
+        for s in sel:
+            if hasattr(s, 'layer_id') and s.layer_id is not None:
+                selected_layer_ids.add(s.layer_id)
 
+        self.scene.clearSelection()
         self.scene.clear()
         self.bg_item = None
         
@@ -1603,12 +1629,11 @@ class EditorWindow(QMainWindow):
         self.sync_placeholders_list()
         self.refresh_layer_list()
 
-        # Restaura a seleção do item que estava ativo
-        if selected_layer_id is not None:
+        # Restaura a seleção múltipla dos itens que estavam ativos
+        if selected_layer_ids:
             for item in self.scene.items():
-                if getattr(item, 'layer_id', None) == selected_layer_id:
+                if getattr(item, 'layer_id', None) in selected_layer_ids:
                     item.setSelected(True)
-                    break
 
         # Se for um Undo/Redo e o fundo mudou, reaplica o enquadramento (Zoom to Fit)
         if is_undo_redo and old_bg != data.get("background_path"):
