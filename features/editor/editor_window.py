@@ -635,7 +635,7 @@ class EditorWindow(QMainWindow):
         if msg_box.clickedButton() == btn_exit:
             self.close() # Fecha a janela do editor
     
-    def load_background_image(self, path, update_ui=True, props=None):
+    def load_background_image(self, path, update_ui=True, props=None, force_document_resize=False):
         original_size = None
         if path:
             reader = QImageReader(path)
@@ -676,7 +676,7 @@ class EditorWindow(QMainWindow):
             h_px = mm_to_px(self.spin_phys_h.value())
             self.bg_item.resize_custom(w_px, h_px)
 
-        if update_ui and original_size:
+        if force_document_resize and original_size:
                 # Lê o tamanho original da imagem ao importar manualmente e molda a "Prancheta"
                 w_mm = px_to_mm(original_size.width())
                 h_mm = px_to_mm(original_size.height())
@@ -988,7 +988,7 @@ class EditorWindow(QMainWindow):
     def _on_click_load_bg(self):
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Fundo", "", "Imagens (*.png *.jpg *.jpeg)")
         if path:
-            self.load_background_image(path)
+            self.load_background_image(path, force_document_resize=True)
 
 
     def _on_click_add_signature(self):
