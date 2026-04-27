@@ -54,7 +54,20 @@ class CaixaDeTextoPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        lbl = QLabel("<b>PPROPRIEDADES DO OBJETO</b>")
+        lbl = QLabel("<b>PROPRIEDADES DO OBJETO</b>")
+        lbl.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        tooltip_propriedades = (
+            "<b>PROPRIEDADES DO OBJETO</b><br><br>"
+            "Ajustes técnicos de dimensionamento, visualização e comportamento do elemento selecionado.<br><br>"
+            "• <b>Largura e Altura:</b> Define a dimensão física exata do objeto em milímetros (mm).<br>"
+            "• <b>Manter proporção:</b> Trava a relação entre os eixos para evitar deformações no redimensionamento.<br>"
+            "• <b>Rotação:</b> Gira o objeto em graus (°) em torno do seu próprio eixo central.<br>"
+            "• <b>Opacidade:</b> Controla a transparência do item. Útil para marcas d'água ou sobreposições sutis.<br>"
+            "• <b>Restaurar original:</b> Reseta a escala e rotação para os valores nativos do arquivo importado.<br>"
+            "• <b>Habilitar link:</b> Transforma o objeto em um botão clicável no PDF (requer campo de URL na tabela).<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Use 'Manter proporção' ativado para garantir que logotipos e fotos não percam a integridade visual ao serem ajustados.</small>"
+        )
+        lbl.setToolTip(tooltip_propriedades)
         layout.addWidget(lbl)
         self._aspect_ratio = 1.0
         
@@ -211,6 +224,21 @@ class EditorDeTextoPanel(QWidget):
         
         lbl = QLabel("EDITOR DE TEXTO")
         lbl.setStyleSheet("font-weight: bold; font-size: 12px; border-bottom: 1px solid #ccc;")
+        lbl.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        
+        tooltip_editor = (
+            "<b>EDITOR DE TEXTO</b><br><br>"
+            "Ferramentas de formatação tipográfica e espaçamento do bloco de texto selecionado.<br><br>"
+            "• <b>Fonte e Tamanho:</b> Define a família tipográfica e a escala da fonte.<br>"
+            "• <b>Estilos:</b> Aplica negrito (Ctrl+B), itálico (Ctrl+I) ou sublinhado (Ctrl+U).<br>"
+            "• <b>Cor:</b> Define a cor do texto para garantir bom contraste com a imagem de fundo.<br>"
+            "• <b>Alinhamento horizontal:</b> Posiciona o texto nas laterais (Esq/Dir), Centralizado ou Justificado.<br>"
+            "• <b>Alinhamento vertical:</b> Fixa o conteúdo no Topo, no Meio ou na Base da moldura.<br>"
+            "• <b>Recuo:</b> Define o recuo horizontal da primeira linha para organizar visualmente o início dos parágrafos.<br>"
+            "• <b>Entrelinha:</b> Controla a distância vertical entre as linhas, melhorando a legibilidade ou compactando o bloco.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Para caixas que receberão nomes curtos ou longos, ajuste o alinhamento vertical para 'Meio' para mantê-los sempre perfeitamente centralizados na altura.</small>"
+        )
+        lbl.setToolTip(tooltip_editor)
         layout.addWidget(lbl)
         
         layout.addWidget(QLabel("Texto:"))
@@ -224,11 +252,24 @@ class EditorDeTextoPanel(QWidget):
         layout.addWidget(self.txt_content)
         
         row_font = QHBoxLayout()
+        
         self.cbo_font = QFontComboBox()
+        self.cbo_font.setToolTip(
+            "<b>FAMÍLIA TIPOGRÁFICA</b><br><br>"
+            "Define a fonte (tipo de letra) do texto ou da seleção atual.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Dê preferência a fontes limpas (como Arial, Roboto ou Montserrat) para garantir máxima legibilidade em impressões menores.</small>"
+        )
         self.cbo_font.currentFontChanged.connect(self.set_font_family)
+        
         self.spin_size = QSpinBox()
         self.spin_size.setRange(6, 300)
+        self.spin_size.setToolTip(
+            "<b>TAMANHO DA FONTE</b><br><br>"
+            "Ajusta a escala do texto em pontos tipográficos (pt).<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Nomes e títulos principais costumam ter grande destaque, enquanto cargos e prefixos usam tamanhos reduzidos.</small>"
+        )
         self.spin_size.valueChanged.connect(self.set_font_size)
+        
         row_font.addWidget(self.cbo_font, 2)
         row_font.addWidget(self.spin_size, 1)
         layout.addLayout(row_font)
@@ -239,18 +280,39 @@ class EditorDeTextoPanel(QWidget):
         self.btn_bold.setFixedWidth(30)
         self.btn_bold.setStyleSheet("font-weight: bold")
         self.btn_bold.setCheckable(True)
+        self.btn_bold.setToolTip(
+            "<b>NEGRITO</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: Ctrl + B</small>"
+            "<br><br>"
+            "Aumenta a espessura da fonte para dar destaque ao texto selecionado.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Ideal para chamar a atenção para nomes, cargos ou informações cruciais no documento.</small>"
+        )
         self.btn_bold.clicked.connect(lambda: self.set_format_attribute("bold"))
 
         self.btn_italic = QPushButton("I")
         self.btn_italic.setFixedWidth(30)
         self.btn_italic.setStyleSheet("font-style: italic")
         self.btn_italic.setCheckable(True)
+        self.btn_italic.setToolTip(
+            "<b>ITÁLICO</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: Ctrl + I</small>"
+            "<br><br>"
+            "Inclina o texto selecionado, alterando seu estilo visual sem mudar o peso.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Utilize para destacar citações, nomes científicos ou palavras de origem estrangeira.</small>"
+        )
         self.btn_italic.clicked.connect(lambda: self.set_format_attribute("italic"))
 
         self.btn_underline = QPushButton("U")
         self.btn_underline.setFixedWidth(30)
         self.btn_underline.setStyleSheet("text-decoration: underline")
         self.btn_underline.setCheckable(True)
+        self.btn_underline.setToolTip(
+            "<b>SUBLINHADO</b><br>"
+            "<small style='color: #A0A0A0;'>Atalho: Ctrl + U</small>"
+            "<br><br>"
+            "Adiciona uma linha contínua sob o texto para ressaltar informações.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Evite usar em blocos de texto muito grandes para não sobrecarregar o design.</small>"
+        )
         self.btn_underline.clicked.connect(lambda: self.set_format_attribute("underline"))
 
         self.btn_color = QPushButton("")
@@ -292,27 +354,34 @@ class EditorDeTextoPanel(QWidget):
         layout.addLayout(row_style)
 
         form_space = QFormLayout()
+        
+        # Recuo com label manual para tooltip
+        lbl_indent = QLabel("Recuo 1ª (px):")
+        lbl_indent.setToolTip(
+            "<b>RECUO DA PRIMEIRA LINHA</b><br><br>"
+            "Define o recuo horizontal inicial do bloco de texto.<br><br>"
+            "• <b>Estética:</b> Cria o efeito visual de parágrafo organizado.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Um valor entre 20 e 40px é o ideal para documentos formais.</small>")
+        
         self.spin_indent = MathDoubleSpinBox()
         self.spin_indent.setRange(0, 500)
         self.spin_indent.valueChanged.connect(self._on_indent_changed)
-        form_space.addRow("Recuo 1ª (px):", self.spin_indent)
-        self.spin_indent.setToolTip(
-            "<b>RECUO DA PRIMEIRA LINHA</b><br><br>"
-            "Define o recuo horizontal inicial do bloco de texto:<br>"
-            "• <b>Organização:</b> Cria o efeito visual de parágrafo sem a necessidade de espaços manuais.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Um recuo entre 20 e 40px costuma ser o ideal para dar um aspeto elegante a convites e documentos.</small>")
+        form_space.addRow(lbl_indent, self.spin_indent)
         
+        # Entrelinha com label manual para tooltip
+        lbl_lh = QLabel("Entrelinha:")
+        lbl_lh.setToolTip(
+            "<b>ENTRELINHA</b><br><br>"
+            "Controla a distância vertical entre as linhas do parágrafo.<br><br>"
+            "• <b>Legibilidade:</b> Valores maiores tornam a leitura mais fluida.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: 1.15 é o padrão de conforto; use 1.0 para compactar informações.</small>")
+
         self.spin_lh = MathDoubleSpinBox()
         self.spin_lh.setRange(0.5, 5.0)
         self.spin_lh.setSingleStep(0.1)
         self.spin_lh.setValue(1.15)
         self.spin_lh.valueChanged.connect(lambda val: self.lineHeightChanged.emit(val))
-        form_space.addRow("Entrelinha:", self.spin_lh)
-        self.spin_lh.setToolTip(
-            "<b>ENTRELINHA (LINE HEIGHT)</b><br><br>"
-            "Controla a distância vertical entre as linhas de um parágrafo:<br>"
-            "• <b>Legibilidade:</b> Valores maiores facilitam a leitura; valores menores compactam o texto.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: O valor 1.15 é o padrão para leitura confortável. Use 1.0 para listas compactas ou 1.5 para designs artísticos.</small>")
+        form_space.addRow(lbl_lh, self.spin_lh)
         
         layout.addLayout(form_space)
         layout.addStretch()
