@@ -734,6 +734,14 @@ class EditorWindow(QMainWindow):
         y = center.y() - (h / 2)
         
         box = DesignerBox(x, y, w, h, "{campo}")
+        
+        # Força o Z-Value para o topo do grupo de Textos
+        base_z = 101
+        for item in self.scene.items():
+            if isinstance(item, DesignerBox) and item.zValue() >= base_z:
+                base_z = int(item.zValue()) + 1
+        box.setZValue(base_z)
+        
         self.scene.addItem(box)
         self.scene.clearSelection()
         box.setSelected(True)
@@ -1055,6 +1063,15 @@ class EditorWindow(QMainWindow):
             sig = SignatureItem(path)
             center = self.view.mapToScene(self.view.viewport().rect().center())
             sig.setPos(center.x() - (sig.pixmap().width() / 2), center.y() - (sig.pixmap().height() / 2))
+            
+            # Força o Z-Value para o topo do grupo de Assinaturas
+            base_z = 201
+            for item in self.scene.items():
+                if isinstance(item, SignatureItem) and item.zValue() >= base_z:
+                    base_z = int(item.zValue()) + 1
+            sig.setZValue(base_z)
+            
+            self.scene.addItem(sig) # Bug fix: a assinatura não estava sendo adicionada à cena
             self.refresh_layer_list()
             self.save_snapshot()
 
@@ -1068,9 +1085,9 @@ class EditorWindow(QMainWindow):
             # Trava automática no Z-Value topo da faixa de Imagens
             base_z = 1
             for item in self.scene.items():
-                if isinstance(item, ImageItem) and item.zValue() >= base_z:
+                if isinstance(item, ImageItem) and not isinstance(item, BackgroundItem) and item.zValue() >= base_z:
                     base_z = int(item.zValue()) + 1
-            img.setZValue(min(base_z, 100))
+            img.setZValue(base_z)
             
             self.scene.addItem(img)
             self.refresh_layer_list()
