@@ -589,7 +589,7 @@ class EditorWindow(QMainWindow):
     def export_to_json(self):
         data = self.get_current_scene_state()
         model_name = data["name"]
-        if not model_name or "Gerador de Cartões em Lote - GCL" in model_name:
+        if not model_name or model_name == "Editor Visual de Modelo":
             model_name, ok = QInputDialog.getText(self, "Salvar Modelo", "Nome do Modelo:")
             if not ok or not model_name: return
             self.setWindowTitle(f"Editor Visual de Modelo - {model_name}")
@@ -721,7 +721,12 @@ class EditorWindow(QMainWindow):
         return sorted(list(placeholders))
     
     def add_new_box(self):
-        box = DesignerBox(350, 450, 300, 60, "{campo}")
+        center = self.view.mapToScene(self.view.viewport().rect().center())
+        w, h = 300, 60
+        x = center.x() - (w / 2)
+        y = center.y() - (h / 2)
+        
+        box = DesignerBox(x, y, w, h, "{campo}")
         self.scene.addItem(box)
         self.scene.clearSelection()
         box.setSelected(True)
@@ -779,29 +784,64 @@ class EditorWindow(QMainWindow):
             self.save_snapshot()
 
     def duplicate_selected(self):
-        original = self._get_selected()
-        if not original: return
+        selected_items = self.scene.selectedItems()
+        valid_items = [i for i in selected_items if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
+        
+        if not valid_items: 
+            return
 
-        offset = 20
-        new_x = original.x() + offset
-        new_y = original.y() + offset
-        rect = original.rect()
-        
-        new_box = DesignerBox(new_x, new_y, rect.width(), rect.height(), "")
-        new_box.layer_id = None 
-        
-        new_box.state = copy.deepcopy(original.state)
-        new_box.setRotation(original.rotation())
-        new_box.apply_state()
-        new_box.update_center()
-
-        self.scene.addItem(new_box)
-        self.refresh_layer_list()
-        
         self.scene.clearSelection()
-        new_box.setSelected(True)
+
+        for original in valid_items:
+            if isinstance(original, DesignerBox):
+                rect = original.rect()
+                new_item = DesignerBox(original.x(), original.y(), rect.width(), rect.height(), "")
+                new_item.state = copy.deepcopy(original.state)
+                new_item.setRotation(original.rotation())
+                new_item.apply_state()
+                new_item.update_center()
+                
+            elif isinstance(original, (ImageItem, SignatureItem)):
+                if isinstance(original, ImageItem):
+                    new_item = ImageItem(getattr(original, '_original_path', ''))
+                    new_item.has_link = getattr(original, 'has_link', False)
+                else:
+                    new_item = SignatureItem(getattr(original, '_original_path', ''))
+                
+                rect = original.pixmap().rect()
+                new_item.resize_custom(rect.width(), rect.height())
+                new_item.setRotation(original.rotation())
+                new_item.setPos(original.x(), original.y())
+
+            new_item.setZValue(original.zValue() + 0.01)
+            
+            # Propriedades Comuns
+            new_item.layer_id = None
+            base_name = self._generate_layer_name(getattr(original, 'layer_id', None), original)
+
+            # Remove qualquer sufixo de cópia anterior para sempre partir do nome limpo
+            import re
+            base_name = re.sub(r' - Cópia(\s\d+)?$', '', base_name)
+
+            existing_names = [
+                getattr(i, 'custom_name', '') or self._generate_layer_name(getattr(i, 'layer_id', None), i)
+                for i in self.scene.items()
+                if hasattr(i, 'layer_id')
+            ]
+            copy_name = f"{base_name} - Cópia"
+            counter = 2
+            while copy_name in existing_names:
+                copy_name = f"{base_name} - Cópia {counter}"
+                counter += 1
+            new_item.custom_name = copy_name
+
+            self.scene.addItem(new_item)
+            new_item.setSelected(True)
+
+        self.refresh_layer_list()
         self.sync_placeholders_list()
         self.save_snapshot()
+        self.on_selection_changed()
 
     def delete_selected_items(self):
         selected = self.scene.selectedItems()
@@ -1007,8 +1047,7 @@ class EditorWindow(QMainWindow):
         if path:
             sig = SignatureItem(path)
             center = self.view.mapToScene(self.view.viewport().rect().center())
-            sig.setPos(center)
-            self.scene.addItem(sig)
+            sig.setPos(center.x() - (sig.pixmap().width() / 2), center.y() - (sig.pixmap().height() / 2))
             self.refresh_layer_list()
             self.save_snapshot()
 
@@ -1017,7 +1056,7 @@ class EditorWindow(QMainWindow):
         if path:
             img = ImageItem(path)
             center = self.view.mapToScene(self.view.viewport().rect().center())
-            img.setPos(center)
+            img.setPos(center.x() - (img.pixmap().width() / 2), center.y() - (img.pixmap().height() / 2))
             
             # Trava automática no Z-Value topo da faixa de Imagens
             base_z = 1
