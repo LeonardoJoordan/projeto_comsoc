@@ -251,6 +251,7 @@ class EditorDeTextoPanel(QWidget):
         tooltip_editor = (
             "<b>EDITOR DE TEXTO</b><br><br>"
             "Ferramentas de formatação tipográfica e espaçamento do bloco de texto selecionado.<br><br>"
+            "• <b>Texto:</b> Defina a redação e crie as chaves que o sistema substituirá automaticamente pelas informações da sua tabela.<br>"
             "• <b>Fonte e Tamanho:</b> Define a família tipográfica e a escala da fonte.<br>"
             "• <b>Estilos:</b> Aplica negrito (Ctrl+B), itálico (Ctrl+I) ou sublinhado (Ctrl+U).<br>"
             "• <b>Cor:</b> Define a cor do texto para garantir bom contraste com a imagem de fundo.<br>"
@@ -263,7 +264,19 @@ class EditorDeTextoPanel(QWidget):
         lbl.setToolTip(tooltip_editor)
         layout.addWidget(lbl)
         
-        layout.addWidget(QLabel("Texto:"))
+        lbl_texto = QLabel("Texto:")
+        lbl_texto.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        tooltip_texto = (
+            "<b>CONTEÚDO E VARIÁVEIS (PLACEHOLDERS)</b><br><br>"
+            "Área de digitação para textos fixos e criação do motor dinâmico do seu modelo.<br><br>"
+            "• <b>Como criar:</b> Envolva qualquer palavra com chaves (ex: <b>{Nome}</b>) para que o sistema crie automaticamente uma coluna na sua tabela de preenchimento.<br>"
+            "• <b>Caracteres Proibidos:</b> O sistema reconhece <b>apenas letras, números e subtraços (_)</b>. O uso de espaços, acentos ou símbolos quebra a variável, transformando-a em texto estático.<br>"
+            "• <b>Composição:</b> Você pode misturar texto estático e variáveis na mesma caixa (ex: <i>Certificamos que {Aluno} concluiu...</i>).<br>"
+            "• <b>Ocultação Automática:</b> Se uma variável estiver vazia na tabela, <b>toda a caixa de texto ficará invisível</b> naquele cartão, evitando lixo visual na impressão final.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica Smart: Agrupe rótulos e variáveis na mesma caixa (ex: \"WhatsApp: {Telefone}\"). Assim, se a pessoa não tiver telefone cadastrado, a palavra \"WhatsApp:\" some junto com a variável, mantendo o layout impecável.</small>"
+        )
+        lbl_texto.setToolTip(tooltip_texto)
+        layout.addWidget(lbl_texto)
         
         self.txt_content = CleanTextEdit()
         self.txt_content.setMinimumHeight(160)
@@ -352,7 +365,7 @@ class EditorDeTextoPanel(QWidget):
         row_style.addWidget(self.btn_color)
         
         self.cbo_align = QComboBox()
-        self.cbo_align.addItems(["Esq", "Cen", "Dir", "Just"])
+        self.cbo_align.addItems(["Esquerda", "Centro", "Direita", "Justificado"])
         self.cbo_align.setToolTip(
             "<b>ALINHAMENTO HORIZONTAL</b><br><br>"
             "Define a posição do texto em relação às laterais da caixa:<br>"
