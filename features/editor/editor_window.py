@@ -286,13 +286,13 @@ class EditorWindow(QMainWindow):
         
         self.spin_pos_x = MathDoubleSpinBox()
         self.spin_pos_x.setRange(-5000, 20000)
-        self.spin_pos_x.setDecimals(1)
+        self.spin_pos_x.setDecimals(2)
         self.spin_pos_x.setKeyboardTracking(False)
         self.spin_pos_x.setEnabled(False)
         
         self.spin_pos_y = MathDoubleSpinBox()
         self.spin_pos_y.setRange(-5000, 20000)
-        self.spin_pos_y.setDecimals(1)
+        self.spin_pos_y.setDecimals(2)
         self.spin_pos_y.setKeyboardTracking(False)
         self.spin_pos_y.setEnabled(False)
         
@@ -523,14 +523,21 @@ class EditorWindow(QMainWindow):
                     return True
                 
                 if key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
-                    step = 10 if (event.modifiers() & Qt.KeyboardModifier.ShiftModifier) else 1
+                    zoom = self.view.transform().m11()
+                    rect = self.scene.sceneRect()
+                    ref = min(rect.width(), rect.height()) / 300
+                    step = max(1, round(ref / zoom))
+                    if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                        step = max(1, step * 10)
                     dx = -step if key == Qt.Key.Key_Left else (step if key == Qt.Key.Key_Right else 0)
                     dy = -step if key == Qt.Key.Key_Up else (step if key == Qt.Key.Key_Down else 0)
                     sel_items = self.scene.selectedItems()
                     if sel_items:
                         for item in sel_items:
                             if item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable:
+                                item._keyboard_move = True
                                 item.moveBy(dx, dy)
+                                item._keyboard_move = False
                         self.on_selection_changed() # Sincroniza a barra superior
                         return True
 

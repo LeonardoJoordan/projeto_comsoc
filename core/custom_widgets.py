@@ -36,8 +36,14 @@ class MathDoubleSpinBox(QDoubleSpinBox):
             result = self._evaluate_math(clean_text)
             return float(result)
         except Exception:
-            # Se falhar (ex: texto inválido), retorna o valor padrão usando o método da classe pai
-            return super().valueFromText(text)
+            # Tenta avaliar removendo operadores ou pontos flutuantes do final
+            try:
+                transient_clean = clean_text.rstrip('.,+-*/')
+                if transient_clean:
+                    return float(self._evaluate_math(transient_clean))
+            except:
+                pass
+            return self.value()
 
     def validate(self, input_text, pos):
         # Permitimos qualquer caractere temporariamente durante a digitação 

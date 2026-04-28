@@ -95,7 +95,7 @@ class Guideline(QGraphicsLineItem):
     def shape(self):
         path = super().shape()
         stroker = QPainterPathStroker()
-        stroker.setWidth(10) 
+        stroker.setWidth(15) 
         return stroker.createStroke(path)
     
     def paint(self, painter, option, widget=None):
@@ -104,9 +104,11 @@ class Guideline(QGraphicsLineItem):
     
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            if getattr(self, '_keyboard_move', False):
+                return value
             new_pos = value
             rect = self.scene().sceneRect()
-            snap_dist = 15 
+            snap_dist = max(10, min(rect.width(), rect.height()) * 0.02)
             
             if self.is_vertical:
                 x = new_pos.x()
@@ -186,6 +188,8 @@ class ImageItem(QGraphicsPixmapItem):
                     self.handle_br.hide()
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            if getattr(self, '_keyboard_move', False):
+                return value
             new_pos = value
             rect = self.pixmap().rect()
             w, h = rect.width(), rect.height()
@@ -322,6 +326,8 @@ class SignatureItem(QGraphicsPixmapItem):
                     self.handle_br.hide()
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            if getattr(self, '_keyboard_move', False):
+                return value
             new_pos = value
             rect = self.pixmap().rect()
             w, h = rect.width(), rect.height()
@@ -453,6 +459,8 @@ class DesignerBox(QGraphicsRectItem):
                     self.handle_br.hide()
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
+            if getattr(self, '_keyboard_move', False):
+                return value
             new_pos = value
             rect = self.rect()
             w, h = rect.width(), rect.height()

@@ -40,9 +40,9 @@ class CleanTextEdit(QTextEdit):
             super().insertFromMimeData(source)
 
 class CaixaDeTextoPanel(QWidget):
-    widthChanged = Signal(int)
-    heightChanged = Signal(int)
-    rotationChanged = Signal(int)
+    widthChanged = Signal(float)
+    heightChanged = Signal(float)
+    rotationChanged = Signal(float)
     proportionToggled = Signal(bool) # Novo sinal para a Checkbox
     linkToggled = Signal(bool)
     restoreRequested = Signal()
@@ -77,7 +77,7 @@ class CaixaDeTextoPanel(QWidget):
 
         self.spin_w = MathDoubleSpinBox()
         self.spin_w.setRange(1.0, 5000.0)
-        self.spin_w.setDecimals(1)
+        self.spin_w.setDecimals(2)
         self.spin_w.setKeyboardTracking(False)
         self.spin_w.valueChanged.connect(self.widthChanged.emit)
         
@@ -91,7 +91,7 @@ class CaixaDeTextoPanel(QWidget):
 
         self.spin_h = MathDoubleSpinBox()
         self.spin_h.setRange(1.0, 5000.0)
-        self.spin_h.setDecimals(1)
+        self.spin_h.setDecimals(2)
         self.spin_h.setKeyboardTracking(False)
         self.spin_h.valueChanged.connect(self.heightChanged.emit)
         
@@ -123,7 +123,7 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_h.valueChanged.connect(self._on_h_changed)
         self.spin_rot = MathDoubleSpinBox()
         self.spin_rot.setRange(-360, 360)
-        self.spin_rot.setDecimals(0)
+        self.spin_rot.setDecimals(1)
         self.spin_rot.setWrapping(True) 
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
         
@@ -214,17 +214,25 @@ class CaixaDeTextoPanel(QWidget):
 
     def _on_w_changed(self, val):
         if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
+            new_h = val / self._aspect_ratio
             self.spin_h.blockSignals(True)
-            self.spin_h.setValue(val / self._aspect_ratio)
+            self.spin_h.setValue(new_h)
             self.spin_h.blockSignals(False)
-        self.widthChanged.emit(val)
+            self.widthChanged.emit(val)
+            self.heightChanged.emit(new_h)
+        else:
+            self.widthChanged.emit(val)
 
     def _on_h_changed(self, val):
         if self.chk_proporcao.isChecked() and self._aspect_ratio > 0:
+            new_w = val * self._aspect_ratio
             self.spin_w.blockSignals(True)
-            self.spin_w.setValue(val * self._aspect_ratio)
+            self.spin_w.setValue(new_w)
             self.spin_w.blockSignals(False)
-        self.heightChanged.emit(val)
+            self.heightChanged.emit(val)
+            self.widthChanged.emit(new_w)
+        else:
+            self.heightChanged.emit(val)
 
     
 class EditorDeTextoPanel(QWidget):

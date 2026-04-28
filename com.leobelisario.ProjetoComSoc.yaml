@@ -31,8 +31,10 @@ modules:
       - mkdir -p /app/share/icons/hicolor/512x512/apps
       
       # VASSOURA: Apaga os ambientes virtuais e pastas de compilação antes de copiar
-      - rm -rf venv .venv .git build build-dir repo *.flatpak .flatpak-builder
-      - cp -r * /app/share/projeto-comsoc/
+      - cp main.py /app/share/projeto-comsoc/
+      - cp -r core /app/share/projeto-comsoc/
+      - cp -r features /app/share/projeto-comsoc/
+      - cp -r shared /app/share/projeto-comsoc/
       - cp icone.png /app/share/icons/hicolor/512x512/apps/com.leobelisario.ProjetoComSoc.png
       
       # Cria o executável
@@ -60,3 +62,8 @@ modules:
     sources:
       - type: dir
         path: .
+
+# Assim que a instalação terminar, você pode retomar a sequência de compilação normalmente:
+#    flatpak-builder --repo=repo --force-clean build-dir com.leobelisario.ProjetoComSoc.yaml
+#    flatpak build-bundle repo ProjetoComSoc.flatpak com.leobelisario.ProjetoComSoc
+#    flatpak install --reinstall ProjetoComSoc.flatpak
