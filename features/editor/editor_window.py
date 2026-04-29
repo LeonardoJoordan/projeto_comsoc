@@ -243,6 +243,7 @@ class EditorWindow(QMainWindow):
         
         self.bg_item = None
         self.background_path = None
+        self._space_pan_items = []
         
         self.fallback_bg = self.scene.addRect(0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
         self.fallback_bg.setZValue(-200) # Afundado para -200 para ficar atrás do BackgroundItem (-100)
@@ -520,13 +521,16 @@ class EditorWindow(QMainWindow):
             if event.type() == QEvent.Type.Resize:
                 self._update_workspace_scene_rect()
 
+            if event.type() == QEvent.Type.FocusOut:
+                self._leave_space_pan_mode()
+
             # --- Eventos de Teclado (Pressionar) ---
             if event.type() == QEvent.Type.KeyPress:
                 key = event.key()
                 
                 # 2. Ativar Pan (Mãozinha) ao segurar Espaço
                 if key == Qt.Key.Key_Space and not event.isAutoRepeat():
-                    self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+                    self._enter_space_pan_mode()
                     return True
                 
                 if key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
@@ -552,7 +556,7 @@ class EditorWindow(QMainWindow):
             elif event.type() == QEvent.Type.KeyRelease:
                 # 3. Desativar Pan (Voltar para seleção) ao soltar Espaço
                 if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
-                    self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+                    self._leave_space_pan_mode()
                     return True
         
         return super().eventFilter(source, event)
@@ -1139,9 +1143,6 @@ class EditorWindow(QMainWindow):
         # Dispara manualmente para atualizar os painéis laterais
         self.on_selection_changed()
 
-        last = selected_list_items[-1].data(Qt.ItemDataRole.UserRole)
-        if last:
-            self.view.ensureVisible(last)
         self.view.setFocus()
 
     def _on_layer_item_changed(self, list_item):
@@ -1840,6 +1841,29 @@ class EditorWindow(QMainWindow):
     def _get_selected_items(self):
         sel = self.scene.selectedItems()
         return [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
+
+    def _enter_space_pan_mode(self):
+        if self.view.dragMode() == QGraphicsView.DragMode.ScrollHandDrag:
+            return
+
+        self._space_pan_items = []
+        for item in self.scene.items():
+            buttons = item.acceptedMouseButtons()
+            if buttons != Qt.MouseButton.NoButton:
+                self._space_pan_items.append((item, buttons))
+                item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+
+        self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
+
+    def _leave_space_pan_mode(self):
+        self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+
+        for item, buttons in getattr(self, "_space_pan_items", []):
+            try:
+                item.setAcceptedMouseButtons(buttons)
+            except RuntimeError:
+                pass
+        self._space_pan_items = []
 
     def _get_document_rect(self):
         return QRectF(getattr(self, "_document_rect", self.scene.sceneRect()))
