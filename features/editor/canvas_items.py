@@ -106,26 +106,95 @@ class ResizeHandle(QGraphicsRectItem):
     MIN_WIDTH = 40
     MIN_HEIGHT = 30
 
-    def __init__(self, parent):
+    def __init__(self, parent, name, x_dir, y_dir, cursor):
         super().__init__(-6, -6, 12, 12, parent)
+        self.name = name
+        self.x_dir = x_dir
+        self.y_dir = y_dir
         self.setBrush(QBrush(QColor("#27ae60")))
         self.setPen(QPen(Qt.GlobalColor.white, 2))
         self.setAcceptHoverEvents(True)
-        self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+        self.setCursor(cursor)
+        self.setZValue(1000)
         self._is_resizing = False
         self._anchor_scene = None
+        self._initial_w = 1.0
+        self._initial_h = 1.0
         self.initial_ratio = 1.0
+
+    def _anchor_local_point(self, w, h):
+        if self.x_dir < 0:
+            anchor_x = w
+        elif self.x_dir > 0:
+            anchor_x = 0
+        else:
+            anchor_x = w / 2
+
+        if self.y_dir < 0:
+            anchor_y = h
+        elif self.y_dir > 0:
+            anchor_y = 0
+        else:
+            anchor_y = h / 2
+
+        return QPointF(anchor_x, anchor_y)
+
+    def _resize_from_local_delta(self, local_delta):
+        ratio = self.initial_ratio if self.initial_ratio > 0 else 1.0
+        keep_proportion = getattr(self.parentItem(), 'keep_proportion', True)
+
+        if self.x_dir and self.y_dir:
+            raw_w = local_delta.x() * self.x_dir
+            raw_h = local_delta.y() * self.y_dir
+            if keep_proportion:
+                diagonal = QPointF(1.0, 1.0 / ratio)
+                diagonal_len_sq = diagonal.x() ** 2 + diagonal.y() ** 2
+                projected_w = (
+                    (raw_w * diagonal.x() + raw_h * diagonal.y())
+                    / diagonal_len_sq
+                )
+                min_w = max(self.MIN_WIDTH, self.MIN_HEIGHT * ratio)
+                new_w = max(min_w, projected_w)
+                new_h = new_w / ratio
+            else:
+                new_w = max(self.MIN_WIDTH, raw_w)
+                new_h = max(self.MIN_HEIGHT, raw_h)
+
+        elif self.x_dir:
+            raw_w = local_delta.x() * self.x_dir
+            if keep_proportion:
+                min_w = max(self.MIN_WIDTH, self.MIN_HEIGHT * ratio)
+                new_w = max(min_w, raw_w)
+                new_h = new_w / ratio
+            else:
+                new_w = max(self.MIN_WIDTH, raw_w)
+                new_h = self._initial_h
+
+        elif self.y_dir:
+            raw_h = local_delta.y() * self.y_dir
+            if keep_proportion:
+                min_h = max(self.MIN_HEIGHT, self.MIN_WIDTH / ratio)
+                new_h = max(min_h, raw_h)
+                new_w = new_h * ratio
+            else:
+                new_w = self._initial_w
+                new_h = max(self.MIN_HEIGHT, raw_h)
+
+        else:
+            new_w = self._initial_w
+            new_h = self._initial_h
+
+        return new_w, new_h
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_resizing = True
             parent = self.parentItem()
-            if hasattr(parent, 'rect'):
-                r = parent.rect()
-            else:
-                r = parent.pixmap().rect()
-            self.initial_ratio = r.width() / r.height() if r.height() > 0 else 1.0
-            self._anchor_scene = parent.mapToScene(QPointF(0, 0)) if parent else None
+            if parent:
+                self._initial_w, self._initial_h = _item_size(parent)
+                self.initial_ratio = self._initial_w / self._initial_h if self._initial_h > 0 else 1.0
+                anchor_local = self._anchor_local_point(self._initial_w, self._initial_h)
+                self._anchor_scene = parent.mapToScene(anchor_local)
             event.accept()
         else:
             super().mousePressEvent(event)
@@ -134,31 +203,20 @@ class ResizeHandle(QGraphicsRectItem):
         if self._is_resizing:
             parent = self.parentItem()
             if parent:
-                anchor_scene = self._anchor_scene or parent.mapToScene(QPointF(0, 0))
+                anchor_scene = self._anchor_scene or parent.mapToScene(
+                    self._anchor_local_point(self._initial_w, self._initial_h)
+                )
                 scene_delta = QPointF(
                     event.scenePos().x() - anchor_scene.x(),
                     event.scenePos().y() - anchor_scene.y(),
                 )
                 local_delta = _unrotated_vector(scene_delta, parent.rotation())
-
-                if getattr(parent, 'keep_proportion', True):
-                    ratio = self.initial_ratio if self.initial_ratio > 0 else 1.0
-                    diagonal = QPointF(1.0, 1.0 / ratio)
-                    diagonal_len_sq = diagonal.x() ** 2 + diagonal.y() ** 2
-                    projected_w = (
-                        (local_delta.x() * diagonal.x() + local_delta.y() * diagonal.y())
-                        / diagonal_len_sq
-                    )
-                    min_w = max(self.MIN_WIDTH, self.MIN_HEIGHT * ratio)
-                    new_w = max(min_w, projected_w)
-                    new_h = new_w / ratio
-                else:
-                    new_w = max(self.MIN_WIDTH, local_delta.x())
-                    new_h = max(self.MIN_HEIGHT, local_delta.y())
+                new_w, new_h = self._resize_from_local_delta(local_delta)
 
                 if hasattr(parent, 'resize_from_handle'):
                     parent.resize_from_handle(new_w, new_h)
-                    new_pos = _item_pos_for_local_scene_point(parent, QPointF(0, 0), anchor_scene)
+                    new_anchor_local = self._anchor_local_point(new_w, new_h)
+                    new_pos = _item_pos_for_local_scene_point(parent, new_anchor_local, anchor_scene)
                     parent._resizing_from_handle = True
                     try:
                         parent.setPos(new_pos)
@@ -183,6 +241,65 @@ class ResizeHandle(QGraphicsRectItem):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+
+RESIZE_HANDLE_SPECS = (
+    ("top_left", -1, -1, Qt.CursorShape.SizeFDiagCursor),
+    ("top", 0, -1, Qt.CursorShape.SizeVerCursor),
+    ("top_right", 1, -1, Qt.CursorShape.SizeBDiagCursor),
+    ("right", 1, 0, Qt.CursorShape.SizeHorCursor),
+    ("bottom_right", 1, 1, Qt.CursorShape.SizeFDiagCursor),
+    ("bottom", 0, 1, Qt.CursorShape.SizeVerCursor),
+    ("bottom_left", -1, 1, Qt.CursorShape.SizeBDiagCursor),
+    ("left", -1, 0, Qt.CursorShape.SizeHorCursor),
+)
+
+
+def _item_size(item):
+    if hasattr(item, 'rect'):
+        rect = item.rect()
+    else:
+        rect = item.pixmap().rect()
+    return float(rect.width()), float(rect.height())
+
+
+def _handle_position(name, w, h):
+    positions = {
+        "top_left": QPointF(0, 0),
+        "top": QPointF(w / 2, 0),
+        "top_right": QPointF(w, 0),
+        "right": QPointF(w, h / 2),
+        "bottom_right": QPointF(w, h),
+        "bottom": QPointF(w / 2, h),
+        "bottom_left": QPointF(0, h),
+        "left": QPointF(0, h / 2),
+    }
+    return positions[name]
+
+
+def _init_resize_handles(item):
+    item.resize_handles = {}
+    for name, x_dir, y_dir, cursor in RESIZE_HANDLE_SPECS:
+        handle = ResizeHandle(item, name, x_dir, y_dir, cursor)
+        handle.hide()
+        item.resize_handles[name] = handle
+    item.handle_br = item.resize_handles["bottom_right"]
+    _update_resize_handles(item)
+
+
+def _update_resize_handles(item):
+    if not hasattr(item, 'resize_handles'):
+        return
+    w, h = _item_size(item)
+    for name, handle in item.resize_handles.items():
+        handle.setPos(_handle_position(name, w, h))
+
+
+def _set_resize_handles_visible(item, visible):
+    if not hasattr(item, 'resize_handles'):
+        return
+    for handle in item.resize_handles.values():
+        handle.setVisible(visible)
 
 
 class Guideline(QGraphicsLineItem):
@@ -288,19 +405,15 @@ class ImageItem(QGraphicsPixmapItem):
         
         self.keep_proportion = True
         self.has_link = False
-        self.handle_br = ResizeHandle(self)
-        rect = self.pixmap().rect()
-        self.handle_br.setPos(rect.width(), rect.height())
-        self.handle_br.hide()
+        _init_resize_handles(self)
         self.update_center()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-            if hasattr(self, 'handle_br'):
-                if self.isSelected() and (self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable):
-                    self.handle_br.show()
-                else:
-                    self.handle_br.hide()
+            can_resize = self.isSelected() and bool(
+                self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+            )
+            _set_resize_handles_visible(self, can_resize)
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
             new_pos = value
@@ -330,7 +443,7 @@ class ImageItem(QGraphicsPixmapItem):
         )
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
-            self.handle_br.setPos(new_w, new_h)
+            _update_resize_handles(self)
         self.update_center()
 
     def resize_custom(self, w, h):
@@ -342,11 +455,14 @@ class ImageItem(QGraphicsPixmapItem):
         )
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
-            self.handle_br.setPos(w, h)
+            _update_resize_handles(self)
         self.update_center()
 
     def resize_from_handle(self, w, h):
         self.resize_custom(w, h)
+
+    def hide_resize_handles(self):
+        _set_resize_handles_visible(self, False)
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
@@ -412,19 +528,15 @@ class SignatureItem(QGraphicsPixmapItem):
         self.setZValue(201)
         
         self.keep_proportion = True
-        self.handle_br = ResizeHandle(self)
-        rect = self.pixmap().rect()
-        self.handle_br.setPos(rect.width(), rect.height())
-        self.handle_br.hide()
+        _init_resize_handles(self)
         self.update_center()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-            if hasattr(self, 'handle_br'):
-                if self.isSelected() and (self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable):
-                    self.handle_br.show()
-                else:
-                    self.handle_br.hide()
+            can_resize = self.isSelected() and bool(
+                self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+            )
+            _set_resize_handles_visible(self, can_resize)
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
             new_pos = value
@@ -454,7 +566,7 @@ class SignatureItem(QGraphicsPixmapItem):
         )
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
-            self.handle_br.setPos(new_w, new_h)
+            _update_resize_handles(self)
         self.update_center()
 
     def resize_custom(self, w, h):
@@ -466,11 +578,14 @@ class SignatureItem(QGraphicsPixmapItem):
         )
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
-            self.handle_br.setPos(w, h)
+            _update_resize_handles(self)
         self.update_center()
 
     def resize_from_handle(self, w, h):
         self.resize_custom(w, h)
+
+    def hide_resize_handles(self):
+        _set_resize_handles_visible(self, False)
 
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
@@ -524,25 +639,21 @@ class DesignerBox(QGraphicsRectItem):
         self.apply_state()
         self.update_center()
         
-        # --- Instanciar Alça de Redimensionamento ---
+        # --- Instanciar Alças de Redimensionamento ---
         self.keep_proportion = True
-        self.handle_br = ResizeHandle(self)
-        self.handle_br.setPos(w, h)
-        self.handle_br.hide()
+        _init_resize_handles(self)
 
     def setRect(self, *args):
         super().setRect(*args)
         if hasattr(self, 'handle_br'):
-            r = self.rect()
-            self.handle_br.setPos(r.width(), r.height())
+            _update_resize_handles(self)
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-            if hasattr(self, 'handle_br'):
-                if self.isSelected() and (self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable):
-                    self.handle_br.show()
-                else:
-                    self.handle_br.hide()
+            can_resize = self.isSelected() and bool(
+                self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+            )
+            _set_resize_handles_visible(self, can_resize)
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
             new_pos = value
@@ -565,6 +676,9 @@ class DesignerBox(QGraphicsRectItem):
         self.setRect(0, 0, w, h)
         self.recalculate_text_position()
         self.update_center()
+
+    def hide_resize_handles(self):
+        _set_resize_handles_visible(self, False)
     
     def set_alignment(self, align_str):
         self.state.align = align_str

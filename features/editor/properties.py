@@ -1,6 +1,7 @@
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox, 
-                               QFormLayout, QTextEdit, QFontComboBox, QPushButton, 
-                               QComboBox, QDoubleSpinBox, QColorDialog, QCheckBox)
+from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
+                               QFormLayout, QGridLayout, QTextEdit, QFontComboBox,
+                               QPushButton, QComboBox, QDoubleSpinBox, QColorDialog,
+                               QCheckBox, QGraphicsOpacityEffect)
 from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
@@ -40,6 +41,10 @@ class CleanTextEdit(QTextEdit):
             super().insertFromMimeData(source)
 
 class CaixaDeTextoPanel(QWidget):
+    ENABLED_OPACITY = 1.0
+    DISABLED_OPACITY = 0.4
+    UNCHECKED_PROPORTION_OPACITY = 0.2
+
     widthChanged = Signal(float)
     heightChanged = Signal(float)
     rotationChanged = Signal(float)
@@ -71,103 +76,219 @@ class CaixaDeTextoPanel(QWidget):
         layout.addWidget(self.lbl_title)
         self._aspect_ratio = 1.0
         self._group_mode = False
+        self._restore_available = False
+        self._link_available = False
         
-        form = QFormLayout()
-        form.setSpacing(4)
-        form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
+                # --- Layout compacto das propriedades ---
+        props_layout = QVBoxLayout()
+        props_layout.setContentsMargins(0, 0, 0, 0)
+        props_layout.setSpacing(6)
+
+        # =========================
+        # Bloco superior: Largura / Altura + botões laterais
+        # =========================
+        size_row = QHBoxLayout()
+        size_row.setContentsMargins(0, 0, 0, 0)
+        size_row.setSpacing(6)
+
+        size_grid = QGridLayout()
+        size_grid.setContentsMargins(0, 0, 0, 0)
+        size_grid.setHorizontalSpacing(6)
+        size_grid.setVerticalSpacing(4)
 
         self.spin_w = MathDoubleSpinBox()
         self.spin_w.setRange(1.0, 5000.0)
         self.spin_w.setDecimals(2)
         self.spin_w.setKeyboardTracking(False)
         self.spin_w.valueChanged.connect(self.widthChanged.emit)
-        
-        lbl_w = QLabel("Larg (mm):")
-        lbl_w.setToolTip(
+
+        self.lbl_w = QLabel("Larg (mm):")
+        self.lbl_w.setToolTip(
             "<b>LARGURA</b><br><br>"
             "Define a dimensão física horizontal exata do objeto.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Valores inseridos aqui refletem o tamanho real (em milímetros) na impressão final.</small>"
         )
-        form.addRow(lbl_w, self.spin_w)
 
         self.spin_h = MathDoubleSpinBox()
         self.spin_h.setRange(1.0, 5000.0)
         self.spin_h.setDecimals(2)
         self.spin_h.setKeyboardTracking(False)
         self.spin_h.valueChanged.connect(self.heightChanged.emit)
-        
-        lbl_h = QLabel("Alt (mm):")
-        lbl_h.setToolTip(
+
+        self.lbl_h = QLabel("Alt (mm):")
+        self.lbl_h.setToolTip(
             "<b>ALTURA</b><br><br>"
             "Define a dimensão física vertical exata do objeto.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Se a opção 'Manter proporção' estiver ativa, a largura será ajustada automaticamente.</small>"
         )
-        form.addRow(lbl_h, self.spin_h)
 
-        self.spin_rot = QSpinBox()
-        self.chk_proporcao = QCheckBox("Manter proporção")
-        self.chk_proporcao.setToolTip("Mantém a relação entre largura e altura ao redimensionar o objeto manualmente.")
-        self.chk_proporcao.setChecked(True)
-        self.chk_proporcao.toggled.connect(self.proportionToggled.emit)
-        form.addRow("", self.chk_proporcao)
-        self.chk_proporcao.setToolTip(
+        size_grid.addWidget(self.lbl_w, 0, 0)
+        size_grid.addWidget(self.spin_w, 0, 1)
+        size_grid.addWidget(self.lbl_h, 1, 0)
+        size_grid.addWidget(self.spin_h, 1, 1)
+        size_grid.setColumnStretch(1, 1)
+
+        size_buttons = QVBoxLayout()
+        size_buttons.setContentsMargins(0, 0, 0, 0)
+        size_buttons.setSpacing(4) # Espaço entre os emojis
+
+        self.chk_proporcao = self._make_tool_button(
+            "🔗",
             "<b>MANTER PROPORÇÃO</b><br><br>"
             "Preserva a relação entre largura e altura durante o redimensionamento:<br>"
             "• <b>Vínculo:</b> Ao alterar um valor, o outro é ajustado automaticamente.<br>"
             "• <b>Integridade:</b> Evita que imagens e textos fiquem esticados ou deformados.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Desative apenas se precisar forçar uma dimensão específica ignorando o aspeto original.</small>")
+            "<small style='color: #A0A0A0;'>Dica: Desative apenas se precisar forçar uma dimensão específica ignorando o aspeto original.</small>",
+            checkable=True
+        )
+        self.chk_proporcao.setChecked(True)
+        # --- Efeito visual de Opacidade ---
+        self.op_proporcao = QGraphicsOpacityEffect(self.chk_proporcao)
+        self.chk_proporcao.setGraphicsEffect(self.op_proporcao)
+        self.op_proporcao.setOpacity(1.0) # Começa ligado (100%)
+
+        # Mudamos a conexão para a nossa nova função que gerencia UI + Sinal
+        self.chk_proporcao.toggled.connect(self._on_proportion_toggled)
+
+        self.btn_restore = self._make_tool_button(
+            "🔄",
+            "<b>RESTAURAR ORIGINAL</b><br><br>"
+            "Reverte o objeto ao seu estado inicial de importação:<br><br>"
+            "• <b>Reset:</b> Redefine o tamanho nativo e remove qualquer rotação aplicada.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>"
+        )
+        # --- Efeito visual de Opacidade ---
+        self.op_restore = QGraphicsOpacityEffect(self.btn_restore)
+        self.btn_restore.setGraphicsEffect(self.op_restore)
+        self.op_restore.setOpacity(1.0) # Começa ligado
+
+        self.btn_restore.clicked.connect(self.restoreRequested.emit)
+
+        size_buttons.addWidget(self.chk_proporcao)
+        size_buttons.addWidget(self.btn_restore)
+        size_buttons.addStretch()
+
+        size_row.addLayout(size_grid, 1)
+        size_row.addLayout(size_buttons)
+        props_layout.addLayout(size_row)
 
         # Intercepta os sinais para calcular a proporção antes de emitir para a cena
         self.spin_w.valueChanged.disconnect(self.widthChanged.emit)
         self.spin_h.valueChanged.disconnect(self.heightChanged.emit)
         self.spin_w.valueChanged.connect(self._on_w_changed)
         self.spin_h.valueChanged.connect(self._on_h_changed)
+
+        # =========================
+        # Bloco inferior: Rotação à esquerda / Opacidade + Link à direita
+        # =========================
+        bottom_row = QHBoxLayout()
+        bottom_row.setContentsMargins(0, 0, 0, 0)
+        bottom_row.setSpacing(8)
+
+        # --- Rotação ---
+        rot_box = QVBoxLayout()
+        rot_box.setContentsMargins(0, 0, 0, 0)
+        rot_box.setSpacing(4)
+
+        rot_line = QHBoxLayout()
+        rot_line.setContentsMargins(0, 0, 0, 0)
+        rot_line.setSpacing(6)
+
         self.spin_rot = MathDoubleSpinBox()
-        self.spin_rot.setRange(-360, 360)
+        self.spin_rot.setRange(0.0, 359.9)
         self.spin_rot.setDecimals(1)
-        self.spin_rot.setWrapping(True) 
+        self.spin_rot.setWrapping(True)
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
-        
-        lbl_rot = QLabel("Rot (°):")
-        lbl_rot.setToolTip(
+
+        self.lbl_rot = QLabel("Rot (°):")
+        self.lbl_rot.setToolTip(
             "<b>ROTAÇÃO</b><br><br>"
             "Gira o objeto selecionado em graus (°) ao redor do seu ponto central.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Use valores positivos para girar no sentido horário ou negativos para o sentido anti-horário.</small>"
         )
-        form.addRow(lbl_rot, self.spin_rot)
+
+        rot_line.addWidget(self.lbl_rot)
+        rot_line.addWidget(self.spin_rot, 1)
+
+        rot_buttons = QHBoxLayout()
+        rot_buttons.setContentsMargins(0, 0, 0, 0)
+        rot_buttons.setSpacing(4)
+
+        self.btn_rot_minus_90 = self._make_tool_button("↪️", "Gira o objeto 90° à esquerda.")
+        self.btn_rot_zero = self._make_tool_button("⬆️", "Zera a rotação do objeto.")
+        self.btn_rot_plus_90 = self._make_tool_button("↩️", "Gira o objeto 90° à direita.")
+
+        # --- Efeitos visuais de Opacidade para Rotação ---
+        self.op_rot_minus = QGraphicsOpacityEffect(self.btn_rot_minus_90)
+        self.btn_rot_minus_90.setGraphicsEffect(self.op_rot_minus)
+        
+        self.op_rot_zero = QGraphicsOpacityEffect(self.btn_rot_zero)
+        self.btn_rot_zero.setGraphicsEffect(self.op_rot_zero)
+        
+        self.op_rot_plus = QGraphicsOpacityEffect(self.btn_rot_plus_90)
+        self.btn_rot_plus_90.setGraphicsEffect(self.op_rot_plus)
+        
+        self.btn_rot_minus_90.clicked.connect(lambda: self._apply_rotation_delta(-90))
+        self.btn_rot_zero.clicked.connect(lambda: self._set_rotation_value(0))
+        self.btn_rot_plus_90.clicked.connect(lambda: self._apply_rotation_delta(90))
+
+        rot_buttons.addStretch(1)
+        rot_buttons.addWidget(self.btn_rot_minus_90)
+        rot_buttons.addStretch(1)
+        rot_buttons.addWidget(self.btn_rot_zero)
+        rot_buttons.addStretch(1)
+        rot_buttons.addWidget(self.btn_rot_plus_90)
+        rot_buttons.addStretch(1)
+
+        rot_box.addLayout(rot_line)
+        rot_box.addLayout(rot_buttons)
+
+        # --- Opacidade + Link ---
+        opac_box = QVBoxLayout()
+        opac_box.setContentsMargins(0, 0, 0, 0)
+        opac_box.setSpacing(4)
+
+        opac_line = QHBoxLayout()
+        opac_line.setContentsMargins(0, 0, 0, 0)
+        opac_line.setSpacing(6)
 
         self.spin_opacity = MathDoubleSpinBox()
         self.spin_opacity.setRange(0.0, 100.0)
         self.spin_opacity.setDecimals(0)
         self.spin_opacity.setValue(100.0)
         self.spin_opacity.valueChanged.connect(lambda v: self.opacityChanged.emit(v / 100.0))
-        
-        lbl_opac = QLabel("Opac (%):")
-        lbl_opac.setToolTip(
+
+        self.lbl_opacity = QLabel("Opac (%):")
+        self.lbl_opacity.setToolTip(
             "<b>OPACIDADE</b><br><br>"
             "Controla o nível de transparência do elemento (0% a 100%).<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Valores baixos são excelentes para criar marcas d'água sutis que não interferem na leitura de outros dados.</small>"
         )
-        form.addRow(lbl_opac, self.spin_opacity)
 
-        self.btn_restore = QPushButton("🔄 Restaurar Original")
-        self.btn_restore.setToolTip(
-            "<b>RESTAURAR ORIGINAL</b><br><br>"
-            "Reverte o objeto ao seu estado inicial de importação:<br><br>"
-            "• <b>Reset:</b> Redefine o tamanho nativo e remove qualquer rotação aplicada.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>")
-        self.btn_restore.clicked.connect(self.restoreRequested.emit)
-        form.addRow("", self.btn_restore)
+        opac_line.addWidget(self.lbl_opacity)
+        opac_line.addWidget(self.spin_opacity, 1)
 
-        self.chk_link = QCheckBox("Habilitar Link (PDF)")
+        self.chk_link = QCheckBox("Habilitar Link")
+        self.chk_link.setFixedHeight(30)
         self.chk_link.setToolTip(
             "<b>HABILITAR LINK (URL)</b><br><br>"
             "Cria uma área de interação (clicável) no PDF exportado:<br><br>"
             "• <b>Cartões interativos:</b> O PDF gerado terá um link clicável para redirecionar ao endereço configurado na tabela.<br>"
             "• <b>Somente em PDF:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>")
+            "<small style='color: #A0A0A0;'>Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>"
+        )
         self.chk_link.toggled.connect(self.linkToggled.emit)
-        form.addRow("", self.chk_link)
+        self.op_link = QGraphicsOpacityEffect(self.chk_link)
+        self.chk_link.setGraphicsEffect(self.op_link)
+        self.op_link.setOpacity(self.DISABLED_OPACITY)
+
+        opac_box.addLayout(opac_line)
+        opac_box.addWidget(self.chk_link)
+
+        bottom_row.addLayout(rot_box, 1)
+        bottom_row.addLayout(opac_box, 1)
+
+        props_layout.addLayout(bottom_row)
 
         self.spin_w.editingFinished.connect(self.snapshotRequested.emit)
         self.spin_h.editingFinished.connect(self.snapshotRequested.emit)
@@ -176,52 +297,178 @@ class CaixaDeTextoPanel(QWidget):
         self.chk_proporcao.clicked.connect(self.snapshotRequested.emit)
         self.chk_link.clicked.connect(self.snapshotRequested.emit)
 
-        layout.addLayout(form)
+        layout.addLayout(props_layout)
         layout.addStretch()
+        self.clear_selection_state()
+
+    def _tool_button_style(self):
+        return """
+            QPushButton { 
+                background-color: transparent; 
+                border: none; 
+                border-radius: 4px; 
+                font-size: 16px; 
+            }
+            QPushButton:hover { background-color: #444444; }
+            QPushButton:pressed { background-color: #222222; }
+            QPushButton:disabled { color: #555555; }
+        """
+
+    def _make_tool_button(self, text, tooltip="", checkable=False):
+        btn = QPushButton(text)
+        btn.setFixedSize(26, 26) # Tamanho padrão dos seus ícones de guia
+        btn.setCheckable(checkable)
+        btn.setStyleSheet(self._tool_button_style())
+        btn.setToolTip(tooltip)
+        return btn
+
+    def _normalize_rotation(self, value):
+        return round(value % 360.0, 1)
+
+    def _apply_rotation_delta(self, delta):
+        self.spin_rot.setValue(self._normalize_rotation(self.spin_rot.value() + delta))
+        self.snapshotRequested.emit()
+
+    def _set_rotation_value(self, value):
+        self.spin_rot.setValue(self._normalize_rotation(value))
+        self.snapshotRequested.emit()
+
+    def _on_proportion_toggled(self, checked):
+        # Altera visualmente a opacidade
+        self._refresh_proportion_button(not self._group_mode and self.isEnabled())
+        # Emite o sinal original para o editor_window atualizar o item
+        self.proportionToggled.emit(checked)
+
+    def _opacity_effect_for(self, widget):
+        effect = widget.graphicsEffect()
+        if not isinstance(effect, QGraphicsOpacityEffect):
+            effect = QGraphicsOpacityEffect(widget)
+            widget.setGraphicsEffect(effect)
+        return effect
+
+    def _set_widget_available(self, widget, available: bool, enabled_opacity=None):
+        widget.setEnabled(available)
+        opacity = enabled_opacity if available and enabled_opacity is not None else self.ENABLED_OPACITY
+        if not available:
+            opacity = self.DISABLED_OPACITY
+        self._opacity_effect_for(widget).setOpacity(opacity)
+
+    def _set_widgets_available(self, widgets, available: bool, enabled_opacity=None):
+        for widget in widgets:
+            self._set_widget_available(widget, available, enabled_opacity)
+
+    def _refresh_proportion_button(self, available: bool):
+        self.chk_proporcao.setEnabled(available)
+        if available:
+            opacity = (
+                self.ENABLED_OPACITY
+                if self.chk_proporcao.isChecked()
+                else self.UNCHECKED_PROPORTION_OPACITY
+            )
+        else:
+            opacity = self.DISABLED_OPACITY
+        self.op_proporcao.setOpacity(opacity)
+
+    def _set_size_controls_available(self, available: bool):
+        self._set_widgets_available(
+            (self.lbl_w, self.spin_w, self.lbl_h, self.spin_h),
+            available,
+        )
+        self._refresh_proportion_button(available)
+
+    def _set_rotation_controls_available(self, available: bool):
+        self._set_widgets_available(
+            (
+                self.lbl_rot,
+                self.spin_rot,
+                self.btn_rot_minus_90,
+                self.btn_rot_zero,
+                self.btn_rot_plus_90,
+            ),
+            available,
+        )
+
+    def _set_restore_available(self, available: bool):
+        self._set_widget_available(self.btn_restore, available)
+
+    def _set_link_available(self, available: bool):
+        self._set_widget_available(self.chk_link, available)
+
+    def set_link_available(self, available: bool):
+        self._link_available = available
+        self._set_link_available(available)
+
+    def _set_opacity_controls_available(self, available: bool):
+        self._set_widgets_available((self.lbl_opacity, self.spin_opacity), available)
+
+    def clear_selection_state(self):
+        self._group_mode = False
+        self._restore_available = False
+        self._link_available = False
+        self.lbl_title.setText("<b>PROPRIEDADES DO OBJETO</b>")
+        self._set_size_controls_available(False)
+        self._set_restore_available(False)
+        self._set_rotation_controls_available(False)
+        self._set_opacity_controls_available(False)
+        self._set_link_available(False)
 
     def set_group_mode(self, enabled: bool):
         self._group_mode = enabled
         title = "PROPRIEDADES DO GRUPO" if enabled else "PROPRIEDADES DO OBJETO"
         self.lbl_title.setText(f"<b>{title}</b>")
 
-        size_controls_enabled = not enabled
-        self.spin_w.setEnabled(size_controls_enabled)
-        self.spin_h.setEnabled(size_controls_enabled)
-        self.chk_proporcao.setEnabled(size_controls_enabled)
-        self.btn_restore.setEnabled(size_controls_enabled)
+        item_controls_enabled = not enabled
+        self._set_size_controls_available(item_controls_enabled)
+        self._set_rotation_controls_available(item_controls_enabled)
+        self._set_restore_available(self._restore_available and item_controls_enabled)
+        self._set_opacity_controls_available(True)
+        self._set_link_available(self._link_available)
 
     def load_from_item(self, box: DesignerBox):
         self.blockSignals(True) 
+        self._restore_available = False
+        self._link_available = True
         rect = box.rect()
         self.spin_w.setValue(px_to_mm(rect.width()))
         self.spin_h.setValue(px_to_mm(rect.height()))
-        self.spin_rot.setValue(int(box.rotation()))
+        self.spin_rot.setValue(self._normalize_rotation(box.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
         self.spin_opacity.setValue(box.opacity() * 100.0)
         
         self.chk_proporcao.blockSignals(True)
-        self.chk_proporcao.setChecked(getattr(box, 'keep_proportion', True))
+        is_proportional = getattr(box, 'keep_proportion', True) # Use img se estiver na load_from_image
+        self.chk_proporcao.setChecked(is_proportional)
         self.chk_proporcao.blockSignals(False)
+        self._refresh_proportion_button(not self._group_mode and self.isEnabled())
         self.chk_link.blockSignals(True)
         self.chk_link.setChecked(getattr(box.state, 'has_link', False))
         self.chk_link.blockSignals(False)
+        # Desativa o botão restaurar para Textos
+        self._set_restore_available(False)
+        self._set_link_available(True)
         self.blockSignals(False)
 
     def load_from_image(self, img):
         self.blockSignals(True)
+        self._restore_available = True
+        self._link_available = isinstance(img, ImageItem)
         rect = img.pixmap().rect()
         self.spin_w.setValue(px_to_mm(rect.width()))
         self.spin_h.setValue(px_to_mm(rect.height()))
-        self.spin_rot.setValue(int(img.rotation()))
+        self.spin_rot.setValue(self._normalize_rotation(img.rotation()))
         if rect.height() > 0: self._aspect_ratio = rect.width() / rect.height()
         self.spin_opacity.setValue(img.opacity() * 100.0)
         
         self.chk_proporcao.blockSignals(True)
         self.chk_proporcao.setChecked(getattr(img, 'keep_proportion', True))
         self.chk_proporcao.blockSignals(False)
+        self._refresh_proportion_button(not self._group_mode and self.isEnabled())
         self.chk_link.blockSignals(True)
         self.chk_link.setChecked(getattr(img, 'has_link', False))
         self.chk_link.blockSignals(False)
+        # Ativa o botão restaurar para Imagens
+        self._set_restore_available(True)
+        self._set_link_available(self._link_available)
         self.blockSignals(False)
 
     def _on_w_changed(self, val):

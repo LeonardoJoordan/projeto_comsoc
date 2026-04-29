@@ -1023,12 +1023,18 @@ class EditorWindow(QMainWindow):
 
         if len(valid_items) >= 2:
             target = valid_items[0]
+            group_link_available = any(
+                isinstance(i, DesignerBox)
+                or (isinstance(i, ImageItem) and not isinstance(i, BackgroundItem))
+                for i in valid_items
+            )
             self.editor_texto_panel.setEnabled(False)
             if isinstance(target, DesignerBox):
                 self.caixa_texto_panel.load_from_item(target)
             else:
                 self.caixa_texto_panel.load_from_image(target)
             self.caixa_texto_panel.set_group_mode(True)
+            self.caixa_texto_panel.set_link_available(group_link_available)
             self.caixa_texto_panel.setEnabled(True)
         elif boxes:
             target_box = boxes[0]
@@ -1045,7 +1051,7 @@ class EditorWindow(QMainWindow):
             self.caixa_texto_panel.setEnabled(True)
         else:
             self.editor_texto_panel.setEnabled(False)
-            self.caixa_texto_panel.set_group_mode(False)
+            self.caixa_texto_panel.clear_selection_state()
             self.caixa_texto_panel.setEnabled(False)
 
     def _on_physical_size_changed(self, _=None):
@@ -1304,8 +1310,8 @@ class EditorWindow(QMainWindow):
             if new_locked:
                 item.setSelected(False) # Força a perda de seleção imediata
                 item.setAcceptedMouseButtons(Qt.MouseButton.NoButton) # Fica invisível aos cliques
-                if hasattr(item, 'handle_br'):
-                    item.handle_br.hide()
+                if hasattr(item, 'hide_resize_handles'):
+                    item.hide_resize_handles()
             else:
                 item.setAcceptedMouseButtons(Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton) # Restaura a detecção de cliques
                 
@@ -1341,7 +1347,6 @@ class EditorWindow(QMainWindow):
                 btn_vis = QPushButton("👁️")
                 btn_vis.setFixedSize(24, 24)
                 btn_vis.setStyleSheet("border: none; background: transparent; font-size: 14px;")
-                btn_vis.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_vis.setToolTip(
                     "<b>VISIBILIDADE DA CAMADA</b><br><br>"
                     "Alterna a exibição do objeto atual no editor e na impressão:<br><br>"
@@ -1367,7 +1372,6 @@ class EditorWindow(QMainWindow):
                 btn_lock = QPushButton("🔒")
                 btn_lock.setFixedSize(24, 24)
                 btn_lock.setStyleSheet("border: none; background: transparent; font-size: 14px;")
-                btn_lock.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn_lock.setToolTip(
                     "<b>BLOQUEIO DE CAMADA</b><br><br>"
                     "Protege o elemento selecionado contra edições acidentais:<br><br>"
@@ -1666,8 +1670,8 @@ class EditorWindow(QMainWindow):
                 box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
                 box.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
                 box.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-                if hasattr(box, 'handle_br'):
-                    box.handle_br.hide()
+                if hasattr(box, 'hide_resize_handles'):
+                    box.hide_resize_handles()
         # Linhas Guia
         guides_data = data.get("guidelines", [])
         for g in guides_data:
@@ -1755,7 +1759,7 @@ class EditorWindow(QMainWindow):
             QPushButton:disabled { background-color: #222222; color: #555555; border-color: #333333; }
         """
 
-        self.btn_undo = QPushButton("↩️")
+        self.btn_undo = QPushButton("⬅️")
         self._apply_tooltip(self.btn_undo, 
             "<b>DESFAZER</b><br>"
             "<small style='color: #A0A0A0;'>Atalho: Ctrl + Z</small>"
@@ -1767,7 +1771,7 @@ class EditorWindow(QMainWindow):
         self.btn_undo.setEnabled(False)
         self.btn_undo.clicked.connect(self.undo)
 
-        self.btn_redo = QPushButton("↪️")
+        self.btn_redo = QPushButton("➡️")
         self._apply_tooltip(self.btn_redo, 
             "<b>REFAZER</b><br>"
             "<small style='color: #A0A0A0;'>Atalho: Ctrl + Y</small>"
