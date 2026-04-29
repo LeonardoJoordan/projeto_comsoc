@@ -226,6 +226,8 @@ class EditorWindow(QMainWindow):
         main_layout.addWidget(left_container)
 
         self.scene = QGraphicsScene(0, 0, 1000, 1000)
+        self._document_rect = QRectF(0, 0, 1000, 1000)
+        self.scene._document_rect = QRectF(self._document_rect)
         self.view = QGraphicsView(self.scene)
         self.view.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate) # <-- EXTIRPA OS FANTASMAS
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
@@ -502,6 +504,7 @@ class EditorWindow(QMainWindow):
                 if delta != 0:
                     zoom_factor = 1.15 if delta > 0 else 1 / 1.15
                     self.view.scale(zoom_factor, zoom_factor)
+                    self._update_workspace_scene_rect()
                 event.accept() # Mata o evento nativo de rolagem
                 return True
 
@@ -510,8 +513,12 @@ class EditorWindow(QMainWindow):
                 zoom_factor = 1.0 + event.value()
                 if zoom_factor > 0:
                     self.view.scale(zoom_factor, zoom_factor)
+                    self._update_workspace_scene_rect()
                 event.accept()
                 return True
+
+            if event.type() == QEvent.Type.Resize:
+                self._update_workspace_scene_rect()
 
             # --- Eventos de Teclado (Pressionar) ---
             if event.type() == QEvent.Type.KeyPress:
@@ -524,7 +531,7 @@ class EditorWindow(QMainWindow):
                 
                 if key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
                     zoom = self.view.transform().m11()
-                    rect = self.scene.sceneRect()
+                    rect = self._get_document_rect()
                     ref = min(rect.width(), rect.height()) / 300
                     step = max(1, round(ref / zoom))
                     if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
@@ -750,11 +757,11 @@ class EditorWindow(QMainWindow):
         self.save_snapshot()
 
     def add_guide(self, vertical):
-        rect = self.scene.sceneRect()
+        rect = self._get_document_rect()
         if vertical:
-            pos = rect.width() / 2
+            pos = rect.center().x()
         else:
-            pos = rect.height() / 2
+            pos = rect.center().y()
         guide = Guideline(pos, is_vertical=vertical)
         # Respeita o estado de visibilidade e bloqueio ao criar
         is_locked = self.btn_lock_guides.isChecked()
@@ -1063,8 +1070,7 @@ class EditorWindow(QMainWindow):
         
         rect = QRectF(0, 0, w_px, h_px)
         
-        self.scene.setSceneRect(rect)
-        self.view.setSceneRect(rect)
+        self._set_document_rect(rect)
         
         if self.fallback_bg:
             self.fallback_bg.setRect(rect)
@@ -1492,10 +1498,11 @@ class EditorWindow(QMainWindow):
                 })
 
         ordered_placeholders = [self.lst_placeholders.item(i).text() for i in range(self.lst_placeholders.count())]
+        document_rect = self._get_document_rect()
 
         data = {
             "name": self.windowTitle().replace("Editor Visual de Modelo - ", "").replace(" (Gerador de Cartões em Lote - GCL)", ""),
-            "canvas_size": {"w": int(self.scene.width()), "h": int(self.scene.height())},
+            "canvas_size": {"w": int(document_rect.width()), "h": int(document_rect.height())},
             "target_w_mm": self.spin_phys_w.value(),
             "target_h_mm": self.spin_phys_h.value(),
             "background_path": self.background_path,
@@ -1539,7 +1546,7 @@ class EditorWindow(QMainWindow):
         
         canvas_w = data.get("canvas_size", {}).get("w", 1000)
         canvas_h = data.get("canvas_size", {}).get("h", 1000)
-        self.scene.setSceneRect(0, 0, canvas_w, canvas_h)
+        self._set_document_rect(QRectF(0, 0, canvas_w, canvas_h))
 
         # Sincroniza os valores de milímetros na UI (Sempre ocorre, mesmo no Undo/Redo)
         self.spin_phys_w.blockSignals(True)
@@ -1834,11 +1841,41 @@ class EditorWindow(QMainWindow):
         sel = self.scene.selectedItems()
         return [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
 
+    def _get_document_rect(self):
+        return QRectF(getattr(self, "_document_rect", self.scene.sceneRect()))
+
+    def _set_document_rect(self, rect):
+        self._document_rect = QRectF(rect)
+        self.scene._document_rect = QRectF(self._document_rect)
+        self._update_workspace_scene_rect()
+
+    def _workspace_scene_rect(self):
+        document_rect = self._get_document_rect()
+        if document_rect.isEmpty() or not hasattr(self, "view"):
+            return document_rect
+
+        zoom = max(0.001, self.view.transform().m11())
+        viewport_size = self.view.viewport().size()
+        margin_x = max(50.0, (viewport_size.width() / zoom) * 0.5)
+        margin_y = max(50.0, (viewport_size.height() / zoom) * 0.5)
+        return document_rect.adjusted(-margin_x, -margin_y, margin_x, margin_y)
+
+    def _update_workspace_scene_rect(self):
+        if not hasattr(self, "scene") or not hasattr(self, "view"):
+            return
+        workspace_rect = self._workspace_scene_rect()
+        if workspace_rect.isEmpty():
+            return
+        self.scene.setSceneRect(workspace_rect)
+        self.view.setSceneRect(workspace_rect)
+
     def _zoom_to_fit(self):
-        if not self.scene.sceneRect().isEmpty():
+        document_rect = self._get_document_rect()
+        if not document_rect.isEmpty():
             margin = 50
-            view_rect = self.scene.sceneRect().adjusted(-margin, -margin, margin, margin)
+            view_rect = document_rect.adjusted(-margin, -margin, margin, margin)
             self.view.fitInView(view_rect, Qt.AspectRatioMode.KeepAspectRatio)
+            self._update_workspace_scene_rect()
 
     def _import_asset(self, source_path: str, model_dir: Path) -> str | None:
         if not source_path: 

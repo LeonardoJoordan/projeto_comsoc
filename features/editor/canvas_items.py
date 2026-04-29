@@ -4,7 +4,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem,
                                QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem,
                                QStyle)
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtCore import Qt, QPointF, QRectF
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
                            QImageReader, QPainterPath, QFontMetrics)
@@ -55,11 +55,18 @@ def _item_pos_for_local_scene_point(item, local_point, scene_point):
     )
 
 
+def _document_rect(scene):
+    rect = getattr(scene, "_document_rect", None)
+    if rect is not None:
+        return QRectF(rect)
+    return scene.sceneRect()
+
+
 def _snap_targets(scene):
     vertical_targets = []
     horizontal_targets = []
 
-    rect = scene.sceneRect()
+    rect = _document_rect(scene)
     if not rect.isEmpty():
         vertical_targets.extend((rect.left(), rect.right()))
         horizontal_targets.extend((rect.top(), rect.bottom()))
@@ -573,7 +580,7 @@ class Guideline(QGraphicsLineItem):
             if getattr(self, '_keyboard_move', False):
                 return value
             new_pos = value
-            rect = self.scene().sceneRect()
+            rect = _document_rect(self.scene())
             snap_dist = max(10, min(rect.width(), rect.height()) * 0.02)
             
             if self.is_vertical:
@@ -721,7 +728,7 @@ class BackgroundItem(ImageItem):
         """MÁGICA VISUAL: Corta a pintura da imagem nas bordas exatas do documento."""
         if self.scene():
             path = QPainterPath()
-            path.addRect(self.scene().sceneRect())
+            path.addRect(_document_rect(self.scene()))
             local_path = self.mapFromScene(path) # Traduz as coordenadas do documento para as da imagem
             
             # Aplica a máscara (PowerClip)
@@ -734,7 +741,7 @@ class BackgroundItem(ImageItem):
         base_shape = super().shape()
         if self.scene():
             path = QPainterPath()
-            path.addRect(self.scene().sceneRect())
+            path.addRect(_document_rect(self.scene()))
             local_path = self.mapFromScene(path)
             
             # O formato "clicável" é apenas a interseção entre o tamanho real da imagem e o tamanho do documento
