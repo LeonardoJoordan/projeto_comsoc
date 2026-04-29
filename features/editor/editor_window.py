@@ -911,10 +911,9 @@ class EditorWindow(QMainWindow):
     def update_rotation(self, angle):
         item = self._get_selected()
         if item:
+            if hasattr(item, 'update_center'):
+                item.update_center()
             item.setRotation(angle)
-            if isinstance(item, (ImageItem, SignatureItem)):
-                rect = item.pixmap().rect()
-                item.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
 
     def update_proportion_lock(self, locked):
         item = self._get_selected()
@@ -1448,6 +1447,7 @@ class EditorWindow(QMainWindow):
                     "width": round(float(pix.width()), 2),
                     "height": round(float(pix.height()), 2),
                     "longest_side": round(float(max(pix.width(), pix.height())), 2),
+                    "rotation": round(float(item.rotation()), 2),
                     "layer_id": getattr(item, 'layer_id', None),
                     "z_value": round(float(item.zValue()), 2)
                 })
@@ -1572,7 +1572,11 @@ class EditorWindow(QMainWindow):
                 sig.custom_name = sig_data.get("custom_name", "")
                 sig.layer_id = sig_data.get("layer_id")
                 sig.setPos(sig_data["x"], sig_data["y"])
-                sig.resize_by_longest_side(sig_data["longest_side"])
+                if "width" in sig_data and "height" in sig_data:
+                    sig.resize_custom(sig_data["width"], sig_data["height"])
+                else:
+                    sig.resize_by_longest_side(sig_data.get("longest_side", 100))
+                sig.setRotation(sig_data.get("rotation", 0))
                 self.scene.addItem(sig)
                 sig.setZValue(sig_data.get("z_value", 201))
                 sig.setVisible(sig_data.get("visible", True))
@@ -1875,49 +1879,3 @@ class EditorWindow(QMainWindow):
         sep.setFrameShape(QFrame.Shape.HLine)
         sep.setFrameShadow(QFrame.Shadow.Sunken)
         layout.addWidget(sep)
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    
-
-
-    
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    
-    
-
-    
-    
-    
-
-    
-
-    
-    
-    
-
-    
-
-    
-
-    
-
-    

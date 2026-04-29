@@ -1,3 +1,4 @@
+import math
 import re
 from pathlib import Path
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem,
@@ -16,6 +17,65 @@ def mm_to_px(mm):
 
 def px_to_mm(px):
     return (px * 25.4) / DPI
+
+
+def _rotated_point(position, origin, angle, point):
+    rad = math.radians(angle)
+    cos_a = math.cos(rad)
+    sin_a = math.sin(rad)
+    dx = point.x() - origin.x()
+    dy = point.y() - origin.y()
+    return QPointF(
+        position.x() + origin.x() + (dx * cos_a - dy * sin_a),
+        position.y() + origin.y() + (dx * sin_a + dy * cos_a),
+    )
+
+
+def _snap_position_to_guides(item, new_pos, w, h):
+    if getattr(item, '_keyboard_move', False):
+        return new_pos
+
+    scene = item.scene()
+    if not scene:
+        return new_pos
+
+    origin = item.transformOriginPoint()
+    angle = item.rotation()
+    local_points = [
+        QPointF(0, 0),
+        QPointF(w, 0),
+        QPointF(w, h),
+        QPointF(0, h),
+    ]
+    scene_points = [_rotated_point(new_pos, origin, angle, p) for p in local_points]
+    center = _rotated_point(new_pos, origin, angle, QPointF(w / 2, h / 2))
+
+    xs = [p.x() for p in scene_points]
+    ys = [p.y() for p in scene_points]
+    x_candidates = [min(xs), center.x(), max(xs)]
+    y_candidates = [min(ys), center.y(), max(ys)]
+
+    best_dx = 0
+    best_dy = 0
+    min_dist_x = item.SNAP_DISTANCE
+    min_dist_y = item.SNAP_DISTANCE
+
+    for other in scene.items():
+        if isinstance(other, Guideline):
+            if other.is_vertical:
+                for x in x_candidates:
+                    dist = abs(x - other.x())
+                    if dist < min_dist_x:
+                        min_dist_x = dist
+                        best_dx = other.x() - x
+            else:
+                for y in y_candidates:
+                    dist = abs(y - other.y())
+                    if dist < min_dist_y:
+                        min_dist_y = dist
+                        best_dy = other.y() - y
+
+    return QPointF(new_pos.x() + best_dx, new_pos.y() + best_dy)
 
 
 class ResizeHandle(QGraphicsRectItem):
@@ -178,6 +238,7 @@ class ImageItem(QGraphicsPixmapItem):
         rect = self.pixmap().rect()
         self.handle_br.setPos(rect.width(), rect.height())
         self.handle_br.hide()
+        self.update_center()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
@@ -188,32 +249,15 @@ class ImageItem(QGraphicsPixmapItem):
                     self.handle_br.hide()
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
-            if getattr(self, '_keyboard_move', False):
-                return value
             new_pos = value
             rect = self.pixmap().rect()
             w, h = rect.width(), rect.height()
-            
-            x_candidates = [(new_pos.x(), 0), (new_pos.x() + w/2, w/2), (new_pos.x() + w, w)]
-            y_candidates = [(new_pos.y(), 0), (new_pos.y() + h/2, h/2), (new_pos.y() + h, h)]
-            
-            best_x, best_y = new_pos.x(), new_pos.y()
-            min_dist_x, min_dist_y = self.SNAP_DISTANCE, self.SNAP_DISTANCE
-
-            for item in self.scene().items():
-                if isinstance(item, Guideline):
-                    if item.is_vertical:
-                        for (cx, offset) in x_candidates:
-                            if abs(cx - item.x()) < min_dist_x:
-                                min_dist_x = abs(cx - item.x())
-                                best_x = item.x() - offset
-                    else:
-                        for (cy, offset) in y_candidates:
-                            if abs(cy - item.y()) < min_dist_y:
-                                min_dist_y = abs(cy - item.y())
-                                best_y = item.y() - offset
-            return QPointF(best_x, best_y)
+            return _snap_position_to_guides(self, new_pos, w, h)
         return super().itemChange(change, value)
+
+    def update_center(self):
+        rect = self.pixmap().rect()
+        self.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
 
     def resize_by_longest_side(self, size_px):
         w = self._original_pixmap.width()
@@ -233,6 +277,7 @@ class ImageItem(QGraphicsPixmapItem):
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
             self.handle_br.setPos(new_w, new_h)
+        self.update_center()
 
     def resize_custom(self, w, h):
         if w <= 0 or h <= 0: return
@@ -244,6 +289,7 @@ class ImageItem(QGraphicsPixmapItem):
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
             self.handle_br.setPos(w, h)
+        self.update_center()
 
     def resize_from_handle(self, w, h):
         self.resize_custom(w, h)
@@ -316,6 +362,7 @@ class SignatureItem(QGraphicsPixmapItem):
         rect = self.pixmap().rect()
         self.handle_br.setPos(rect.width(), rect.height())
         self.handle_br.hide()
+        self.update_center()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
@@ -326,32 +373,15 @@ class SignatureItem(QGraphicsPixmapItem):
                     self.handle_br.hide()
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
-            if getattr(self, '_keyboard_move', False):
-                return value
             new_pos = value
             rect = self.pixmap().rect()
             w, h = rect.width(), rect.height()
-            
-            x_candidates = [(new_pos.x(), 0), (new_pos.x() + w/2, w/2), (new_pos.x() + w, w)]
-            y_candidates = [(new_pos.y(), 0), (new_pos.y() + h/2, h/2), (new_pos.y() + h, h)]
-            
-            best_x, best_y = new_pos.x(), new_pos.y()
-            min_dist_x, min_dist_y = self.SNAP_DISTANCE, self.SNAP_DISTANCE
-
-            for item in self.scene().items():
-                if isinstance(item, Guideline):
-                    if item.is_vertical:
-                        for (cx, offset) in x_candidates:
-                            if abs(cx - item.x()) < min_dist_x:
-                                min_dist_x = abs(cx - item.x())
-                                best_x = item.x() - offset
-                    else:
-                        for (cy, offset) in y_candidates:
-                            if abs(cy - item.y()) < min_dist_y:
-                                min_dist_y = abs(cy - item.y())
-                                best_y = item.y() - offset
-            return QPointF(best_x, best_y)
+            return _snap_position_to_guides(self, new_pos, w, h)
         return super().itemChange(change, value)
+
+    def update_center(self):
+        rect = self.pixmap().rect()
+        self.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
 
     def resize_by_longest_side(self, size_px):
         w = self._original_pixmap.width()
@@ -371,6 +401,7 @@ class SignatureItem(QGraphicsPixmapItem):
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
             self.handle_br.setPos(new_w, new_h)
+        self.update_center()
 
     def resize_custom(self, w, h):
         if w <= 0 or h <= 0: return
@@ -382,6 +413,7 @@ class SignatureItem(QGraphicsPixmapItem):
         self.setPixmap(scaled)
         if hasattr(self, 'handle_br'):
             self.handle_br.setPos(w, h)
+        self.update_center()
 
     def resize_from_handle(self, w, h):
         self.resize_custom(w, h)
@@ -459,31 +491,10 @@ class DesignerBox(QGraphicsRectItem):
                     self.handle_br.hide()
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
-            if getattr(self, '_keyboard_move', False):
-                return value
             new_pos = value
             rect = self.rect()
             w, h = rect.width(), rect.height()
-            
-            x_candidates = [(new_pos.x(), 0), (new_pos.x() + w/2, w/2), (new_pos.x() + w, w)]
-            y_candidates = [(new_pos.y(), 0), (new_pos.y() + h/2, h/2), (new_pos.y() + h, h)]
-            
-            best_x, best_y = new_pos.x(), new_pos.y()
-            min_dist_x, min_dist_y = self.SNAP_DISTANCE, self.SNAP_DISTANCE
-
-            for item in self.scene().items():
-                if isinstance(item, Guideline):
-                    if item.is_vertical:
-                        for (cx, offset) in x_candidates:
-                            if abs(cx - item.x()) < min_dist_x:
-                                min_dist_x = abs(cx - item.x())
-                                best_x = item.x() - offset
-                    else:
-                        for (cy, offset) in y_candidates:
-                            if abs(cy - item.y()) < min_dist_y:
-                                min_dist_y = abs(cy - item.y())
-                                best_y = item.y() - offset
-            return QPointF(best_x, best_y)
+            return _snap_position_to_guides(self, new_pos, w, h)
         return super().itemChange(change, value)
     
     def paint(self, painter, option, widget=None):

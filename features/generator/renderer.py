@@ -8,6 +8,25 @@ class NativeRenderer:
     def __init__(self, template_data: dict):
         self.tpl = template_data
 
+    def _draw_pixmap_item(self, painter: QPainter, pixmap: QPixmap, x, y, w, h, rotation=0, opacity=1.0) -> QRectF:
+        painter.save()
+        try:
+            painter.setOpacity(opacity)
+            if rotation:
+                center_x = float(x) + (w / 2)
+                center_y = float(y) + (h / 2)
+                painter.translate(center_x, center_y)
+                painter.rotate(rotation)
+                target_rect = QRectF(-w / 2, -h / 2, w, h)
+                painter.drawPixmap(target_rect, pixmap, QRectF(pixmap.rect()))
+                return painter.transform().mapRect(target_rect)
+
+            target_rect = QRectF(float(x), float(y), w, h)
+            painter.drawPixmap(target_rect, pixmap, QRectF(pixmap.rect()))
+            return target_rect
+        finally:
+            painter.restore()
+
 
     def render_row(self, row_plain: dict, row_rich: dict, out_path: Path, out_links: list = None):
         
@@ -134,17 +153,22 @@ class NativeRenderer:
                 
                 # Blindagem contra corrompimento de QImage/QPixmap ou dimensões ausentes
                 if not pix.isNull() and w > 0 and h > 0:
-                    scaled = pix.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                    painter.setOpacity(img.get("opacity", 1.0))
-                    painter.drawPixmap(QPointF(float(img.get("x", 0)), float(img.get("y", 0))), scaled)
-                    painter.setOpacity(1.0)
+                    rect = self._draw_pixmap_item(
+                        painter,
+                        pix,
+                        float(img.get("x", 0)),
+                        float(img.get("y", 0)),
+                        w,
+                        h,
+                        img.get("rotation", 0),
+                        img.get("opacity", 1.0),
+                    )
 
                     if img.get("has_link") and img.get("link_key"):
                         url = row_rich.get(img["link_key"], "").strip()
                         if url and out_links is not None:
                             if not url.startswith(("http://", "https://", "mailto:", "tel:")):
                                 url = "https://" + url
-                            rect = QRectF(float(img.get("x", 0)), float(img.get("y", 0)), w, h)
                             out_links.append({"url": url, "rect": rect})
 
         for box in self.tpl.get("boxes", []):
@@ -182,12 +206,17 @@ class NativeRenderer:
 
             if Path(sig["path"]).exists():
                 pix = QPixmap(sig["path"])
-                scaled = pix.scaled(sig["width"], sig["height"], 
-                                   Qt.AspectRatioMode.IgnoreAspectRatio, 
-                                   Qt.TransformationMode.SmoothTransformation)
-                painter.setOpacity(sig.get("opacity", 1.0))
-                painter.drawPixmap(QPointF(float(sig.get("x", 0)), float(sig.get("y", 0))), scaled)
-                painter.setOpacity(1.0)
+                if not pix.isNull():
+                    self._draw_pixmap_item(
+                        painter,
+                        pix,
+                        float(sig.get("x", 0)),
+                        float(sig.get("y", 0)),
+                        sig["width"],
+                        sig["height"],
+                        sig.get("rotation", 0),
+                        sig.get("opacity", 1.0),
+                    )
 
     
     def _draw_html_box(self, painter, box_data, html_text, row_rich=None, out_links=None):
