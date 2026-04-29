@@ -31,8 +31,32 @@ def _rotated_point(position, origin, angle, point):
     )
 
 
+def _rotated_vector(point, angle):
+    rad = math.radians(angle)
+    cos_a = math.cos(rad)
+    sin_a = math.sin(rad)
+    return QPointF(
+        point.x() * cos_a - point.y() * sin_a,
+        point.x() * sin_a + point.y() * cos_a,
+    )
+
+
+def _unrotated_vector(point, angle):
+    return _rotated_vector(point, -angle)
+
+
+def _item_pos_for_local_scene_point(item, local_point, scene_point):
+    origin = item.transformOriginPoint()
+    local_from_origin = QPointF(local_point.x() - origin.x(), local_point.y() - origin.y())
+    rotated_from_origin = _rotated_vector(local_from_origin, item.rotation())
+    return QPointF(
+        scene_point.x() - origin.x() - rotated_from_origin.x(),
+        scene_point.y() - origin.y() - rotated_from_origin.y(),
+    )
+
+
 def _snap_position_to_guides(item, new_pos, w, h):
-    if getattr(item, '_keyboard_move', False):
+    if getattr(item, '_keyboard_move', False) or getattr(item, '_resizing_from_handle', False):
         return new_pos
 
     scene = item.scene()
@@ -79,6 +103,9 @@ def _snap_position_to_guides(item, new_pos, w, h):
 
 
 class ResizeHandle(QGraphicsRectItem):
+    MIN_WIDTH = 40
+    MIN_HEIGHT = 30
+
     def __init__(self, parent):
         super().__init__(-6, -6, 12, 12, parent)
         self.setBrush(QBrush(QColor("#27ae60")))
@@ -86,6 +113,7 @@ class ResizeHandle(QGraphicsRectItem):
         self.setAcceptHoverEvents(True)
         self.setCursor(Qt.CursorShape.SizeFDiagCursor)
         self._is_resizing = False
+        self._anchor_scene = None
         self.initial_ratio = 1.0
 
     def mousePressEvent(self, event):
@@ -97,6 +125,7 @@ class ResizeHandle(QGraphicsRectItem):
             else:
                 r = parent.pixmap().rect()
             self.initial_ratio = r.width() / r.height() if r.height() > 0 else 1.0
+            self._anchor_scene = parent.mapToScene(QPointF(0, 0)) if parent else None
             event.accept()
         else:
             super().mousePressEvent(event)
@@ -105,30 +134,55 @@ class ResizeHandle(QGraphicsRectItem):
         if self._is_resizing:
             parent = self.parentItem()
             if parent:
-                parent_pos = self.mapToParent(event.pos())
-                new_w = max(40, parent_pos.x())
-                new_h = max(30, parent_pos.y())
-                
-                # A mágica da proporção travada acontece aqui:
+                anchor_scene = self._anchor_scene or parent.mapToScene(QPointF(0, 0))
+                scene_delta = QPointF(
+                    event.scenePos().x() - anchor_scene.x(),
+                    event.scenePos().y() - anchor_scene.y(),
+                )
+                local_delta = _unrotated_vector(scene_delta, parent.rotation())
+
                 if getattr(parent, 'keep_proportion', True):
-                    new_h = new_w / self.initial_ratio
-                
+                    ratio = self.initial_ratio if self.initial_ratio > 0 else 1.0
+                    diagonal = QPointF(1.0, 1.0 / ratio)
+                    diagonal_len_sq = diagonal.x() ** 2 + diagonal.y() ** 2
+                    projected_w = (
+                        (local_delta.x() * diagonal.x() + local_delta.y() * diagonal.y())
+                        / diagonal_len_sq
+                    )
+                    min_w = max(self.MIN_WIDTH, self.MIN_HEIGHT * ratio)
+                    new_w = max(min_w, projected_w)
+                    new_h = new_w / ratio
+                else:
+                    new_w = max(self.MIN_WIDTH, local_delta.x())
+                    new_h = max(self.MIN_HEIGHT, local_delta.y())
+
                 if hasattr(parent, 'resize_from_handle'):
                     parent.resize_from_handle(new_w, new_h)
+                    new_pos = _item_pos_for_local_scene_point(parent, QPointF(0, 0), anchor_scene)
+                    parent._resizing_from_handle = True
+                    try:
+                        parent.setPos(new_pos)
+                    finally:
+                        parent._resizing_from_handle = False
                 
                 if parent.scene():
                     parent.scene().update() 
+            event.accept()
+            return
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
-        super().mouseReleaseEvent(event)
-        if event.button() == Qt.MouseButton.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton and self._is_resizing:
             self._is_resizing = False
+            self._anchor_scene = None
             # Gatilho do Undo/Redo
             if self.scene() and self.scene().views():
                 win = self.scene().views()[0].window()
                 if hasattr(win, 'save_snapshot'):
                     win.save_snapshot()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 class Guideline(QGraphicsLineItem):

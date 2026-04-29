@@ -909,8 +909,8 @@ class EditorWindow(QMainWindow):
                 item.resize_custom(w_px, height_px)
 
     def update_rotation(self, angle):
-        item = self._get_selected()
-        if item:
+        items = self._get_selected_items()
+        for item in items:
             if hasattr(item, 'update_center'):
                 item.update_center()
             item.setRotation(angle)
@@ -921,18 +921,19 @@ class EditorWindow(QMainWindow):
             item.keep_proportion = locked
 
     def update_link_state(self, has_link):
-        item = self._get_selected()
-        if item:
-            if isinstance(item, DesignerBox):
-                item.state.has_link = has_link
-            elif isinstance(item, ImageItem):
-                item.has_link = has_link
+        items = self._get_selected_items()
+        if items:
+            for item in items:
+                if isinstance(item, DesignerBox):
+                    item.state.has_link = has_link
+                elif isinstance(item, ImageItem):
+                    item.has_link = has_link
             self.sync_placeholders_list()
             self.refresh_layer_list()
 
     def update_opacity(self, value):
-        item = self._get_selected()
-        if item:
+        items = self._get_selected_items()
+        for item in items:
             item.setOpacity(value)
 
     def update_text_html(self, html_content):
@@ -1004,6 +1005,7 @@ class EditorWindow(QMainWindow):
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
         images = [i for i in sel if isinstance(i, ImageItem)]
         signatures = [i for i in sel if isinstance(i, SignatureItem)]
+        valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
         
         self.update_position_ui()
 
@@ -1019,19 +1021,31 @@ class EditorWindow(QMainWindow):
             self.layer_list.clearSelection()
         self.layer_list.blockSignals(False)
 
-        if boxes:
+        if len(valid_items) >= 2:
+            target = valid_items[0]
+            self.editor_texto_panel.setEnabled(False)
+            if isinstance(target, DesignerBox):
+                self.caixa_texto_panel.load_from_item(target)
+            else:
+                self.caixa_texto_panel.load_from_image(target)
+            self.caixa_texto_panel.set_group_mode(True)
+            self.caixa_texto_panel.setEnabled(True)
+        elif boxes:
             target_box = boxes[0]
             self.editor_texto_panel.load_from_item(target_box)
             self.editor_texto_panel.setEnabled(True)
             self.caixa_texto_panel.load_from_item(target_box)
+            self.caixa_texto_panel.set_group_mode(False)
             self.caixa_texto_panel.setEnabled(True)
         elif images or signatures:
             target = images[0] if images else signatures[0]
             self.editor_texto_panel.setEnabled(False)
             self.caixa_texto_panel.load_from_image(target)
+            self.caixa_texto_panel.set_group_mode(False)
             self.caixa_texto_panel.setEnabled(True)
         else:
             self.editor_texto_panel.setEnabled(False)
+            self.caixa_texto_panel.set_group_mode(False)
             self.caixa_texto_panel.setEnabled(False)
 
     def _on_physical_size_changed(self, _=None):
@@ -1809,9 +1823,12 @@ class EditorWindow(QMainWindow):
         return container
 
     def _get_selected(self):
-        sel = self.scene.selectedItems()
-        valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
+        valid_items = self._get_selected_items()
         return valid_items[0] if valid_items else None
+
+    def _get_selected_items(self):
+        sel = self.scene.selectedItems()
+        return [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
 
     def _zoom_to_fit(self):
         if not self.scene.sceneRect().isEmpty():

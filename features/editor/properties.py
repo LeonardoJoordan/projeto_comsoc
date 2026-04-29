@@ -54,8 +54,8 @@ class CaixaDeTextoPanel(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        lbl = QLabel("<b>PROPRIEDADES DO OBJETO</b>")
-        lbl.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        self.lbl_title = QLabel("<b>PROPRIEDADES DO OBJETO</b>")
+        self.lbl_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
         tooltip_propriedades = (
             "<b>PROPRIEDADES DO OBJETO</b><br><br>"
             "Gestão técnica de dimensões, orientação e comportamento do elemento selecionado.<br><br>"
@@ -67,9 +67,10 @@ class CaixaDeTextoPanel(QWidget):
             "• <b>Habilitar link:</b> Cria uma área de interação para redirecionamento em arquivos PDF.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Utilize a função 'Restaurar original' para recuperar instantaneamente a proporção e nitidez nativa de imagens que foram deformadas.</small>"
         )
-        lbl.setToolTip(tooltip_propriedades)
-        layout.addWidget(lbl)
+        self.lbl_title.setToolTip(tooltip_propriedades)
+        layout.addWidget(self.lbl_title)
         self._aspect_ratio = 1.0
+        self._group_mode = False
         
         form = QFormLayout()
         form.setSpacing(4)
@@ -177,6 +178,17 @@ class CaixaDeTextoPanel(QWidget):
 
         layout.addLayout(form)
         layout.addStretch()
+
+    def set_group_mode(self, enabled: bool):
+        self._group_mode = enabled
+        title = "PROPRIEDADES DO GRUPO" if enabled else "PROPRIEDADES DO OBJETO"
+        self.lbl_title.setText(f"<b>{title}</b>")
+
+        size_controls_enabled = not enabled
+        self.spin_w.setEnabled(size_controls_enabled)
+        self.spin_h.setEnabled(size_controls_enabled)
+        self.chk_proporcao.setEnabled(size_controls_enabled)
+        self.btn_restore.setEnabled(size_controls_enabled)
 
     def load_from_item(self, box: DesignerBox):
         self.blockSignals(True) 
