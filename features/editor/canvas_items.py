@@ -55,6 +55,25 @@ def _item_pos_for_local_scene_point(item, local_point, scene_point):
     )
 
 
+def _snap_targets(scene):
+    vertical_targets = []
+    horizontal_targets = []
+
+    rect = scene.sceneRect()
+    if not rect.isEmpty():
+        vertical_targets.extend((rect.left(), rect.right()))
+        horizontal_targets.extend((rect.top(), rect.bottom()))
+
+    for item in scene.items():
+        if isinstance(item, Guideline):
+            if item.is_vertical:
+                vertical_targets.append(item.x())
+            else:
+                horizontal_targets.append(item.y())
+
+    return vertical_targets, horizontal_targets
+
+
 def _snap_position_to_guides(item, new_pos, w, h):
     if getattr(item, '_keyboard_move', False) or getattr(item, '_resizing_from_handle', False):
         return new_pos
@@ -84,20 +103,20 @@ def _snap_position_to_guides(item, new_pos, w, h):
     min_dist_x = item.SNAP_DISTANCE
     min_dist_y = item.SNAP_DISTANCE
 
-    for other in scene.items():
-        if isinstance(other, Guideline):
-            if other.is_vertical:
-                for x in x_candidates:
-                    dist = abs(x - other.x())
-                    if dist < min_dist_x:
-                        min_dist_x = dist
-                        best_dx = other.x() - x
-            else:
-                for y in y_candidates:
-                    dist = abs(y - other.y())
-                    if dist < min_dist_y:
-                        min_dist_y = dist
-                        best_dy = other.y() - y
+    vertical_targets, horizontal_targets = _snap_targets(scene)
+    for target_x in vertical_targets:
+        for x in x_candidates:
+            dist = abs(x - target_x)
+            if dist < min_dist_x:
+                min_dist_x = dist
+                best_dx = target_x - x
+
+    for target_y in horizontal_targets:
+        for y in y_candidates:
+            dist = abs(y - target_y)
+            if dist < min_dist_y:
+                min_dist_y = dist
+                best_dy = target_y - y
 
     return QPointF(new_pos.x() + best_dx, new_pos.y() + best_dy)
 
@@ -186,6 +205,221 @@ class ResizeHandle(QGraphicsRectItem):
 
         return new_w, new_h
 
+    def _active_point_factors(self):
+        if self.x_dir and self.y_dir:
+            fx = 1.0 if self.x_dir > 0 else 0.0
+            fy = 1.0 if self.y_dir > 0 else 0.0
+            return [(fx, fy)]
+
+        if self.x_dir:
+            fx = 1.0 if self.x_dir > 0 else 0.0
+            return [(fx, 0.5)]
+
+        if self.y_dir:
+            fy = 1.0 if self.y_dir > 0 else 0.0
+            return [(0.5, fy)]
+
+        return []
+
+    def _scene_point_from_factors(self, parent, anchor_scene, w, h, fx, fy):
+        anchor_local = self._anchor_local_point(w, h)
+        local_point = QPointF(w * fx, h * fy)
+        local_delta = QPointF(
+            local_point.x() - anchor_local.x(),
+            local_point.y() - anchor_local.y(),
+        )
+        rotated_delta = _rotated_vector(local_delta, parent.rotation())
+        return QPointF(
+            anchor_scene.x() + rotated_delta.x(),
+            anchor_scene.y() + rotated_delta.y(),
+        )
+
+    def _size_for_control(self, control_axis, control_value, base_w, base_h):
+        ratio = self.initial_ratio if self.initial_ratio > 0 else 1.0
+        keep_proportion = getattr(self.parentItem(), 'keep_proportion', True)
+
+        if keep_proportion:
+            if control_axis == "w":
+                min_w = max(self.MIN_WIDTH, self.MIN_HEIGHT * ratio)
+                w = max(min_w, control_value)
+                return w, w / ratio
+
+            min_h = max(self.MIN_HEIGHT, self.MIN_WIDTH / ratio)
+            h = max(min_h, control_value)
+            return h * ratio, h
+
+        if control_axis == "w":
+            return max(self.MIN_WIDTH, control_value), base_h
+        return base_w, max(self.MIN_HEIGHT, control_value)
+
+    def _control_axis_for_snap(self, is_vertical_guide):
+        if self.x_dir and self.y_dir:
+            return "w" if is_vertical_guide else "h"
+        if self.x_dir:
+            return "w"
+        if self.y_dir:
+            return "h"
+        return None
+
+    def _solve_snap_size(self, parent, anchor_scene, base_w, base_h, factors, target, coord_axis, control_axis):
+        fx, fy = factors
+        base_point = self._scene_point_from_factors(parent, anchor_scene, base_w, base_h, fx, fy)
+        base_coord = base_point.x() if coord_axis == "x" else base_point.y()
+        base_control = base_w if control_axis == "w" else base_h
+        epsilon = max(1.0, abs(base_control) * 0.001)
+
+        test_w, test_h = self._size_for_control(control_axis, base_control + epsilon, base_w, base_h)
+        test_point = self._scene_point_from_factors(parent, anchor_scene, test_w, test_h, fx, fy)
+        test_coord = test_point.x() if coord_axis == "x" else test_point.y()
+        coefficient = (test_coord - base_coord) / epsilon
+        if abs(coefficient) < 1e-6:
+            return None
+
+        snapped_control = base_control + (target - base_coord) / coefficient
+        snapped_w, snapped_h = self._size_for_control(control_axis, snapped_control, base_w, base_h)
+        snapped_point = self._scene_point_from_factors(parent, anchor_scene, snapped_w, snapped_h, fx, fy)
+        snapped_coord = snapped_point.x() if coord_axis == "x" else snapped_point.y()
+        final_distance = abs(snapped_coord - target)
+
+        return {
+            "axis": control_axis,
+            "w": snapped_w,
+            "h": snapped_h,
+            "final_distance": final_distance,
+        }
+
+    def _solve_corner_snap_size(self, parent, anchor_scene, base_w, base_h, width_option, height_option):
+        if not (self.x_dir and self.y_dir):
+            return None
+
+        factors = width_option["factors"]
+        if factors != height_option["factors"]:
+            return None
+
+        base_point = self._scene_point_from_factors(parent, anchor_scene, base_w, base_h, *factors)
+        epsilon_w = max(1.0, abs(base_w) * 0.001)
+        epsilon_h = max(1.0, abs(base_h) * 0.001)
+
+        point_w = self._scene_point_from_factors(
+            parent,
+            anchor_scene,
+            base_w + epsilon_w,
+            base_h,
+            *factors,
+        )
+        point_h = self._scene_point_from_factors(
+            parent,
+            anchor_scene,
+            base_w,
+            base_h + epsilon_h,
+            *factors,
+        )
+
+        dx_dw = (point_w.x() - base_point.x()) / epsilon_w
+        dx_dh = (point_h.x() - base_point.x()) / epsilon_h
+        dy_dw = (point_w.y() - base_point.y()) / epsilon_w
+        dy_dh = (point_h.y() - base_point.y()) / epsilon_h
+        determinant = dx_dw * dy_dh - dx_dh * dy_dw
+        if abs(determinant) < 1e-6:
+            return None
+
+        target_x = width_option["target"]
+        target_y = height_option["target"]
+        rhs_x = target_x - base_point.x()
+        rhs_y = target_y - base_point.y()
+
+        delta_w = (rhs_x * dy_dh - dx_dh * rhs_y) / determinant
+        delta_h = (dx_dw * rhs_y - rhs_x * dy_dw) / determinant
+        snapped_w = max(self.MIN_WIDTH, base_w + delta_w)
+        snapped_h = max(self.MIN_HEIGHT, base_h + delta_h)
+
+        snapped_point = self._scene_point_from_factors(
+            parent,
+            anchor_scene,
+            snapped_w,
+            snapped_h,
+            *factors,
+        )
+        snap_distance = getattr(parent, 'SNAP_DISTANCE', 15)
+        if abs(snapped_point.x() - target_x) >= snap_distance:
+            return None
+        if abs(snapped_point.y() - target_y) >= snap_distance:
+            return None
+
+        return snapped_w, snapped_h
+
+    def _snap_size_to_guides(self, parent, anchor_scene, w, h):
+        scene = parent.scene()
+        if not scene:
+            return w, h
+
+        snap_distance = getattr(parent, 'SNAP_DISTANCE', 15)
+        keep_proportion = getattr(parent, 'keep_proportion', True)
+        active_points = self._active_point_factors()
+        best = None
+        best_w = None
+        best_h = None
+
+        vertical_targets, horizontal_targets = _snap_targets(scene)
+        targets = [(True, target) for target in vertical_targets]
+        targets.extend((False, target) for target in horizontal_targets)
+
+        for is_vertical, target in targets:
+            coord_axis = "x" if is_vertical else "y"
+            control_axis = self._control_axis_for_snap(is_vertical)
+            if control_axis is None:
+                continue
+
+            for factors in active_points:
+                scene_point = self._scene_point_from_factors(parent, anchor_scene, w, h, *factors)
+                coord = scene_point.x() if coord_axis == "x" else scene_point.y()
+                distance = abs(coord - target)
+                if distance >= snap_distance:
+                    continue
+
+                solved = self._solve_snap_size(
+                    parent,
+                    anchor_scene,
+                    w,
+                    h,
+                    factors,
+                    target,
+                    coord_axis,
+                    control_axis,
+                )
+                if not solved or solved["final_distance"] >= snap_distance:
+                    continue
+
+                option = {
+                    "distance": distance,
+                    "factors": factors,
+                    "target": target,
+                    "coord_axis": coord_axis,
+                    **solved,
+                }
+                if keep_proportion:
+                    if best is None or option["distance"] < best["distance"]:
+                        best = option
+                elif control_axis == "w":
+                    if best_w is None or option["distance"] < best_w["distance"]:
+                        best_w = option
+                elif best_h is None or option["distance"] < best_h["distance"]:
+                    best_h = option
+
+        if keep_proportion:
+            if best:
+                return best["w"], best["h"]
+            return w, h
+
+        if best_w and best_h:
+            solved_corner = self._solve_corner_snap_size(parent, anchor_scene, w, h, best_w, best_h)
+            if solved_corner:
+                return solved_corner
+
+        snapped_w = best_w["w"] if best_w else w
+        snapped_h = best_h["h"] if best_h else h
+        return snapped_w, snapped_h
+
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_resizing = True
@@ -212,6 +446,7 @@ class ResizeHandle(QGraphicsRectItem):
                 )
                 local_delta = _unrotated_vector(scene_delta, parent.rotation())
                 new_w, new_h = self._resize_from_local_delta(local_delta)
+                new_w, new_h = self._snap_size_to_guides(parent, anchor_scene, new_w, new_h)
 
                 if hasattr(parent, 'resize_from_handle'):
                     parent.resize_from_handle(new_w, new_h)

@@ -43,7 +43,8 @@ class CleanTextEdit(QTextEdit):
 class CaixaDeTextoPanel(QWidget):
     ENABLED_OPACITY = 1.0
     DISABLED_OPACITY = 0.4
-    UNCHECKED_PROPORTION_OPACITY = 0.2
+    PROPORTION_OFF_BACKGROUND = "rgba(220, 53, 69, 102)"
+    PROPORTION_OFF_HOVER_BACKGROUND = "rgba(220, 53, 69, 130)"
 
     widthChanged = Signal(float)
     heightChanged = Signal(float)
@@ -314,6 +315,22 @@ class CaixaDeTextoPanel(QWidget):
             QPushButton:disabled { color: #555555; }
         """
 
+    def _proportion_button_style(self, warning: bool):
+        if not warning:
+            return self._tool_button_style()
+
+        return f"""
+            QPushButton {{
+                background-color: {self.PROPORTION_OFF_BACKGROUND};
+                border: none;
+                border-radius: 4px;
+                font-size: 16px;
+            }}
+            QPushButton:hover {{ background-color: {self.PROPORTION_OFF_HOVER_BACKGROUND}; }}
+            QPushButton:pressed {{ background-color: rgba(220, 53, 69, 160); }}
+            QPushButton:disabled {{ color: #555555; }}
+        """
+
     def _make_tool_button(self, text, tooltip="", checkable=False):
         btn = QPushButton(text)
         btn.setFixedSize(26, 26) # Tamanho padrão dos seus ícones de guia
@@ -359,12 +376,11 @@ class CaixaDeTextoPanel(QWidget):
 
     def _refresh_proportion_button(self, available: bool):
         self.chk_proporcao.setEnabled(available)
+        self.chk_proporcao.setStyleSheet(
+            self._proportion_button_style(available and not self.chk_proporcao.isChecked())
+        )
         if available:
-            opacity = (
-                self.ENABLED_OPACITY
-                if self.chk_proporcao.isChecked()
-                else self.UNCHECKED_PROPORTION_OPACITY
-            )
+            opacity = self.ENABLED_OPACITY
         else:
             opacity = self.DISABLED_OPACITY
         self.op_proporcao.setOpacity(opacity)
