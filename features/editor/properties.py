@@ -257,7 +257,7 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_opacity.setRange(0.0, 100.0)
         self.spin_opacity.setDecimals(0)
         self.spin_opacity.setValue(100.0)
-        self.spin_opacity.valueChanged.connect(lambda v: self.opacityChanged.emit(v / 100.0))
+        self.spin_opacity.valueChanged.connect(self._on_opacity_changed)
 
         self.lbl_opacity = QLabel("Opac (%):")
         self.lbl_opacity.setToolTip(
@@ -417,6 +417,14 @@ class CaixaDeTextoPanel(QWidget):
     def _set_opacity_controls_available(self, available: bool):
         self._set_widgets_available((self.lbl_opacity, self.spin_opacity), available)
 
+    def _on_opacity_changed(self, val):
+        clamped = max(0.0, min(100.0, val))
+        if val != clamped:
+            self.spin_opacity.blockSignals(True)
+            self.spin_opacity.setValue(clamped)
+            self.spin_opacity.blockSignals(False)
+        self.opacityChanged.emit(clamped / 100.0)
+    
     def clear_selection_state(self):
         self._group_mode = False
         self._restore_available = False
