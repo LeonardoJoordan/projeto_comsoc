@@ -215,9 +215,9 @@ class CaixaDeTextoPanel(QWidget):
         rot_buttons.setContentsMargins(0, 0, 0, 0)
         rot_buttons.setSpacing(4)
 
-        self.btn_rot_minus_90 = self._make_tool_button("↪️", "Gira o objeto 90° à esquerda.")
+        self.btn_rot_minus_90 = self._make_tool_button("↪️", "Gira o objeto 90° anti-horário.")
         self.btn_rot_zero = self._make_tool_button("⬆️", "Zera a rotação do objeto.")
-        self.btn_rot_plus_90 = self._make_tool_button("↩️", "Gira o objeto 90° à direita.")
+        self.btn_rot_plus_90 = self._make_tool_button("↩️", "Gira o objeto 90° horário.")
 
         # --- Efeitos visuais de Opacidade para Rotação ---
         self.op_rot_minus = QGraphicsOpacityEffect(self.btn_rot_minus_90)
