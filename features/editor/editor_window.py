@@ -32,7 +32,7 @@ class EditorWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Editor Visual de Modelo (Gerador de Cartões em Lote - GCL)")
+        self.setWindowTitle("Editor Visual de Modelo - Projeto COMSOC")
         self.resize(1200, 800)
 
         central = QWidget()
@@ -1502,7 +1502,7 @@ class EditorWindow(QMainWindow):
         document_rect = self._get_document_rect()
 
         data = {
-            "name": self.windowTitle().replace("Editor Visual de Modelo - ", "").replace(" (Gerador de Cartões em Lote - GCL)", ""),
+            "name": self.windowTitle().replace("Editor Visual de Modelo - ", "").replace(" - Projeto COMSOC", ""),
             "canvas_size": {"w": int(document_rect.width()), "h": int(document_rect.height())},
             "target_w_mm": self.spin_phys_w.value(),
             "target_h_mm": self.spin_phys_h.value(),
