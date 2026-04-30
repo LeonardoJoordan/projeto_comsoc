@@ -32,6 +32,7 @@ class EditorWindow(QMainWindow):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._current_model_name = None
         self.setWindowTitle("Editor Visual de Modelo - Projeto COMSOC")
         self.resize(1200, 800)
 
@@ -594,7 +595,8 @@ class EditorWindow(QMainWindow):
             data = json.load(f)
 
         data = self._migrate_model_data(data)
-        self.setWindowTitle(f"Editor Visual de Modelo - {data['name']}")
+        self._current_model_name = data.get("name", "")
+        self.setWindowTitle(f"Editor Visual de Modelo - {self._current_model_name}")
         
         # O apply_scene_state faz todo o trabalho duro de desenhar
         self.apply_scene_state(data, is_undo_redo=False)
@@ -606,11 +608,15 @@ class EditorWindow(QMainWindow):
 
     def export_to_json(self):
         data = self.get_current_scene_state()
-        model_name = data["name"]
-        if not model_name or model_name == "Editor Visual de Modelo":
-            model_name, ok = QInputDialog.getText(self, "Salvar Modelo", "Nome do Modelo:")
-            if not ok or not model_name: return
-            self.setWindowTitle(f"Editor Visual de Modelo - {model_name}")
+        
+        if not self._current_model_name:
+            novo_nome, ok = QInputDialog.getText(self, "Salvar Modelo", "Nome do Modelo:")
+            if not ok or not novo_nome.strip(): return
+            self._current_model_name = novo_nome.strip()
+            self.setWindowTitle(f"Editor Visual de Modelo - {self._current_model_name}")
+            
+        data["name"] = self._current_model_name
+        model_name = self._current_model_name
 
         slug = slugify_model_name(model_name)
         model_dir = get_models_dir() / slug
@@ -1502,7 +1508,7 @@ class EditorWindow(QMainWindow):
         document_rect = self._get_document_rect()
 
         data = {
-            "name": self.windowTitle().replace("Editor Visual de Modelo - ", "").replace(" - Projeto COMSOC", ""),
+            "name": self._current_model_name or "",
             "canvas_size": {"w": int(document_rect.width()), "h": int(document_rect.height())},
             "target_w_mm": self.spin_phys_w.value(),
             "target_h_mm": self.spin_phys_h.value(),
