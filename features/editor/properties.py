@@ -435,7 +435,7 @@ class CaixaDeTextoPanel(QWidget):
 
         item_controls_enabled = not enabled
         self._set_size_controls_available(item_controls_enabled)
-        self._set_rotation_controls_available(item_controls_enabled)
+        self._set_rotation_controls_available(True)
         self._set_restore_available(self._restore_available and item_controls_enabled)
         self._set_opacity_controls_available(True)
         self._set_link_available(self._link_available)
