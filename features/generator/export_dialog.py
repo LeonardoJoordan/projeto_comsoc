@@ -20,7 +20,7 @@ class ConfigDialog(QDialog):
         
         self.imposition_settings = current_imposition or {
             "enabled": False, "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
-            "crop_marks": True, "bleed_margin": False, "target_w_mm": 0, "target_h_mm": 0
+            "crop_marks": True, "bleed_margin": True, "target_w_mm": 0, "target_h_mm": 0
         }
         self.current_is_dark = is_dark
 
@@ -128,10 +128,10 @@ class ConfigDialog(QDialog):
         ly_sheet.addStretch()
         ly_print.addLayout(ly_sheet)
 
-        self.chk_imposition = QCheckBox("Habilitar Imposição (Agrupamento na folha)")
+        self.chk_imposition = QCheckBox("Habilitar múltiplos itens por página")
         self.chk_imposition.setChecked(self.imposition_settings.get("enabled", False))
         self.chk_imposition.setToolTip(
-            "<b>IMPOSIÇÃO GRÁFICA (AGRUPAMENTO)</b><br><br>"
+            "<b>MÚLTIPLOS ITENS POR PÁGINA (AGRUPAMENTO)</b><br><br>"
             "Organiza automaticamente vários exemplares do seu modelo dentro da mesma folha de saída.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Além de economizar papel, este recurso otimiza o corte manual. Os itens são alinhados para que você possa usar régua e estilete e destacar vários cartões com poucos cortes retos, sem rebarbas.</small>"
         )
@@ -167,8 +167,11 @@ class ConfigDialog(QDialog):
             self.spin_w_mm.setValue(saved_w)
             self.spin_h_mm.setValue(saved_w / self.ratio)
         else:
-            self.spin_w_mm.setValue(100.0)
-            self.spin_h_mm.setValue(100.0 / self.ratio)
+            # Calcula o tamanho físico real baseado nos pixels a 300 DPI
+            default_w_mm = (self.model_w / 300.0) * 25.4
+            default_h_mm = (self.model_h / 300.0) * 25.4
+            self.spin_w_mm.setValue(default_w_mm)
+            self.spin_h_mm.setValue(default_h_mm)
 
         self.spin_w_mm.valueChanged.connect(self._on_width_changed)
         self.spin_h_mm.valueChanged.connect(self._on_height_changed)
@@ -193,7 +196,7 @@ class ConfigDialog(QDialog):
         )
         ly_imp.addWidget(self.chk_crop_marks)
         self.chk_bleed = QCheckBox("Habilitar margem de sangria")
-        self.chk_bleed.setChecked(self.imposition_settings.get("bleed_margin", False))
+        self.chk_bleed.setChecked(self.imposition_settings.get("bleed_margin", True))
         self.chk_bleed.setToolTip(
             "<b>MARGEM DE SANGRIA</b><br><br>"
             "Reserva um espaço extra (5mm) ao redor dos itens na folha.<br><br>"
