@@ -80,6 +80,20 @@ def _snap_targets(scene):
 
     return vertical_targets, horizontal_targets
 
+def _get_dynamic_snap_distance(scene):
+    if not scene: 
+        return 15.0
+    
+    rect = _document_rect(scene)
+    media_lados = (rect.width() + rect.height()) / 2.0
+    base_dist = max(5.0, media_lados * 0.008)
+    
+    zoom = 1.0
+    if scene.views():
+        zoom = max(0.001, scene.views()[0].transform().m11())
+        
+    return base_dist / math.sqrt(zoom)
+
 
 def _snap_position_to_guides(item, new_pos, w, h):
     # BLINDAGEM: O ímã só atua se o usuário estiver ativamente arrastando o item com o mouse
@@ -108,8 +122,10 @@ def _snap_position_to_guides(item, new_pos, w, h):
 
     best_dx = 0
     best_dy = 0
-    min_dist_x = item.SNAP_DISTANCE
-    min_dist_y = item.SNAP_DISTANCE
+    
+    dynamic_snap = _get_dynamic_snap_distance(scene)
+    min_dist_x = dynamic_snap
+    min_dist_y = dynamic_snap
 
     vertical_targets, horizontal_targets = _snap_targets(scene)
     for target_x in vertical_targets:
@@ -348,7 +364,8 @@ class ResizeHandle(QGraphicsRectItem):
             snapped_h,
             *factors,
         )
-        snap_distance = getattr(parent, 'SNAP_DISTANCE', 15)
+        
+        snap_distance = _get_dynamic_snap_distance(parent.scene())
         if abs(snapped_point.x() - target_x) >= snap_distance:
             return None
         if abs(snapped_point.y() - target_y) >= snap_distance:
@@ -361,7 +378,7 @@ class ResizeHandle(QGraphicsRectItem):
         if not scene:
             return w, h
 
-        snap_distance = getattr(parent, 'SNAP_DISTANCE', 15)
+        snap_distance = _get_dynamic_snap_distance(scene)
         keep_proportion = getattr(parent, 'keep_proportion', True)
         active_points = self._active_point_factors()
         best = None
@@ -582,7 +599,7 @@ class Guideline(QGraphicsLineItem):
                 return value
             new_pos = value
             rect = _document_rect(self.scene())
-            snap_dist = max(10, min(rect.width(), rect.height()) * 0.02)
+            snap_dist = _get_dynamic_snap_distance(self.scene())
             
             if self.is_vertical:
                 x = new_pos.x()
