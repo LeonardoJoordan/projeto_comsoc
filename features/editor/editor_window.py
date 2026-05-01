@@ -903,6 +903,9 @@ class EditorWindow(QMainWindow):
         item = self._get_selected()
         width_px = mm_to_px(width_mm)
         if item:
+            # 1. Foto do Antes (Captura o centro absoluto na cena)
+            old_center = item.mapToScene(item.transformOriginPoint())
+            
             if isinstance(item, DesignerBox):
                 r = item.rect()
                 item.setRect(0, 0, width_px, r.height())
@@ -911,11 +914,22 @@ class EditorWindow(QMainWindow):
             elif isinstance(item, (ImageItem, SignatureItem)):
                 h_px = mm_to_px(self.caixa_texto_panel.spin_h.value())
                 item.resize_custom(width_px, h_px)
+                
+            # 2. Foto do Depois e Compensação (Calcula o delta e move o item de volta)
+            new_center = item.mapToScene(item.transformOriginPoint())
+            delta = old_center - new_center
+            item.moveBy(delta.x(), delta.y())
+            
+            # 3. Atualiza a UI para refletir o recuo da coordenada X/Y
+            self.update_position_ui()
 
     def update_height(self, height_mm):
         item = self._get_selected()
         height_px = mm_to_px(height_mm)
         if item:
+            # 1. Foto do Antes (Captura o centro absoluto na cena)
+            old_center = item.mapToScene(item.transformOriginPoint())
+            
             if isinstance(item, DesignerBox):
                 r = item.rect()
                 item.setRect(0, 0, r.width(), height_px)
@@ -924,6 +938,14 @@ class EditorWindow(QMainWindow):
             elif isinstance(item, (ImageItem, SignatureItem)):
                 w_px = mm_to_px(self.caixa_texto_panel.spin_w.value())
                 item.resize_custom(w_px, height_px)
+                
+            # 2. Foto do Depois e Compensação (Calcula o delta e move o item de volta)
+            new_center = item.mapToScene(item.transformOriginPoint())
+            delta = old_center - new_center
+            item.moveBy(delta.x(), delta.y())
+            
+            # 3. Atualiza a UI para refletir o recuo da coordenada X/Y
+            self.update_position_ui()
 
     def update_rotation(self, angle):
         items = self._get_selected_items()

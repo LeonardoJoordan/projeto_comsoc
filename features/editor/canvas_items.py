@@ -82,7 +82,8 @@ def _snap_targets(scene):
 
 
 def _snap_position_to_guides(item, new_pos, w, h):
-    if getattr(item, '_keyboard_move', False) or getattr(item, '_resizing_from_handle', False):
+    # BLINDAGEM: O ímã só atua se o usuário estiver ativamente arrastando o item com o mouse
+    if not getattr(item, '_is_mouse_dragging', False):
         return new_pos
 
     scene = item.scene()
@@ -706,7 +707,13 @@ class ImageItem(QGraphicsPixmapItem):
     def hide_resize_handles(self):
         _set_resize_handles_visible(self, False)
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_mouse_dragging = True
+        super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event):
+        self._is_mouse_dragging = False
         super().mouseReleaseEvent(event)
         # Gatilho do Undo/Redo
         if self.scene() and self.scene().views():
@@ -829,7 +836,13 @@ class SignatureItem(QGraphicsPixmapItem):
     def hide_resize_handles(self):
         _set_resize_handles_visible(self, False)
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_mouse_dragging = True
+        super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event):
+        self._is_mouse_dragging = False
         super().mouseReleaseEvent(event)
         # Gatilho do Undo/Redo
         if self.scene() and self.scene().views():
@@ -1051,7 +1064,13 @@ class DesignerBox(QGraphicsRectItem):
         rect = self.rect()
         self.setTransformOriginPoint(rect.center())
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_mouse_dragging = True
+        super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event):
+        self._is_mouse_dragging = False
         super().mouseReleaseEvent(event)
         # Gatilho do Undo/Redo
         if self.scene() and self.scene().views():
