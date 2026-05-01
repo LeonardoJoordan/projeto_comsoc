@@ -150,6 +150,7 @@ class ResizeHandle(QGraphicsRectItem):
     MIN_HEIGHT = 30
 
     def __init__(self, parent, name, x_dir, y_dir, cursor):
+        # Começamos com um tamanho padrão, mas ele será atualizado dinamicamente
         super().__init__(-6, -6, 12, 12, parent)
         self.name = name
         self.x_dir = x_dir
@@ -444,6 +445,23 @@ class ResizeHandle(QGraphicsRectItem):
         snapped_w = best_w["w"] if best_w else w
         snapped_h = best_h["h"] if best_h else h
         return snapped_w, snapped_h
+    
+    def update_handle_size(self):
+        scene = self.scene()
+        if not scene:
+            return
+            
+        # Usamos a nossa inteligência de magnetismo para definir o tamanho da "pegada"
+        size = _get_dynamic_snap_distance(scene)
+        # Limitamos para a alça não ficar bizarramente gigante ou invisível
+        handle_size = max(8.0, min(25.0, size))
+        half = handle_size / 2.0
+        
+        self.setRect(-half, -half, handle_size, handle_size)
+
+    def paint(self, painter, option, widget=None):
+        self.update_handle_size()
+        super().paint(painter, option, widget)
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -552,6 +570,7 @@ def _update_resize_handles(item):
         return
     w, h = _item_size(item)
     for name, handle in item.resize_handles.items():
+        handle.update_handle_size()
         handle.setPos(_handle_position(name, w, h))
 
 
