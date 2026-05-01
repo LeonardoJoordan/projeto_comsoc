@@ -87,11 +87,20 @@ class SheetAssembler:
         idx = 0
         limit = len(cards)
         
+        if limit == 0:
+            painter.end()
+            return sheet
+
+        # Calcula a malha efetivamente ocupada nesta folha
+        actual_cols = min(self.cols, limit)
+        actual_rows = (limit + self.cols - 1) // self.cols
+        
         for r in range(self.rows):
             for c in range(self.cols):
                 if idx >= limit:
                     break
                 original_img = cards[idx]
+                # A margem continua sendo a estática (baseada na grade máxima)
                 x = self.margin_left + (c * self.card_w_px)
                 y = self.margin_top + (r * self.card_h_px)
                 
@@ -104,21 +113,22 @@ class SheetAssembler:
                 idx += 1
 
         if self.crop_marks:
-            self._draw_crop_marks(painter)
+            self._draw_crop_marks(painter, actual_cols, actual_rows)
         painter.end()
         return sheet
 
-    def _draw_crop_marks(self, painter: QPainter):
+    def _draw_crop_marks(self, painter: QPainter, cols: int, rows: int):
         pen = QPen(Qt.GlobalColor.black)
         pen.setWidth(2) 
         painter.setPen(pen)
 
         grid_start_x = self.margin_left
-        grid_end_x = self.margin_left + (self.cols * self.card_w_px)
+        # Usa as colunas e linhas dinâmicas para travar o fim do bloco
+        grid_end_x = self.margin_left + (cols * self.card_w_px)
         grid_start_y = self.margin_top
-        grid_end_y = self.margin_top + (self.rows * self.card_h_px)
+        grid_end_y = self.margin_top + (rows * self.card_h_px)
 
-        for c in range(self.cols + 1):
+        for c in range(cols + 1):
             x = grid_start_x + (c * self.card_w_px)
             p1_top = QPointF(x, grid_start_y - self.mark_gap)
             p2_top = QPointF(x, grid_start_y - self.mark_gap - self.mark_len)
@@ -128,7 +138,7 @@ class SheetAssembler:
             p2_btm = QPointF(x, grid_end_y + self.mark_gap + self.mark_len)
             painter.drawLine(p1_btm, p2_btm)
 
-        for r in range(self.rows + 1):
+        for r in range(rows + 1):
             y = grid_start_y + (r * self.card_h_px)
             p1_lft = QPointF(grid_start_x - self.mark_gap, y)
             p2_lft = QPointF(grid_start_x - self.mark_gap - self.mark_len, y)
