@@ -587,10 +587,10 @@ class Guideline(QGraphicsLineItem):
         self.is_vertical = is_vertical
         
         if is_vertical:
-            self.setLine(0, -10000, 0, 10000)
+            self.setLine(0, -20000, 0, 40000)
             self.setPos(position_px, 0)
         else:
-            self.setLine(-10000, 0, 10000, 0)
+            self.setLine(-20000, 0, 40000, 0)
             self.setPos(0, position_px)
 
         pen = QPen(QColor("#00bcd4"), 1, Qt.PenStyle.DashLine)
@@ -788,17 +788,7 @@ class BackgroundItem(ImageItem):
         super().paint(painter, option, widget)
 
     def shape(self):
-        """MÁGICA DE UX: Impede que o usuário selecione a parte invisível da imagem clicando no nada."""
-        base_shape = super().shape()
-        if self.scene():
-            path = QPainterPath()
-            path.addRect(_document_rect(self.scene()))
-            local_path = self.mapFromScene(path)
-            
-            # O formato "clicável" é apenas a interseção entre o tamanho real da imagem e o tamanho do documento
-            return base_shape.intersected(local_path)
-            
-        return base_shape
+        return super().shape()
     
 class SignatureItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15

@@ -588,7 +588,7 @@ class EditorDeTextoPanel(QWidget):
         self.cbo_font.currentFontChanged.connect(self.set_font_family)
         
         self.spin_size = QSpinBox()
-        self.spin_size.setRange(6, 300)
+        self.spin_size.setRange(1, 999)
         self.spin_size.setToolTip(
             "<b>TAMANHO DA FONTE</b><br><br>"
             "Ajusta a escala do texto em pontos tipográficos (pt).<br><br>"

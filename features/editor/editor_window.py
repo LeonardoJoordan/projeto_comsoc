@@ -1,4 +1,5 @@
 import json
+import re
 import copy
 import shutil
 from pathlib import Path
@@ -330,13 +331,13 @@ class EditorWindow(QMainWindow):
         form_dim.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
         
         self.spin_phys_w = MathDoubleSpinBox()
-        self.spin_phys_w.setRange(10, 2000)
+        self.spin_phys_w.setRange(10, 1000)
         self.spin_phys_w.setDecimals(1)
         self.spin_phys_w.setKeyboardTracking(False)
         self.spin_phys_w.setValue(100.0) 
         
         self.spin_phys_h = MathDoubleSpinBox()
-        self.spin_phys_h.setRange(10, 2000)
+        self.spin_phys_h.setRange(10, 1000)
         self.spin_phys_h.setDecimals(1)
         self.spin_phys_h.setKeyboardTracking(False)
         self.spin_phys_h.setValue(150.0) 
@@ -505,8 +506,7 @@ class EditorWindow(QMainWindow):
                 
                 if delta != 0:
                     zoom_factor = 1.15 if delta > 0 else 1 / 1.15
-                    self.view.scale(zoom_factor, zoom_factor)
-                    self._update_workspace_scene_rect()
+                    self._apply_zoom(zoom_factor)
                 event.accept() # Mata o evento nativo de rolagem
                 return True
 
@@ -514,8 +514,7 @@ class EditorWindow(QMainWindow):
             if event.type() == QEvent.Type.NativeGesture and event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
                 zoom_factor = 1.0 + event.value()
                 if zoom_factor > 0:
-                    self.view.scale(zoom_factor, zoom_factor)
-                    self._update_workspace_scene_rect()
+                    self._apply_zoom(zoom_factor)
                 event.accept()
                 return True
 
@@ -716,6 +715,13 @@ class EditorWindow(QMainWindow):
                 # Lê o tamanho original da imagem ao importar manualmente e molda a "Prancheta"
                 w_mm = px_to_mm(original_size.width())
                 h_mm = px_to_mm(original_size.height())
+
+                # Trava: se qualquer lado ultrapassar 1000mm, redimensiona proporcionalmente
+                MAX_MM = 1000.0
+                if w_mm > MAX_MM or h_mm > MAX_MM:
+                    scale = MAX_MM / max(w_mm, h_mm)
+                    w_mm = w_mm * scale
+                    h_mm = h_mm * scale
                 
                 self.spin_phys_w.blockSignals(True)
                 self.spin_phys_h.blockSignals(True)
@@ -852,7 +858,6 @@ class EditorWindow(QMainWindow):
             base_name = self._generate_layer_name(getattr(original, 'layer_id', None), original)
 
             # Remove qualquer sufixo de cópia anterior para sempre partir do nome limpo
-            import re
             base_name = re.sub(r' - Cópia(\s\d+)?$', '', base_name)
 
             existing_names = [
@@ -1928,6 +1933,33 @@ class EditorWindow(QMainWindow):
             view_rect = document_rect.adjusted(-margin, -margin, margin, margin)
             self.view.fitInView(view_rect, Qt.AspectRatioMode.KeepAspectRatio)
             self._update_workspace_scene_rect()
+
+    def _apply_zoom(self, zoom_factor):
+        """Aplica zoom respeitando os limites mínimo dinâmico e máximo fixo."""
+        current_scale = self.view.transform().m11()
+        new_scale = current_scale * zoom_factor
+
+        # Limite máximo: 1000% (escala 10.0x)
+        MAX_SCALE = 10.0
+
+        # Limite mínimo dinâmico: documento deve ocupar pelo menos 50% da menor dimensão visível
+        doc = self._get_document_rect()
+        viewport = self.view.viewport().size()
+        if not doc.isEmpty() and viewport.width() > 0 and viewport.height() > 0:
+            min_scale_w = (viewport.width() * 0.5) / doc.width()
+            min_scale_h = (viewport.height() * 0.5) / doc.height()
+            MIN_SCALE = min(min_scale_w, min_scale_h)
+        else:
+            MIN_SCALE = 0.01
+
+        new_scale = max(MIN_SCALE, min(MAX_SCALE, new_scale))
+
+        if abs(new_scale - current_scale) < 1e-9:
+            return
+
+        corrected_factor = new_scale / current_scale
+        self.view.scale(corrected_factor, corrected_factor)
+        self._update_workspace_scene_rect()
 
     def _import_asset(self, source_path: str, model_dir: Path) -> str | None:
         if not source_path: 
