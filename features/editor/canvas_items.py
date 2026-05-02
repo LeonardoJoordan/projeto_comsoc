@@ -605,7 +605,15 @@ class Guideline(QGraphicsLineItem):
     def shape(self):
         path = super().shape()
         stroker = QPainterPathStroker()
-        stroker.setWidth(15) 
+        
+        hitbox_width = 15.0
+        if self.scene():
+            # Aproveitamos a nossa inteligência de zoom/escala para a espessura do clique
+            hitbox_width = _get_dynamic_snap_distance(self.scene())
+            # Limitamos para não ficar nem impossível de clicar, nem cobrir a tela toda
+            hitbox_width = max(10.0, min(40.0, hitbox_width))
+            
+        stroker.setWidth(hitbox_width) 
         return stroker.createStroke(path)
     
     def paint(self, painter, option, widget=None):
