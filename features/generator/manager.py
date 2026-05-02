@@ -86,7 +86,12 @@ class RenderManager(QObject):
     def _start_imposition_mode(self, all_data, num_threads):
         w_mm = self.imposition_settings.get("target_w_mm", 100)
         h_mm = self.imposition_settings.get("target_h_mm", 150)
-        temp_asm = SheetAssembler(w_mm, h_mm)
+        sheet_w = self.imposition_settings.get("sheet_w_mm", 210.0)
+        sheet_h = self.imposition_settings.get("sheet_h_mm", 297.0)
+        crop = self.imposition_settings.get("crop_marks", True)
+        bleed = self.imposition_settings.get("bleed_margin", False)
+        
+        temp_asm = SheetAssembler(w_mm, h_mm, sheet_w, sheet_h, crop, bleed)
         capacity = temp_asm.capacity
         
         if capacity <= 0:

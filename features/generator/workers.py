@@ -132,8 +132,9 @@ class PageRenderWorker(QThread):
         sheet_w = imposition_settings.get("sheet_w_mm", 210.0)
         sheet_h = imposition_settings.get("sheet_h_mm", 297.0)
         crop_marks = imposition_settings.get("crop_marks", True)
+        bleed_margin = imposition_settings.get("bleed_margin", False)
         
-        self.assembler = SheetAssembler(w_mm, h_mm, sheet_w, sheet_h, crop_marks)
+        self.assembler = SheetAssembler(w_mm, h_mm, sheet_w, sheet_h, crop_marks, bleed_margin)
         
         self._is_running = True
 
