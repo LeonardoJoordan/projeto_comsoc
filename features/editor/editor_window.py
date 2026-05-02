@@ -520,6 +520,7 @@ class EditorWindow(QMainWindow):
 
             if event.type() == QEvent.Type.Resize:
                 self._update_workspace_scene_rect()
+                self._apply_zoom(1.0)
 
             if event.type() == QEvent.Type.FocusOut:
                 self._leave_space_pan_mode()
