@@ -96,53 +96,78 @@ def _get_dynamic_snap_distance(scene):
 
 
 def _snap_position_to_guides(item, new_pos, w, h):
-    # BLINDAGEM: O ímã só atua se o usuário estiver ativamente arrastando o item com o mouse
-    if not getattr(item, '_is_mouse_dragging', False):
-        return new_pos
-
     scene = item.scene()
     if not scene:
         return new_pos
 
-    origin = item.transformOriginPoint()
-    angle = item.rotation()
-    local_points = [
-        QPointF(0, 0),
-        QPointF(w, 0),
-        QPointF(w, h),
-        QPointF(0, h),
-    ]
-    scene_points = [_rotated_point(new_pos, origin, angle, p) for p in local_points]
-    center = _rotated_point(new_pos, origin, angle, QPointF(w / 2, h / 2))
+    sel = scene.selectedItems()
+    leader = next((i for i in sel if getattr(i, '_is_mouse_dragging', False)), None)
+    
+    # Validação rigorosa: Só atua se houver arrastre e o estado coletivo estiver inicializado
+    if not leader or not hasattr(scene, '_drag_start_positions') or item not in scene._drag_start_positions:
+        return new_pos
 
-    xs = [p.x() for p in scene_points]
-    ys = [p.y() for p in scene_points]
-    x_candidates = [min(xs), center.x(), max(xs)]
-    y_candidates = [min(ys), center.y(), max(ys)]
+    start_pos = scene._drag_start_positions[item]
+    abs_delta = new_pos - start_pos
+
+    # Hit de Cache: Garante que todos os itens leiam o exato mesmo vetor matemático no quadro atual
+    cached_delta = getattr(scene, '_group_raw_delta', None)
+    if cached_delta and abs(cached_delta.x() - abs_delta.x()) < 0.001 and abs(cached_delta.y() - abs_delta.y()) < 0.001:
+        return new_pos + QPointF(getattr(scene, '_group_snap_dx', 0), getattr(scene, '_group_snap_dy', 0))
+
+    dynamic_snap = _get_dynamic_snap_distance(scene)
+    vertical_targets, horizontal_targets = _snap_targets(scene)
 
     best_dx = 0
     best_dy = 0
-    
-    dynamic_snap = _get_dynamic_snap_distance(scene)
     min_dist_x = dynamic_snap
     min_dist_y = dynamic_snap
 
-    vertical_targets, horizontal_targets = _snap_targets(scene)
-    for target_x in vertical_targets:
-        for x in x_candidates:
-            dist = abs(x - target_x)
-            if dist < min_dist_x:
-                min_dist_x = dist
-                best_dx = target_x - x
+    # Batch Scan: Analisa todos os itens selecionados contra as guias simultaneamente
+    for sel_item in sel:
+        if sel_item not in scene._drag_start_positions:
+            continue
+            
+        if hasattr(sel_item, 'rect'):
+            iw, ih = sel_item.rect().width(), sel_item.rect().height()
+        elif hasattr(sel_item, 'pixmap'):
+            iw, ih = sel_item.pixmap().width(), sel_item.pixmap().height()
+        else:
+            continue
+            
+        origin = sel_item.transformOriginPoint()
+        angle = sel_item.rotation()
+        cand_pos = scene._drag_start_positions[sel_item] + abs_delta
+        
+        local_points = [QPointF(0, 0), QPointF(iw, 0), QPointF(iw, ih), QPointF(0, ih)]
+        scene_points = [_rotated_point(cand_pos, origin, angle, p) for p in local_points]
+        center = _rotated_point(cand_pos, origin, angle, QPointF(iw / 2, ih / 2))
 
-    for target_y in horizontal_targets:
-        for y in y_candidates:
-            dist = abs(y - target_y)
-            if dist < min_dist_y:
-                min_dist_y = dist
-                best_dy = target_y - y
+        xs = [p.x() for p in scene_points]
+        ys = [p.y() for p in scene_points]
+        x_candidates = [min(xs), center.x(), max(xs)]
+        y_candidates = [min(ys), center.y(), max(ys)]
 
-    return QPointF(new_pos.x() + best_dx, new_pos.y() + best_dy)
+        for target_x in vertical_targets:
+            for x in x_candidates:
+                dist = abs(x - target_x)
+                if dist < min_dist_x:
+                    min_dist_x = dist
+                    best_dx = target_x - x
+
+        for target_y in horizontal_targets:
+            for y in y_candidates:
+                dist = abs(y - target_y)
+                if dist < min_dist_y:
+                    min_dist_y = dist
+                    best_dy = target_y - y
+
+    # Atualiza o cache do quadro
+    scene._group_raw_delta = abs_delta
+    scene._group_snap_dx = best_dx
+    scene._group_snap_dy = best_dy
+
+    return new_pos + QPointF(best_dx, best_dy)
 
 
 class ResizeHandle(QGraphicsRectItem):
@@ -754,10 +779,17 @@ class ImageItem(QGraphicsPixmapItem):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_mouse_dragging = True
+            scene = self.scene()
+            if scene:
+                scene._drag_start_positions = {i: i.pos() for i in scene.selectedItems()}
+                scene._group_raw_delta = None
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
+        scene = self.scene()
+        if scene:
+            scene._group_raw_delta = None
         super().mouseReleaseEvent(event)
         # Gatilho do Undo/Redo
         if self.scene() and self.scene().views():
@@ -873,10 +905,17 @@ class SignatureItem(QGraphicsPixmapItem):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_mouse_dragging = True
+            scene = self.scene()
+            if scene:
+                scene._drag_start_positions = {i: i.pos() for i in scene.selectedItems()}
+                scene._group_raw_delta = None
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
+        scene = self.scene()
+        if scene:
+            scene._group_raw_delta = None
         super().mouseReleaseEvent(event)
         # Gatilho do Undo/Redo
         if self.scene() and self.scene().views():
@@ -1101,10 +1140,17 @@ class DesignerBox(QGraphicsRectItem):
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_mouse_dragging = True
+            scene = self.scene()
+            if scene:
+                scene._drag_start_positions = {i: i.pos() for i in scene.selectedItems()}
+                scene._group_raw_delta = None
         super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
+        scene = self.scene()
+        if scene:
+            scene._group_raw_delta = None
         super().mouseReleaseEvent(event)
         # Gatilho do Undo/Redo
         if self.scene() and self.scene().views():
