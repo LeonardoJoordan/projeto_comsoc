@@ -1047,6 +1047,16 @@ class EditorWindow(QMainWindow):
         except RuntimeError:
             return 
             
+        # Filtro de prioridade: Guias só podem ser selecionadas sozinha
+        has_non_guide = any(not isinstance(i, Guideline) for i in sel)
+        if has_non_guide:
+            # Desmarca silenciosamente as guias da seleção mista
+            for i in sel:
+                if isinstance(i, Guideline):
+                    i.setSelected(False)
+            # Atualiza a lista de itens selecionados após a limpeza
+            sel = self.scene.selectedItems()
+            
         boxes = [i for i in sel if isinstance(i, DesignerBox)]
         images = [i for i in sel if isinstance(i, ImageItem)]
         signatures = [i for i in sel if isinstance(i, SignatureItem)]
