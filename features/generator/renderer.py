@@ -121,7 +121,8 @@ class NativeRenderer:
                 painter.setOpacity(1.0)
 
         for img in self.tpl.get("images", []):
-            if not img.get("visible", True): continue
+            if not img.get("visible", True):
+                continue
             
             raw_path = img.get("path", "")
             img_path = Path(raw_path)
@@ -171,22 +172,66 @@ class NativeRenderer:
                                 url = "https://" + url
                             out_links.append({"url": url, "rect": rect})
 
+        def _is_empty_placeholder_value(var_name: str) -> bool:
+            """
+            Retorna True quando o placeholder não tem conteúdo útil na linha atual.
+            Remove tags HTML antes de testar, preservando a mesma lógica antiga.
+            """
+            val = row_rich.get(var_name, "")
+            clean_val = re.sub(r"<[^>]+>", "", str(val)).strip()
+            return not clean_val
+
+        def _process_optional_blocks(html_text: str) -> str:
+            """
+            Processa blocos opcionais usando pipe, mas somente quando o conteúdo
+            entre os pipes possui pelo menos um placeholder.
+
+            Bloco opcional válido:
+                |texto com {placeholder}|
+
+            Trecho comum ignorado:
+                | texto sem placeholder |
+            """
+
+            def replace_optional_block(match):
+                block_content = match.group(1)
+                vars_in_block = re.findall(r"\{([a-zA-Z0-9_]+)\}", block_content)
+
+                for var in vars_in_block:
+                    if _is_empty_placeholder_value(var):
+                        return ""
+
+                return block_content
+
+            optional_block_pattern = r"\|([^|]*\{[a-zA-Z0-9_]+\}[^|]*)\|"
+
+            return re.sub(optional_block_pattern, replace_optional_block, html_text)
+
         for box in self.tpl.get("boxes", []):
             if not box.get("visible", True):
                 continue
-            needed_vars = re.findall(r"\{([a-zA-Z0-9_]+)\}", box["html"])
+
+            html_original = box["html"]
+
+            # 1. Primeiro resolve os blocos opcionais | ... |
+            html_processado = _process_optional_blocks(html_original)
+
+            # 2. Depois mantém a regra antiga:
+            # se ainda sobrou placeholder vazio fora dos blocos opcionais,
+            # a caixa inteira continua sumindo.
+            needed_vars = re.findall(r"\{([a-zA-Z0-9_]+)\}", html_processado)
             should_skip = False
+
             for var in needed_vars:
-                val = row_rich.get(var, "")
-                clean_val = re.sub(r"<[^>]+>", "", str(val)).strip()
-                if not clean_val:
+                if _is_empty_placeholder_value(var):
                     should_skip = True
                     break
             
             if should_skip:
                 continue
+
             try:
-                html_resolved = self.resolve_html(box["html"], row_rich)
+                html_resolved = self.resolve_html(html_processado, row_rich)
                 painter.setOpacity(box.get("opacity", 1.0))
                 self._draw_html_box(painter, box, html_resolved, row_rich, out_links)
                 painter.setOpacity(1.0)
@@ -217,7 +262,7 @@ class NativeRenderer:
                         sig.get("rotation", 0),
                         sig.get("opacity", 1.0),
                     )
-
+    
     
     def _draw_html_box(self, painter, box_data, html_text, row_rich=None, out_links=None):
         painter.save()

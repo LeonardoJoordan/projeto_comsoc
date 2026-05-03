@@ -563,7 +563,8 @@ class EditorDeTextoPanel(QWidget):
             "• <b>Como criar:</b> Envolva qualquer palavra com chaves (ex: <b>{Nome}</b>) para que o sistema crie automaticamente uma coluna na sua tabela de preenchimento.<br>"
             "• <b>Caracteres Proibidos:</b> O sistema reconhece <b>apenas letras, números e subtraços (_)</b>. O uso de espaços, acentos ou símbolos quebra a variável, transformando-a em texto estático.<br>"
             "• <b>Composição:</b> Você pode misturar texto estático e variáveis na mesma caixa (ex: <i>Certificamos que {Aluno} concluiu...</i>).<br>"
-            "• <b>Ocultação Automática:</b> Se uma variável estiver vazia na tabela, <b>toda a caixa de texto ficará invisível</b> naquele cartão, evitando lixo visual na impressão final.<br><br>"
+            "• <b>Ocultação Automática:</b> Se uma variável solta estiver vazia na tabela, <b>toda a caixa de texto ficará invisível</b> naquele cartão, evitando lixo visual na impressão final, exceto se contiver <b>Trechos Opcionais</b>.<br>"
+            "• <b>Trechos Opcionais (Condicionais):</b> Use barras retas (<b>|</b>) para isolar partes do texto. Ex: <i>| CPF n° {CPF} |</i>. Se o dado estiver vazio, apenas o trecho entre as barras desaparece, salvando o restante da caixa.<br><br>"
             "<small style='color: #A0A0A0;'>Dica Smart: Agrupe rótulos e variáveis na mesma caixa (ex: \"WhatsApp: {Telefone}\"). Assim, se a pessoa não tiver telefone cadastrado, a palavra \"WhatsApp:\" some junto com a variável, mantendo o layout impecável.</small>"
         )
         lbl_texto.setToolTip(tooltip_texto)
