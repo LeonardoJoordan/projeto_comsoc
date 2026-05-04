@@ -1041,23 +1041,27 @@ class DesignerBox(QGraphicsRectItem):
         html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", html)
         html = re.sub(r"(?i)</h[1-6]>", "</p>", html)
         
-        self.text_item.setHtml(html)
-        
-        # 2. Aplicar Fonte Global e Cor NATIVA (SEMPRE após o setHtml, pois ele reseta o documento)
+        # 2. Prepara a Fonte da Verdade ANTES do HTML
+        # Isso garante que o parser já inicie o documento com as métricas reais
         font = QFont(self.state.font_family, self.state.font_size)
         font.setStyleStrategy(QFont.StyleStrategy.ForceOutline)
+        
         self.text_item.setFont(font)
         self.text_item.document().setDefaultFont(font)
         
+        self.text_item.setHtml(html)
+        
+        # 3. Forçar a Cor e a Fonte NATIVA em todos os caracteres vivos
         color = QColor(getattr(self.state, 'font_color', '#000000'))
         
-        cursor_color = QTextCursor(self.text_item.document())
-        cursor_color.select(QTextCursor.SelectionType.Document)
+        cursor = QTextCursor(self.text_item.document())
+        cursor.select(QTextCursor.SelectionType.Document)
         char_fmt = QTextCharFormat()
         char_fmt.setForeground(QBrush(color))
-        cursor_color.mergeCharFormat(char_fmt)
+        char_fmt.setFont(font) # O SEGREDO: Invalida o cache antigo e recalcula a área pintada na hora
+        cursor.mergeCharFormat(char_fmt)
         
-        # 3. Aplicar Alinhamento Horizontal
+        # 4. Aplicar Alinhamento Horizontal
         opt = self.text_item.document().defaultTextOption()
         if self.state.align == "center": opt.setAlignment(Qt.AlignmentFlag.AlignCenter)
         elif self.state.align == "right": opt.setAlignment(Qt.AlignmentFlag.AlignRight)
@@ -1065,7 +1069,7 @@ class DesignerBox(QGraphicsRectItem):
         else: opt.setAlignment(Qt.AlignmentFlag.AlignLeft)
         self.text_item.document().setDefaultTextOption(opt)
         
-        # 4. Aplicar Margens e Entrelinhas
+        # 5. Aplicar Margens e Entrelinhas
         cursor = QTextCursor(self.text_item.document())
         cursor.select(QTextCursor.SelectionType.Document)
         fmt = QTextBlockFormat()
@@ -1073,7 +1077,7 @@ class DesignerBox(QGraphicsRectItem):
         fmt.setLineHeight(self.state.line_height * 100.0, 1)
         cursor.mergeBlockFormat(fmt)
 
-        # 5. Zerar margens para sistema de ancoragem livre
+        # 6. Zerar margens para sistema de ancoragem livre
         root_frame = self.text_item.document().rootFrame()
         frame_fmt = root_frame.frameFormat()
         frame_fmt.setMargin(0)
