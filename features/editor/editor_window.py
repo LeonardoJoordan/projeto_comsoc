@@ -443,7 +443,7 @@ class EditorWindow(QMainWindow):
         # O histórico não deve registrar a inicialização em branco, deixaremos para 
         # registrar o Estado #0 logo após carregar o JSON ou criar novos itens.
 
-        self.shortcut_dup = QShortcut(QKeySequence("Ctrl+J"), self)
+        self.shortcut_dup = QShortcut(QKeySequence("Ctrl+D"), self)
         self.shortcut_dup.activated.connect(self.duplicate_selected)
 
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
@@ -524,6 +524,31 @@ class EditorWindow(QMainWindow):
 
             if event.type() == QEvent.Type.FocusOut:
                 self._leave_space_pan_mode()
+                self._is_middle_panning = False
+                self.view.viewport().unsetCursor()
+
+            # --- Eventos de Mouse (Botão do Meio) ---
+            if event.type() == QEvent.Type.MouseButtonPress:
+                if event.button() == Qt.MouseButton.MiddleButton:
+                    self._is_middle_panning = True
+                    self._last_pan_pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
+                    self.view.viewport().setCursor(Qt.CursorShape.ClosedHandCursor)
+                    return True
+                    
+            elif event.type() == QEvent.Type.MouseMove:
+                if getattr(self, '_is_middle_panning', False):
+                    current_pos = event.position().toPoint() if hasattr(event, 'position') else event.pos()
+                    delta = current_pos - self._last_pan_pos
+                    self.view.horizontalScrollBar().setValue(self.view.horizontalScrollBar().value() - delta.x())
+                    self.view.verticalScrollBar().setValue(self.view.verticalScrollBar().value() - delta.y())
+                    self._last_pan_pos = current_pos
+                    return True
+                    
+            elif event.type() == QEvent.Type.MouseButtonRelease:
+                if event.button() == Qt.MouseButton.MiddleButton:
+                    self._is_middle_panning = False
+                    self.view.viewport().unsetCursor()
+                    return True
 
             # --- Eventos de Teclado (Pressionar) ---
             if event.type() == QEvent.Type.KeyPress:
@@ -1850,7 +1875,7 @@ class EditorWindow(QMainWindow):
         self.btn_dup_layer = QPushButton("📑")
         self._apply_tooltip(self.btn_dup_layer, 
             "<b>DUPLICAR CAMADA</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Ctrl + J</small>"
+            "<small style='color: #A0A0A0;'>Atalho: Ctrl + D</small>"
             "<br><br>"
             "Cria uma cópia exata do elemento selecionado, preservando todas as cores, fontes e tamanhos.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: A cópia é criada com um pequeno deslocamento. Ótimo para criar padrões repetitivos ou variações de uma mesma base.</small>")
