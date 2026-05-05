@@ -496,10 +496,36 @@ class EditorWindow(QMainWindow):
         # --- FORÇA A SINCRONIA INICIAL ---
         # Faz o quadrado branco (1000x1000) se transformar no retângulo exato ditado pelas caixas (100x150mm) a 300 DPI
         self._on_physical_size_changed()
+        self._last_saved_state = self.get_current_scene_state()
 
     def showEvent(self, event):
         super().showEvent(event)
         self._zoom_to_fit()
+
+    def closeEvent(self, event):
+        current_state = self.get_current_scene_state()
+        if hasattr(self, '_last_saved_state') and self._last_saved_state is not None:
+            if current_state != self._last_saved_state:
+                msg_box = QMessageBox(self)
+                msg_box.setWindowTitle("Alterações não salvas")
+                msg_box.setIcon(QMessageBox.Icon.Warning)
+                msg_box.setText("<b>Você tem alterações não salvas neste modelo.</b><br><br>Gostaria de salvá-las antes de sair?")
+                
+                btn_save = msg_box.addButton("Salvar e Sair", QMessageBox.ButtonRole.AcceptRole)
+                btn_discard = msg_box.addButton("Sair sem salvar", QMessageBox.ButtonRole.DestructiveRole)
+                btn_cancel = msg_box.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+                msg_box.setDefaultButton(btn_save)
+                
+                msg_box.exec()
+                
+                if msg_box.clickedButton() == btn_save:
+                    event.ignore()
+                    self.export_to_json(skip_close_dialog=True)
+                    return
+                elif msg_box.clickedButton() == btn_cancel:
+                    event.ignore()
+                    return
+        super().closeEvent(event)
 
     def eventFilter(self, source, event):
         # Escuta tanto a view principal quanto o viewport das barras de rolagem
@@ -636,8 +662,9 @@ class EditorWindow(QMainWindow):
         # Limpa o histórico e salva o Estado #0
         self.history.clear()
         self.save_snapshot()
+        self._last_saved_state = self.get_current_scene_state()
 
-    def export_to_json(self):
+    def export_to_json(self, skip_close_dialog=False):
         data = self.get_current_scene_state()
         
         if not self._current_model_name:
@@ -686,6 +713,12 @@ class EditorWindow(QMainWindow):
             
         # Emite o sinal agora contendo também o caminho do arquivo para o Log da MainWindow
         self.modelSaved.emit(model_name, data["placeholders"], str(file_path))
+
+        self._last_saved_state = self.get_current_scene_state()
+        
+        if skip_close_dialog:
+            self.close()
+            return
         
         # Criação do Diálogo de Decisão Customizado
         msg_box = QMessageBox(self)
