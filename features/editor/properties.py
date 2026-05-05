@@ -476,7 +476,7 @@ class CaixaDeTextoPanel(QWidget):
         self.blockSignals(True)
         self._restore_available = True
         self._link_available = isinstance(img, ImageItem)
-        rect = img.pixmap().rect()
+        rect = img.rect() if hasattr(img, 'rect') else img.pixmap().rect()
         self.spin_w.setValue(px_to_mm(rect.width()))
         self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(self._normalize_rotation(img.rotation()))
@@ -929,6 +929,6 @@ class AssinaturaPanel(QWidget):
 
     def load_from_item(self, item: SignatureItem):
         self.blockSignals(True)
-        rect = item.pixmap().rect()
+        rect = item.rect() if hasattr(item, 'rect') else item.pixmap().rect()
         self.spin_size.setValue(max(rect.width(), rect.height()))
         self.blockSignals(False)

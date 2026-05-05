@@ -251,9 +251,10 @@ class HybridAssemblerWorker(QThread):
                 tw = self.imposition_settings.get("target_w_mm", 100.0)
                 th = self.imposition_settings.get("target_h_mm", 150.0)
                 marks = self.imposition_settings.get("crop_marks", True)
-                
+                bleed = self.imposition_settings.get("bleed_margin", False)
+
                 # Recalcula a orientação vencedora para o PDF final
-                temp_asm = SheetAssembler(tw, th, sheet_w, sheet_h, marks)
+                temp_asm = SheetAssembler(tw, th, sheet_w, sheet_h, marks, bleed)
                 layout.setPageSize(QPageSize(QSizeF(sheet_w, sheet_h), QPageSize.Unit.Millimeter))
                 layout.setOrientation(temp_asm.orientation)
             else:

@@ -4,10 +4,11 @@ from pathlib import Path
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem,
                                QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem,
                                QStyle)
-from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtCore import Qt, QPointF, QRectF, QSize
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
-                           QImageReader, QPainterPath, QFontMetrics)
+                           QImageReader, QPainterPath, QFontMetrics, QPainter,
+                           QImageIOHandler)
 from core.text_state import TextState
 
 DPI = 300
@@ -17,6 +18,56 @@ def mm_to_px(mm):
 
 def px_to_mm(px):
     return (px * 25.4) / DPI
+
+def _reader_logical_size(reader, raw_size):
+    transform = reader.transformation()
+    if transform & QImageIOHandler.Transformation.TransformationRotate90:
+        return QSize(raw_size.height(), raw_size.width())
+    return QSize(raw_size.width(), raw_size.height())
+
+def _load_proxy_pixmap(path):
+    """
+    Carrega a imagem gerando um proxy leve na RAM se o lado maior ultrapassar 2048px.
+    Retorna: (pixmap, logical_w, logical_h, proxy_scale)
+    """
+    if not path:
+        pix = QPixmap(1000, 1000)
+        pix.fill(Qt.GlobalColor.transparent)
+        return pix, 1000.0, 1000.0, 1.0
+
+    reader = QImageReader(path)
+    reader.setAutoTransform(True)
+    raw_size = reader.size()
+    
+    if raw_size.isEmpty():
+        img = reader.read() if reader.canRead() else None
+        pix = QPixmap.fromImage(img) if img is not None and not img.isNull() else QPixmap(path)
+        return pix, float(pix.width()), float(pix.height()), 1.0
+
+    logical_size = _reader_logical_size(reader, raw_size)
+    logical_w = float(logical_size.width())
+    logical_h = float(logical_size.height())
+    
+    MAX_SIDE = 2048.0
+    longest_side = max(logical_w, logical_h)
+    
+    if longest_side <= MAX_SIDE:
+        img = reader.read() if reader.canRead() else None
+        pix = QPixmap.fromImage(img) if img is not None and not img.isNull() else QPixmap(path)
+        if not pix.isNull():
+            logical_w = float(pix.width())
+            logical_h = float(pix.height())
+        return pix, logical_w, logical_h, 1.0
+        
+    proxy_scale = MAX_SIDE / longest_side
+    new_w = int(raw_size.width() * proxy_scale)
+    new_h = int(raw_size.height() * proxy_scale)
+    
+    reader.setScaledSize(QSize(new_w, new_h))
+    img = reader.read()
+    pix = QPixmap.fromImage(img) if not img.isNull() else QPixmap(path)
+    
+    return pix, logical_w, logical_h, proxy_scale
 
 
 def _rotated_point(position, origin, angle, point):
@@ -695,25 +746,23 @@ class ImageItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
     def __init__(self, pixmap_path=None, parent=None):
-        if pixmap_path:
-            reader = QImageReader(pixmap_path)
-            reader.setAutoTransform(True)
-            size = reader.size()        
-            img = reader.read()
-            pixmap = QPixmap.fromImage(img) if not img.isNull() else QPixmap(pixmap_path)
-        else:
-            pixmap = QPixmap(1000, 1000)
-            pixmap.fill(Qt.GlobalColor.transparent)
+        pixmap, logical_w, logical_h, proxy_scale = _load_proxy_pixmap(pixmap_path)
             
         super().__init__(pixmap)
         self._original_path = pixmap_path or ""
+        self._logical_w = logical_w
+        self._logical_h = logical_h
+        self._current_w = logical_w
+        self._current_h = logical_h
+        self._proxy_scale = proxy_scale
+        
         self.setFlags(
             QGraphicsItem.GraphicsItemFlag.ItemIsMovable |
             QGraphicsItem.GraphicsItemFlag.ItemIsSelectable |
             QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges
         )
-        self._original_pixmap = pixmap
-        self.setZValue(1) 
+        self._proxy_pixmap = pixmap
+        self.setZValue(1)
         
         self.keep_proportion = True
         self.has_link = False
@@ -729,43 +778,48 @@ class ImageItem(QGraphicsPixmapItem):
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
             new_pos = value
-            rect = self.pixmap().rect()
-            w, h = rect.width(), rect.height()
+            w, h = self._current_w, self._current_h
             return _snap_position_to_guides(self, new_pos, w, h)
         return super().itemChange(change, value)
 
+    def rect(self):
+        return QRectF(0, 0, self._current_w, self._current_h)
+        
+    def boundingRect(self):
+        return self.rect()
+
+    def shape(self):
+        path = QPainterPath()
+        path.addRect(self.rect())
+        return path
+
+    def contains(self, point):
+        return self.rect().contains(point)
+        
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(self.rect(), self.pixmap(), QRectF(self.pixmap().rect()))
+
     def update_center(self):
-        rect = self.pixmap().rect()
-        self.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
+        r = self.rect()
+        self.setTransformOriginPoint(r.width() / 2, r.height() / 2)
 
     def resize_by_longest_side(self, size_px):
-        w = self._original_pixmap.width()
-        h = self._original_pixmap.height()
+        w = self._logical_w
+        h = self._logical_h
         if w > h:
             new_w = size_px
             new_h = (h * size_px) / w
         else:
             new_h = size_px
             new_w = (w * size_px) / h
-            
-        scaled = self._original_pixmap.scaled(
-            new_w, new_h, 
-            Qt.AspectRatioMode.KeepAspectRatio, 
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.setPixmap(scaled)
-        if hasattr(self, 'handle_br'):
-            _update_resize_handles(self)
-        self.update_center()
+        self.resize_custom(new_w, new_h)
 
     def resize_custom(self, w, h):
         if w <= 0 or h <= 0: return
-        scaled = self._original_pixmap.scaled(
-            w, h, 
-            Qt.AspectRatioMode.IgnoreAspectRatio, 
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.setPixmap(scaled)
+        self.prepareGeometryChange()
+        self._current_w = w
+        self._current_h = h
         if hasattr(self, 'handle_br'):
             _update_resize_handles(self)
         self.update_center()
@@ -820,26 +874,30 @@ class BackgroundItem(ImageItem):
         super().paint(painter, option, widget)
 
     def shape(self):
-        return super().shape()
+        path = QPainterPath()
+        path.addRect(self.rect())
+        return path
     
 class SignatureItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
     def __init__(self, pixmap_path, parent=None):
-        reader = QImageReader(pixmap_path)
-        reader.setAutoTransform(True) # Lê metadados EXIF e rotaciona corretamente
-        size = reader.size()        
-        img = reader.read()
-        pixmap = QPixmap.fromImage(img) if not img.isNull() else QPixmap(pixmap_path)
+        pixmap, logical_w, logical_h, proxy_scale = _load_proxy_pixmap(pixmap_path)
         
         super().__init__(pixmap)
         self._original_path = pixmap_path
+        self._logical_w = logical_w
+        self._logical_h = logical_h
+        self._current_w = logical_w
+        self._current_h = logical_h
+        self._proxy_scale = proxy_scale
+        
         self.setFlags(
             QGraphicsItem.GraphicsItemFlag.ItemIsMovable |
             QGraphicsItem.GraphicsItemFlag.ItemIsSelectable |
             QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges
         )
-        self._original_pixmap = pixmap
+        self._proxy_pixmap = pixmap
         self.setZValue(201)
         
         self.keep_proportion = True
@@ -855,43 +913,48 @@ class SignatureItem(QGraphicsPixmapItem):
 
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
             new_pos = value
-            rect = self.pixmap().rect()
-            w, h = rect.width(), rect.height()
+            w, h = self._current_w, self._current_h
             return _snap_position_to_guides(self, new_pos, w, h)
         return super().itemChange(change, value)
 
+    def rect(self):
+        return QRectF(0, 0, self._current_w, self._current_h)
+        
+    def boundingRect(self):
+        return self.rect()
+
+    def shape(self):
+        path = QPainterPath()
+        path.addRect(self.rect())
+        return path
+
+    def contains(self, point):
+        return self.rect().contains(point)
+        
+    def paint(self, painter, option, widget=None):
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        painter.drawPixmap(self.rect(), self.pixmap(), QRectF(self.pixmap().rect()))
+
     def update_center(self):
-        rect = self.pixmap().rect()
-        self.setTransformOriginPoint(rect.width() / 2, rect.height() / 2)
+        r = self.rect()
+        self.setTransformOriginPoint(r.width() / 2, r.height() / 2)
 
     def resize_by_longest_side(self, size_px):
-        w = self._original_pixmap.width()
-        h = self._original_pixmap.height()
+        w = self._logical_w
+        h = self._logical_h
         if w > h:
             new_w = size_px
             new_h = (h * size_px) / w
         else:
             new_h = size_px
             new_w = (w * size_px) / h
-            
-        scaled = self._original_pixmap.scaled(
-            new_w, new_h, 
-            Qt.AspectRatioMode.KeepAspectRatio, 
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.setPixmap(scaled)
-        if hasattr(self, 'handle_br'):
-            _update_resize_handles(self)
-        self.update_center()
+        self.resize_custom(new_w, new_h)
 
     def resize_custom(self, w, h):
         if w <= 0 or h <= 0: return
-        scaled = self._original_pixmap.scaled(
-            w, h, 
-            Qt.AspectRatioMode.IgnoreAspectRatio, 
-            Qt.TransformationMode.SmoothTransformation
-        )
-        self.setPixmap(scaled)
+        self.prepareGeometryChange()
+        self._current_w = w
+        self._current_h = h
         if hasattr(self, 'handle_br'):
             _update_resize_handles(self)
         self.update_center()

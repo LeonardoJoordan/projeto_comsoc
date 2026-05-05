@@ -12,7 +12,8 @@ from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap)
 from PySide6.QtCore import Qt, Signal, QEvent, QRectF
 
-from .canvas_items import DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, ImageItem, BackgroundItem
+from .canvas_items import (DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem,
+                           ImageItem, BackgroundItem, _reader_logical_size)
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
 from core.template_manager import slugify_model_name
 from core.history_manager import HistoryManager
@@ -740,7 +741,8 @@ class EditorWindow(QMainWindow):
         if path:
             reader = QImageReader(path)
             reader.setAutoTransform(True)
-            original_size = reader.size()
+            raw_size = reader.size()
+            original_size = _reader_logical_size(reader, raw_size) if not raw_size.isEmpty() else raw_size
             
             if not reader.canRead() and QPixmap(path).isNull():
                 QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
@@ -888,7 +890,11 @@ class EditorWindow(QMainWindow):
 
     def duplicate_selected(self):
         selected_items = self.scene.selectedItems()
-        valid_items = [i for i in selected_items if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
+        valid_items = [
+            i for i in selected_items
+            if isinstance(i, (DesignerBox, SignatureItem))
+            or (isinstance(i, ImageItem) and not isinstance(i, BackgroundItem))
+        ]
         
         if not valid_items: 
             return
@@ -911,7 +917,7 @@ class EditorWindow(QMainWindow):
                 else:
                     new_item = SignatureItem(getattr(original, '_original_path', ''))
                 
-                rect = original.pixmap().rect()
+                rect = original.rect() if hasattr(original, 'rect') else original.pixmap().rect()
                 new_item.resize_custom(rect.width(), rect.height())
                 new_item.setRotation(original.rotation())
                 new_item.setPos(original.x(), original.y())
@@ -1092,9 +1098,9 @@ class EditorWindow(QMainWindow):
         item.setRotation(0)
         
         if isinstance(item, (ImageItem, SignatureItem)):
-            if hasattr(item, '_original_pixmap') and not item._original_pixmap.isNull():
-                w_px = item._original_pixmap.width()
-                h_px = item._original_pixmap.height()
+            if hasattr(item, '_logical_w'):
+                w_px = item._logical_w
+                h_px = item._logical_h
                 item.resize_custom(w_px, h_px)
                 item.setTransformOriginPoint(w_px / 2, h_px / 2) # Corrige o pivô de giro
             self.caixa_texto_panel.load_from_image(item) # Recarrega a UI com os dados puros
@@ -1199,7 +1205,7 @@ class EditorWindow(QMainWindow):
         if path:
             sig = SignatureItem(path)
             center = self.view.mapToScene(self.view.viewport().rect().center())
-            sig.setPos(center.x() - (sig.pixmap().width() / 2), center.y() - (sig.pixmap().height() / 2))
+            sig.setPos(center.x() - (sig._current_w / 2), center.y() - (sig._current_h / 2))
             
             # Força o Z-Value para o topo do grupo de Assinaturas
             base_z = 201
@@ -1217,7 +1223,7 @@ class EditorWindow(QMainWindow):
         if path:
             img = ImageItem(path)
             center = self.view.mapToScene(self.view.viewport().rect().center())
-            img.setPos(center.x() - (img.pixmap().width() / 2), center.y() - (img.pixmap().height() / 2))
+            img.setPos(center.x() - (img._current_w / 2), center.y() - (img._current_h / 2))
             
             # Trava automática no Z-Value topo da faixa de Imagens
             base_z = 1
@@ -1363,7 +1369,7 @@ class EditorWindow(QMainWindow):
             self.caixa_texto_panel.blockSignals(False)
         elif isinstance(item, (ImageItem, SignatureItem)):
             self.caixa_texto_panel.blockSignals(True)
-            rect = item.pixmap().rect()
+            rect = item.rect() if hasattr(item, 'rect') else item.pixmap().rect()
             self.caixa_texto_panel.spin_w.setValue(px_to_mm(rect.width()))
             self.caixa_texto_panel.spin_h.setValue(px_to_mm(rect.height()))
             self.caixa_texto_panel.blockSignals(False)
@@ -1568,7 +1574,7 @@ class EditorWindow(QMainWindow):
             
             elif isinstance(item, SignatureItem):
                 pos = item.pos()
-                pix = item.pixmap()
+                pix_rect = item.rect() if hasattr(item, 'rect') else item.pixmap().rect()
                 signatures_data.append({
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
@@ -1577,9 +1583,9 @@ class EditorWindow(QMainWindow):
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": round(float(pos.x()), 2),
                     "y": round(float(pos.y()), 2),
-                    "width": round(float(pix.width()), 2),
-                    "height": round(float(pix.height()), 2),
-                    "longest_side": round(float(max(pix.width(), pix.height())), 2),
+                    "width": round(float(pix_rect.width()), 2),
+                    "height": round(float(pix_rect.height()), 2),
+                    "longest_side": round(float(max(pix_rect.width(), pix_rect.height())), 2),
                     "rotation": round(float(item.rotation()), 2),
                     "layer_id": getattr(item, 'layer_id', None),
                     "z_value": round(float(item.zValue()), 2)
@@ -1587,7 +1593,7 @@ class EditorWindow(QMainWindow):
 
             elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
                 pos = item.pos()
-                pix = item.pixmap()
+                pix_rect = item.rect() if hasattr(item, 'rect') else item.pixmap().rect()
                 images_data.append({
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
@@ -1596,9 +1602,9 @@ class EditorWindow(QMainWindow):
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                     "x": round(float(pos.x()), 2),
                     "y": round(float(pos.y()), 2),
-                    "width": round(float(pix.width()), 2),
-                    "height": round(float(pix.height()), 2),
-                    "longest_side": round(float(max(pix.width(), pix.height())), 2),
+                    "width": round(float(pix_rect.width()), 2),
+                    "height": round(float(pix_rect.height()), 2),
+                    "longest_side": round(float(max(pix_rect.width(), pix_rect.height())), 2),
                     "rotation": round(float(item.rotation()), 2),
                     "has_link": getattr(item, "has_link", False),
                     "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
@@ -1624,11 +1630,12 @@ class EditorWindow(QMainWindow):
         }
         
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
+            bg_rect = self.bg_item.rect() if hasattr(self.bg_item, 'rect') else self.bg_item.pixmap().rect()
             data["bg_props"] = {
                 "x": round(float(self.bg_item.pos().x()), 2),
                 "y": round(float(self.bg_item.pos().y()), 2),
-                "w": round(float(self.bg_item.pixmap().width()), 2),
-                "h": round(float(self.bg_item.pixmap().height()), 2),
+                "w": round(float(bg_rect.width()), 2),
+                "h": round(float(bg_rect.height()), 2),
                 "visible": self.bg_item.isVisible(),
                 "opacity": round(float(self.bg_item.opacity()), 2),
                 "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),

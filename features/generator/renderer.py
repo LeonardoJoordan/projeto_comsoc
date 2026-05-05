@@ -1,5 +1,6 @@
 from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont, 
-                           QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush, QFontMetrics)
+                           QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush,
+                           QFontMetrics, QImageReader)
 from PySide6.QtCore import Qt, QPointF, QRectF
 import re
 from pathlib import Path
@@ -7,6 +8,14 @@ from pathlib import Path
 class NativeRenderer:
     def __init__(self, template_data: dict):
         self.tpl = template_data
+
+    def _load_original_pixmap(self, path) -> QPixmap:
+        reader = QImageReader(str(path))
+        reader.setAutoTransform(True)
+        img = reader.read()
+        if not img.isNull():
+            return QPixmap.fromImage(img)
+        return QPixmap(str(path))
 
     def _draw_pixmap_item(self, painter: QPainter, pixmap: QPixmap, x, y, w, h, rotation=0, opacity=1.0) -> QRectF:
         painter.save()
@@ -105,7 +114,7 @@ class NativeRenderer:
         painter.setFont(base_font)
 
         if self.tpl.get("background_path"):
-            bg = QPixmap(self.tpl["background_path"])
+            bg = self._load_original_pixmap(self.tpl["background_path"])
             if not bg.isNull():
                 bg_props = self.tpl.get("bg_props", {})
                 
@@ -149,7 +158,7 @@ class NativeRenderer:
                             img_path = alt_path
 
             if img_path.exists():
-                pix = QPixmap(str(img_path))
+                pix = self._load_original_pixmap(img_path)
                 w, h = img.get("width", 0), img.get("height", 0)
                 
                 # Blindagem contra corrompimento de QImage/QPixmap ou dimensões ausentes
@@ -250,7 +259,7 @@ class NativeRenderer:
                 continue
 
             if Path(sig["path"]).exists():
-                pix = QPixmap(sig["path"])
+                pix = self._load_original_pixmap(sig["path"])
                 if not pix.isNull():
                     self._draw_pixmap_item(
                         painter,
