@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
                                QFormLayout, QGridLayout, QTextEdit, QFontComboBox,
                                QPushButton, QComboBox, QDoubleSpinBox, QColorDialog,
-                               QCheckBox, QGraphicsOpacityEffect)
+                               QCheckBox, QGraphicsOpacityEffect, QMessageBox)
 from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
@@ -864,6 +864,42 @@ class EditorDeTextoPanel(QWidget):
         clean_html = re.sub(r"(?i)</h[1-6]>", "</p>", clean_html)
         
         self.htmlChanged.emit(clean_html)
+
+    def make_placeholder(self):
+        if not self.isVisible() or not self.isEnabled(): 
+            return
+            
+        cursor = self.txt_content.textCursor()
+        if not cursor.hasSelection():
+            QMessageBox.warning(self, "Atenção", "Selecione uma palavra primeiro para transformá-la em variável.")
+            return
+            
+        selected_text = cursor.selectedText()
+        if not re.match(r"^[a-zA-Z0-9_]+$", selected_text):
+            QMessageBox.warning(self, "Caracteres Inválidos", "A variável só pode conter letras (sem acentos), números e subtraços (_). Remova espaços ou símbolos.")
+            return
+            
+        cursor.insertText(f"{{{selected_text}}}")
+        self.snapshotRequested.emit()
+        self.txt_content.setFocus()
+
+    def make_optional_section(self):
+        if not self.isVisible() or not self.isEnabled(): 
+            return
+            
+        cursor = self.txt_content.textCursor()
+        if not cursor.hasSelection():
+            QMessageBox.warning(self, "Atenção", "Selecione um trecho de texto para transformá-lo em opcional.")
+            return
+            
+        selected_text = cursor.selectedText()
+        if not re.search(r"\{[a-zA-Z0-9_]+\}", selected_text):
+            QMessageBox.warning(self, "Ausência de Variável", "Um trecho opcional precisa conter pelo menos uma variável válida (ex: {Nome}) para funcionar.")
+            return
+            
+        cursor.insertText(f"|{selected_text}|")
+        self.snapshotRequested.emit()
+        self.txt_content.setFocus()
 
 class AssinaturaPanel(QWidget):
     sideChanged = Signal(int)

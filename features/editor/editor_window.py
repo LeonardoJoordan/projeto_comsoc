@@ -449,6 +449,12 @@ class EditorWindow(QMainWindow):
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
         self.shortcut_save.activated.connect(self.export_to_json)
 
+        self.shortcut_placeholder = QShortcut(QKeySequence("Ctrl+1"), self)
+        self.shortcut_placeholder.activated.connect(lambda: self.editor_texto_panel.make_placeholder() if self.editor_texto_panel.isEnabled() else None)
+
+        self.shortcut_optional = QShortcut(QKeySequence("Ctrl+2"), self)
+        self.shortcut_optional.activated.connect(lambda: self.editor_texto_panel.make_optional_section() if self.editor_texto_panel.isEnabled() else None)
+        
         self.shortcut_bold = QShortcut(QKeySequence("Ctrl+B"), self)
         self.shortcut_bold.activated.connect(lambda: self.editor_texto_panel.btn_bold.click() if self.editor_texto_panel.isEnabled() else None)
 
