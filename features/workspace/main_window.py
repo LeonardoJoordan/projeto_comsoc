@@ -178,18 +178,18 @@ class MainWindow(QMainWindow):
         col_right_footer.addLayout(row_format_cfg)
 
         # Linha de Predefinição (O Atalho)
-        row_presets_main = QHBoxLayout()
+        row_presets_main = QVBoxLayout()
         self.cbo_presets_main = QComboBox()
         self.cbo_presets_main.currentIndexChanged.connect(self._on_main_preset_changed)
-        lbl_layout = QLabel("Layout:")
+        lbl_layout = QLabel("<b>Predefinição de Impressão:</b>")
         self._apply_tooltip(lbl_layout,
-            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
+            "<b>PREDEFINIÇÃO DE IMPRESSÃO</b><br><br>"
             "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
         row_presets_main.addWidget(lbl_layout)
         row_presets_main.addWidget(self.cbo_presets_main, 1)
         self._apply_tooltip(self.cbo_presets_main,
-            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
+            "<b>PREDEFINIÇÃO DE IMPRESSÃO</b><br><br>"
             "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
         col_right_footer.addLayout(row_presets_main)
