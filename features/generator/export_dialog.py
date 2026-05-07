@@ -1,7 +1,8 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QHBoxLayout, QFrame, QGridLayout, 
                                QDialogButtonBox, QCheckBox, QGroupBox, QDoubleSpinBox,
-                               QWidget, QRadioButton, QButtonGroup, QTabWidget)
+                               QWidget, QRadioButton, QButtonGroup, QTabWidget,
+                               QComboBox, QMessageBox, QInputDialog)
 from PySide6.QtCore import Qt
 from .imposition import SheetAssembler
 
@@ -20,8 +21,13 @@ class ConfigDialog(QDialog):
         
         self.imposition_settings = current_imposition or {
             "enabled": False, "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
-            "crop_marks": True, "bleed_margin": True, "target_w_mm": 0, "target_h_mm": 0
+            "crop_marks": True, "bleed_margin": True, "target_w_mm": 0, "target_h_mm": 0,
+            "presets": {}, "active_preset_name": ""
         }
+        self.presets = self.imposition_settings.get("presets", {})
+        self.active_preset_name = self.imposition_settings.get("active_preset_name", "")
+        self._is_dirty = False
+        self._internal_update = False
         self.current_is_dark = is_dark
 
         main_layout = QVBoxLayout(self)
@@ -100,6 +106,47 @@ class ConfigDialog(QDialog):
         tab_print = QWidget()
         ly_print = QVBoxLayout(tab_print)
         ly_print.setSpacing(10)
+
+        # --- PRESETS UI (No topo da aba de Impressão) ---
+        ly_presets_v = QVBoxLayout()
+        ly_combo_row = QHBoxLayout()
+        self.cmb_presets = QComboBox()
+        self.cmb_presets.currentIndexChanged.connect(self._on_preset_selected)
+        lbl_preset = QLabel("<b>Predefinição:</b>")
+        lbl_preset.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        lbl_preset.setToolTip(
+            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
+            "Atalho para carregar e salvar conjuntos completos de configurações de impressão:<br>"
+            "• <b>Salvar Novo:</b> Cria uma predefinição com as configurações atuais da tela.<br>"
+            "• <b>Atualizar:</b> Sobrescreve a predefinição selecionada com as configurações atuais.<br>"
+            "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>")
+        ly_combo_row.addWidget(lbl_preset)
+        self.cmb_presets.setToolTip(
+            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
+            "Atalho para carregar e salvar conjuntos completos de configurações de impressão:<br>"
+            "• <b>Salvar Novo:</b> Cria uma predefinição com as configurações atuais da tela.<br>"
+            "• <b>Atualizar:</b> Sobrescreve a predefinição selecionada com as configurações atuais.<br>"
+            "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>")
+        ly_combo_row.addWidget(self.cmb_presets, 1)
+        
+        ly_buttons_row = QHBoxLayout()
+        self.btn_save_new = QPushButton("Salvar Novo")
+        self.btn_save_new.clicked.connect(self._save_new_preset)
+        self.btn_update = QPushButton("Atualizar")
+        self.btn_update.clicked.connect(self._update_preset)
+        self.btn_del_preset = QPushButton("Apagar")
+        self.btn_del_preset.clicked.connect(self._delete_preset)
+        
+        ly_buttons_row.addWidget(self.btn_save_new)
+        ly_buttons_row.addWidget(self.btn_update)
+        ly_buttons_row.addWidget(self.btn_del_preset)
+        
+        ly_presets_v.addLayout(ly_combo_row)
+        ly_presets_v.addLayout(ly_buttons_row)
+        ly_print.addLayout(ly_presets_v)
+        ly_print.addSpacing(10) # Respiro visual
         
         lbl_sheet_title = QLabel("<b>Folha de saída (Largura x Altura):</b>")
         lbl_sheet_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
@@ -142,7 +189,7 @@ class ConfigDialog(QDialog):
         self.container_imposition.setVisible(self.chk_imposition.isChecked())
         ly_imp = QVBoxLayout(self.container_imposition)
         ly_imp.setContentsMargins(10, 0, 0, 0)
-        
+                
         lbl_model_dims_title = QLabel("Dimensões do modelo final (Largura x Altura):")
         lbl_model_dims_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
         lbl_model_dims_title.setToolTip(
@@ -203,6 +250,20 @@ class ConfigDialog(QDialog):
             "<small style='color: #A0A0A0;'>Dica: Ative para garantir que artes com fundo contínuo não criem filetes brancos durante o corte manual.</small>"
         )
         ly_imp.addWidget(self.chk_bleed)
+
+        # Conexões globais da aba de impressão
+        self.spin_sheet_w_mm.valueChanged.connect(self._mark_dirty)
+        self.spin_sheet_h_mm.valueChanged.connect(self._mark_dirty)
+        self.chk_imposition.toggled.connect(self._mark_dirty)
+
+        # Conexões de rastreamento de modificações (Dirty State)
+        self.spin_w_mm.valueChanged.connect(self._mark_dirty)
+        self.spin_h_mm.valueChanged.connect(self._mark_dirty)
+        self.chk_crop_marks.toggled.connect(self._mark_dirty)
+        self.chk_bleed.toggled.connect(self._mark_dirty)
+        
+        # Carrega a UI com os dados em memória
+        self._load_presets_ui()
         
         ly_print.addWidget(self.container_imposition)
         ly_print.addStretch()
@@ -264,7 +325,9 @@ class ConfigDialog(QDialog):
             "crop_marks": self.chk_crop_marks.isChecked(),
             "bleed_margin": self.chk_bleed.isChecked(),
             "target_w_mm": self.spin_w_mm.value(),
-            "target_h_mm": self.spin_h_mm.value()
+            "target_h_mm": self.spin_h_mm.value(),
+            "presets": self.presets,
+            "active_preset_name": self.active_preset_name if not self._is_dirty else ""
         }
 
     def _update_capacity_preview(self):
@@ -297,8 +360,160 @@ class ConfigDialog(QDialog):
             ok_button.setEnabled(False)
 
     def _on_accept(self):
+        if not self._prompt_dirty_state(): return
         self.result_pattern = self.txt_pattern.text().strip()
         self.accept()
+
+    def reject(self):
+        if not self._prompt_dirty_state(): return
+        super().reject()
+
+    def closeEvent(self, event):
+        if not self._prompt_dirty_state():
+            event.ignore()
+        else:
+            super().closeEvent(event)
+
+    def _prompt_dirty_state(self) -> bool:
+        """Garante que alterações feitas sobre um preset existente não sejam perdidas."""
+        if not self._is_dirty or not self.active_preset_name:
+            return True
+            
+        msg = QMessageBox(self)
+        msg.setWindowTitle("Alterações não salvas")
+        msg.setText(f"A predefinição '{self.active_preset_name}' foi modificada.")
+        msg.setInformativeText("O que deseja fazer com as alterações antes de sair?")
+        msg.setIcon(QMessageBox.Icon.Warning)
+        
+        btn_update = msg.addButton("Atualizar", QMessageBox.ButtonRole.AcceptRole)
+        btn_new = msg.addButton("Salvar como Nova", QMessageBox.ButtonRole.AcceptRole)
+        btn_ignore = msg.addButton("Ignorar", QMessageBox.ButtonRole.RejectRole)
+        btn_cancel = msg.addButton("Cancelar", QMessageBox.ButtonRole.DestructiveRole)
+        
+        msg.exec()
+        
+        if msg.clickedButton() == btn_update:
+            self._update_preset()
+            return True
+        elif msg.clickedButton() == btn_new:
+            return self._save_new_preset()
+        elif msg.clickedButton() == btn_ignore:
+            return True
+        else:
+            return False
+
+    def _load_presets_ui(self):
+        self._internal_update = True
+        self.cmb_presets.blockSignals(True)
+        self.cmb_presets.clear()
+        
+        if not self.presets:
+            self.cmb_presets.addItem("Personalizado (Salve um preset)")
+            self.cmb_presets.setEnabled(False)
+            self.btn_save_new.setEnabled(True)
+            self.btn_update.setEnabled(False)
+            self.btn_del_preset.setEnabled(False)
+            self.active_preset_name = ""
+        else:
+            self.cmb_presets.setEnabled(True)
+            for name in sorted(self.presets.keys()):
+                self.cmb_presets.addItem(name)
+                
+            if self.active_preset_name and self.active_preset_name in self.presets:
+                idx = self.cmb_presets.findText(self.active_preset_name)
+                if idx >= 0: self.cmb_presets.setCurrentIndex(idx)
+            else:
+                self.cmb_presets.setCurrentIndex(0)
+                self.active_preset_name = self.cmb_presets.currentText()
+                
+            # Estado limpo
+            self._is_dirty = False
+            self.btn_save_new.setEnabled(False)
+            self.btn_update.setEnabled(False)
+            self.btn_del_preset.setEnabled(True)
+                
+        self.cmb_presets.blockSignals(False)
+        self._internal_update = False
+
+    def _on_preset_selected(self, index):
+        if self._internal_update or index < 0: return
+        name = self.cmb_presets.itemText(index)
+        if "Personalizado" in name: return
+        data = self.presets.get(name)
+        if not data: return
+        
+        self._internal_update = True
+        # Novos campos: Folha e Status da Imposição
+        self.spin_sheet_w_mm.setValue(data.get("sheet_w", 210.0))
+        self.spin_sheet_h_mm.setValue(data.get("sheet_h", 297.0))
+        self.chk_imposition.setChecked(data.get("enabled", False))
+        
+        # Campos do Modelo
+        self.spin_w_mm.setValue(data["w"])
+        self.spin_h_mm.setValue(data["h"])
+        self.chk_crop_marks.setChecked(data.get("crop", True))
+        self.chk_bleed.setChecked(data.get("bleed", True))
+        
+        self.active_preset_name = name
+        self._is_dirty = False
+        self.btn_save_new.setEnabled(False)
+        self.btn_update.setEnabled(False)
+        self.btn_del_preset.setEnabled(True)
+        self._internal_update = False
+
+    def _mark_dirty(self, *_):
+        if self._internal_update: return
+        self._is_dirty = True
+        
+        # Aplica a regra exata de botões quando ocorre alteração
+        self.btn_save_new.setEnabled(True)
+        self.btn_update.setEnabled(bool(self.active_preset_name))
+        self.btn_del_preset.setEnabled(bool(self.active_preset_name))
+
+    def _save_new_preset(self) -> bool:
+        name, ok = QInputDialog.getText(self, "Nova Configuração", "Nome do preset:", QLineEdit.EchoMode.Normal, "")
+        if ok and name.strip():
+            name = name.strip()
+            self.presets[name] = {
+                "sheet_w": self.spin_sheet_w_mm.value(),
+                "sheet_h": self.spin_sheet_h_mm.value(),
+                "enabled": self.chk_imposition.isChecked(),
+                "w": self.spin_w_mm.value(),
+                "h": self.spin_h_mm.value(),
+                "crop": self.chk_crop_marks.isChecked(),
+                "bleed": self.chk_bleed.isChecked()
+            }
+            self.active_preset_name = name
+            self._is_dirty = False
+            self._load_presets_ui()
+            return True
+        return False
+
+    def _update_preset(self):
+        if not self.active_preset_name: return
+        self.presets[self.active_preset_name] = {
+            "sheet_w": self.spin_sheet_w_mm.value(),
+            "sheet_h": self.spin_sheet_h_mm.value(),
+            "enabled": self.chk_imposition.isChecked(),
+            "w": self.spin_w_mm.value(),
+            "h": self.spin_h_mm.value(),
+            "crop": self.chk_crop_marks.isChecked(),
+            "bleed": self.chk_bleed.isChecked()
+        }
+        self._is_dirty = False
+        self.btn_save_new.setEnabled(False)
+        self.btn_update.setEnabled(False)
+        self.btn_del_preset.setEnabled(True)
+
+    def _delete_preset(self):
+        if not self.active_preset_name or self.active_preset_name not in self.presets: return
+        
+        reply = QMessageBox.question(self, "Apagar Preset", f"Tem certeza que deseja apagar '{self.active_preset_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            del self.presets[self.active_preset_name]
+            self.active_preset_name = ""
+            self._is_dirty = False
+            self._load_presets_ui()
 
     def _toggle_imposition_ui(self, enabled):
         self.container_imposition.setVisible(enabled)

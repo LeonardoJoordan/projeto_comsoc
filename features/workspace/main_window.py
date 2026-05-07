@@ -98,18 +98,22 @@ class MainWindow(QMainWindow):
         """)
         left_stack.addWidget(self.progress_bar, 0)
 
-        # --- Seletor de Pasta ---
-        grp_out = QWidget()
-        ly_out = QHBoxLayout(grp_out)
-        ly_out.setContentsMargins(0, 0, 0, 0)
-        ly_out.setSpacing(5)
+        # --- CONTAINER DE CONTROLES DE SAÍDA (Rodapé em Duas Colunas) ---
+        footer_container = QWidget()
+        ly_footer = QHBoxLayout(footer_container)
+        ly_footer.setContentsMargins(0, 0, 0, 0)
+        ly_footer.setSpacing(15)
 
-        ly_out.addWidget(QLabel("Saída:"))
+        # --- Coluna Esquerda: Gatilho e Caminho ---
+        col_left_footer = QVBoxLayout()
         
+        # Linha de Saída
+        row_out_path = QHBoxLayout()
+        row_out_path.addWidget(QLabel("Saída:"))
         self.txt_output_path = QLineEdit()
         self.txt_output_path.setPlaceholderText("Padrão: Documentos/ProjetoComSoc_Saida/modelo")
-        ly_out.addWidget(self.txt_output_path)
-
+        row_out_path.addWidget(self.txt_output_path)
+        
         self.btn_sel_out = QPushButton("...")
         self.btn_sel_out.setFixedWidth(40)
         self._apply_tooltip(self.btn_sel_out, 
@@ -117,28 +121,49 @@ class MainWindow(QMainWindow):
             "Define em qual local do computador os arquivos gerados serão salvos.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: O sistema criará automaticamente uma subpasta com a data e hora atual dentro do local escolhido para manter seus lotes organizados.</small>")
         self.btn_sel_out.clicked.connect(self._select_output_folder)
-        ly_out.addWidget(self.btn_sel_out)
+        row_out_path.addWidget(self.btn_sel_out)
+        col_left_footer.addLayout(row_out_path)
 
+        # Botão Gerar
+        self.btn_generate_cards = QPushButton("Gerar Material")
+        self.btn_generate_cards.setMinimumHeight(40)
+        self.btn_generate_cards.setStyleSheet("font-weight: bold; font-size: 13px;")
+        self._apply_tooltip(self.btn_generate_cards, 
+            "<b>GERAR MATERIAL</b><br><br>"
+            "Inicia o processamento da tabela e a construção dos arquivos finais na pasta de saída.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Faça uma checagem rápida nas colunas de Quantidade e Assinatura antes de iniciar a geração de lotes muito grandes para evitar desperdícios.</small>")
+        self.btn_generate_cards.clicked.connect(self._generate_cards_async)
+        col_left_footer.addWidget(self.btn_generate_cards)
+        
+        ly_footer.addLayout(col_left_footer, 1) # Proporção 1
+
+        # --- Coluna Direita: Parâmetros de Saída e Presets ---
+        widget_right_footer = QWidget()
+        widget_right_footer.setFixedWidth(280) # O tamanho fixo vai no QWidget
+        col_right_footer = QVBoxLayout(widget_right_footer)
+        col_right_footer.setContentsMargins(0, 0, 0, 0)
+
+        # Linha de Formato e Configs
+        row_format_cfg = QHBoxLayout()
         self.cbo_export_format = QComboBox()
         self.cbo_export_format.addItems(["PNG", "PDF"])
-        self.cbo_export_format.setFixedWidth(60)
+        self.cbo_export_format.setFixedWidth(65)
         self._apply_tooltip(self.cbo_export_format, 
             "<b>FORMATO DE SAÍDA</b><br><br>"
             "Escolha o tipo de arquivo final:<br>"
             "• <b>PNG:</b> Ideal para imagens estáticas de alta qualidade.<br>"
             "• <b>PDF:</b> Formato padrão para documentos e impressões, permitindo o uso de links interativos.")
-        ly_out.addWidget(self.cbo_export_format)
-
+        
         self.chk_single_pdf = QCheckBox("Arquivo Único")
+        self.chk_single_pdf.setVisible(True)  # Layout estático
+        self.chk_single_pdf.setEnabled(False) # Bloqueado por padrão (PNG)
         self._apply_tooltip(self.chk_single_pdf, 
             "<b>ARQUIVO ÚNICO (PDF)</b><br><br>"
             "Agrupa todo o lote gerado em um único documento de múltiplas páginas, em vez de criar arquivos separados.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Ideal para impressões em massa. Você abre apenas um arquivo e envia todas as páginas para a impressora de uma só vez, economizando tempo.</small>")
-        self.chk_single_pdf.setVisible(False)
-        ly_out.addWidget(self.chk_single_pdf)
-
+        
         self.btn_config_name = QPushButton("Configurações")
-        self.btn_config_name.setFixedWidth(100)
+        self.btn_config_name.clicked.connect(self._open_config_dialog)
         self._apply_tooltip(self.btn_config_name, 
             "<b>CONFIGURAÇÕES GERAIS</b><br><br>"
             "Acesso aos ajustes avançados do projeto e do sistema:<br>"
@@ -146,19 +171,32 @@ class MainWindow(QMainWindow):
             "• <b>Impressão:</b> Configura o agrupamento de vários cartões em uma folha e ativa marcas de corte.<br>"
             "• <b>Tema:</b> Alterna a interface do programa entre os modos Claro e Escuro.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Na aba de Impressão, o sistema calcula automaticamente quantos cartões cabem na folha assim que você digita as dimensões.</small>")
-        self.btn_config_name.clicked.connect(self._open_config_dialog)
-        ly_out.addWidget(self.btn_config_name)
+        
+        row_format_cfg.addWidget(self.cbo_export_format)
+        row_format_cfg.addWidget(self.chk_single_pdf)
+        row_format_cfg.addWidget(self.btn_config_name)
+        col_right_footer.addLayout(row_format_cfg)
 
-        left_stack.addWidget(grp_out, 0)
+        # Linha de Predefinição (O Atalho)
+        row_presets_main = QHBoxLayout()
+        self.cbo_presets_main = QComboBox()
+        self.cbo_presets_main.currentIndexChanged.connect(self._on_main_preset_changed)
+        lbl_layout = QLabel("Layout:")
+        self._apply_tooltip(lbl_layout,
+            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
+            "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
+        row_presets_main.addWidget(lbl_layout)
+        row_presets_main.addWidget(self.cbo_presets_main, 1)
+        self._apply_tooltip(self.cbo_presets_main,
+            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
+            "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
+        col_right_footer.addLayout(row_presets_main)
 
-        self.btn_generate_cards = QPushButton("Gerar Material")
-        self.btn_generate_cards.setMinimumHeight(44)
-        self._apply_tooltip(self.btn_generate_cards, 
-            "<b>GERAR MATERIAL</b><br><br>"
-            "Inicia o processamento da tabela e a construção dos arquivos finais na pasta de saída.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Faça uma checagem rápida nas colunas de Quantidade e Assinatura antes de iniciar a geração de lotes muito grandes para evitar desperdícios.</small>")
-        self.btn_generate_cards.clicked.connect(self._generate_cards_async)
-        left_stack.addWidget(self.btn_generate_cards, 0)
+        ly_footer.addWidget(widget_right_footer, 0) # Adiciona o Widget em vez do Layout isolado
+
+        left_stack.addWidget(footer_container, 0)
 
         # --- Painel DIREITO ---
         self.table_panel = TablePanel()
@@ -676,6 +714,7 @@ class MainWindow(QMainWindow):
                     self._update_table_columns(placeholders, signatures)
                     
                     self.cached_model_data = data
+                    self._refresh_imposition_presets()
                     
                     try:
                         renderer = NativeRenderer(data)
@@ -836,6 +875,9 @@ class MainWindow(QMainWindow):
             else:
                 self.log_panel.append(f"Configuração salva: Sequencial automático{msg_imp}")
 
+            # 3. Atualiza a combobox de presets da tela principal para refletir mudanças feitas no diálogo
+            self._refresh_imposition_presets()
+
     def _select_output_folder(self):
         start_dir = self.txt_output_path.text() or ""
         folder = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Saída", start_dir)
@@ -870,9 +912,9 @@ class MainWindow(QMainWindow):
         self._update_template_json({"last_single_pdf": checked})
 
     def _toggle_single_pdf_option(self, fmt):
-        """Gerencia a visibilidade do checkbox de PDF único."""
+        """Gerencia a disponibilidade do checkbox de arquivo único."""
         is_pdf = (fmt == "PDF")
-        self.chk_single_pdf.setVisible(is_pdf)
+        self.chk_single_pdf.setEnabled(is_pdf) # Apenas habilita/desabilita
         if not is_pdf:
             self.chk_single_pdf.setChecked(False)
 
@@ -1071,7 +1113,64 @@ class MainWindow(QMainWindow):
         self.log_panel.append("=== Processo Finalizado ===")    
         self.log_panel.append(f"⏱️ Tempo total: {time_str}")
         
+    def _refresh_imposition_presets(self):
+        """Atualiza a lista de presets rápidos na tela principal baseada no modelo atual."""
+        if not self.cached_model_data:
+            self.cbo_presets_main.clear()
+            self.cbo_presets_main.setEnabled(False)
+            return
 
+        imp_settings = self.cached_model_data.get("imposition_settings", {})
+        presets = imp_settings.get("presets", {})
+        active_name = imp_settings.get("active_preset_name", "")
+
+        self.cbo_presets_main.blockSignals(True)
+        self.cbo_presets_main.clear()
+
+        if not presets:
+            self.cbo_presets_main.addItem("Sem predefinições")
+            self.cbo_presets_main.setEnabled(False)
+        else:
+            self.cbo_presets_main.setEnabled(True)
+            sorted_names = sorted(presets.keys())
+            self.cbo_presets_main.addItems(sorted_names)
+            
+            # Sincroniza a seleção inicial
+            if active_name in sorted_names:
+                idx = self.cbo_presets_main.findText(active_name)
+                self.cbo_presets_main.setCurrentIndex(idx)
+            else:
+                self.cbo_presets_main.setCurrentIndex(0)
+
+        self.cbo_presets_main.blockSignals(False)
+
+    def _on_main_preset_changed(self, index):
+        """Aplica instantaneamente as configurações do preset selecionado ao cache de memória."""
+        if not self.cached_model_data or index < 0: return
+        
+        name = self.cbo_presets_main.itemText(index)
+        if "Sem predefinições" in name: return
+        
+        presets = self.cached_model_data.get("imposition_settings", {}).get("presets", {})
+        data = presets.get(name)
+        
+        if data:
+            # Atualiza o estado ATIVO no cache (o atalho que o Gerar vai ler)
+            imp = self.cached_model_data["imposition_settings"]
+            imp["sheet_w_mm"] = data.get("sheet_w", 210.0)
+            imp["sheet_h_mm"] = data.get("sheet_h", 297.0)
+            imp["enabled"] = data.get("enabled", False)
+            imp["target_w_mm"] = data.get("w", 100.0)
+            imp["target_h_mm"] = data.get("h", 150.0)
+            imp["crop_marks"] = data.get("crop", True)
+            imp["bleed_margin"] = data.get("bleed", True)
+            imp["active_preset_name"] = name
+            
+            # --- PERSISTÊNCIA EM DISCO ---
+            # Salva a escolha do usuário no JSON do modelo para que seja lembrada ao reiniciar
+            self._update_template_json({"imposition_settings": imp})
+            
+            self.log_panel.append(f"⚡ Layout aplicado: <b>{name}</b>")
     
 
    
