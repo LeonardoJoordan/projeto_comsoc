@@ -148,33 +148,6 @@ class ConfigDialog(QDialog):
         ly_print.addLayout(ly_presets_v)
         ly_print.addSpacing(10) # Respiro visual
         
-        lbl_sheet_title = QLabel("<b>Folha de saída (Largura x Altura):</b>")
-        lbl_sheet_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        lbl_sheet_title.setToolTip(
-            "<b>FOLHA DE SAÍDA (DOCUMENTO FINAL)</b><br><br>"
-            "Define o tamanho real do papel que será colocado na impressora (ex: A4, A3 ou formatos personalizados).<br><br>"
-            "<small style='color: #A0A0A0;'>Importante: Esta configuração dita a área útil de trabalho. Uma folha maior (A3) permite agrupar muito mais exemplares no mesmo documento do que uma folha A4.</small>"
-        )
-        ly_print.addWidget(lbl_sheet_title)
-        ly_sheet = QHBoxLayout()
-        self.spin_sheet_w_mm = QDoubleSpinBox()
-        self.spin_sheet_w_mm.setRange(50, 2000)
-        self.spin_sheet_w_mm.setSuffix(" mm")
-        self.spin_sheet_w_mm.setDecimals(1)
-        self.spin_sheet_w_mm.setValue(self.imposition_settings.get("sheet_w_mm", 210.0))
-        
-        self.spin_sheet_h_mm = QDoubleSpinBox()
-        self.spin_sheet_h_mm.setRange(50, 2000)
-        self.spin_sheet_h_mm.setSuffix(" mm")
-        self.spin_sheet_h_mm.setDecimals(1)
-        self.spin_sheet_h_mm.setValue(self.imposition_settings.get("sheet_h_mm", 297.0))
-        
-        ly_sheet.addWidget(self.spin_sheet_w_mm)
-        ly_sheet.addWidget(QLabel("x"))
-        ly_sheet.addWidget(self.spin_sheet_h_mm)
-        ly_sheet.addStretch()
-        ly_print.addLayout(ly_sheet)
-
         self.chk_imposition = QCheckBox("Habilitar múltiplos itens por página")
         self.chk_imposition.setChecked(self.imposition_settings.get("enabled", False))
         self.chk_imposition.setToolTip(
@@ -185,10 +158,42 @@ class ConfigDialog(QDialog):
         self.chk_imposition.toggled.connect(self._toggle_imposition_ui)
         ly_print.addWidget(self.chk_imposition)
 
+        # Label de aviso dinâmico (abaixo do checkbox)
+        self.lbl_imposition_hint = QLabel()
+        self.lbl_imposition_hint.setWordWrap(True)
+        self.lbl_imposition_hint.setStyleSheet("color: gray; font-style: italic; padding-left: 4px;")
+        ly_print.addWidget(self.lbl_imposition_hint)
+
         self.container_imposition = QWidget()
         self.container_imposition.setVisible(self.chk_imposition.isChecked())
         ly_imp = QVBoxLayout(self.container_imposition)
         ly_imp.setContentsMargins(10, 0, 0, 0)
+
+        # Folha de Saída agora está dentro do container de imposição
+        lbl_sheet_title = QLabel("<b>Folha de saída (Largura x Altura):</b>")
+        lbl_sheet_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
+        lbl_sheet_title.setToolTip(
+            "<b>FOLHA DE SAÍDA (DOCUMENTO FINAL)</b><br><br>"
+            "Define o tamanho real do papel que será colocado na impressora (ex: A4, A3 ou formatos personalizados).<br><br>"
+            "<small style='color: #A0A0A0;'>Importante: Esta configuração dita a área útil de trabalho. Uma folha maior (A3) permite agrupar muito mais exemplares no mesmo documento do que uma folha A4.</small>"
+        )
+        ly_imp.addWidget(lbl_sheet_title)
+        ly_sheet = QHBoxLayout()
+        self.spin_sheet_w_mm = QDoubleSpinBox()
+        self.spin_sheet_w_mm.setRange(50, 2000)
+        self.spin_sheet_w_mm.setSuffix(" mm")
+        self.spin_sheet_w_mm.setDecimals(1)
+        self.spin_sheet_w_mm.setValue(self.imposition_settings.get("sheet_w_mm", 210.0))
+        self.spin_sheet_h_mm = QDoubleSpinBox()
+        self.spin_sheet_h_mm.setRange(50, 2000)
+        self.spin_sheet_h_mm.setSuffix(" mm")
+        self.spin_sheet_h_mm.setDecimals(1)
+        self.spin_sheet_h_mm.setValue(self.imposition_settings.get("sheet_h_mm", 297.0))
+        ly_sheet.addWidget(self.spin_sheet_w_mm)
+        ly_sheet.addWidget(QLabel("x"))
+        ly_sheet.addWidget(self.spin_sheet_h_mm)
+        ly_sheet.addStretch()
+        ly_imp.addLayout(ly_sheet)
                 
         lbl_model_dims_title = QLabel("Dimensões do modelo final (Largura x Altura):")
         lbl_model_dims_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
@@ -208,13 +213,11 @@ class ConfigDialog(QDialog):
         self.spin_h_mm.setSuffix(" mm")
         self.spin_h_mm.setDecimals(1)
 
-
         saved_w = self.imposition_settings.get("target_w_mm", 0)
         if saved_w > 0:
             self.spin_w_mm.setValue(saved_w)
             self.spin_h_mm.setValue(saved_w / self.ratio)
         else:
-            # Calcula o tamanho físico real baseado nos pixels a 300 DPI
             default_w_mm = (self.model_w / 300.0) * 25.4
             default_h_mm = (self.model_h / 300.0) * 25.4
             self.spin_w_mm.setValue(default_w_mm)
@@ -402,78 +405,85 @@ class ConfigDialog(QDialog):
         else:
             return False
 
+    SYSTEM_PRESET_NAME = "Definição do Modelo"
+
     def _load_presets_ui(self):
         self._internal_update = True
         self.cmb_presets.blockSignals(True)
         self.cmb_presets.clear()
         
-        if not self.presets:
-            self.cmb_presets.addItem("Personalizado (Salve um preset)")
-            self.cmb_presets.setEnabled(False)
-            self.btn_save_new.setEnabled(True)
-            self.btn_update.setEnabled(False)
-            self.btn_del_preset.setEnabled(False)
-            self.active_preset_name = ""
-        else:
-            self.cmb_presets.setEnabled(True)
-            for name in sorted(self.presets.keys()):
-                self.cmb_presets.addItem(name)
-                
-            if self.active_preset_name and self.active_preset_name in self.presets:
-                idx = self.cmb_presets.findText(self.active_preset_name)
-                if idx >= 0: self.cmb_presets.setCurrentIndex(idx)
+        # O preset de sistema sempre existe no topo
+        self.cmb_presets.addItem(self.SYSTEM_PRESET_NAME)
+        self.cmb_presets.setEnabled(True)
+
+        user_presets = sorted(k for k in self.presets.keys() if k != self.SYSTEM_PRESET_NAME)
+        for name in user_presets:
+            self.cmb_presets.addItem(name)
+
+        if self.active_preset_name and self.active_preset_name in self.presets:
+            idx = self.cmb_presets.findText(self.active_preset_name)
+            if idx >= 0:
+                self.cmb_presets.setCurrentIndex(idx)
             else:
                 self.cmb_presets.setCurrentIndex(0)
-                self.active_preset_name = self.cmb_presets.currentText()
-                
-            # Estado limpo
-            self._is_dirty = False
-            self.btn_save_new.setEnabled(False)
-            self.btn_update.setEnabled(False)
-            self.btn_del_preset.setEnabled(True)
-                
+                self.active_preset_name = self.SYSTEM_PRESET_NAME
+        elif self.active_preset_name == self.SYSTEM_PRESET_NAME or not self.active_preset_name:
+            self.cmb_presets.setCurrentIndex(0)
+            self.active_preset_name = self.SYSTEM_PRESET_NAME
+        else:
+            self.cmb_presets.setCurrentIndex(0)
+            self.active_preset_name = self.SYSTEM_PRESET_NAME
+
+        is_system = (self.active_preset_name == self.SYSTEM_PRESET_NAME)
+        self._is_dirty = False
+        self.btn_save_new.setEnabled(True)
+        self.btn_update.setEnabled(False)
+        self.btn_del_preset.setEnabled(not is_system)
+
         self.cmb_presets.blockSignals(False)
         self._internal_update = False
 
     def _on_preset_selected(self, index):
         if self._internal_update or index < 0: return
         name = self.cmb_presets.itemText(index)
-        if "Personalizado" in name: return
-        data = self.presets.get(name)
-        if not data: return
         
         self._internal_update = True
-        # Novos campos: Folha e Status da Imposição
-        self.spin_sheet_w_mm.setValue(data.get("sheet_w", 210.0))
-        self.spin_sheet_h_mm.setValue(data.get("sheet_h", 297.0))
-        self.chk_imposition.setChecked(data.get("enabled", False))
-        
-        # Campos do Modelo
-        self.spin_w_mm.setValue(data["w"])
-        self.spin_h_mm.setValue(data["h"])
-        self.chk_crop_marks.setChecked(data.get("crop", True))
-        self.chk_bleed.setChecked(data.get("bleed", True))
-        
-        self.active_preset_name = name
-        self._is_dirty = False
-        self.btn_save_new.setEnabled(False)
-        self.btn_update.setEnabled(False)
-        self.btn_del_preset.setEnabled(True)
-        self._internal_update = False
 
-    def _mark_dirty(self, *_):
-        if self._internal_update: return
-        self._is_dirty = True
-        
-        # Aplica a regra exata de botões quando ocorre alteração
-        self.btn_save_new.setEnabled(True)
-        self.btn_update.setEnabled(bool(self.active_preset_name))
-        self.btn_del_preset.setEnabled(bool(self.active_preset_name))
+        if name == self.SYSTEM_PRESET_NAME:
+            # Preset de sistema: desativa imposição, não carrega dados de folha
+            self.chk_imposition.setChecked(False)
+            self.active_preset_name = self.SYSTEM_PRESET_NAME
+            self._is_dirty = False
+            self.btn_save_new.setEnabled(True)
+            self.btn_update.setEnabled(False)
+            self.btn_del_preset.setEnabled(False)
+        else:
+            data = self.presets.get(name)
+            if not data:
+                self._internal_update = False
+                return
+            self.spin_sheet_w_mm.setValue(data.get("sheet_w", 210.0))
+            self.spin_sheet_h_mm.setValue(data.get("sheet_h", 297.0))
+            self.chk_imposition.setChecked(data.get("enabled", False))
+            self.spin_w_mm.setValue(data["w"])
+            self.spin_h_mm.setValue(data["h"])
+            self.chk_crop_marks.setChecked(data.get("crop", True))
+            self.chk_bleed.setChecked(data.get("bleed", True))
+            self.active_preset_name = name
+            self._is_dirty = False
+            self.btn_save_new.setEnabled(True)
+            self.btn_update.setEnabled(False)
+            self.btn_del_preset.setEnabled(True)
+
+        self._internal_update = False
 
     def _save_new_preset(self) -> bool:
         name, ok = QInputDialog.getText(self, "Nova Configuração", "Nome do preset:", QLineEdit.EchoMode.Normal, "")
         if ok and name.strip():
             name = name.strip()
+            if name == self.SYSTEM_PRESET_NAME:
+                QMessageBox.warning(self, "Nome reservado", f"O nome '{self.SYSTEM_PRESET_NAME}' é reservado pelo sistema. Escolha outro nome.")
+                return False
             self.presets[name] = {
                 "sheet_w": self.spin_sheet_w_mm.value(),
                 "sheet_h": self.spin_sheet_h_mm.value(),
@@ -490,7 +500,7 @@ class ConfigDialog(QDialog):
         return False
 
     def _update_preset(self):
-        if not self.active_preset_name: return
+        if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
         self.presets[self.active_preset_name] = {
             "sheet_w": self.spin_sheet_w_mm.value(),
             "sheet_h": self.spin_sheet_h_mm.value(),
@@ -501,22 +511,38 @@ class ConfigDialog(QDialog):
             "bleed": self.chk_bleed.isChecked()
         }
         self._is_dirty = False
-        self.btn_save_new.setEnabled(False)
+        self.btn_save_new.setEnabled(True)
         self.btn_update.setEnabled(False)
         self.btn_del_preset.setEnabled(True)
 
     def _delete_preset(self):
-        if not self.active_preset_name or self.active_preset_name not in self.presets: return
+        if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
+        if self.active_preset_name not in self.presets: return
         
         reply = QMessageBox.question(self, "Apagar Preset", f"Tem certeza que deseja apagar '{self.active_preset_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
             del self.presets[self.active_preset_name]
-            self.active_preset_name = ""
+            self.active_preset_name = self.SYSTEM_PRESET_NAME
             self._is_dirty = False
             self._load_presets_ui()
 
+    def _mark_dirty(self, *_):
+        if self._internal_update: return
+        self._is_dirty = True
+        
+        # Aplica a regra exata de botões quando ocorre alteração
+        self.btn_save_new.setEnabled(True)
+        self.btn_update.setEnabled(bool(self.active_preset_name))
+        self.btn_del_preset.setEnabled(bool(self.active_preset_name))
+    
     def _toggle_imposition_ui(self, enabled):
         self.container_imposition.setVisible(enabled)
+        if enabled:
+            self.lbl_imposition_hint.setText("⚙️ Configure a folha e as dimensões do modelo para um resultado preciso.")
+            self.lbl_imposition_hint.setStyleSheet("color: #e67e22; font-style: italic; padding-left: 4px;")
+        else:
+            self.lbl_imposition_hint.setText("ℹ️ O arquivo gerado terá as dimensões exatas do modelo original (1 item por arquivo).")
+            self.lbl_imposition_hint.setStyleSheet("color: gray; font-style: italic; padding-left: 4px;")
 
     def _insert_variable(self, var_name):
         self.txt_pattern.insert(f"{{{var_name}}}")

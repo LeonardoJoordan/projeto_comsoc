@@ -1115,30 +1115,31 @@ class MainWindow(QMainWindow):
         
     def _refresh_imposition_presets(self):
         """Atualiza a lista de presets rápidos na tela principal baseada no modelo atual."""
-        if not self.cached_model_data:
-            self.cbo_presets_main.clear()
-            self.cbo_presets_main.setEnabled(False)
-            return
-
-        imp_settings = self.cached_model_data.get("imposition_settings", {})
-        presets = imp_settings.get("presets", {})
-        active_name = imp_settings.get("active_preset_name", "")
-
+        SYSTEM_PRESET = "Definição do Modelo"
+        
         self.cbo_presets_main.blockSignals(True)
         self.cbo_presets_main.clear()
 
-        if not presets:
-            self.cbo_presets_main.addItem("Sem predefinições")
-            self.cbo_presets_main.setEnabled(False)
-        else:
-            self.cbo_presets_main.setEnabled(True)
-            sorted_names = sorted(presets.keys())
-            self.cbo_presets_main.addItems(sorted_names)
-            
-            # Sincroniza a seleção inicial
-            if active_name in sorted_names:
+        # O preset de sistema sempre existe, mesmo sem modelo carregado
+        self.cbo_presets_main.addItem(SYSTEM_PRESET)
+        self.cbo_presets_main.setEnabled(True)
+
+        if self.cached_model_data:
+            imp_settings = self.cached_model_data.get("imposition_settings", {})
+            presets = imp_settings.get("presets", {})
+            active_name = imp_settings.get("active_preset_name", "")
+
+            user_presets = sorted(k for k in presets.keys() if k != SYSTEM_PRESET)
+            for name in user_presets:
+                self.cbo_presets_main.addItem(name)
+
+            # Sincroniza a seleção com o preset ativo salvo
+            if active_name and active_name != SYSTEM_PRESET:
                 idx = self.cbo_presets_main.findText(active_name)
-                self.cbo_presets_main.setCurrentIndex(idx)
+                if idx >= 0:
+                    self.cbo_presets_main.setCurrentIndex(idx)
+                else:
+                    self.cbo_presets_main.setCurrentIndex(0)
             else:
                 self.cbo_presets_main.setCurrentIndex(0)
 
@@ -1146,17 +1147,25 @@ class MainWindow(QMainWindow):
 
     def _on_main_preset_changed(self, index):
         """Aplica instantaneamente as configurações do preset selecionado ao cache de memória."""
+        SYSTEM_PRESET = "Definição do Modelo"
         if not self.cached_model_data or index < 0: return
         
         name = self.cbo_presets_main.itemText(index)
-        if "Sem predefinições" in name: return
         
-        presets = self.cached_model_data.get("imposition_settings", {}).get("presets", {})
+        imp = self.cached_model_data.setdefault("imposition_settings", {})
+
+        if name == SYSTEM_PRESET:
+            # Preset de sistema: desativa imposição, mantém demais configs intactas
+            imp["enabled"] = False
+            imp["active_preset_name"] = SYSTEM_PRESET
+            self._update_template_json({"imposition_settings": imp})
+            self.log_panel.append(f"⚡ Layout aplicado: <b>{SYSTEM_PRESET}</b>")
+            return
+
+        presets = imp.get("presets", {})
         data = presets.get(name)
         
         if data:
-            # Atualiza o estado ATIVO no cache (o atalho que o Gerar vai ler)
-            imp = self.cached_model_data["imposition_settings"]
             imp["sheet_w_mm"] = data.get("sheet_w", 210.0)
             imp["sheet_h_mm"] = data.get("sheet_h", 297.0)
             imp["enabled"] = data.get("enabled", False)
@@ -1166,10 +1175,7 @@ class MainWindow(QMainWindow):
             imp["bleed_margin"] = data.get("bleed", True)
             imp["active_preset_name"] = name
             
-            # --- PERSISTÊNCIA EM DISCO ---
-            # Salva a escolha do usuário no JSON do modelo para que seja lembrada ao reiniciar
             self._update_template_json({"imposition_settings": imp})
-            
             self.log_panel.append(f"⚡ Layout aplicado: <b>{name}</b>")
     
 
