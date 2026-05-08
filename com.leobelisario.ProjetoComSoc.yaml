@@ -67,3 +67,5 @@ modules:
 #    flatpak-builder --repo=repo --force-clean build-dir com.leobelisario.ProjetoComSoc.yaml
 #    flatpak build-bundle repo ProjetoComSoc.flatpak com.leobelisario.ProjetoComSoc
 #    flatpak install --reinstall ProjetoComSoc.flatpak
+
+#    flatpak-builder --repo=repo --force-clean build-dir com.leobelisario.ProjetoComSoc.yaml && flatpak build-bundle repo ProjetoComSoc.flatpak com.leobelisario.ProjetoComSoc && flatpak install --reinstall ProjetoComSoc.flatpak

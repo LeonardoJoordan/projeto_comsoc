@@ -253,6 +253,11 @@ class EditorWindow(QMainWindow):
         
         # Inicializa o fundo vazio para garantir a existência da camada desde o início
         self.bg_item = BackgroundItem(None)
+        self.bg_item.resize_custom(mm_to_px(148.0), mm_to_px(105.0))
+        self.bg_item.setPos(0, 0)
+        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         self.scene.addItem(self.bg_item)
 
         center_container = QWidget()
@@ -335,13 +340,13 @@ class EditorWindow(QMainWindow):
         self.spin_phys_w.setRange(10, 1000)
         self.spin_phys_w.setDecimals(1)
         self.spin_phys_w.setKeyboardTracking(False)
-        self.spin_phys_w.setValue(100.0) 
+        self.spin_phys_w.setValue(148.0) 
         
         self.spin_phys_h = MathDoubleSpinBox()
         self.spin_phys_h.setRange(10, 1000)
         self.spin_phys_h.setDecimals(1)
         self.spin_phys_h.setKeyboardTracking(False)
-        self.spin_phys_h.setValue(150.0) 
+        self.spin_phys_h.setValue(105.0) 
         
         form_dim.addRow("Larg:", self.spin_phys_w)
         form_dim.addRow("Alt:", self.spin_phys_h)
