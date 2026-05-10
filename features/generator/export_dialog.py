@@ -453,6 +453,10 @@ class ConfigDialog(QDialog):
         }
 
     def _save_new_preset(self, default_name=""):
+        # Se chamado pelo clique do botão, default_name será um booleano (checked state)
+        if isinstance(default_name, bool):
+            default_name = ""
+            
         name, ok = QInputDialog.getText(self, "Nova Predefinição", "Nome da predefinição:", QLineEdit.EchoMode.Normal, default_name)
         if ok and name.strip():
             name = name.strip()
