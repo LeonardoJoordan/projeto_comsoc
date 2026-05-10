@@ -24,10 +24,9 @@ class ConfigDialog(QDialog):
             "crop_marks": True, "bleed_margin": True, "target_w_mm": 0, "target_h_mm": 0,
             "presets": {}, "active_preset_name": ""
         }
+        self._original_enabled = self.imposition_settings.get("enabled", False)
         self.presets = self.imposition_settings.get("presets", {})
         self.active_preset_name = self.imposition_settings.get("active_preset_name", "")
-        self._is_dirty = False
-        self._internal_update = False
         self.current_is_dark = is_dark
 
         main_layout = QVBoxLayout(self)
@@ -132,15 +131,16 @@ class ConfigDialog(QDialog):
         ly_combo_row.addWidget(self.cmb_presets, 1)
         
         ly_buttons_row = QHBoxLayout()
-        self.btn_save_new = QPushButton("Salvar Novo")
-        self.btn_save_new.clicked.connect(self._save_new_preset)
-        self.btn_update = QPushButton("Atualizar")
-        self.btn_update.clicked.connect(self._update_preset)
-        self.btn_del_preset = QPushButton("Apagar")
+        self.btn_new_preset = QPushButton("Criar Nova Predefinição")
+        self.btn_new_preset.clicked.connect(self._save_new_preset)
+        self.btn_rename_preset = QPushButton("Renomear")
+        self.btn_rename_preset.clicked.connect(self._rename_preset)
+        self.btn_del_preset = QPushButton("Excluir")
         self.btn_del_preset.clicked.connect(self._delete_preset)
         
-        ly_buttons_row.addWidget(self.btn_save_new)
-        ly_buttons_row.addWidget(self.btn_update)
+        ly_buttons_row.addWidget(self.btn_new_preset)
+        ly_buttons_row.addStretch()
+        ly_buttons_row.addWidget(self.btn_rename_preset)
         ly_buttons_row.addWidget(self.btn_del_preset)
         
         ly_presets_v.addLayout(ly_combo_row)
@@ -170,7 +170,7 @@ class ConfigDialog(QDialog):
         ly_imp.setContentsMargins(10, 0, 0, 0)
 
         # Folha de Saída agora está dentro do container de imposição
-        lbl_sheet_title = QLabel("<b>Folha de saída (Largura x Altura):</b>")
+        lbl_sheet_title = QLabel("Folha de saída (Largura x Altura):")
         lbl_sheet_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
         lbl_sheet_title.setToolTip(
             "<b>FOLHA DE SAÍDA (DOCUMENTO FINAL)</b><br><br>"
@@ -194,12 +194,18 @@ class ConfigDialog(QDialog):
         ly_sheet.addWidget(self.spin_sheet_h_mm)
         ly_sheet.addStretch()
         ly_imp.addLayout(ly_sheet)
-                
-        lbl_model_dims_title = QLabel("Dimensões do modelo final (Largura x Altura):")
+
+        ly_imp.addSpacing(6)
+        sep = QFrame()
+        sep.setFrameShape(QFrame.Shape.HLine)
+        sep.setFrameShadow(QFrame.Shadow.Sunken)
+        ly_imp.addWidget(sep)
+        
+        lbl_model_dims_title = QLabel("Dimensões do modelo na folha (Largura x Altura):")
         lbl_model_dims_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
         lbl_model_dims_title.setToolTip(
             "<b>DIMENSÕES REAIS DO MODELO</b><br><br>"
-            "Define o tamanho exato (em milímetros) que o seu cartão/documento terá após ser impresso e cortado.<br><br>"
+            "Define o tamanho exato (em milímetros) que o seu cartão/documento terá impresso na folha.<br><br>"
             "<small style='color: #A0A0A0;'>Dica Smart: Essencial para materiais que precisam encaixar em suportes físicos, como displays de acrílico, crachás ou etiquetas. Meça o suporte com uma régua e digite os valores exatos aqui para um ajuste milimétrico.</small>"
         )
         ly_imp.addWidget(lbl_model_dims_title)
@@ -253,17 +259,6 @@ class ConfigDialog(QDialog):
             "<small style='color: #A0A0A0;'>Dica: Ative para garantir que artes com fundo contínuo não criem filetes brancos durante o corte manual.</small>"
         )
         ly_imp.addWidget(self.chk_bleed)
-
-        # Conexões globais da aba de impressão
-        self.spin_sheet_w_mm.valueChanged.connect(self._mark_dirty)
-        self.spin_sheet_h_mm.valueChanged.connect(self._mark_dirty)
-        self.chk_imposition.toggled.connect(self._mark_dirty)
-
-        # Conexões de rastreamento de modificações (Dirty State)
-        self.spin_w_mm.valueChanged.connect(self._mark_dirty)
-        self.spin_h_mm.valueChanged.connect(self._mark_dirty)
-        self.chk_crop_marks.toggled.connect(self._mark_dirty)
-        self.chk_bleed.toggled.connect(self._mark_dirty)
         
         # Carrega a UI com os dados em memória
         self._load_presets_ui()
@@ -316,6 +311,7 @@ class ConfigDialog(QDialog):
         self.buttonBox.rejected.connect(self.reject)
         main_layout.addWidget(self.buttonBox)
 
+        self._toggle_imposition_ui(self.chk_imposition.isChecked())
         self._update_capacity_preview()
     def get_pattern(self):
         return self.result_pattern
@@ -330,7 +326,7 @@ class ConfigDialog(QDialog):
             "target_w_mm": self.spin_w_mm.value(),
             "target_h_mm": self.spin_h_mm.value(),
             "presets": self.presets,
-            "active_preset_name": self.active_preset_name if not self._is_dirty else ""
+            "active_preset_name": self.active_preset_name
         }
 
     def _update_capacity_preview(self):
@@ -363,58 +359,40 @@ class ConfigDialog(QDialog):
             ok_button.setEnabled(False)
 
     def _on_accept(self):
-        if not self._prompt_dirty_state(): return
+        # Auto-save inteligente das configurações
+        if self.active_preset_name == self.SYSTEM_PRESET_NAME:
+            # Se ativou imposição no preset de sistema, assumimos que algo foi customizado
+            if self.chk_imposition.isChecked():
+                name, ok = QInputDialog.getText(self, "Configurações Personalizadas", "Você alterou as configurações padrão.\nDê um nome para salvar esta predefinição:", QLineEdit.EchoMode.Normal, "Personalizada")
+                
+                # Se o usuário cancelar ou deixar em branco, aplica o nome padrão de fallback
+                new_name = name.strip() if (ok and name.strip()) else "Personalizada"
+                if new_name == self.SYSTEM_PRESET_NAME:
+                    new_name = "Personalizada"
+                
+                # Previne colisão silenciosa caso a pessoa apenas feche a janela ou confirme o padrão
+                final_name = new_name
+                counter = 2
+                while final_name in self.presets:
+                    final_name = f"{new_name} {counter}"
+                    counter += 1
+                    
+                self.presets[final_name] = self._get_current_settings()
+                self.active_preset_name = final_name
+        else:
+            # Se já está em um preset do usuário, salva silenciosamente (auto-save fluido)
+            self.presets[self.active_preset_name] = self._get_current_settings()
+
         self.result_pattern = self.txt_pattern.text().strip()
         self.accept()
-
-    def reject(self):
-        if not self._prompt_dirty_state(): return
-        super().reject()
-
-    def closeEvent(self, event):
-        if not self._prompt_dirty_state():
-            event.ignore()
-        else:
-            super().closeEvent(event)
-
-    def _prompt_dirty_state(self) -> bool:
-        """Garante que alterações feitas sobre um preset existente não sejam perdidas."""
-        if not self._is_dirty or not self.active_preset_name:
-            return True
-            
-        msg = QMessageBox(self)
-        msg.setWindowTitle("Alterações não salvas")
-        msg.setText(f"A predefinição '{self.active_preset_name}' foi modificada.")
-        msg.setInformativeText("O que deseja fazer com as alterações antes de sair?")
-        msg.setIcon(QMessageBox.Icon.Warning)
-        
-        btn_update = msg.addButton("Atualizar", QMessageBox.ButtonRole.AcceptRole)
-        btn_new = msg.addButton("Salvar como Nova", QMessageBox.ButtonRole.AcceptRole)
-        btn_ignore = msg.addButton("Ignorar", QMessageBox.ButtonRole.RejectRole)
-        btn_cancel = msg.addButton("Cancelar", QMessageBox.ButtonRole.DestructiveRole)
-        
-        msg.exec()
-        
-        if msg.clickedButton() == btn_update:
-            self._update_preset()
-            return True
-        elif msg.clickedButton() == btn_new:
-            return self._save_new_preset()
-        elif msg.clickedButton() == btn_ignore:
-            return True
-        else:
-            return False
 
     SYSTEM_PRESET_NAME = "Definição do Modelo"
 
     def _load_presets_ui(self):
-        self._internal_update = True
         self.cmb_presets.blockSignals(True)
         self.cmb_presets.clear()
         
-        # O preset de sistema sempre existe no topo
         self.cmb_presets.addItem(self.SYSTEM_PRESET_NAME)
-        self.cmb_presets.setEnabled(True)
 
         user_presets = sorted(k for k in self.presets.keys() if k != self.SYSTEM_PRESET_NAME)
         for name in user_presets:
@@ -427,81 +405,44 @@ class ConfigDialog(QDialog):
             else:
                 self.cmb_presets.setCurrentIndex(0)
                 self.active_preset_name = self.SYSTEM_PRESET_NAME
-        elif self.active_preset_name == self.SYSTEM_PRESET_NAME or not self.active_preset_name:
-            self.cmb_presets.setCurrentIndex(0)
-            self.active_preset_name = self.SYSTEM_PRESET_NAME
         else:
             self.cmb_presets.setCurrentIndex(0)
             self.active_preset_name = self.SYSTEM_PRESET_NAME
 
         is_system = (self.active_preset_name == self.SYSTEM_PRESET_NAME)
-        self._is_dirty = False
-        self.btn_save_new.setEnabled(True)
-        self.btn_update.setEnabled(False)
+        self.btn_rename_preset.setEnabled(not is_system)
         self.btn_del_preset.setEnabled(not is_system)
 
         self.cmb_presets.blockSignals(False)
-        self._internal_update = False
 
     def _on_preset_selected(self, index):
-        if self._internal_update or index < 0: return
+        if index < 0: return
         name = self.cmb_presets.itemText(index)
-        
-        self._internal_update = True
 
         if name == self.SYSTEM_PRESET_NAME:
-            # Preset de sistema: desativa imposição, não carrega dados de folha
             self.chk_imposition.setChecked(False)
             self.active_preset_name = self.SYSTEM_PRESET_NAME
-            self._is_dirty = False
-            self.btn_save_new.setEnabled(True)
-            self.btn_update.setEnabled(False)
+            self.btn_rename_preset.setEnabled(False)
             self.btn_del_preset.setEnabled(False)
         else:
             data = self.presets.get(name)
-            if not data:
-                self._internal_update = False
-                return
+            if not data: return
+            
             self.spin_sheet_w_mm.setValue(data.get("sheet_w", 210.0))
             self.spin_sheet_h_mm.setValue(data.get("sheet_h", 297.0))
             self.chk_imposition.setChecked(data.get("enabled", False))
-            self.spin_w_mm.setValue(data["w"])
-            self.spin_h_mm.setValue(data["h"])
+            self.spin_w_mm.setValue(data.get("w", 0))
+            self.spin_h_mm.setValue(data.get("h", 0))
             self.chk_crop_marks.setChecked(data.get("crop", True))
             self.chk_bleed.setChecked(data.get("bleed", True))
+            
             self.active_preset_name = name
-            self._is_dirty = False
-            self.btn_save_new.setEnabled(True)
-            self.btn_update.setEnabled(False)
+            self.btn_rename_preset.setEnabled(True)
             self.btn_del_preset.setEnabled(True)
 
-        self._internal_update = False
-
-    def _save_new_preset(self) -> bool:
-        name, ok = QInputDialog.getText(self, "Nova Configuração", "Nome do preset:", QLineEdit.EchoMode.Normal, "")
-        if ok and name.strip():
-            name = name.strip()
-            if name == self.SYSTEM_PRESET_NAME:
-                QMessageBox.warning(self, "Nome reservado", f"O nome '{self.SYSTEM_PRESET_NAME}' é reservado pelo sistema. Escolha outro nome.")
-                return False
-            self.presets[name] = {
-                "sheet_w": self.spin_sheet_w_mm.value(),
-                "sheet_h": self.spin_sheet_h_mm.value(),
-                "enabled": self.chk_imposition.isChecked(),
-                "w": self.spin_w_mm.value(),
-                "h": self.spin_h_mm.value(),
-                "crop": self.chk_crop_marks.isChecked(),
-                "bleed": self.chk_bleed.isChecked()
-            }
-            self.active_preset_name = name
-            self._is_dirty = False
-            self._load_presets_ui()
-            return True
-        return False
-
-    def _update_preset(self):
-        if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
-        self.presets[self.active_preset_name] = {
+    def _get_current_settings(self):
+        """Coleta as configurações atuais da tela."""
+        return {
             "sheet_w": self.spin_sheet_w_mm.value(),
             "sheet_h": self.spin_sheet_h_mm.value(),
             "enabled": self.chk_imposition.isChecked(),
@@ -510,31 +451,53 @@ class ConfigDialog(QDialog):
             "crop": self.chk_crop_marks.isChecked(),
             "bleed": self.chk_bleed.isChecked()
         }
-        self._is_dirty = False
-        self.btn_save_new.setEnabled(True)
-        self.btn_update.setEnabled(False)
-        self.btn_del_preset.setEnabled(True)
+
+    def _save_new_preset(self, default_name=""):
+        name, ok = QInputDialog.getText(self, "Nova Predefinição", "Nome da predefinição:", QLineEdit.EchoMode.Normal, default_name)
+        if ok and name.strip():
+            name = name.strip()
+            if name == self.SYSTEM_PRESET_NAME:
+                QMessageBox.warning(self, "Nome reservado", f"O nome '{self.SYSTEM_PRESET_NAME}' é reservado pelo sistema.")
+                return False
+            
+            if name in self.presets:
+                reply = QMessageBox.question(self, "Sobrescrever", f"A predefinição '{name}' já existe. Deseja sobrescrevê-la?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                if reply == QMessageBox.StandardButton.No:
+                    return self._save_new_preset(name) # Repete o prompt para o usuário tentar outro nome
+                    
+            self.presets[name] = self._get_current_settings()
+            self.active_preset_name = name
+            self._load_presets_ui()
+            return True
+        return False
 
     def _delete_preset(self):
         if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
-        if self.active_preset_name not in self.presets: return
         
-        reply = QMessageBox.question(self, "Apagar Preset", f"Tem certeza que deseja apagar '{self.active_preset_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = QMessageBox.question(self, "Excluir Predefinição", f"Tem certeza que deseja excluir '{self.active_preset_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
             del self.presets[self.active_preset_name]
             self.active_preset_name = self.SYSTEM_PRESET_NAME
-            self._is_dirty = False
             self._load_presets_ui()
 
-    def _mark_dirty(self, *_):
-        if self._internal_update: return
-        self._is_dirty = True
-        
-        # Aplica a regra exata de botões quando ocorre alteração
-        self.btn_save_new.setEnabled(True)
-        self.btn_update.setEnabled(bool(self.active_preset_name))
-        self.btn_del_preset.setEnabled(bool(self.active_preset_name))
-    
+    def _rename_preset(self):
+        if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
+
+        new_name, ok = QInputDialog.getText(self, "Renomear Predefinição", "Novo nome:", QLineEdit.EchoMode.Normal, self.active_preset_name)
+        if ok and new_name.strip():
+            new_name = new_name.strip()
+            if new_name == self.active_preset_name: return
+            if new_name == self.SYSTEM_PRESET_NAME:
+                QMessageBox.warning(self, "Nome reservado", f"O nome '{self.SYSTEM_PRESET_NAME}' é reservado pelo sistema.")
+                return
+            if new_name in self.presets:
+                QMessageBox.warning(self, "Nome já existe", f"Já existe uma predefinição com o nome '{new_name}'.")
+                return
+
+            self.presets[new_name] = self.presets.pop(self.active_preset_name)
+            self.active_preset_name = new_name
+            self._load_presets_ui()
+
     def _toggle_imposition_ui(self, enabled):
         self.container_imposition.setVisible(enabled)
         if enabled:
