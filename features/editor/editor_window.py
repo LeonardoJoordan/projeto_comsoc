@@ -515,10 +515,37 @@ class EditorWindow(QMainWindow):
         super().showEvent(event)
         self._zoom_to_fit()
 
+    def _state_item_sort_key(self, item):
+        """Chave estável para comparar estados recriados via undo/redo."""
+        return (
+            item.get("z_value", 0),
+            item.get("layer_id", 999999),
+            item.get("vertical", False),
+            item.get("pos", 0),
+            item.get("x", 0),
+            item.get("y", 0),
+            item.get("custom_name", ""),
+            item.get("path", ""),
+            item.get("html", ""),
+        )
+
+    def _normalize_state_for_compare(self, state):
+        normalized = copy.deepcopy(state)
+        for key in ("boxes", "images", "signatures", "guidelines"):
+            if isinstance(normalized.get(key), list):
+                normalized[key].sort(key=self._state_item_sort_key)
+        return normalized
+
+    def _states_equal_for_close(self, current_state, saved_state):
+        return (
+            self._normalize_state_for_compare(current_state)
+            == self._normalize_state_for_compare(saved_state)
+        )
+
     def closeEvent(self, event):
         current_state = self.get_current_scene_state()
         if hasattr(self, '_last_saved_state') and self._last_saved_state is not None:
-            if current_state != self._last_saved_state:
+            if not self._states_equal_for_close(current_state, self._last_saved_state):
                 msg_box = QMessageBox(self)
                 msg_box.setWindowTitle("Alterações não salvas")
                 msg_box.setIcon(QMessageBox.Icon.Warning)
