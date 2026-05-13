@@ -831,13 +831,20 @@ class ImageItem(QGraphicsPixmapItem):
         _set_resize_handles_visible(self, False)
 
     def mousePressEvent(self, event):
+        scene = self.scene()
+        pre_selected = scene.selectedItems() if scene else []
+
+        super().mousePressEvent(event)
+
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_mouse_dragging = True
-            scene = self.scene()
             if scene:
-                scene._drag_start_positions = {i: i.pos() for i in scene.selectedItems()}
+                post_selected = scene.selectedItems()
+                drag_items = pre_selected if self in pre_selected else post_selected
+                if self not in drag_items:
+                    drag_items.append(self)
+                scene._drag_start_positions = {i: i.pos() for i in drag_items}
                 scene._group_raw_delta = None
-        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
@@ -845,7 +852,7 @@ class ImageItem(QGraphicsPixmapItem):
         has_moved = False
         if scene and hasattr(scene, '_drag_start_positions'):
             start_pos = scene._drag_start_positions.get(self)
-            if start_pos and start_pos != self.pos():
+            if start_pos is not None and start_pos != self.pos():
                 has_moved = True
             scene._group_raw_delta = None
         
@@ -971,13 +978,20 @@ class SignatureItem(QGraphicsPixmapItem):
         _set_resize_handles_visible(self, False)
 
     def mousePressEvent(self, event):
+        scene = self.scene()
+        pre_selected = scene.selectedItems() if scene else []
+
+        super().mousePressEvent(event)
+
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_mouse_dragging = True
-            scene = self.scene()
             if scene:
-                scene._drag_start_positions = {i: i.pos() for i in scene.selectedItems()}
+                post_selected = scene.selectedItems()
+                drag_items = pre_selected if self in pre_selected else post_selected
+                if self not in drag_items:
+                    drag_items.append(self)
+                scene._drag_start_positions = {i: i.pos() for i in drag_items}
                 scene._group_raw_delta = None
-        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
@@ -985,7 +999,7 @@ class SignatureItem(QGraphicsPixmapItem):
         has_moved = False
         if scene and hasattr(scene, '_drag_start_positions'):
             start_pos = scene._drag_start_positions.get(self)
-            if start_pos and start_pos != self.pos():
+            if start_pos is not None and start_pos != self.pos():
                 has_moved = True
             scene._group_raw_delta = None
         
@@ -1211,13 +1225,20 @@ class DesignerBox(QGraphicsRectItem):
         self.setTransformOriginPoint(rect.center())
 
     def mousePressEvent(self, event):
+        scene = self.scene()
+        pre_selected = scene.selectedItems() if scene else []
+
+        super().mousePressEvent(event)
+
         if event.button() == Qt.MouseButton.LeftButton:
             self._is_mouse_dragging = True
-            scene = self.scene()
             if scene:
-                scene._drag_start_positions = {i: i.pos() for i in scene.selectedItems()}
+                post_selected = scene.selectedItems()
+                drag_items = pre_selected if self in pre_selected else post_selected
+                if self not in drag_items:
+                    drag_items.append(self)
+                scene._drag_start_positions = {i: i.pos() for i in drag_items}
                 scene._group_raw_delta = None
-        super().mousePressEvent(event)
 
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
@@ -1225,7 +1246,7 @@ class DesignerBox(QGraphicsRectItem):
         has_moved = False
         if scene and hasattr(scene, '_drag_start_positions'):
             start_pos = scene._drag_start_positions.get(self)
-            if start_pos and start_pos != self.pos():
+            if start_pos is not None and start_pos != self.pos():
                 has_moved = True
             scene._group_raw_delta = None
         

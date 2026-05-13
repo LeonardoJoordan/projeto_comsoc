@@ -479,7 +479,7 @@ class EditorWindow(QMainWindow):
         self.shortcut_delete.activated.connect(self.delete_selected_items)
 
         # --- SISTEMA DE UNDO/REDO ---
-        self.history = HistoryManager(max_steps=30)
+        self.history = HistoryManager(max_steps=100)
         
         # Conecta o estado da pilha aos novos botões da UI
         self.history.canUndoChanged.connect(self.btn_undo.setEnabled)
