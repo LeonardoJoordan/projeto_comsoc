@@ -4,7 +4,7 @@ from PySide6.QtCore import Qt, QPointF
 DPI = 300
 
 def mm_to_px_300(mm):
-    return int((mm * DPI) / 25.4)
+    return round((mm * DPI) / 25.4)
 
 class SheetAssembler:
     def __init__(self, target_w_mm: float, target_h_mm: float, sheet_w_mm: float = 210.0, sheet_h_mm: float = 297.0, crop_marks: bool = True, bleed_margin: bool = False):
