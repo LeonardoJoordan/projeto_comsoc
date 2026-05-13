@@ -1993,16 +1993,29 @@ class EditorWindow(QMainWindow):
         self.scene._document_rect = QRectF(self._document_rect)
         self._update_workspace_scene_rect()
 
+    def _get_content_rect(self):
+        total_rect = self._get_document_rect()
+        for item in self.scene.items():
+            # Ignora as linhas guia infinitas e o papel branco de fallback
+            if isinstance(item, Guideline) or item == getattr(self, 'fallback_bg', None):
+                continue
+            total_rect = total_rect.united(item.sceneBoundingRect())
+        return total_rect
+
     def _workspace_scene_rect(self):
-        document_rect = self._get_document_rect()
-        if document_rect.isEmpty() or not hasattr(self, "view"):
-            return document_rect
+        total_rect = self._get_content_rect()
+        
+        if total_rect.isEmpty() or not hasattr(self, "view"):
+            return total_rect
 
         zoom = max(0.001, self.view.transform().m11())
         viewport_size = self.view.viewport().size()
-        margin_x = max(50.0, (viewport_size.width() / zoom) * 0.5)
-        margin_y = max(50.0, (viewport_size.height() / zoom) * 0.5)
-        return document_rect.adjusted(-margin_x, -margin_y, margin_x, margin_y)
+        
+        # Mantém uma margem de segurança baseada no tamanho da tela
+        margin_x = max(100.0, (viewport_size.width() / zoom) * 0.5)
+        margin_y = max(100.0, (viewport_size.height() / zoom) * 0.5)
+        
+        return total_rect.adjusted(-margin_x, -margin_y, margin_x, margin_y)
 
     def _update_workspace_scene_rect(self):
         if not hasattr(self, "scene") or not hasattr(self, "view"):
@@ -2014,10 +2027,11 @@ class EditorWindow(QMainWindow):
         self.view.setSceneRect(workspace_rect)
 
     def _zoom_to_fit(self):
-        document_rect = self._get_document_rect()
-        if not document_rect.isEmpty():
+        total_rect = self._get_content_rect()
+        
+        if not total_rect.isEmpty():
             margin = 50
-            view_rect = document_rect.adjusted(-margin, -margin, margin, margin)
+            view_rect = total_rect.adjusted(-margin, -margin, margin, margin)
             self.view.fitInView(view_rect, Qt.AspectRatioMode.KeepAspectRatio)
             self._update_workspace_scene_rect()
 
@@ -2029,12 +2043,14 @@ class EditorWindow(QMainWindow):
         # Limite máximo: 1000% (escala 10.0x)
         MAX_SCALE = 10.0
 
-        # Limite mínimo dinâmico: documento deve ocupar pelo menos 50% da menor dimensão visível
-        doc = self._get_document_rect()
+        # Limite mínimo dinâmico: a área total (doc + itens) deve ser visível
+        total_rect = self._get_content_rect()
+        
         viewport = self.view.viewport().size()
-        if not doc.isEmpty() and viewport.width() > 0 and viewport.height() > 0:
-            min_scale_w = (viewport.width() * 0.5) / doc.width()
-            min_scale_h = (viewport.height() * 0.5) / doc.height()
+        if not total_rect.isEmpty() and viewport.width() > 0 and viewport.height() > 0:
+            # Garante que mesmo o item mais longe ainda possa ser visto no menor zoom
+            min_scale_w = (viewport.width() * 0.5) / total_rect.width()
+            min_scale_h = (viewport.height() * 0.5) / total_rect.height()
             MIN_SCALE = min(min_scale_w, min_scale_h)
         else:
             MIN_SCALE = 0.01
