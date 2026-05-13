@@ -114,20 +114,20 @@ class NativeRenderer:
         painter.setFont(base_font)
 
         if self.tpl.get("background_path"):
-            bg = self._load_original_pixmap(self.tpl["background_path"])
-            if not bg.isNull():
-                bg_props = self.tpl.get("bg_props", {})
-                
-                w = bg_props.get("w", self.tpl["canvas_size"]["w"])
-                h = bg_props.get("h", self.tpl["canvas_size"]["h"])
-                x = bg_props.get("x", 0)
-                y = bg_props.get("y", 0)
-                
-                scaled_bg = bg.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                
-                painter.setOpacity(bg_props.get("opacity", 1.0))
-                painter.drawPixmap(QPointF(float(x), float(y)), scaled_bg)
-                painter.setOpacity(1.0)
+            bg_props = self.tpl.get("bg_props", {})
+            if bg_props.get("visible", True):
+                bg = self._load_original_pixmap(self.tpl["background_path"])
+                if not bg.isNull():
+                    w = bg_props.get("w", self.tpl["canvas_size"]["w"])
+                    h = bg_props.get("h", self.tpl["canvas_size"]["h"])
+                    x = bg_props.get("x", 0)
+                    y = bg_props.get("y", 0)
+                    
+                    scaled_bg = bg.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                    
+                    painter.setOpacity(bg_props.get("opacity", 1.0))
+                    painter.drawPixmap(QPointF(float(x), float(y)), scaled_bg)
+                    painter.setOpacity(1.0)
 
         for img in self.tpl.get("images", []):
             if not img.get("visible", True):

@@ -842,12 +842,17 @@ class ImageItem(QGraphicsPixmapItem):
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
         scene = self.scene()
-        if scene:
+        has_moved = False
+        if scene and hasattr(scene, '_drag_start_positions'):
+            start_pos = scene._drag_start_positions.get(self)
+            if start_pos and start_pos != self.pos():
+                has_moved = True
             scene._group_raw_delta = None
+        
         super().mouseReleaseEvent(event)
-        # Gatilho do Undo/Redo
-        if self.scene() and self.scene().views():
-            win = self.scene().views()[0].window()
+        
+        if has_moved and scene and scene.views():
+            win = scene.views()[0].window()
             if hasattr(win, 'save_snapshot'):
                 win.save_snapshot()
 
@@ -977,12 +982,17 @@ class SignatureItem(QGraphicsPixmapItem):
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
         scene = self.scene()
-        if scene:
+        has_moved = False
+        if scene and hasattr(scene, '_drag_start_positions'):
+            start_pos = scene._drag_start_positions.get(self)
+            if start_pos and start_pos != self.pos():
+                has_moved = True
             scene._group_raw_delta = None
+        
         super().mouseReleaseEvent(event)
-        # Gatilho do Undo/Redo
-        if self.scene() and self.scene().views():
-            win = self.scene().views()[0].window()
+        
+        if has_moved and scene and scene.views():
+            win = scene.views()[0].window()
             if hasattr(win, 'save_snapshot'):
                 win.save_snapshot()
 
@@ -1212,11 +1222,16 @@ class DesignerBox(QGraphicsRectItem):
     def mouseReleaseEvent(self, event):
         self._is_mouse_dragging = False
         scene = self.scene()
-        if scene:
+        has_moved = False
+        if scene and hasattr(scene, '_drag_start_positions'):
+            start_pos = scene._drag_start_positions.get(self)
+            if start_pos and start_pos != self.pos():
+                has_moved = True
             scene._group_raw_delta = None
+        
         super().mouseReleaseEvent(event)
-        # Gatilho do Undo/Redo
-        if self.scene() and self.scene().views():
-            win = self.scene().views()[0].window()
+        
+        if has_moved and scene and scene.views():
+            win = scene.views()[0].window()
             if hasattr(win, 'save_snapshot'):
                 win.save_snapshot()

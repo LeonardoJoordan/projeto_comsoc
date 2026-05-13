@@ -358,8 +358,13 @@ class EditorWindow(QMainWindow):
         # Conexões de Sinais
         self.spin_phys_w.valueChanged.connect(self._on_physical_size_changed)
         self.spin_phys_h.valueChanged.connect(self._on_physical_size_changed)
+        self.spin_phys_w.editingFinished.connect(self.save_snapshot)
+        self.spin_phys_h.editingFinished.connect(self.save_snapshot)
+        
         self.spin_pos_x.valueChanged.connect(self.apply_position_x)
+        self.spin_pos_x.editingFinished.connect(self.save_snapshot)
         self.spin_pos_y.valueChanged.connect(self.apply_position_y)
+        self.spin_pos_y.editingFinished.connect(self.save_snapshot)
         self._add_separator(right_layout)
 
         container_misto = QWidget()
@@ -407,6 +412,7 @@ class EditorWindow(QMainWindow):
         self.lst_placeholders.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
         self.lst_placeholders.setFixedHeight(170) 
         ly_cols_compact.addWidget(self.lst_placeholders)
+        self.lst_placeholders.model().rowsMoved.connect(lambda: self.save_snapshot())
         
         # Adiciona uma "mola" no final para empurrar tudo para cima
         ly_cols_compact.addStretch() 
@@ -502,6 +508,7 @@ class EditorWindow(QMainWindow):
         # --- FORÇA A SINCRONIA INICIAL ---
         # Faz o quadrado branco (1000x1000) se transformar no retângulo exato ditado pelas caixas (100x150mm) a 300 DPI
         self._on_physical_size_changed()
+        self.save_snapshot()
         self._last_saved_state = self.get_current_scene_state()
 
     def showEvent(self, event):
@@ -621,6 +628,10 @@ class EditorWindow(QMainWindow):
                 # 3. Desativar Pan (Voltar para seleção) ao soltar Espaço
                 if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
                     self._leave_space_pan_mode()
+                    return True
+                if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down) and not event.isAutoRepeat():
+                    if self.scene.selectedItems():
+                        self.save_snapshot()
                     return True
         
         return super().eventFilter(source, event)
@@ -773,6 +784,7 @@ class EditorWindow(QMainWindow):
                 self.bg_item.resize_custom(props["w"], props["h"])
             self.bg_item.setVisible(props.get("visible", True))
             self.bg_item.setOpacity(props.get("opacity", 1.0))
+            self.bg_item.keep_proportion = props.get("keep_proportion", True)
             if props.get("locked", False):
                 self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
                 self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
@@ -931,6 +943,7 @@ class EditorWindow(QMainWindow):
             
             # Propriedades Comuns
             new_item.layer_id = None
+            new_item.keep_proportion = getattr(original, 'keep_proportion', True)
             base_name = self._generate_layer_name(getattr(original, 'layer_id', None), original)
 
             # Remove qualquer sufixo de cópia anterior para sempre partir do nome limpo
@@ -1574,6 +1587,7 @@ class EditorWindow(QMainWindow):
                     "indent_px": item.state.indent_px,
                     "line_height": item.state.line_height,
                     "layer_id": getattr(item, 'layer_id', None),
+                    "keep_proportion": getattr(item, 'keep_proportion', True),
                     "z_value": round(float(item.zValue()), 2)
                 })
             
@@ -1593,6 +1607,7 @@ class EditorWindow(QMainWindow):
                     "longest_side": round(float(max(pix_rect.width(), pix_rect.height())), 2),
                     "rotation": round(float(item.rotation()), 2),
                     "layer_id": getattr(item, 'layer_id', None),
+                    "keep_proportion": getattr(item, 'keep_proportion', True),
                     "z_value": round(float(item.zValue()), 2)
                 })
 
@@ -1614,6 +1629,7 @@ class EditorWindow(QMainWindow):
                     "has_link": getattr(item, "has_link", False),
                     "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
                     "layer_id": getattr(item, 'layer_id', None),
+                    "keep_proportion": getattr(item, 'keep_proportion', True),
                     "z_value": round(float(item.zValue()), 2)
                 })
 
@@ -1631,7 +1647,8 @@ class EditorWindow(QMainWindow):
             "images": images_data,
             "boxes": boxes_data,
             "guidelines": guidelines_data,
-            "guidelines_locked": self.btn_lock_guides.isChecked()
+            "guidelines_locked": self.btn_lock_guides.isChecked(),
+            "guidelines_visible": self.btn_toggle_guides.isChecked()
         }
         
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
@@ -1645,6 +1662,7 @@ class EditorWindow(QMainWindow):
                 "opacity": round(float(self.bg_item.opacity()), 2),
                 "locked": not bool(self.bg_item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
                 "layer_id": getattr(self.bg_item, 'layer_id', None),
+                "keep_proportion": getattr(self.bg_item, 'keep_proportion', True),
                 "z_value": round(float(self.bg_item.zValue()), 2)
             }
             
@@ -1724,6 +1742,7 @@ class EditorWindow(QMainWindow):
                     sig.resize_by_longest_side(sig_data.get("longest_side", 100))
                 sig.setRotation(sig_data.get("rotation", 0))
                 self.scene.addItem(sig)
+                sig.keep_proportion = sig_data.get("keep_proportion", True)
                 sig.setZValue(sig_data.get("z_value", 201))
                 sig.setVisible(sig_data.get("visible", True))
                 sig.setOpacity(sig_data.get("opacity", 1.0))
@@ -1753,6 +1772,7 @@ class EditorWindow(QMainWindow):
                     
                 img.setRotation(img_data.get("rotation", 0))
                 self.scene.addItem(img)
+                img.keep_proportion = img_data.get("keep_proportion", True)
                 img.setZValue(img_data.get("z_value", 1))
                 img.has_link = img_data.get("has_link", False)
                 img.setVisible(img_data.get("visible", True))
@@ -1788,6 +1808,7 @@ class EditorWindow(QMainWindow):
 
             box.setRotation(b.get("rotation", 0))
             box.apply_state()
+            box.keep_proportion = b.get("keep_proportion", True)
             box.update_center() 
 
             self.scene.addItem(box)
@@ -1807,13 +1828,17 @@ class EditorWindow(QMainWindow):
             guide.setVisible(g.get("visible", True))
             self.scene.addItem(guide)
             
-        if guides_data:
-            # Sincroniza o botão visual com o estado da primeira guia carregada
+        # Sincroniza o estado global de visibilidade das guias (independente de haver guias na lista)
+        if "guidelines_visible" in data:
+            is_visible = data.get("guidelines_visible", True)
+        elif guides_data:
             is_visible = guides_data[0].get("visible", True)
-            self.btn_toggle_guides.blockSignals(True)
-            self.btn_toggle_guides.setChecked(is_visible)
-            self.op_eye.setOpacity(1.0 if is_visible else 0.2)
-            self.btn_toggle_guides.blockSignals(False)
+        else:
+            is_visible = True
+        self.btn_toggle_guides.blockSignals(True)
+        self.btn_toggle_guides.setChecked(is_visible)
+        self.op_eye.setOpacity(1.0 if is_visible else 0.2)
+        self.btn_toggle_guides.blockSignals(False)
 
         # Restaura o estado do cadeado das guias
         is_locked = data.get("guidelines_locked", False)

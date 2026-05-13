@@ -6,7 +6,7 @@ from PySide6.QtCore import Qt, Signal, QMimeData
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
 import re
 
-from .canvas_items import DesignerBox, SignatureItem, ImageItem, px_to_mm
+from .canvas_items import DesignerBox, SignatureItem, ImageItem, BackgroundItem, px_to_mm
 from core.custom_widgets import MathDoubleSpinBox
 
 
@@ -475,7 +475,7 @@ class CaixaDeTextoPanel(QWidget):
     def load_from_image(self, img):
         self.blockSignals(True)
         self._restore_available = True
-        self._link_available = isinstance(img, ImageItem)
+        self._link_available = isinstance(img, ImageItem) and not isinstance(img, BackgroundItem)
         rect = img.rect() if hasattr(img, 'rect') else img.pixmap().rect()
         self.spin_w.setValue(px_to_mm(rect.width()))
         self.spin_h.setValue(px_to_mm(rect.height()))
