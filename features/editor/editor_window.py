@@ -670,6 +670,7 @@ class EditorWindow(QMainWindow):
         # Garante layer_id em bg_props (acesso direto sem padrão)
         if "bg_props" in data:
             data["bg_props"].setdefault("layer_id", None)
+            data["bg_props"].setdefault("custom_name", "")
 
         # Garante layer_id e html nas caixas (html é lido com b["html"] sem .get())
         for box in data.get("boxes", []):
@@ -1681,6 +1682,7 @@ class EditorWindow(QMainWindow):
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
             bg_rect = self.bg_item.rect() if hasattr(self.bg_item, 'rect') else self.bg_item.pixmap().rect()
             data["bg_props"] = {
+                "custom_name": getattr(self.bg_item, "custom_name", ""),
                 "x": round(float(self.bg_item.pos().x()), 2),
                 "y": round(float(self.bg_item.pos().y()), 2),
                 "w": round(float(bg_rect.width()), 2),
@@ -1747,6 +1749,7 @@ class EditorWindow(QMainWindow):
             self.load_background_image(None, update_ui=not is_undo_redo, props=data.get("bg_props"))
 
         if self.bg_item and "bg_props" in data:
+            self.bg_item.custom_name = data["bg_props"].get("custom_name", "")
             self.bg_item.layer_id = data["bg_props"].get("layer_id")
             self.bg_item.setZValue(data["bg_props"].get("z_value", -100))
 
@@ -2169,10 +2172,10 @@ class EditorWindow(QMainWindow):
             return f"{prefix}_{raw}"
         elif isinstance(item, SignatureItem):
             return f"{prefix}_Assinatura"
+        elif isinstance(item, BackgroundItem):
+            return f"{prefix}_Fundo"
         elif isinstance(item, ImageItem):
             return f"{prefix}_Imagem"
-        if isinstance(item, BackgroundItem):
-            return f"{prefix}_Fundo"
         return f"{prefix}_Objeto"
     
     def _add_separator(self, layout):
