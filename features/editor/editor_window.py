@@ -1703,7 +1703,7 @@ class EditorWindow(QMainWindow):
         selected_layer_ids = set()
         sel = self.scene.selectedItems()
         for s in sel:
-            if hasattr(s, 'layer_id') and s.layer_id is not None:
+            if isinstance(s, (DesignerBox, ImageItem, SignatureItem)) and getattr(s, 'layer_id', None) is not None:
                 selected_layer_ids.add(s.layer_id)
 
         self.scene.clearSelection()
@@ -1897,7 +1897,10 @@ class EditorWindow(QMainWindow):
         # Restaura a seleção múltipla dos itens que estavam ativos
         if selected_layer_ids:
             for item in self.scene.items():
-                if getattr(item, 'layer_id', None) in selected_layer_ids:
+                if (
+                    isinstance(item, (DesignerBox, ImageItem, SignatureItem))
+                    and getattr(item, 'layer_id', None) in selected_layer_ids
+                ):
                     item.setSelected(True)
 
         # Se for um Undo/Redo e o fundo mudou, reaplica o enquadramento (Zoom to Fit)
@@ -2144,9 +2147,10 @@ class EditorWindow(QMainWindow):
         for item in self.scene.items():
             if hasattr(item, 'layer_id') and item.layer_id is not None:
                 used.add(item.layer_id)
-        for i in range(100):
-            if i not in used: return i
-        return 99
+        i = 0
+        while i in used:
+            i += 1
+        return i
 
     def _generate_layer_name(self, layer_id, item):
         if hasattr(item, 'custom_name') and item.custom_name:
