@@ -8,14 +8,27 @@ from pathlib import Path
 class NativeRenderer:
     def __init__(self, template_data: dict):
         self.tpl = template_data
+        self._pixmap_cache = {}
 
     def _load_original_pixmap(self, path) -> QPixmap:
-        reader = QImageReader(str(path))
+        path_str = str(path)
+        # Se o ingrediente já está na bancada, não precisa buscar no estoque (disco)
+        if path_str in self._pixmap_cache:
+            return self._pixmap_cache[path_str]
+            
+        reader = QImageReader(path_str)
         reader.setAutoTransform(True)
         img = reader.read()
+        
+        pix = QPixmap()
         if not img.isNull():
-            return QPixmap.fromImage(img)
-        return QPixmap(str(path))
+            pix = QPixmap.fromImage(img)
+        else:
+            pix = QPixmap(path_str)
+            
+        # Guarda para o próximo hambúrguer
+        self._pixmap_cache[path_str] = pix
+        return pix
 
     def _draw_pixmap_item(self, painter: QPainter, pixmap: QPixmap, x, y, w, h, rotation=0, opacity=1.0) -> QRectF:
         painter.save()

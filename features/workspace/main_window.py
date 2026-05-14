@@ -206,6 +206,7 @@ class MainWindow(QMainWindow):
         self.splitter.setCollapsible(0, False)
 
         self.cached_model_data = None
+        self.preview_renderer = None # Persistência do Renderer para o Live Preview
         
         # Garante que um usuário novato não veja uma tela em branco
         self._ensure_starter_pack()
@@ -717,8 +718,9 @@ class MainWindow(QMainWindow):
                     self._refresh_imposition_presets()
                     
                     try:
-                        renderer = NativeRenderer(data)
-                        preview_pix = renderer.render_to_pixmap(row_rich=None)
+                        # Cria o "Chef" uma única vez ao selecionar o modelo
+                        self.preview_renderer = NativeRenderer(data)
+                        preview_pix = self.preview_renderer.render_to_pixmap(row_rich=None)
                         self.preview_panel.set_preview_pixmap(preview_pix)
                     except Exception as e:
                         self.log_panel.append(f"Erro ao gerar preview: {e}")
@@ -777,8 +779,11 @@ class MainWindow(QMainWindow):
 
         try:
             row_rich = self._get_row_data_rich(row)
-            renderer = NativeRenderer(self.cached_model_data)
-            pix = renderer.render_to_pixmap(row_rich=row_rich)
+            # Reutiliza o renderer existente. O cache de QPixmaps estará pronto aqui.
+            if not self.preview_renderer:
+                self.preview_renderer = NativeRenderer(self.cached_model_data)
+            
+            pix = self.preview_renderer.render_to_pixmap(row_rich=row_rich)
             self.preview_panel.set_preview_pixmap(pix)
         except Exception as e:
             print(f"Erro no Live Preview: {e}")
