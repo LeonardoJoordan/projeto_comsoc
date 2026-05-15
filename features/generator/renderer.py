@@ -8,29 +8,26 @@ from pathlib import Path
 class NativeRenderer:
     def __init__(self, template_data: dict):
         self.tpl = template_data
+        self._image_cache = {}
+        self._static_base_cache = None
         self._pixmap_cache = {}
 
-    def _load_original_pixmap(self, path) -> QPixmap:
+    def _get_image(self, path) -> QImage:
         path_str = str(path)
-        # Se o ingrediente já está na bancada, não precisa buscar no estoque (disco)
-        if path_str in self._pixmap_cache:
-            return self._pixmap_cache[path_str]
+        if path_str in self._image_cache:
+            return self._image_cache[path_str]
             
         reader = QImageReader(path_str)
         reader.setAutoTransform(True)
         img = reader.read()
         
-        pix = QPixmap()
-        if not img.isNull():
-            pix = QPixmap.fromImage(img)
-        else:
-            pix = QPixmap(path_str)
+        if img.isNull():
+            img = QImage(path_str)
             
-        # Guarda para o próximo hambúrguer
-        self._pixmap_cache[path_str] = pix
-        return pix
+        self._image_cache[path_str] = img
+        return img
 
-    def _draw_pixmap_item(self, painter: QPainter, pixmap: QPixmap, x, y, w, h, rotation=0, opacity=1.0) -> QRectF:
+    def _draw_image_item(self, painter: QPainter, img: QImage, x, y, w, h, rotation=0, opacity=1.0) -> QRectF:
         painter.save()
         try:
             painter.setOpacity(opacity)
@@ -40,15 +37,29 @@ class NativeRenderer:
                 painter.translate(center_x, center_y)
                 painter.rotate(rotation)
                 target_rect = QRectF(-w / 2, -h / 2, w, h)
-                painter.drawPixmap(target_rect, pixmap, QRectF(pixmap.rect()))
+                painter.drawImage(target_rect, img, QRectF(img.rect()))
                 return painter.transform().mapRect(target_rect)
 
             target_rect = QRectF(float(x), float(y), w, h)
-            painter.drawPixmap(target_rect, pixmap, QRectF(pixmap.rect()))
+            painter.drawImage(target_rect, img, QRectF(img.rect()))
             return target_rect
         finally:
             painter.restore()
 
+    def pre_render_static_base(self):
+        w = self.tpl["canvas_size"]["w"]
+        h = self.tpl["canvas_size"]["h"]
+        
+        self._static_base_cache = QImage(w, h, QImage.Format_ARGB32)
+        self._static_base_cache.setDotsPerMeterX(3780)
+        self._static_base_cache.setDotsPerMeterY(3780)
+        self._static_base_cache.fill(Qt.GlobalColor.white)
+
+        painter = QPainter(self._static_base_cache)
+        try:
+            self._paint_card(painter, {}, out_links=None, static_only=True)
+        finally:
+            painter.end()
 
     def render_row(self, row_plain: dict, row_rich: dict, out_path: Path, out_links: list = None):
         
@@ -91,18 +102,20 @@ class NativeRenderer:
     
 
     def render_to_qimage(self, row_plain: dict, row_rich: dict, out_links: list = None) -> QImage:
-        
-        w = self.tpl["canvas_size"]["w"]
-        h = self.tpl["canvas_size"]["h"]
-        
-        image = QImage(w, h, QImage.Format_ARGB32)
-        image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
-        image.setDotsPerMeterY(3780)
-        image.fill(Qt.GlobalColor.white)
+        if self._static_base_cache is not None:
+            image = self._static_base_cache.copy()
+        else:
+            w = self.tpl["canvas_size"]["w"]
+            h = self.tpl["canvas_size"]["h"]
+            image = QImage(w, h, QImage.Format_ARGB32)
+            image.setDotsPerMeterX(3780)
+            image.setDotsPerMeterY(3780)
+            image.fill(Qt.GlobalColor.white)
 
         painter = QPainter(image)
         try:
-            self._paint_card(painter, row_rich, out_links)
+            is_dynamic = (self._static_base_cache is not None)
+            self._paint_card(painter, row_rich, out_links, dynamic_only=is_dynamic)
         finally:
             painter.end()
         return image
@@ -115,7 +128,7 @@ class NativeRenderer:
         return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
     
 
-    def _paint_card(self, painter: QPainter, row_rich: dict, out_links: list = None):
+    def _paint_card(self, painter: QPainter, row_rich: dict, out_links: list = None, static_only: bool = False, dynamic_only: bool = False):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
@@ -126,25 +139,27 @@ class NativeRenderer:
         base_font.setStyleStrategy(QFont.StyleStrategy.ForceOutline)
         painter.setFont(base_font)
 
-        if self.tpl.get("background_path"):
+        if not dynamic_only and self.tpl.get("background_path"):
             bg_props = self.tpl.get("bg_props", {})
             if bg_props.get("visible", True):
-                bg = self._load_original_pixmap(self.tpl["background_path"])
+                bg = self._get_image(self.tpl["background_path"])
                 if not bg.isNull():
                     w = bg_props.get("w", self.tpl["canvas_size"]["w"])
                     h = bg_props.get("h", self.tpl["canvas_size"]["h"])
                     x = bg_props.get("x", 0)
                     y = bg_props.get("y", 0)
                     
-                    scaled_bg = bg.scaled(w, h, Qt.AspectRatioMode.IgnoreAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                    
                     painter.setOpacity(bg_props.get("opacity", 1.0))
-                    painter.drawPixmap(QPointF(float(x), float(y)), scaled_bg)
+                    painter.drawImage(QRectF(float(x), float(y), w, h), bg, QRectF(bg.rect()))
                     painter.setOpacity(1.0)
 
         for img in self.tpl.get("images", []):
             if not img.get("visible", True):
                 continue
+
+            is_linked = bool(img.get("has_link") and img.get("link_key"))
+            if static_only and is_linked: continue
+            if dynamic_only and not is_linked: continue
             
             raw_path = img.get("path", "")
             img_path = Path(raw_path)
@@ -171,12 +186,12 @@ class NativeRenderer:
                             img_path = alt_path
 
             if img_path.exists():
-                pix = self._load_original_pixmap(img_path)
+                pix = self._get_image(img_path)
                 w, h = img.get("width", 0), img.get("height", 0)
                 
                 # Blindagem contra corrompimento de QImage/QPixmap ou dimensões ausentes
                 if not pix.isNull() and w > 0 and h > 0:
-                    rect = self._draw_pixmap_item(
+                    rect = self._draw_image_item(
                         painter,
                         pix,
                         float(img.get("x", 0)),
@@ -228,6 +243,9 @@ class NativeRenderer:
             optional_block_pattern = r"\|([^|]*\{[a-zA-Z0-9_]+\}[^|]*)\|"
 
             return re.sub(optional_block_pattern, replace_optional_block, html_text)
+        
+        if static_only:
+            return  # Caixas de texto e assinaturas são exclusivamente dinâmicas
 
         for box in self.tpl.get("boxes", []):
             if not box.get("visible", True):
@@ -272,9 +290,9 @@ class NativeRenderer:
                 continue
 
             if Path(sig["path"]).exists():
-                pix = self._load_original_pixmap(sig["path"])
+                pix = self._get_image(sig["path"])
                 if not pix.isNull():
-                    self._draw_pixmap_item(
+                    self._draw_image_item(
                         painter,
                         pix,
                         float(sig.get("x", 0)),

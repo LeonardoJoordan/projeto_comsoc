@@ -70,6 +70,9 @@ class RenderManager(QObject):
                 
             all_tasks_data.append( (i, self.rows_plain[i], self.rows_rich[i], fname) )
 
+        # Gera a base estática de forma síncrona na Thread Principal antes de acionar os Workers
+        self.renderer.pre_render_static_base()
+
         if self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
         else:
