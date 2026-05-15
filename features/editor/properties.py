@@ -315,21 +315,15 @@ class CaixaDeTextoPanel(QWidget):
             QPushButton:disabled { color: #555555; }
         """
 
-    def _proportion_button_style(self, warning: bool):
-        if not warning:
-            return self._tool_button_style()
-
-        return f"""
-            QPushButton {{
-                background-color: {self.PROPORTION_OFF_BACKGROUND};
-                border: none;
-                border-radius: 4px;
-                font-size: 16px;
-            }}
-            QPushButton:hover {{ background-color: {self.PROPORTION_OFF_HOVER_BACKGROUND}; }}
-            QPushButton:pressed {{ background-color: rgba(220, 53, 69, 160); }}
-            QPushButton:disabled {{ color: #555555; }}
-        """
+    def _proportion_button_style(self, active: bool):
+        if active:
+            return """
+                QPushButton { background-color: #3a3a3a; border: 1px solid #555555; font-size: 16px; border-radius: 4px; }
+                QPushButton:hover { background-color: #444444; }
+                QPushButton:pressed { background-color: #222222; }
+                QPushButton:disabled { color: #555555; }
+            """
+        return self._tool_button_style()
 
     def _make_tool_button(self, text, tooltip="", checkable=False):
         btn = QPushButton(text)
@@ -375,14 +369,17 @@ class CaixaDeTextoPanel(QWidget):
             self._set_widget_available(widget, available, enabled_opacity)
 
     def _refresh_proportion_button(self, available: bool):
+        checked = self.chk_proporcao.isChecked()
         self.chk_proporcao.setEnabled(available)
         self.chk_proporcao.setStyleSheet(
-            self._proportion_button_style(available and not self.chk_proporcao.isChecked())
+            self._proportion_button_style(available and checked)
         )
-        if available:
-            opacity = self.ENABLED_OPACITY
-        else:
+        if not available:
             opacity = self.DISABLED_OPACITY
+        elif not checked:
+            opacity = 0.2
+        else:
+            opacity = self.ENABLED_OPACITY
         self.op_proporcao.setOpacity(opacity)
 
     def _set_size_controls_available(self, available: bool):

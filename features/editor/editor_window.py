@@ -7,7 +7,7 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidg
                                QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton,
                                QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
-                               QFileDialog, QGraphicsOpacityEffect, QFormLayout)
+                               QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap)
 from PySide6.QtCore import Qt, Signal, QEvent, QRectF
@@ -274,6 +274,7 @@ class EditorWindow(QMainWindow):
 
         # --- Container Superior Misto (Dimensões e Posição) ---
         container_sup = QWidget()
+        self.container_sup = container_sup
         layout_sup = QHBoxLayout(container_sup)
         layout_sup.setContentsMargins(0, 0, 0, 0)
         layout_sup.setSpacing(10)
@@ -333,31 +334,84 @@ class EditorWindow(QMainWindow):
             "<small style='color: #A0A0A0;'>Dica: Ao carregar uma imagem de fundo (Background), o documento se ajustará sozinho às proporções dela.</small>")
         ly_dim.addWidget(lbl_dim)
         
-        form_dim = QFormLayout()
-        form_dim.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        
+        doc_size_row = QHBoxLayout()
+        doc_size_row.setContentsMargins(0, 0, 0, 0)
+        doc_size_row.setSpacing(6)
+
+        doc_size_grid = QGridLayout()
+        doc_size_grid.setContentsMargins(0, 0, 0, 0)
+        doc_size_grid.setHorizontalSpacing(6)
+        doc_size_grid.setVerticalSpacing(4)
+
         self.spin_phys_w = MathDoubleSpinBox()
-        self.spin_phys_w.setRange(10, 1000)
+        self.spin_phys_w.setRange(10.0, 1000.0)
         self.spin_phys_w.setDecimals(1)
         self.spin_phys_w.setKeyboardTracking(False)
-        self.spin_phys_w.setValue(148.0) 
-        
+        self.spin_phys_w.setValue(148.0)
+
         self.spin_phys_h = MathDoubleSpinBox()
-        self.spin_phys_h.setRange(10, 1000)
+        self.spin_phys_h.setRange(10.0, 1000.0)
         self.spin_phys_h.setDecimals(1)
         self.spin_phys_h.setKeyboardTracking(False)
-        self.spin_phys_h.setValue(105.0) 
+        self.spin_phys_h.setValue(105.0)
+
+        doc_size_grid.addWidget(QLabel("Larg:"), 0, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        doc_size_grid.addWidget(self.spin_phys_w, 0, 1)
+        doc_size_grid.addWidget(QLabel("Alt:"), 1, 0, alignment=Qt.AlignmentFlag.AlignRight)
+        doc_size_grid.addWidget(self.spin_phys_h, 1, 1)
+        doc_size_grid.setColumnStretch(1, 1)
+
+        doc_size_buttons = QVBoxLayout()
+        doc_size_buttons.setContentsMargins(0, 0, 0, 0)
+        doc_size_buttons.setSpacing(4)
+
+        btn_icon_style = """
+            QPushButton { background-color: transparent; border: none; font-size: 16px; border-radius: 4px; }
+            QPushButton:hover { background-color: #444444; }
+            QPushButton:pressed { background-color: #222222; }
+            QPushButton:disabled { color: #555555; }
+        """
+
+        self.chk_doc_proporcao = QPushButton("🔗")
+        self.chk_doc_proporcao.setFixedSize(26, 26)
+        self.chk_doc_proporcao.setCheckable(True)
+        self.chk_doc_proporcao.setChecked(True)
+        self.chk_doc_proporcao.setStyleSheet(btn_icon_style)
+        self._apply_tooltip(self.chk_doc_proporcao, "<b>MANTER PROPORÇÃO</b><br><br>Preserva a relação entre largura e altura do documento.")
         
-        form_dim.addRow("Larg:", self.spin_phys_w)
-        form_dim.addRow("Alt:", self.spin_phys_h)
-        ly_dim.addLayout(form_dim)
+        self.op_doc_proporcao = QGraphicsOpacityEffect(self.chk_doc_proporcao)
+        self.chk_doc_proporcao.setGraphicsEffect(self.op_doc_proporcao)
+        self.op_doc_proporcao.setOpacity(1.0)
+        self.chk_doc_proporcao.toggled.connect(self._on_doc_proportion_toggled)
+        self._refresh_doc_proportion_button()
+
+        self.btn_fit_bg = QPushButton("🖼️")
+        self.btn_fit_bg.setFixedSize(26, 26)
+        self.btn_fit_bg.setStyleSheet(btn_icon_style)
+        self._apply_tooltip(self.btn_fit_bg, "<b>PREENCHER COM FUNDO</b><br><br>Redimensiona o fundo atual para cobrir todo o documento, centralizando o corte.")
+        self.btn_fit_bg.clicked.connect(self._fit_background_to_doc)
+
+        doc_size_buttons.addWidget(self.chk_doc_proporcao)
+        doc_size_buttons.addWidget(self.btn_fit_bg)
+        doc_size_buttons.addStretch()
+
+        doc_size_row.addLayout(doc_size_grid, 1)
+        doc_size_row.addLayout(doc_size_buttons)
+        ly_dim.addLayout(doc_size_row)
+
+        self._doc_aspect_ratio = 148.0 / 105.0
         layout_sup.addWidget(col_dim, 1)
 
+        container_sup.setSizePolicy(
+            container_sup.sizePolicy().horizontalPolicy(),
+            __import__('PySide6.QtWidgets', fromlist=['QSizePolicy']).QSizePolicy.Policy.Fixed
+        )
+        container_sup.setFixedHeight(container_sup.sizeHint().height())
         right_layout.addWidget(container_sup)
 
         # Conexões de Sinais
-        self.spin_phys_w.valueChanged.connect(self._on_physical_size_changed)
-        self.spin_phys_h.valueChanged.connect(self._on_physical_size_changed)
+        self.spin_phys_w.valueChanged.connect(self._on_doc_w_changed)
+        self.spin_phys_h.valueChanged.connect(self._on_doc_h_changed)
         self.spin_phys_w.editingFinished.connect(self.save_snapshot)
         self.spin_phys_h.editingFinished.connect(self.save_snapshot)
         
@@ -514,6 +568,7 @@ class EditorWindow(QMainWindow):
     def showEvent(self, event):
         super().showEvent(event)
         self._zoom_to_fit()
+        self.container_sup.setFixedHeight(self.container_sup.sizeHint().height())
 
     def _state_item_sort_key(self, item):
         """Chave estável para comparar estados recriados via undo/redo."""
@@ -1225,6 +1280,78 @@ class EditorWindow(QMainWindow):
             self.caixa_texto_panel.clear_selection_state()
             self.caixa_texto_panel.setEnabled(False)
 
+    _DOC_PROPORTION_OFF_BG      = "rgba(220, 53, 69, 102)"
+    _DOC_PROPORTION_OFF_HOVER   = "rgba(220, 53, 69, 130)"
+
+    def _doc_proportion_button_style(self, active: bool):
+        if active:
+            return """
+                QPushButton { background-color: #3a3a3a; border: 1px solid #555555; font-size: 16px; border-radius: 4px; }
+                QPushButton:hover { background-color: #444444; }
+                QPushButton:pressed { background-color: #222222; }
+                QPushButton:disabled { color: #555555; }
+            """
+        return """
+            QPushButton { background-color: transparent; border: none; font-size: 16px; border-radius: 4px; }
+            QPushButton:hover { background-color: #444444; }
+            QPushButton:pressed { background-color: #222222; }
+            QPushButton:disabled { color: #555555; }
+        """
+
+    def _refresh_doc_proportion_button(self):
+        checked = self.chk_doc_proporcao.isChecked()
+        self.chk_doc_proporcao.setStyleSheet(self._doc_proportion_button_style(checked))
+        self.op_doc_proporcao.setOpacity(1.0 if checked else 0.2)
+
+    def _on_doc_proportion_toggled(self, checked):
+        self._refresh_doc_proportion_button()
+        if checked:
+            h = self.spin_phys_h.value()
+            self._doc_aspect_ratio = self.spin_phys_w.value() / h if h > 0 else 1.0
+
+    def _on_doc_w_changed(self, val):
+        if self.chk_doc_proporcao.isChecked() and self._doc_aspect_ratio > 0:
+            new_h = val / self._doc_aspect_ratio
+            self.spin_phys_h.blockSignals(True)
+            self.spin_phys_h.setValue(new_h)
+            self.spin_phys_h.blockSignals(False)
+        self._on_physical_size_changed()
+
+    def _on_doc_h_changed(self, val):
+        if self.chk_doc_proporcao.isChecked() and self._doc_aspect_ratio > 0:
+            new_w = val * self._doc_aspect_ratio
+            self.spin_phys_w.blockSignals(True)
+            self.spin_phys_w.setValue(new_w)
+            self.spin_phys_w.blockSignals(False)
+        self._on_physical_size_changed()
+
+    def _fit_background_to_doc(self):
+        if not getattr(self, 'background_path', None) or not self.bg_item:
+            QMessageBox.information(self, "Sem fundo", "Nenhum arquivo de imagem de fundo carregado para ajustar.")
+            return
+
+        doc_w_px = mm_to_px(self.spin_phys_w.value())
+        doc_h_px = mm_to_px(self.spin_phys_h.value())
+
+        scale_w = doc_w_px / self.bg_item._logical_w
+        scale_h = doc_h_px / self.bg_item._logical_h
+        
+        # Preenchimento total (cover)
+        scale_cover = max(scale_w, scale_h)
+        
+        new_w = self.bg_item._logical_w * scale_cover
+        new_h = self.bg_item._logical_h * scale_cover
+        
+        self.bg_item.resize_custom(new_w, new_h)
+        
+        # Centralizar o excedente (Bleed)
+        center_x = (doc_w_px - new_w) / 2.0
+        center_y = (doc_h_px - new_h) / 2.0
+        self.bg_item.setPos(center_x, center_y)
+        
+        self.update_position_ui()
+        self.save_snapshot()
+
     def _on_physical_size_changed(self, _=None):
         """Redimensiona APENAS a prancheta (papel branco). A imagem de fundo agora é livre."""
         if not hasattr(self, 'scene'): return
@@ -1676,7 +1803,9 @@ class EditorWindow(QMainWindow):
             "boxes": boxes_data,
             "guidelines": guidelines_data,
             "guidelines_locked": self.btn_lock_guides.isChecked(),
-            "guidelines_visible": self.btn_toggle_guides.isChecked()
+            "guidelines_visible": self.btn_toggle_guides.isChecked(),
+            "doc_proportion_locked": self.chk_doc_proporcao.isChecked(),
+            "doc_aspect_ratio": self._doc_aspect_ratio
         }
         
         if self.bg_item and isinstance(self.bg_item, BackgroundItem):
@@ -1723,6 +1852,13 @@ class EditorWindow(QMainWindow):
         self.spin_phys_h.setValue(data.get("target_h_mm", 150.0))
         self.spin_phys_w.blockSignals(False)
         self.spin_phys_h.blockSignals(False)
+
+        proportion_locked = data.get("doc_proportion_locked", False)
+        self.chk_doc_proporcao.blockSignals(True)
+        self.chk_doc_proporcao.setChecked(proportion_locked)
+        self.chk_doc_proporcao.blockSignals(False)
+        self._doc_aspect_ratio = data.get("doc_aspect_ratio", self._doc_aspect_ratio)
+        self._refresh_doc_proportion_button()
         
         self.fallback_bg = self.scene.addRect(0, 0, canvas_w, canvas_h, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
         self.fallback_bg.setZValue(-200)
