@@ -164,15 +164,21 @@ class RichTableWidget(QTableWidget):
         md = QApplication.clipboard().mimeData()
         if not md: return
 
-        text_raw = md.text() if md.hasText() else ""
-        grid_struct = parse_tsv(text_raw)
-        
+        grid_struct = []
         grid_style = []
+
         if md.hasHtml():
             try:
-                grid_style = parse_clipboard_html_table(md.html())
+                parsed = parse_clipboard_html_table(md.html())
+                if parsed:
+                    grid_struct = parsed
+                    grid_style = parsed
             except Exception:
-                grid_style = []
+                pass
+
+        if not grid_struct:
+            text_raw = md.text() if md.hasText() else ""
+            grid_struct = parse_tsv(text_raw)
 
         if not grid_struct: return
 
@@ -185,7 +191,7 @@ class RichTableWidget(QTableWidget):
         
         if is_single_cell and len(selected_indexes) > 1:
             val_plain = grid_struct[0][0].plain
-            val_rich = grid_style[0][0].rich_html if (grid_style and len(grid_style) > 0 and len(grid_style[0]) > 0) else val_plain
+            val_rich = grid_style[0][0].rich_html if (grid_style and len(grid_style) > 0 and len(grid_style[0]) > 0) else grid_struct[0][0].rich_html
             
             affected_cols_logical = set()
             for idx in selected_indexes:
@@ -252,15 +258,6 @@ class RichTableWidget(QTableWidget):
                     self.setItem(dest_row, 0, qty_item)
 
             # 2. Garante a inicialização da Coluna Assinatura (Index 1)
-            # 1. Garante a inicialização da Coluna Qtd (Index 0)
-            if has_qty_col:
-                qty_item = self.item(dest_row, 0)
-                if qty_item is None:
-                    qty_item = QTableWidgetItem("1")
-                    qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    self.setItem(dest_row, 0, qty_item)
-
-            # 2. Garante a inicialização da Coluna Assinatura (Index 1)
             if has_sig_col:
                 sig_item = self.item(dest_row, 1)
                 if sig_item is None:
@@ -292,7 +289,7 @@ class RichTableWidget(QTableWidget):
                     rich_val = style_row[c].rich_html
                     item.setData(self.RICH_ROLE, rich_val)
                 else:
-                    item.setData(self.RICH_ROLE, txt_val)
+                    item.setData(self.RICH_ROLE, cell_plain.rich_html)
 
                 affected_cols_logical.add(dest_col_logical)
 

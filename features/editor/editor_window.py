@@ -345,13 +345,13 @@ class EditorWindow(QMainWindow):
 
         self.spin_phys_w = MathDoubleSpinBox()
         self.spin_phys_w.setRange(10.0, 1000.0)
-        self.spin_phys_w.setDecimals(1)
+        self.spin_phys_w.setDecimals(2)
         self.spin_phys_w.setKeyboardTracking(False)
         self.spin_phys_w.setValue(148.0)
 
         self.spin_phys_h = MathDoubleSpinBox()
         self.spin_phys_h.setRange(10.0, 1000.0)
-        self.spin_phys_h.setDecimals(1)
+        self.spin_phys_h.setDecimals(2)
         self.spin_phys_h.setKeyboardTracking(False)
         self.spin_phys_h.setValue(105.0)
 
