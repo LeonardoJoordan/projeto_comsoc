@@ -30,6 +30,8 @@ from core.paths import get_models_dir
 
 
 class MainWindow(QMainWindow):
+    SYSTEM_IMPOSITION_PRESET = "Definição do Modelo"
+
     def _apply_tooltip(self, widget, text):
             """Aplica tooltip e garante que labels estáticos capturem o evento no motor customizado."""
             if isinstance(widget, QLabel):
@@ -827,11 +829,13 @@ class MainWindow(QMainWindow):
         
         current_imposition = None
         model_size = (1000, 1000) 
+        model_print_size_mm = (100.0, 100.0)
         has_any_link = False
 
         if self.cached_model_data:
             sz = self.cached_model_data.get("canvas_size", {})
             model_size = (sz.get("w", 1000), sz.get("h", 1000))
+            model_print_size_mm = self._get_model_base_print_size_mm()
             current_imposition = self.cached_model_data.get("imposition_settings") 
             has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", [])))
 
@@ -840,6 +844,7 @@ class MainWindow(QMainWindow):
         
         dlg = ConfigDialog(self, slug, vars_available, self.current_filename_suffix, 
                            model_size_px=model_size, 
+                           model_print_size_mm=model_print_size_mm,
                            current_imposition=current_imposition,
                            is_dark=is_dark_now)
         
@@ -1004,6 +1009,47 @@ class MainWindow(QMainWindow):
             row_data[key] = val
         return row_data
 
+    def _get_model_base_print_size_mm(self, model_data: dict = None):
+        """Retorna o tamanho físico próprio do modelo, sem presets de impressão."""
+        data = model_data or self.cached_model_data or {}
+
+        w = data.get("target_w_mm", 0) or 0
+        h = data.get("target_h_mm", 0) or 0
+        if w > 0 and h > 0:
+            return float(w), float(h)
+
+        canvas = data.get("canvas_size", {})
+        canvas_w = canvas.get("w", 1000)
+        canvas_h = canvas.get("h", 1000)
+        return (canvas_w / 300.0) * 25.4, (canvas_h / 300.0) * 25.4
+
+    def _resolve_imposition_settings(self):
+        """Resolve a configuração efetiva sem deixar presets contaminarem o modelo base."""
+        base_w, base_h = self._get_model_base_print_size_mm()
+        imp = (self.cached_model_data or {}).get("imposition_settings", {}) or {}
+        presets = imp.get("presets", {}) or {}
+        active_name = imp.get("active_preset_name") or self.SYSTEM_IMPOSITION_PRESET
+
+        if active_name == self.SYSTEM_IMPOSITION_PRESET or active_name not in presets:
+            return {
+                "enabled": False,
+                "target_w_mm": base_w,
+                "target_h_mm": base_h,
+                "active_preset_name": self.SYSTEM_IMPOSITION_PRESET,
+            }
+
+        preset = presets[active_name]
+        return {
+            "enabled": preset.get("enabled", False),
+            "sheet_w_mm": preset.get("sheet_w", 210.0),
+            "sheet_h_mm": preset.get("sheet_h", 297.0),
+            "crop_marks": preset.get("crop", True),
+            "bleed_margin": preset.get("bleed", True),
+            "target_w_mm": preset.get("w", base_w),
+            "target_h_mm": preset.get("h", base_h),
+            "active_preset_name": active_name,
+        }
+
     def _generate_cards_async(self):
         rows_plain, rows_rich = self._scrape_table_data()
         if not rows_plain:
@@ -1077,7 +1123,8 @@ class MainWindow(QMainWindow):
         # Se estiver vazio, usamos {modelo} como fallback padrão.
         full_pattern = self.current_filename_suffix if self.current_filename_suffix else "{modelo}"
 
-        imposition_cfg = self.cached_model_data.get("imposition_settings", None)
+        imposition_cfg = self._resolve_imposition_settings()
+        model_w_mm, model_h_mm = self._get_model_base_print_size_mm()
         export_format = self.cbo_export_format.currentText()
         is_single_pdf = self.chk_single_pdf.isChecked() and export_format == "PDF"
 
@@ -1090,8 +1137,8 @@ class MainWindow(QMainWindow):
             imposition_settings=imposition_cfg,
             export_format=export_format,
             single_pdf=is_single_pdf,
-            target_w_mm=self.cached_model_data.get("target_w_mm", 100.0),
-            target_h_mm=self.cached_model_data.get("target_h_mm", 150.0)
+            target_w_mm=model_w_mm,
+            target_h_mm=model_h_mm
         )
         
         self.manager.progress_updated.connect(self.progress_bar.setValue)
@@ -1120,7 +1167,7 @@ class MainWindow(QMainWindow):
         
     def _refresh_imposition_presets(self):
         """Atualiza a lista de presets rápidos na tela principal baseada no modelo atual."""
-        SYSTEM_PRESET = "Definição do Modelo"
+        SYSTEM_PRESET = self.SYSTEM_IMPOSITION_PRESET
         
         self.cbo_presets_main.blockSignals(True)
         self.cbo_presets_main.clear()
@@ -1130,8 +1177,8 @@ class MainWindow(QMainWindow):
         self.cbo_presets_main.setEnabled(True)
 
         if self.cached_model_data:
-            imp_settings = self.cached_model_data.get("imposition_settings", {})
-            presets = imp_settings.get("presets", {})
+            imp_settings = self.cached_model_data.setdefault("imposition_settings", {})
+            presets = imp_settings.get("presets", {}) or {}
             active_name = imp_settings.get("active_preset_name", "")
 
             user_presets = sorted(k for k in presets.keys() if k != SYSTEM_PRESET)
@@ -1145,14 +1192,21 @@ class MainWindow(QMainWindow):
                     self.cbo_presets_main.setCurrentIndex(idx)
                 else:
                     self.cbo_presets_main.setCurrentIndex(0)
+                    imp_settings["active_preset_name"] = SYSTEM_PRESET
+                    imp_settings["enabled"] = False
+                    self._update_template_json({"imposition_settings": imp_settings})
             else:
                 self.cbo_presets_main.setCurrentIndex(0)
+                if active_name != SYSTEM_PRESET:
+                    imp_settings["active_preset_name"] = SYSTEM_PRESET
+                    imp_settings["enabled"] = False
+                    self._update_template_json({"imposition_settings": imp_settings})
 
         self.cbo_presets_main.blockSignals(False)
 
     def _on_main_preset_changed(self, index):
-        """Aplica instantaneamente as configurações do preset selecionado ao cache de memória."""
-        SYSTEM_PRESET = "Definição do Modelo"
+        """Atualiza qual predefinição será usada, sem sobrescrever o modelo base."""
+        SYSTEM_PRESET = self.SYSTEM_IMPOSITION_PRESET
         if not self.cached_model_data or index < 0: return
         
         name = self.cbo_presets_main.itemText(index)
@@ -1160,26 +1214,15 @@ class MainWindow(QMainWindow):
         imp = self.cached_model_data.setdefault("imposition_settings", {})
 
         if name == SYSTEM_PRESET:
-            # Preset de sistema: desativa imposição, mantém demais configs intactas
             imp["enabled"] = False
             imp["active_preset_name"] = SYSTEM_PRESET
             self._update_template_json({"imposition_settings": imp})
             self.log_panel.append(f"⚡ Layout aplicado: <b>{SYSTEM_PRESET}</b>")
             return
 
-        presets = imp.get("presets", {})
-        data = presets.get(name)
-        
-        if data:
-            imp["sheet_w_mm"] = data.get("sheet_w", 210.0)
-            imp["sheet_h_mm"] = data.get("sheet_h", 297.0)
-            imp["enabled"] = data.get("enabled", False)
-            imp["target_w_mm"] = data.get("w", 100.0)
-            imp["target_h_mm"] = data.get("h", 150.0)
-            imp["crop_marks"] = data.get("crop", True)
-            imp["bleed_margin"] = data.get("bleed", True)
+        presets = imp.get("presets", {}) or {}
+        if name in presets:
             imp["active_preset_name"] = name
-            
             self._update_template_json({"imposition_settings": imp})
             self.log_panel.append(f"⚡ Layout aplicado: <b>{name}</b>")
     

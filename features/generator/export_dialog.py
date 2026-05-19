@@ -9,6 +9,7 @@ from .imposition import SheetAssembler
 class ConfigDialog(QDialog):
     def __init__(self, parent, model_slug: str, available_vars: list[str], 
                  current_pattern: str = "", model_size_px: tuple[int, int] = (1000, 1000),
+                 model_print_size_mm: tuple[float, float] = None,
                  current_imposition: dict = None, is_dark: bool = True):
         super().__init__(parent)
         self.setWindowTitle("Configurações Gerais")
@@ -17,7 +18,13 @@ class ConfigDialog(QDialog):
         self.model_slug = model_slug
         self.result_pattern = current_pattern
         self.model_w, self.model_h = model_size_px
-        self.ratio = self.model_w / self.model_h if self.model_h > 0 else 1.0
+        fallback_w_mm = (self.model_w / 300.0) * 25.4
+        fallback_h_mm = (self.model_h / 300.0) * 25.4
+        if model_print_size_mm and model_print_size_mm[0] > 0 and model_print_size_mm[1] > 0:
+            self.model_print_w_mm, self.model_print_h_mm = model_print_size_mm
+        else:
+            self.model_print_w_mm, self.model_print_h_mm = fallback_w_mm, fallback_h_mm
+        self.ratio = self.model_print_w_mm / self.model_print_h_mm if self.model_print_h_mm > 0 else 1.0
         
         self.imposition_settings = current_imposition or {
             "enabled": False, "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
@@ -25,8 +32,11 @@ class ConfigDialog(QDialog):
             "presets": {}, "active_preset_name": ""
         }
         self._original_enabled = self.imposition_settings.get("enabled", False)
-        self.presets = self.imposition_settings.get("presets", {})
-        self.active_preset_name = self.imposition_settings.get("active_preset_name", "")
+        self.presets = self.imposition_settings.get("presets", {}) or {}
+        self.active_preset_name = self.imposition_settings.get("active_preset_name", "") or self.SYSTEM_PRESET_NAME
+        if self.active_preset_name not in self.presets:
+            self.active_preset_name = self.SYSTEM_PRESET_NAME
+        initial_print = self._settings_for_active_preset()
         self.current_is_dark = is_dark
 
         main_layout = QVBoxLayout(self)
@@ -149,7 +159,7 @@ class ConfigDialog(QDialog):
         ly_print.addSpacing(10) # Respiro visual
         
         self.chk_imposition = QCheckBox("Habilitar múltiplos itens por página")
-        self.chk_imposition.setChecked(self.imposition_settings.get("enabled", False))
+        self.chk_imposition.setChecked(initial_print["enabled"])
         self.chk_imposition.setToolTip(
             "<b>MÚLTIPLOS ITENS POR PÁGINA (AGRUPAMENTO)</b><br><br>"
             "Organiza automaticamente vários exemplares do seu modelo dentro da mesma folha de saída.<br><br>"
@@ -183,12 +193,12 @@ class ConfigDialog(QDialog):
         self.spin_sheet_w_mm.setRange(50, 2000)
         self.spin_sheet_w_mm.setSuffix(" mm")
         self.spin_sheet_w_mm.setDecimals(2)
-        self.spin_sheet_w_mm.setValue(self.imposition_settings.get("sheet_w_mm", 210.0))
+        self.spin_sheet_w_mm.setValue(initial_print["sheet_w"])
         self.spin_sheet_h_mm = QDoubleSpinBox()
         self.spin_sheet_h_mm.setRange(50, 2000)
         self.spin_sheet_h_mm.setSuffix(" mm")
         self.spin_sheet_h_mm.setDecimals(2)
-        self.spin_sheet_h_mm.setValue(self.imposition_settings.get("sheet_h_mm", 297.0))
+        self.spin_sheet_h_mm.setValue(initial_print["sheet_h"])
         ly_sheet.addWidget(self.spin_sheet_w_mm)
         ly_sheet.addWidget(QLabel("x"))
         ly_sheet.addWidget(self.spin_sheet_h_mm)
@@ -219,15 +229,8 @@ class ConfigDialog(QDialog):
         self.spin_h_mm.setSuffix(" mm")
         self.spin_h_mm.setDecimals(2)
 
-        saved_w = self.imposition_settings.get("target_w_mm", 0)
-        if saved_w > 0:
-            self.spin_w_mm.setValue(saved_w)
-            self.spin_h_mm.setValue(saved_w / self.ratio)
-        else:
-            default_w_mm = (self.model_w / 300.0) * 25.4
-            default_h_mm = (self.model_h / 300.0) * 25.4
-            self.spin_w_mm.setValue(default_w_mm)
-            self.spin_h_mm.setValue(default_h_mm)
+        self.spin_w_mm.setValue(initial_print["w"])
+        self.spin_h_mm.setValue(initial_print["h"])
 
         self.spin_w_mm.valueChanged.connect(self._on_width_changed)
         self.spin_h_mm.valueChanged.connect(self._on_height_changed)
@@ -244,7 +247,7 @@ class ConfigDialog(QDialog):
         ly_imp.addWidget(self.lbl_capacity)
 
         self.chk_crop_marks = QCheckBox("Habilitar marcas de corte")
-        self.chk_crop_marks.setChecked(self.imposition_settings.get("crop_marks", True))
+        self.chk_crop_marks.setChecked(initial_print["crop"])
         self.chk_crop_marks.setToolTip(
             "<b>MARCAS DE CORTE</b><br><br>"
             "Adiciona pequenas guias visuais nos cantos de cada item na folha impressa.<br><br>"
@@ -252,7 +255,7 @@ class ConfigDialog(QDialog):
         )
         ly_imp.addWidget(self.chk_crop_marks)
         self.chk_bleed = QCheckBox("Habilitar margem de sangria")
-        self.chk_bleed.setChecked(self.imposition_settings.get("bleed_margin", True))
+        self.chk_bleed.setChecked(initial_print["bleed"])
         self.chk_bleed.setToolTip(
             "<b>MARGEM DE SANGRIA</b><br><br>"
             "Reserva um espaço extra (5mm) ao redor dos itens na folha.<br><br>"
@@ -328,6 +331,44 @@ class ConfigDialog(QDialog):
             "presets": self.presets,
             "active_preset_name": self.active_preset_name
         }
+
+    def _settings_for_active_preset(self):
+        """Retorna os valores iniciais da UI sem contaminar a definição do modelo."""
+        base = {
+            "enabled": False,
+            "sheet_w": 210.0,
+            "sheet_h": 297.0,
+            "w": self.model_print_w_mm,
+            "h": self.model_print_h_mm,
+            "crop": True,
+            "bleed": True,
+        }
+
+        if self.active_preset_name == self.SYSTEM_PRESET_NAME:
+            return base
+
+        preset = self.presets.get(self.active_preset_name)
+        if not preset:
+            self.active_preset_name = self.SYSTEM_PRESET_NAME
+            return base
+
+        return {
+            "enabled": preset.get("enabled", False),
+            "sheet_w": preset.get("sheet_w", base["sheet_w"]),
+            "sheet_h": preset.get("sheet_h", base["sheet_h"]),
+            "w": preset.get("w", base["w"]) or base["w"],
+            "h": preset.get("h", base["h"]) or base["h"],
+            "crop": preset.get("crop", True),
+            "bleed": preset.get("bleed", True),
+        }
+
+    def _set_model_print_size_controls(self):
+        self.spin_w_mm.blockSignals(True)
+        self.spin_h_mm.blockSignals(True)
+        self.spin_w_mm.setValue(self.model_print_w_mm)
+        self.spin_h_mm.setValue(self.model_print_h_mm)
+        self.spin_w_mm.blockSignals(False)
+        self.spin_h_mm.blockSignals(False)
 
     def _update_capacity_preview(self):
         """Calcula dinamicamente quantos itens cabem e valida se o modelo cabe na folha."""
@@ -421,6 +462,11 @@ class ConfigDialog(QDialog):
 
         if name == self.SYSTEM_PRESET_NAME:
             self.chk_imposition.setChecked(False)
+            self.spin_sheet_w_mm.setValue(210.0)
+            self.spin_sheet_h_mm.setValue(297.0)
+            self._set_model_print_size_controls()
+            self.chk_crop_marks.setChecked(True)
+            self.chk_bleed.setChecked(True)
             self.active_preset_name = self.SYSTEM_PRESET_NAME
             self.btn_rename_preset.setEnabled(False)
             self.btn_del_preset.setEnabled(False)
@@ -505,6 +551,8 @@ class ConfigDialog(QDialog):
     def _toggle_imposition_ui(self, enabled):
         self.container_imposition.setVisible(enabled)
         if enabled:
+            if self.active_preset_name == self.SYSTEM_PRESET_NAME:
+                self._set_model_print_size_controls()
             self.lbl_imposition_hint.setText("⚙️ Configure a folha e as dimensões do modelo para um resultado preciso.")
             self.lbl_imposition_hint.setStyleSheet("color: #e67e22; font-style: italic; padding-left: 4px;")
         else:
