@@ -1060,8 +1060,8 @@ class MainWindow(QMainWindow):
         base_dir = Path(custom_path)
         self.settings.setValue("last_output_dir", custom_path)
 
-        timestamp = datetime.now().strftime("%y.%m.%d_%H.%M.%S")
-        folder_name = f"Lote_{timestamp}"
+        timestamp = datetime.now().strftime("%y.%m.%d-%H.%M.%S")
+        folder_name = f"Projeto COMSOC_{timestamp}"
         
         output_dir = base_dir / folder_name
         output_dir.mkdir(parents=True, exist_ok=True)
