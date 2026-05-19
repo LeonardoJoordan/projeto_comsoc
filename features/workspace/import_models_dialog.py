@@ -5,13 +5,14 @@ from PySide6.QtCore import Qt
 from core.template_manager import slugify_model_name
 
 class ImportModelsDialog(QDialog):
-    def __init__(self, parent, zip_models, existing_slugs):
+    def __init__(self, parent, zip_models, existing_slugs, missing_fonts_by_model=None):
         super().__init__(parent)
         self.setWindowTitle("Importação de Lote")
-        self.resize(750, 500)
+        self.resize(900, 500)
         
         self.zip_models = zip_models
         self.existing_slugs = existing_slugs
+        self.missing_fonts_by_model = missing_fonts_by_model or {}
         self.decisions = {}
         
         layout = QVBoxLayout(self)
@@ -39,8 +40,8 @@ class ImportModelsDialog(QDialog):
         layout.addLayout(top_layout)
         
         # --- Tabela Central ---
-        self.table = QTableWidget(len(zip_models), 4)
-        self.table.setHorizontalHeaderLabels(["Importar", "Modelo no ZIP", "Status", "Resolução de Conflito"])
+        self.table = QTableWidget(len(zip_models), 5)
+        self.table.setHorizontalHeaderLabels(["Importar", "Modelo no ZIP", "Observação", "Status", "Resolução de Conflito"])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.setAlternatingRowColors(True)
         layout.addWidget(self.table)
@@ -75,13 +76,16 @@ class ImportModelsDialog(QDialog):
 
     def _populate_table(self):
         for row, model_name in enumerate(self.zip_models):
+            slug = slugify_model_name(model_name)
+            is_conflict = slug in self.existing_slugs
+
             # 1. Coluna Importar (Checkbox)
             chk_widget = QWidget()
             chk_layout = QHBoxLayout(chk_widget)
             chk_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
             chk_layout.setContentsMargins(0, 0, 0, 0)
             chk = QCheckBox()
-            chk.setChecked(True)
+            chk.setChecked(not is_conflict)
             chk.stateChanged.connect(self._on_item_changed)
             chk_layout.addWidget(chk)
             self.table.setCellWidget(row, 0, chk_widget)
@@ -90,14 +94,23 @@ class ImportModelsDialog(QDialog):
             # 2. Coluna Nome do Modelo
             self.table.setItem(row, 1, QTableWidgetItem(model_name))
             
-            # 3. Colunas Status e Resolução
-            slug = slugify_model_name(model_name)
-            is_conflict = slug in self.existing_slugs
+            # 3. Coluna Observação
+            missing_fonts = self.missing_fonts_by_model.get(model_name, [])
+            if missing_fonts:
+                label = "Fonte ausente" if len(missing_fonts) == 1 else "Fontes ausentes"
+                item_note = QTableWidgetItem(f"{label}: {', '.join(missing_fonts)}")
+                item_note.setForeground(Qt.GlobalColor.darkYellow)
+            else:
+                item_note = QTableWidgetItem("-")
+                item_note.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(row, 2, item_note)
+            
+            # 4. Colunas Status e Resolução
             
             if is_conflict:
                 item_status = QTableWidgetItem("⚠️ Já Existe")
                 item_status.setForeground(Qt.GlobalColor.red)
-                self.table.setItem(row, 2, item_status)
+                self.table.setItem(row, 3, item_status)
                 
                 action_widget = QWidget()
                 action_layout = QHBoxLayout(action_widget)
@@ -115,23 +128,26 @@ class ImportModelsDialog(QDialog):
                 
                 action_layout.addWidget(rb_replace)
                 action_layout.addWidget(rb_rename)
-                self.table.setCellWidget(row, 3, action_widget)
+                action_widget.setEnabled(chk.isChecked())
+                self.table.setCellWidget(row, 4, action_widget)
 
                 # BÔNUS UX: Desativa a coluna de conflito se desmarcar a importação
                 chk.stateChanged.connect(lambda state, aw=action_widget: aw.setEnabled(state == Qt.CheckState.Checked.value))
             else:
                 item_status = QTableWidgetItem("✨ Novo")
                 item_status.setForeground(Qt.GlobalColor.darkGreen)
-                self.table.setItem(row, 2, item_status)
+                self.table.setItem(row, 3, item_status)
                 
                 item_empty = QTableWidgetItem("-")
                 item_empty.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.table.setItem(row, 3, item_empty)
+                self.table.setItem(row, 4, item_empty)
         
         # Trava as colunas de controle no tamanho exato do seu conteúdo
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+        self._on_item_changed()
 
     def _apply_global_conflict(self, action):
         idx = {"replace": 1, "rename": 2}[action]

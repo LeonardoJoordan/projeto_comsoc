@@ -25,6 +25,7 @@ from features.workspace.import_models_dialog import ImportModelsDialog
 from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
+from core.font_utils import format_font_list, missing_template_fonts
 
 
 
@@ -542,17 +543,20 @@ class MainWindow(QMainWindow):
                 top_level_folders = set(info.filename.split('/')[0] for info in zip_ref.infolist() if '/' in info.filename)
                 
                 models_in_zip = {} # Mapeamento (Nome Legível do JSON -> Nome da Pasta no Zip)
+                missing_fonts_by_model = {}
                 
-                for zip_slug in top_level_folders:
+                for zip_slug in sorted(top_level_folders):
                     json_path = f"{zip_slug}/template_v3.json"
                     try:
                         with zip_ref.open(json_path) as f:
                             data = json.loads(f.read().decode('utf-8'))
                             name = data.get("name", zip_slug)
                             models_in_zip[name] = zip_slug
+                            missing_fonts_by_model[name] = missing_template_fonts(data)
                     except KeyError: 
                         # Se o modelo não tiver um JSON válido, usamos o nome bruto da pasta
                         models_in_zip[zip_slug] = zip_slug
+                        missing_fonts_by_model[zip_slug] = []
                         
                 if not models_in_zip:
                     QMessageBox.warning(self, "Arquivo Inválido", "Este arquivo ZIP não contém modelos compatíveis com o Projeto ComSoc.")
@@ -561,7 +565,7 @@ class MainWindow(QMainWindow):
                 # Etapa 2: Checagem de Conflitos e Abertura da Janela de Decisão
                 existing_slugs = set(d.name for d in models_dir.iterdir() if d.is_dir())
                 
-                dlg = ImportModelsDialog(self, list(models_in_zip.keys()), existing_slugs)
+                dlg = ImportModelsDialog(self, list(models_in_zip.keys()), existing_slugs, missing_fonts_by_model)
                 if not dlg.exec():
                     return # O usuário clicou em Cancelar
                     
@@ -718,6 +722,14 @@ class MainWindow(QMainWindow):
                     
                     self.cached_model_data = data
                     self._refresh_imposition_presets()
+
+                    missing_fonts = missing_template_fonts(data)
+                    if missing_fonts:
+                        if len(missing_fonts) == 1:
+                            msg = f"Este modelo usa uma fonte não encontrada no sistema: {format_font_list(missing_fonts)}"
+                        else:
+                            msg = f"Este modelo usa fontes não encontradas no sistema: {format_font_list(missing_fonts)}"
+                        self.log_panel.append(f"<b>AVISO:</b> {msg}")
                     
                     try:
                         # Cria o "Chef" uma única vez ao selecionar o modelo
@@ -798,16 +810,50 @@ class MainWindow(QMainWindow):
             
         self.active_model_name = current_model_name
 
-        self.editor_window = EditorWindow(self)
-        self.editor_window.modelSaved.connect(self._on_editor_saved)
-
         slug = slugify_model_name(current_model_name)
         json_path = get_models_dir() / slug / "template_v3.json"
+
+        if json_path.exists():
+            try:
+                with open(json_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                missing_fonts = missing_template_fonts(data)
+            except Exception:
+                missing_fonts = []
+
+            if missing_fonts and not self._confirm_open_model_with_missing_fonts(missing_fonts):
+                return
+
+        self.editor_window = EditorWindow(self)
+        self.editor_window.modelSaved.connect(self._on_editor_saved)
 
         if json_path.exists():
             self.editor_window.load_from_json(str(json_path))
         
         self.editor_window.show()
+
+    def _confirm_open_model_with_missing_fonts(self, missing_fonts: list[str]) -> bool:
+        font_names = format_font_list(missing_fonts)
+        if len(missing_fonts) == 1:
+            headline = f"Está faltando a fonte {font_names}."
+        else:
+            headline = f"Estão faltando as fontes {font_names}."
+
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Fonte ausente")
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setText(
+            f"<b>{headline}</b><br><br>"
+            "Se você prosseguir para a edição, a fonte será substituída pela fonte padrão do sistema "
+            "e o modelo sofrerá uma mudança visual."
+        )
+
+        btn_cancel = msg_box.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+        btn_open = msg_box.addButton("Abrir mesmo assim", QMessageBox.ButtonRole.AcceptRole)
+        msg_box.setDefaultButton(btn_cancel)
+        msg_box.exec()
+
+        return msg_box.clickedButton() == btn_open
 
     def _on_editor_saved(self, model_name, placeholders, file_path):
         # Formata o log conforme o seu novo padrão
