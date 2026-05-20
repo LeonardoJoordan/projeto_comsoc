@@ -19,6 +19,7 @@ from core.template_manager import slugify_model_name
 from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
+from core.render_cache import ensure_background_proxy
 
 
 
@@ -793,6 +794,8 @@ class EditorWindow(QMainWindow):
             rel_img = self._import_asset(img["path"], model_dir)
             if rel_img:
                 img["path"] = rel_img
+
+        ensure_background_proxy(model_dir, data)
 
         file_path = model_dir / "template_v3.json"
         

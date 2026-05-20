@@ -4,10 +4,12 @@ from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont,
 from PySide6.QtCore import Qt, QPointF, QRectF
 import re
 from pathlib import Path
+from core.render_cache import get_background_proxy_path, infer_model_dir
 
 class NativeRenderer:
     def __init__(self, template_data: dict):
         self.tpl = template_data
+        self.model_dir = infer_model_dir(template_data)
         self._image_cache = {}
         self._static_base_cache = None
         self._pixmap_cache = {}
@@ -62,35 +64,32 @@ class NativeRenderer:
             painter.end()
 
     def render_row(self, row_plain: dict, row_rich: dict, out_path: Path, out_links: list = None):
-        
-        w = self.tpl["canvas_size"]["w"]
-        h = self.tpl["canvas_size"]["h"]
-        
-        image = QImage(w, h, QImage.Format_ARGB32)
-        image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
-        image.setDotsPerMeterY(3780)
-        image.fill(Qt.GlobalColor.white)
-
-        painter = QPainter(image)
-        try:
-            self._paint_card(painter, row_rich, out_links)
-        finally:
-            painter.end()
-
+        image = self.render_to_qimage(row_plain, row_rich, out_links=out_links)
         image.save(str(out_path), "PNG")
 
     
-    def render_to_pixmap(self, row_rich: dict = None) -> QPixmap:
+    def render_to_pixmap(self, row_rich: dict = None, max_side: int = None) -> QPixmap:
         w = self.tpl["canvas_size"]["w"]
         h = self.tpl["canvas_size"]["h"]
+
+        scale = 1.0
+        if max_side and max(w, h) > max_side:
+            scale = max_side / max(w, h)
+            render_w = max(1, int(round(w * scale)))
+            render_h = max(1, int(round(h * scale)))
+        else:
+            render_w = w
+            render_h = h
         
-        image = QImage(w, h, QImage.Format_ARGB32)
+        image = QImage(render_w, render_h, QImage.Format_ARGB32)
         image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
         image.setDotsPerMeterY(3780)
         image.fill(Qt.GlobalColor.white)
 
         painter = QPainter(image)
         try:
+            if scale != 1.0:
+                painter.scale(scale, scale)
             if row_rich is None:
                 placeholders = self.tpl.get("placeholders", [])
                 row_rich = {p: f"{{{p}}}" for p in placeholders}
@@ -142,16 +141,28 @@ class NativeRenderer:
         if not dynamic_only and self.tpl.get("background_path"):
             bg_props = self.tpl.get("bg_props", {})
             if bg_props.get("visible", True):
-                bg = self._get_image(self.tpl["background_path"])
-                if not bg.isNull():
-                    w = bg_props.get("w", self.tpl["canvas_size"]["w"])
-                    h = bg_props.get("h", self.tpl["canvas_size"]["h"])
-                    x = bg_props.get("x", 0)
-                    y = bg_props.get("y", 0)
-                    
-                    painter.setOpacity(bg_props.get("opacity", 1.0))
-                    painter.drawImage(QRectF(float(x), float(y), w, h), bg, QRectF(bg.rect()))
-                    painter.setOpacity(1.0)
+                proxy_path = get_background_proxy_path(self.model_dir, self.tpl)
+                proxy_drawn = False
+                if proxy_path:
+                    bg = self._get_image(proxy_path)
+                    if not bg.isNull():
+                        painter.drawImage(
+                            QRectF(0, 0, self.tpl["canvas_size"]["w"], self.tpl["canvas_size"]["h"]),
+                            bg,
+                            QRectF(bg.rect()),
+                        )
+                        proxy_drawn = True
+                if not proxy_drawn:
+                    bg = self._get_image(self.tpl["background_path"])
+                    if not bg.isNull():
+                        w = bg_props.get("w", self.tpl["canvas_size"]["w"])
+                        h = bg_props.get("h", self.tpl["canvas_size"]["h"])
+                        x = bg_props.get("x", 0)
+                        y = bg_props.get("y", 0)
+                        
+                        painter.setOpacity(bg_props.get("opacity", 1.0))
+                        painter.drawImage(QRectF(float(x), float(y), w, h), bg, QRectF(bg.rect()))
+                        painter.setOpacity(1.0)
 
         for img in self.tpl.get("images", []):
             if not img.get("visible", True):

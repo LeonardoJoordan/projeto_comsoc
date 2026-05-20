@@ -26,6 +26,7 @@ from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 from core.font_utils import format_font_list, missing_template_fonts
+from core.render_cache import ensure_background_proxy
 
 
 
@@ -662,7 +663,8 @@ class MainWindow(QMainWindow):
                     model_dir = models_dir / slug
                     if not model_dir.exists(): continue
                     
-                    for root, _, files in os.walk(model_dir):
+                    for root, dirs, files in os.walk(model_dir):
+                        dirs[:] = [d for d in dirs if d != ".render_cache"]
                         for file in files:
                             file_path = Path(root) / file
                             arcname = Path(slug) / file_path.relative_to(model_dir)
@@ -715,6 +717,8 @@ class MainWindow(QMainWindow):
                     for sig in data.get("signatures", []):
                         if not Path(sig["path"]).is_absolute():
                             sig["path"] = str(model_dir / sig["path"])
+                    data["__model_dir"] = str(model_dir)
+                    ensure_background_proxy(model_dir, data)
 
                     placeholders = data.get("placeholders", [])
                     signatures = data.get("signatures", [])
@@ -734,7 +738,7 @@ class MainWindow(QMainWindow):
                     try:
                         # Cria o "Chef" uma única vez ao selecionar o modelo
                         self.preview_renderer = NativeRenderer(data)
-                        preview_pix = self.preview_renderer.render_to_pixmap(row_rich=None)
+                        preview_pix = self.preview_renderer.render_to_pixmap(row_rich=None, max_side=1600)
                         self.preview_panel.set_preview_pixmap(preview_pix)
                     except Exception as e:
                         self.log_panel.append(f"Erro ao gerar preview: {e}")
@@ -797,7 +801,7 @@ class MainWindow(QMainWindow):
             if not self.preview_renderer:
                 self.preview_renderer = NativeRenderer(self.cached_model_data)
             
-            pix = self.preview_renderer.render_to_pixmap(row_rich=row_rich)
+            pix = self.preview_renderer.render_to_pixmap(row_rich=row_rich, max_side=1600)
             self.preview_panel.set_preview_pixmap(pix)
         except Exception as e:
             print(f"Erro no Live Preview: {e}")
@@ -1140,6 +1144,8 @@ class MainWindow(QMainWindow):
             for sig in tpl_data.get("signatures", []):
                 if not Path(sig["path"]).is_absolute():
                     sig["path"] = str(model_dir / sig["path"])
+            tpl_data["__model_dir"] = str(model_dir)
+            ensure_background_proxy(model_dir, tpl_data)
 
         renderer = NativeRenderer(tpl_data)
 
