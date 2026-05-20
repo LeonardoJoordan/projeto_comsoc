@@ -736,10 +736,19 @@ class MainWindow(QMainWindow):
                         self.log_panel.append(f"<b>AVISO:</b> {msg}")
                     
                     try:
-                        # Cria o "Chef" uma única vez ao selecionar o modelo
+                        # Cria o "Chef" na memória (operação ultraleve, sem desenho)
                         self.preview_renderer = NativeRenderer(data)
-                        preview_pix = self.preview_renderer.render_to_pixmap(row_rich=None, max_side=1600)
-                        self.preview_panel.set_preview_pixmap(preview_pix)
+                        
+                        # --- LEGO: Carregamento Instantâneo da Thumbnail de Performance ---
+                        thumb_path = model_dir / ".render_cache" / "thumbnail_raw.png"
+                        
+                        if thumb_path.exists():
+                            self.preview_panel.set_preview_image(str(thumb_path))
+                        else:
+                            # Fallback seguro caso o modelo antigo ainda não tenha a imagem crua
+                            preview_pix = self.preview_renderer.render_to_pixmap(row_rich=None, max_side=1600)
+                            self.preview_panel.set_preview_pixmap(preview_pix)
+                        # --- FIM DO LEGO ---
                     except Exception as e:
                         self.log_panel.append(f"Erro ao gerar preview: {e}")
                         self.preview_panel.set_preview_text("Erro ao gerar preview do modelo")
@@ -793,7 +802,15 @@ class MainWindow(QMainWindow):
     def _on_table_selection(self):
         if not self.cached_model_data: return
         row = self.table_panel.table.currentRow()
-        if row < 0: return
+        
+        # --- LEGO: Fallback para a Thumbnail Estática se não houver linha selecionada ---
+        if row < 0:
+            slug = slugify_model_name(self.active_model_name)
+            thumb_path = get_models_dir() / slug / ".render_cache" / "thumbnail_raw.png"
+            if thumb_path.exists():
+                self.preview_panel.set_preview_image(str(thumb_path))
+            return
+        # --- FIM DO LEGO ---
 
         try:
             row_rich = self._get_row_data_rich(row)

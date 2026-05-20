@@ -817,6 +817,24 @@ class EditorWindow(QMainWindow):
         # Emite o sinal agora contendo também o caminho do arquivo para o Log da MainWindow
         self.modelSaved.emit(model_name, data["placeholders"], str(file_path))
 
+        try:
+            from features.generator.renderer import NativeRenderer
+            
+            # Instancia o renderizador com os dados fresquinhos do modelo
+            thumb_renderer = NativeRenderer(data)
+            
+            # Força o caminho físico da pasta de cache
+            cache_folder = model_dir / ".render_cache"
+            cache_folder.mkdir(parents=True, exist_ok=True)
+            thumb_path = cache_folder / "thumbnail_raw.png"
+            
+            # Gera o Pixmap estático (sem row_rich para manter placeholders brutos)
+            # Salvamos a QImage nativa direto no disco de forma limpa
+            preview_pix = thumb_renderer.render_to_pixmap(row_rich=None, max_side=1600)
+            preview_pix.save(str(thumb_path), "PNG")
+        except Exception as e:
+            print(f"[WARN] Falha ao gerar a thumbnail_raw em background: {e}")
+
         self._last_saved_state = self.get_current_scene_state()
         
         if skip_close_dialog:
