@@ -739,7 +739,7 @@ class MainWindow(QMainWindow):
                         # Cria o "Chef" na memória (operação ultraleve, sem desenho)
                         self.preview_renderer = NativeRenderer(data)
                         
-                        # --- LEGO: Carregamento Instantâneo da Thumbnail de Performance ---
+                        # Carregamento Instantâneo da Thumbnail de Performance ---
                         thumb_path = model_dir / ".render_cache" / "thumbnail_raw.png"
                         
                         if thumb_path.exists():
@@ -748,7 +748,14 @@ class MainWindow(QMainWindow):
                             # Fallback seguro caso o modelo antigo ainda não tenha a imagem crua
                             preview_pix = self.preview_renderer.render_to_pixmap(row_rich=None, max_side=1600)
                             self.preview_panel.set_preview_pixmap(preview_pix)
-                        # --- FIM DO LEGO ---
+                            
+                            # Auto-Healing: Salva silenciosamente a imagem no disco para as próximas cargas
+                            try:
+                                thumb_path.parent.mkdir(parents=True, exist_ok=True)
+                                preview_pix.save(str(thumb_path), "PNG")
+                            except Exception as save_err:
+                                print(f"[WARN] Auto-Healing falhou ao salvar thumbnail: {save_err}")
+
                     except Exception as e:
                         self.log_panel.append(f"Erro ao gerar preview: {e}")
                         self.preview_panel.set_preview_text("Erro ao gerar preview do modelo")
