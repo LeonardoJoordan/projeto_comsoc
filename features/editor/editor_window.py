@@ -36,6 +36,7 @@ class EditorWindow(QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self._current_model_name = None
+        self._current_model_dir = None
         self.setWindowTitle("Editor Visual de Modelo - Projeto COMSOC")
         self.resize(1200, 800)
 
@@ -621,7 +622,157 @@ class EditorWindow(QMainWindow):
                 elif msg_box.clickedButton() == btn_cancel:
                     event.ignore()
                     return
+        self._cleanup_unused_assets_on_close()
         super().closeEvent(event)
+
+    def _current_model_directory(self) -> Path | None:
+        if self._current_model_dir:
+            return Path(self._current_model_dir)
+        if self._current_model_name:
+            return get_models_dir() / slugify_model_name(self._current_model_name)
+        return None
+
+    def _resolve_model_asset_path(self, raw_path: str, model_dir: Path) -> Path | None:
+        if not raw_path:
+            return None
+
+        try:
+            path = Path(raw_path)
+        except TypeError:
+            return None
+
+        if not path.is_absolute():
+            path = model_dir / path
+
+        try:
+            return path.resolve()
+        except OSError:
+            return path.absolute()
+
+    def _collect_used_asset_paths(self, template_data: dict, model_dir: Path) -> set[Path]:
+        assets_dir = (model_dir / "assets").resolve()
+        used_assets = set()
+
+        def add_if_local_asset(raw_path):
+            resolved = self._resolve_model_asset_path(raw_path, model_dir)
+            if not resolved:
+                return
+            if resolved == assets_dir or assets_dir in resolved.parents:
+                used_assets.add(resolved)
+
+        add_if_local_asset(template_data.get("background_path"))
+        for sig in template_data.get("signatures", []):
+            add_if_local_asset(sig.get("path"))
+        for img in template_data.get("images", []):
+            add_if_local_asset(img.get("path"))
+
+        return used_assets
+
+    def _cleanup_unused_assets_on_close(self):
+        model_dir = self._current_model_directory()
+        if not model_dir:
+            return
+
+        template_path = model_dir / "template_v3.json"
+        assets_dir = model_dir / "assets"
+        if not template_path.exists() or not assets_dir.exists():
+            return
+
+        try:
+            with open(template_path, "r", encoding="utf-8") as f:
+                template_data = json.load(f)
+        except Exception as e:
+            print(f"[WARN] Limpeza de assets cancelada: não foi possível ler o modelo. {e}")
+            return
+
+        try:
+            used_assets = self._collect_used_asset_paths(template_data, model_dir)
+            asset_paths = list(assets_dir.rglob("*"))
+        except OSError as e:
+            print(f"[WARN] Limpeza de assets cancelada: não foi possível varrer a pasta assets. {e}")
+            return
+
+        removed = 0
+
+        for asset_path in asset_paths:
+            try:
+                is_file = asset_path.is_file()
+                resolved = asset_path.resolve()
+            except OSError as e:
+                print(f"[WARN] Não foi possível verificar asset '{asset_path}': {e}")
+                continue
+
+            if not is_file:
+                continue
+
+            if resolved in used_assets:
+                continue
+
+            try:
+                asset_path.unlink()
+                removed += 1
+            except OSError as e:
+                print(f"[WARN] Não foi possível remover asset órfão '{asset_path}': {e}")
+
+        # Remove apenas subpastas vazias dentro de assets; a pasta assets permanece.
+        for folder in sorted(
+            [p for p in assets_dir.rglob("*") if p.is_dir()],
+            key=lambda p: len(p.parts),
+            reverse=True,
+        ):
+            try:
+                folder.rmdir()
+            except OSError:
+                pass
+
+        if removed:
+            print(f"[INFO] Limpeza de assets: {removed} arquivo(s) órfão(s) removido(s).")
+
+    def _remember_saved_asset_path(self, updates: dict[str, str], original_path: str, saved_path: str, model_dir: Path):
+        if not original_path or not saved_path:
+            return
+
+        saved = Path(saved_path)
+        if saved.is_absolute() or not saved.parts or saved.parts[0] != "assets":
+            return
+
+        updates[str(original_path)] = str(model_dir / saved)
+
+    def _rewrite_state_asset_paths(self, state: dict, updates: dict[str, str]):
+        bg_path = state.get("background_path")
+        if bg_path in updates:
+            state["background_path"] = updates[bg_path]
+
+        for sig in state.get("signatures", []):
+            path = sig.get("path")
+            if path in updates:
+                sig["path"] = updates[path]
+
+        for img in state.get("images", []):
+            path = img.get("path")
+            if path in updates:
+                img["path"] = updates[path]
+
+    def _apply_saved_asset_paths(self, updates: dict[str, str]):
+        if not updates:
+            return
+
+        if self.background_path in updates:
+            self.background_path = updates[self.background_path]
+            if self.bg_item:
+                self.bg_item._original_path = self.background_path
+
+        for item in self.scene.items():
+            if isinstance(item, BackgroundItem):
+                continue
+            if isinstance(item, (ImageItem, SignatureItem)):
+                original_path = getattr(item, "_original_path", "")
+                if original_path in updates:
+                    item._original_path = updates[original_path]
+
+        for state in getattr(self.history, "_undo_stack", []):
+            if isinstance(state, dict):
+                self._rewrite_state_asset_paths(state, updates)
 
     def eventFilter(self, source, event):
         # Escuta tanto a view principal quanto o viewport das barras de rolagem
@@ -754,6 +905,7 @@ class EditorWindow(QMainWindow):
 
         data = self._migrate_model_data(data)
         self._current_model_name = data.get("name", "")
+        self._current_model_dir = path.parent
         self.setWindowTitle(f"Editor Visual de Modelo - {self._current_model_name}")
         
         # O apply_scene_state faz todo o trabalho duro de desenhar
@@ -780,20 +932,28 @@ class EditorWindow(QMainWindow):
         slug = slugify_model_name(model_name)
         model_dir = get_models_dir() / slug
         model_dir.mkdir(parents=True, exist_ok=True)
+        self._current_model_dir = model_dir
+        saved_asset_paths = {}
         
         if self.background_path:
             rel_bg = self._import_asset(self.background_path, model_dir)
-            data["background_path"] = rel_bg
+            if rel_bg:
+                data["background_path"] = rel_bg
+                self._remember_saved_asset_path(saved_asset_paths, self.background_path, rel_bg, model_dir)
 
         for sig in data["signatures"]:
+            original_path = sig["path"]
             rel_sig = self._import_asset(sig["path"], model_dir)
             if rel_sig:
                 sig["path"] = rel_sig
+                self._remember_saved_asset_path(saved_asset_paths, original_path, rel_sig, model_dir)
 
         for img in data.get("images", []):
+            original_path = img["path"]
             rel_img = self._import_asset(img["path"], model_dir)
             if rel_img:
                 img["path"] = rel_img
+                self._remember_saved_asset_path(saved_asset_paths, original_path, rel_img, model_dir)
 
         ensure_background_proxy(model_dir, data)
 
@@ -813,9 +973,8 @@ class EditorWindow(QMainWindow):
         data["name"] = model_name
         with open(file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4, ensure_ascii=False)
-            
-        # Emite o sinal agora contendo também o caminho do arquivo para o Log da MainWindow
-        self.modelSaved.emit(model_name, data["placeholders"], str(file_path))
+
+        self._apply_saved_asset_paths(saved_asset_paths)
 
         try:
             from features.generator.renderer import NativeRenderer
@@ -834,6 +993,9 @@ class EditorWindow(QMainWindow):
             preview_pix.save(str(thumb_path), "PNG")
         except Exception as e:
             print(f"[WARN] Falha ao gerar a thumbnail_raw em background: {e}")
+
+        # Emite o sinal depois do cache visual ser atualizado.
+        self.modelSaved.emit(model_name, data["placeholders"], str(file_path))
 
         self._last_saved_state = self.get_current_scene_state()
         
@@ -2285,6 +2447,9 @@ class EditorWindow(QMainWindow):
         
         src = Path(source_path)
         if not src.exists():
+            existing_asset = model_dir / "assets" / src.name
+            if existing_asset.exists():
+                return f"assets/{src.name}"
             return None
             
         if "assets" in src.parts and model_dir in src.parents:
@@ -2300,6 +2465,8 @@ class EditorWindow(QMainWindow):
             return f"assets/{src.name}"
         except Exception as e:
             print(f"Erro ao copiar asset: {e}")
+            if dest.exists():
+                return f"assets/{src.name}"
             return source_path 
     
     def _get_next_layer_id(self):

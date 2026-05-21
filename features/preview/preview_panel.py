@@ -1,6 +1,6 @@
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QComboBox
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QPixmap, QResizeEvent
+from PySide6.QtGui import QPixmap, QResizeEvent, QImageReader
 from pathlib import Path
 
 class ResizingLabel(QLabel):
@@ -12,21 +12,34 @@ class ResizingLabel(QLabel):
         self._pixmap = None
 
     def set_image_path(self, path: str):
-        if not path or not Path(path).exists():
-            self.setText("Sem imagem")
+        image_path = Path(path) if path else None
+        if not image_path or not image_path.exists():
             self._pixmap = None
+            self.setText("Sem imagem")
             return
-        
-        self._pixmap = QPixmap(path)
+
+        reader = QImageReader(str(image_path))
+        reader.setAutoTransform(True)
+        image = reader.read()
+        if image.isNull():
+            self._pixmap = None
+            self.setText("Erro na prévia")
+            return
+
+        self._pixmap = QPixmap.fromImage(image)
         self._update_view()
 
     def set_pixmap_direct(self, pixmap: QPixmap):
         if not pixmap or pixmap.isNull():
-            self.setText("Erro na prévia")
             self._pixmap = None
+            self.setText("Erro na prévia")
         else:
             self._pixmap = pixmap
             self._update_view()
+
+    def set_message(self, text: str):
+        self._pixmap = None
+        self.setText(text)
 
     def resizeEvent(self, event: QResizeEvent):
         self._update_view()
@@ -65,7 +78,7 @@ class PreviewPanel(QWidget):
         layout.addWidget(self.preview, 1)
 
     def set_preview_text(self, text: str):
-        self.preview.setText(text)
+        self.preview.set_message(text)
 
     def set_preview_image(self, path: str):
         self.preview.set_image_path(path)
