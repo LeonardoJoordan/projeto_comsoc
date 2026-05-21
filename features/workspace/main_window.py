@@ -745,16 +745,21 @@ class MainWindow(QMainWindow):
                         if thumb_path.exists():
                             self.preview_panel.set_preview_image(str(thumb_path))
                         else:
-                            # Fallback seguro caso o modelo antigo ainda não tenha a imagem crua
-                            preview_pix = self.preview_renderer.render_to_pixmap(row_rich=None, max_side=1600)
-                            self.preview_panel.set_preview_pixmap(preview_pix)
+                            # --- LEGO: Worker de Preview Assíncrono ---
+                            self.preview_panel.set_preview_text("Gerando prévia, aguarde um instante...")
                             
-                            # Auto-Healing: Salva silenciosamente a imagem no disco para as próximas cargas
-                            try:
-                                thumb_path.parent.mkdir(parents=True, exist_ok=True)
-                                preview_pix.save(str(thumb_path), "PNG")
-                            except Exception as save_err:
-                                print(f"[WARN] Auto-Healing falhou ao salvar thumbnail: {save_err}")
+                            from features.generator.workers import PreviewRenderWorker
+                            
+                            worker = PreviewRenderWorker(name, data, model_dir)
+                            # Anexa à janela para o Garbage Collector não matar a Thread no meio do processo
+                            worker.setParent(self) 
+                            
+                            worker.preview_ready.connect(self._on_preview_ready)
+                            worker.error_occurred.connect(lambda msg: self.log_panel.append(f"Erro preview background: {msg}"))
+                            worker.finished.connect(worker.deleteLater) # Autolimpeza imediata ao terminar
+                        
+                            worker.start()
+                            # --- FIM DO LEGO ---
 
                     except Exception as e:
                         self.log_panel.append(f"Erro ao gerar preview: {e}")
@@ -763,6 +768,15 @@ class MainWindow(QMainWindow):
                 self.log_panel.append(f"Erro ao ler colunas do modelo: {e}")
         else:
             self.log_panel.append("Aviso: template_v3.json não encontrado.")
+
+    # --- LEGO: Recebimento do Preview e Descarte Inteligente ---
+    def _on_preview_ready(self, worker_model_name: str, thumb_path: str):
+        """Atualiza a UI apenas se o usuário ainda estiver aguardando este modelo específico."""
+        if self.active_model_name == worker_model_name:
+            self.preview_panel.set_preview_image(thumb_path)
+        # Nota: Se os nomes forem diferentes, significa que o usuário já trocou de modelo. 
+        # A UI ignora, mas a imagem já ficou salva no disco em background para a próxima vez.
+    # --- FIM DO LEGO ---
 
     def _update_table_columns(self, placeholders, signatures=None):
         self.table_panel.table.clearContents()

@@ -322,3 +322,48 @@ class HybridAssemblerWorker(QThread):
             
         except Exception as e:
             self.error_occurred.emit(str(e))
+
+class PreviewRenderWorker(QThread):
+    preview_ready = Signal(str, str) # model_name, thumb_path
+    error_occurred = Signal(str)
+
+    def __init__(self, model_name, template_data, model_dir):
+        super().__init__()
+        self.model_name = model_name
+        self.template_data = template_data
+        self.model_dir = model_dir
+
+    def run(self):
+        try:
+            from features.generator.renderer import NativeRenderer
+            from PySide6.QtCore import Qt
+            
+            renderer = NativeRenderer(self.template_data)
+            
+            cache_folder = self.model_dir / ".render_cache"
+            cache_folder.mkdir(parents=True, exist_ok=True)
+            thumb_path = cache_folder / "thumbnail_raw.png"
+            
+            # Prepara os placeholders para a thumbnail crua
+            placeholders = self.template_data.get("placeholders", [])
+            row_rich = {p: f"{{{p}}}" for p in placeholders}
+            
+            # Gera a imagem usando QImage nativo (Thread-Safe)
+            img = renderer.render_to_qimage({}, row_rich)
+            
+            # Aplica a mesma escala do render_to_pixmap original
+            w = self.template_data.get("canvas_size", {}).get("w", 1000)
+            h = self.template_data.get("canvas_size", {}).get("h", 1000)
+            max_side = 1600
+            
+            if max(w, h) > max_side:
+                scale = max_side / max(w, h)
+                img = img.scaled(int(w * scale), int(h * scale), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+                
+            img.save(str(thumb_path), "PNG")
+            
+            # Avisa a Janela Principal que terminou
+            self.preview_ready.emit(self.model_name, str(thumb_path))
+            
+        except Exception as e:
+            self.error_occurred.emit(f"Erro no background preview: {str(e)}")
