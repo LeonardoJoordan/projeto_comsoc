@@ -300,8 +300,29 @@ class NativeRenderer:
             if not show_sig:
                 continue
 
-            if Path(sig["path"]).exists():
-                pix = self._get_image(sig["path"])
+            raw_sig = sig["path"]
+            sig_path = Path(raw_sig)
+
+            if not sig_path.exists():
+                try:
+                    from core.template_manager import slugify_model_name
+                    from core.paths import get_models_dir
+                    if "name" in self.tpl:
+                        alt_path = get_models_dir() / slugify_model_name(self.tpl["name"]) / raw_sig
+                        if alt_path.exists():
+                            sig_path = alt_path
+                except ImportError:
+                    pass
+
+                if not sig_path.exists() and self.tpl.get("background_path"):
+                    bg_path = Path(self.tpl["background_path"])
+                    if bg_path.is_absolute():
+                        alt_path = bg_path.parent.parent / raw_sig
+                        if alt_path.exists():
+                            sig_path = alt_path
+
+            if sig_path.exists():
+                pix = self._get_image(sig_path)
                 if not pix.isNull():
                     self._draw_image_item(
                         painter,
