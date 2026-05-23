@@ -34,6 +34,68 @@ def _clean_spaces_keep_edges(s: str) -> str:
     s = re.sub(r"[ \t]+", " ", s)
     return s
 
+_STYLE_TAGS = ("b", "i", "u")
+
+def _empty_style_state(value: Optional[bool] = None) -> dict:
+    return {tag: value for tag in _STYLE_TAGS}
+
+def _style_state_has_values(state: dict) -> bool:
+    return any(value is not None for value in state.values())
+
+def _merge_style_states(*states: dict) -> dict:
+    merged = _empty_style_state()
+    for state in states:
+        for tag in _STYLE_TAGS:
+            value = state.get(tag)
+            if value is not None:
+                merged[tag] = value
+    return merged
+
+def _style_state_to_tags(state: dict) -> List[str]:
+    return [tag for tag in _STYLE_TAGS if state.get(tag) is True]
+
+def _style_state_from_style(style_str: str) -> dict:
+    style = _parse_style(style_str)
+    state = _empty_style_state()
+
+    if "font-weight" in style:
+        fw = style.get("font-weight", "")
+        if fw in ("bold", "bolder"):
+            state["b"] = True
+        elif fw in ("normal", "lighter"):
+            state["b"] = False
+        else:
+            match = re.search(r"\d+", fw)
+            if match:
+                state["b"] = int(match.group(0)) >= 600
+
+    if "font-style" in style:
+        fs = style.get("font-style", "")
+        if fs in ("italic", "oblique"):
+            state["i"] = True
+        elif fs == "normal":
+            state["i"] = False
+
+    decoration = " ".join([
+        style.get("text-decoration", ""),
+        style.get("text-decoration-line", ""),
+    ]).strip()
+    underline_style = style.get("text-underline-style", "")
+    if decoration or underline_style:
+        if "underline" in decoration or (underline_style and underline_style != "none"):
+            state["u"] = True
+        elif "none" in decoration or underline_style == "none" or decoration:
+            state["u"] = False
+
+    return state
+
+def _remove_empty_style_tags(rich: str) -> str:
+    previous = None
+    while previous != rich:
+        previous = rich
+        rich = re.sub(r"<([biu])></\1>", "", rich)
+    return rich
+
 # ---------------------------------------------------------------------------
 # Trabalhadores Especializados
 # ---------------------------------------------------------------------------
@@ -185,7 +247,7 @@ class GoogleSheets:
                 self._close_tags(self.base_tags, self.cell_chunks)
 
                 rich = "".join(self.cell_chunks)
-                rich = re.sub(r"\s*<br>\s*", "<br>", rich).strip()
+                rich = _remove_empty_style_tags(re.sub(r"\s*<br>\s*", "<br>", rich)).strip()
                 plain = plain_from_rich(rich)
                 self.current_row.append(CellValue(plain=plain, rich_html=rich))
 
@@ -269,7 +331,7 @@ class GoogleSheets:
                 parser._close_tags(tags, parser.fragment_chunks)
 
             rich = "".join(parser.fragment_chunks)
-            rich = re.sub(r"\s*<br>\s*", "<br>", rich).strip()
+            rich = _remove_empty_style_tags(re.sub(r"\s*<br>\s*", "<br>", rich)).strip()
             plain = plain_from_rich(rich)
             if plain:
                 return [[CellValue(plain=plain, rich_html=rich)]]
@@ -304,38 +366,6 @@ class Excel:
 
             return attrs_dict
 
-        def unique_ordered_tags(tags: List[str]) -> List[str]:
-            ordered = []
-            for tag in ("b", "i", "u"):
-                if tag in tags:
-                    ordered.append(tag)
-            return ordered
-
-        def tags_from_style(style_str: str) -> List[str]:
-            style = _parse_style(style_str)
-            tags = []
-
-            fw = style.get("font-weight", "")
-            if fw in ("bold", "bolder"):
-                tags.append("b")
-            else:
-                match = re.search(r"\d+", fw)
-                if match and int(match.group(0)) >= 600:
-                    tags.append("b")
-
-            if style.get("font-style", "") in ("italic", "oblique"):
-                tags.append("i")
-
-            decoration = " ".join([
-                style.get("text-decoration", ""),
-                style.get("text-decoration-line", ""),
-            ])
-            underline_style = style.get("text-underline-style", "")
-            if "underline" in decoration or (underline_style and underline_style != "none"):
-                tags.append("u")
-
-            return tags
-
         def plain_from_rich(rich: str) -> str:
             text = re.sub(r"<br\s*/?>", "\n", rich, flags=re.IGNORECASE)
             text = re.sub(r"<[^>]+>", "", text)
@@ -351,30 +381,31 @@ class Excel:
                 self.seen_table_cell = False
                 self.cell_chunks: List[str] = []
                 self.style_text = []
-                self.classes_map: dict[str, List[str]] = {}
-                self.base_tags: List[str] = []
-                self.frames: List[tuple[str, List[str]]] = []
+                self.classes_map: dict[str, dict] = {}
+                self.current_state = _empty_style_state(False)
+                self.frames: List[tuple[str, dict]] = []
                 self.fragment_chunks: List[str] = []
-                self.fragment_frames: List[tuple[str, List[str]]] = []
+                self.fragment_state = _empty_style_state(False)
+                self.fragment_frames: List[tuple[str, dict]] = []
 
-            def _merge_class_tags(self, class_name: str, tags: List[str]):
-                if not tags:
+            def _merge_class_state(self, class_name: str, state: dict):
+                if not _style_state_has_values(state):
                     return
 
-                current = self.classes_map.get(class_name, [])
-                self.classes_map[class_name] = unique_ordered_tags(current + tags)
+                current = self.classes_map.get(class_name, _empty_style_state())
+                self.classes_map[class_name] = _merge_style_states(current, state)
 
             def _parse_css_block(self, css_text: str):
                 css_text = re.sub(r"/\*.*?\*/", "", css_text, flags=re.DOTALL)
                 for m in re.finditer(r"([^{}]+)\{([^}]*)\}", css_text):
                     selectors = m.group(1)
-                    tags = tags_from_style(m.group(2))
-                    if not tags:
+                    state = _style_state_from_style(m.group(2))
+                    if not _style_state_has_values(state):
                         continue
 
                     for selector in selectors.split(","):
                         for cls in re.findall(r"\.([\w-]+)", selector):
-                            self._merge_class_tags(cls, tags)
+                            self._merge_class_state(cls, state)
 
             def _open_tags(self, tags: List[str], target: List[str]):
                 for tag in tags:
@@ -384,29 +415,49 @@ class Excel:
                 for tag in reversed(tags):
                     target.append(f"</{tag}>")
 
-            def _class_tags(self, class_attr: str) -> List[str]:
-                tags = []
-                for cls in (class_attr or "").split():
-                    tags.extend(self.classes_map.get(cls, []))
-                return unique_ordered_tags(tags)
+            def _transition_state(self, current_state: dict, new_state: dict, target: List[str]) -> dict:
+                old_tags = _style_state_to_tags(current_state)
+                new_tags = _style_state_to_tags(new_state)
 
-            def _tags_for_tag(self, tag: str, attrs) -> List[str]:
-                semantic = []
+                common_len = 0
+                for old_tag, new_tag in zip(old_tags, new_tags):
+                    if old_tag != new_tag:
+                        break
+                    common_len += 1
+
+                self._close_tags(old_tags[common_len:], target)
+                self._open_tags(new_tags[common_len:], target)
+                return new_state.copy()
+
+            def _class_state(self, class_attr: str) -> dict:
+                state = _empty_style_state()
+                for cls in (class_attr or "").split():
+                    state = _merge_style_states(state, self.classes_map.get(cls, _empty_style_state()))
+                return state
+
+            def _state_for_tag(self, tag: str, attrs) -> dict:
+                semantic = _empty_style_state()
                 if tag in ("b", "strong"):
-                    semantic.append("b")
+                    semantic["b"] = True
                 elif tag in ("i", "em"):
-                    semantic.append("i")
+                    semantic["i"] = True
                 elif tag == "u":
-                    semantic.append("u")
+                    semantic["u"] = True
 
                 attrs_dict = attrs_to_dict(attrs)
-                style_tags = tags_from_style(attrs_dict.get("style", ""))
-                class_tags = self._class_tags(attrs_dict.get("class", ""))
-                return unique_ordered_tags(semantic + class_tags + style_tags)
+                class_state = self._class_state(attrs_dict.get("class", ""))
+                style_state = _style_state_from_style(attrs_dict.get("style", ""))
+                return _merge_style_states(semantic, class_state, style_state)
 
-            def _push_frame(self, tag: str, tags: List[str]):
-                self._open_tags(tags, self.cell_chunks)
-                self.frames.append((tag, tags))
+            def _push_frame(self, tag: str, state: dict):
+                previous_state = self.current_state.copy()
+                next_state = _merge_style_states(previous_state, state)
+                self.current_state = self._transition_state(
+                    self.current_state,
+                    next_state,
+                    self.cell_chunks
+                )
+                self.frames.append((tag, previous_state))
 
             def _pop_frame(self, tag: str):
                 if not self.frames:
@@ -419,14 +470,23 @@ class Excel:
                 if idx < 0:
                     idx = len(self.frames) - 1
 
-                closing = self.frames[idx:]
+                previous_state = self.frames[idx][1]
                 del self.frames[idx:]
-                for _, tags in reversed(closing):
-                    self._close_tags(tags, self.cell_chunks)
+                self.current_state = self._transition_state(
+                    self.current_state,
+                    previous_state,
+                    self.cell_chunks
+                )
 
-            def _push_fragment_frame(self, tag: str, tags: List[str]):
-                self._open_tags(tags, self.fragment_chunks)
-                self.fragment_frames.append((tag, tags))
+            def _push_fragment_frame(self, tag: str, state: dict):
+                previous_state = self.fragment_state.copy()
+                next_state = _merge_style_states(previous_state, state)
+                self.fragment_state = self._transition_state(
+                    self.fragment_state,
+                    next_state,
+                    self.fragment_chunks
+                )
+                self.fragment_frames.append((tag, previous_state))
 
             def _pop_fragment_frame(self, tag: str):
                 if not self.fragment_frames:
@@ -439,27 +499,30 @@ class Excel:
                 if idx < 0:
                     idx = len(self.fragment_frames) - 1
 
-                closing = self.fragment_frames[idx:]
+                previous_state = self.fragment_frames[idx][1]
                 del self.fragment_frames[idx:]
-                for _, tags in reversed(closing):
-                    self._close_tags(tags, self.fragment_chunks)
+                self.fragment_state = self._transition_state(
+                    self.fragment_state,
+                    previous_state,
+                    self.fragment_chunks
+                )
 
             def _finalize_cell(self):
-                while self.frames:
-                    _, tags = self.frames.pop()
-                    self._close_tags(tags, self.cell_chunks)
-
-                self._close_tags(self.base_tags, self.cell_chunks)
+                self.current_state = self._transition_state(
+                    self.current_state,
+                    _empty_style_state(False),
+                    self.cell_chunks
+                )
 
                 rich = "".join(self.cell_chunks)
-                rich = re.sub(r"\s*<br>\s*", "<br>", rich).strip()
+                rich = _remove_empty_style_tags(re.sub(r"\s*<br>\s*", "<br>", rich)).strip()
                 plain = plain_from_rich(rich)
                 self.current_row.append(CellValue(plain=plain, rich_html=rich))
 
                 self.in_td = False
                 self.cell_chunks = []
-                self.base_tags = []
                 self.frames = []
+                self.current_state = _empty_style_state(False)
 
             def handle_starttag(self, tag, attrs):
                 tag = tag.lower()
@@ -478,8 +541,16 @@ class Excel:
                     self.seen_table_cell = True
                     self.cell_chunks = []
                     self.frames = []
-                    self.base_tags = self._tags_for_tag(tag, attrs)
-                    self._open_tags(self.base_tags, self.cell_chunks)
+                    self.current_state = _empty_style_state(False)
+                    base_state = _merge_style_states(
+                        self.current_state,
+                        self._state_for_tag(tag, attrs)
+                    )
+                    self.current_state = self._transition_state(
+                        self.current_state,
+                        base_state,
+                        self.cell_chunks
+                    )
                     return
 
                 if self.in_td:
@@ -487,14 +558,14 @@ class Excel:
                         self.cell_chunks.append("<br>")
                         return
 
-                    self._push_frame(tag, self._tags_for_tag(tag, attrs))
+                    self._push_frame(tag, self._state_for_tag(tag, attrs))
                     return
 
                 if not self.seen_table_cell:
                     if tag == "br":
                         self.fragment_chunks.append("<br>")
                         return
-                    self._push_fragment_frame(tag, self._tags_for_tag(tag, attrs))
+                    self._push_fragment_frame(tag, self._state_for_tag(tag, attrs))
 
             def handle_endtag(self, tag):
                 tag = tag.lower()
@@ -532,12 +603,15 @@ class Excel:
         parser.feed(html or "")
 
         if not parser.grid and parser.fragment_chunks:
-            while parser.fragment_frames:
-                _, tags = parser.fragment_frames.pop()
-                parser._close_tags(tags, parser.fragment_chunks)
+            parser.fragment_state = parser._transition_state(
+                parser.fragment_state,
+                _empty_style_state(False),
+                parser.fragment_chunks
+            )
+            parser.fragment_frames = []
 
             rich = "".join(parser.fragment_chunks)
-            rich = re.sub(r"\s*<br>\s*", "<br>", rich).strip()
+            rich = _remove_empty_style_tags(re.sub(r"\s*<br>\s*", "<br>", rich)).strip()
             plain = plain_from_rich(rich)
             if plain:
                 return [[CellValue(plain=plain, rich_html=rich)]]
@@ -572,38 +646,6 @@ class LibreOffice:
 
             return attrs_dict
 
-        def unique_ordered_tags(tags: List[str]) -> List[str]:
-            ordered = []
-            for tag in ("b", "i", "u"):
-                if tag in tags:
-                    ordered.append(tag)
-            return ordered
-
-        def tags_from_style(style_str: str) -> List[str]:
-            style = _parse_style(style_str)
-            tags = []
-
-            fw = style.get("font-weight", "")
-            if fw in ("bold", "bolder"):
-                tags.append("b")
-            else:
-                match = re.search(r"\d+", fw)
-                if match and int(match.group(0)) >= 600:
-                    tags.append("b")
-
-            if style.get("font-style", "") in ("italic", "oblique"):
-                tags.append("i")
-
-            decoration = " ".join([
-                style.get("text-decoration", ""),
-                style.get("text-decoration-line", ""),
-            ])
-            underline_style = style.get("text-underline-style", "")
-            if "underline" in decoration or (underline_style and underline_style != "none"):
-                tags.append("u")
-
-            return tags
-
         def plain_from_rich(rich: str) -> str:
             text = re.sub(r"<br\s*/?>", "\n", rich, flags=re.IGNORECASE)
             text = re.sub(r"<[^>]+>", "", text)
@@ -619,30 +661,31 @@ class LibreOffice:
                 self.seen_table_cell = False
                 self.cell_chunks: List[str] = []
                 self.style_text = []
-                self.classes_map: dict[str, List[str]] = {}
-                self.base_tags: List[str] = []
-                self.frames: List[tuple[str, List[str]]] = []
+                self.classes_map: dict[str, dict] = {}
+                self.current_state = _empty_style_state(False)
+                self.frames: List[tuple[str, dict]] = []
                 self.fragment_chunks: List[str] = []
-                self.fragment_frames: List[tuple[str, List[str]]] = []
+                self.fragment_state = _empty_style_state(False)
+                self.fragment_frames: List[tuple[str, dict]] = []
 
-            def _merge_class_tags(self, class_name: str, tags: List[str]):
-                if not tags:
+            def _merge_class_state(self, class_name: str, state: dict):
+                if not _style_state_has_values(state):
                     return
 
-                current = self.classes_map.get(class_name, [])
-                self.classes_map[class_name] = unique_ordered_tags(current + tags)
+                current = self.classes_map.get(class_name, _empty_style_state())
+                self.classes_map[class_name] = _merge_style_states(current, state)
 
             def _parse_css_block(self, css_text: str):
                 css_text = re.sub(r"/\*.*?\*/", "", css_text, flags=re.DOTALL)
                 for m in re.finditer(r"([^{}@]+)\{([^}]*)\}", css_text):
                     selectors = m.group(1)
-                    tags = tags_from_style(m.group(2))
-                    if not tags:
+                    state = _style_state_from_style(m.group(2))
+                    if not _style_state_has_values(state):
                         continue
 
                     for selector in selectors.split(","):
                         for cls in re.findall(r"\.([\w-]+)", selector):
-                            self._merge_class_tags(cls, tags)
+                            self._merge_class_state(cls, state)
 
             def _open_tags(self, tags: List[str], target: List[str]):
                 for tag in tags:
@@ -652,29 +695,49 @@ class LibreOffice:
                 for tag in reversed(tags):
                     target.append(f"</{tag}>")
 
-            def _class_tags(self, class_attr: str) -> List[str]:
-                tags = []
-                for cls in (class_attr or "").split():
-                    tags.extend(self.classes_map.get(cls, []))
-                return unique_ordered_tags(tags)
+            def _transition_state(self, current_state: dict, new_state: dict, target: List[str]) -> dict:
+                old_tags = _style_state_to_tags(current_state)
+                new_tags = _style_state_to_tags(new_state)
 
-            def _tags_for_tag(self, tag: str, attrs) -> List[str]:
-                semantic = []
+                common_len = 0
+                for old_tag, new_tag in zip(old_tags, new_tags):
+                    if old_tag != new_tag:
+                        break
+                    common_len += 1
+
+                self._close_tags(old_tags[common_len:], target)
+                self._open_tags(new_tags[common_len:], target)
+                return new_state.copy()
+
+            def _class_state(self, class_attr: str) -> dict:
+                state = _empty_style_state()
+                for cls in (class_attr or "").split():
+                    state = _merge_style_states(state, self.classes_map.get(cls, _empty_style_state()))
+                return state
+
+            def _state_for_tag(self, tag: str, attrs) -> dict:
+                semantic = _empty_style_state()
                 if tag in ("b", "strong"):
-                    semantic.append("b")
+                    semantic["b"] = True
                 elif tag in ("i", "em"):
-                    semantic.append("i")
+                    semantic["i"] = True
                 elif tag == "u":
-                    semantic.append("u")
+                    semantic["u"] = True
 
                 attrs_dict = attrs_to_dict(attrs)
-                class_tags = self._class_tags(attrs_dict.get("class", ""))
-                style_tags = tags_from_style(attrs_dict.get("style", ""))
-                return unique_ordered_tags(semantic + class_tags + style_tags)
+                class_state = self._class_state(attrs_dict.get("class", ""))
+                style_state = _style_state_from_style(attrs_dict.get("style", ""))
+                return _merge_style_states(semantic, class_state, style_state)
 
-            def _push_frame(self, tag: str, tags: List[str]):
-                self._open_tags(tags, self.cell_chunks)
-                self.frames.append((tag, tags))
+            def _push_frame(self, tag: str, state: dict):
+                previous_state = self.current_state.copy()
+                next_state = _merge_style_states(previous_state, state)
+                self.current_state = self._transition_state(
+                    self.current_state,
+                    next_state,
+                    self.cell_chunks
+                )
+                self.frames.append((tag, previous_state))
 
             def _pop_frame(self, tag: str):
                 if not self.frames:
@@ -687,14 +750,23 @@ class LibreOffice:
                 if idx < 0:
                     idx = len(self.frames) - 1
 
-                closing = self.frames[idx:]
+                previous_state = self.frames[idx][1]
                 del self.frames[idx:]
-                for _, tags in reversed(closing):
-                    self._close_tags(tags, self.cell_chunks)
+                self.current_state = self._transition_state(
+                    self.current_state,
+                    previous_state,
+                    self.cell_chunks
+                )
 
-            def _push_fragment_frame(self, tag: str, tags: List[str]):
-                self._open_tags(tags, self.fragment_chunks)
-                self.fragment_frames.append((tag, tags))
+            def _push_fragment_frame(self, tag: str, state: dict):
+                previous_state = self.fragment_state.copy()
+                next_state = _merge_style_states(previous_state, state)
+                self.fragment_state = self._transition_state(
+                    self.fragment_state,
+                    next_state,
+                    self.fragment_chunks
+                )
+                self.fragment_frames.append((tag, previous_state))
 
             def _pop_fragment_frame(self, tag: str):
                 if not self.fragment_frames:
@@ -707,27 +779,30 @@ class LibreOffice:
                 if idx < 0:
                     idx = len(self.fragment_frames) - 1
 
-                closing = self.fragment_frames[idx:]
+                previous_state = self.fragment_frames[idx][1]
                 del self.fragment_frames[idx:]
-                for _, tags in reversed(closing):
-                    self._close_tags(tags, self.fragment_chunks)
+                self.fragment_state = self._transition_state(
+                    self.fragment_state,
+                    previous_state,
+                    self.fragment_chunks
+                )
 
             def _finalize_cell(self):
-                while self.frames:
-                    _, tags = self.frames.pop()
-                    self._close_tags(tags, self.cell_chunks)
-
-                self._close_tags(self.base_tags, self.cell_chunks)
+                self.current_state = self._transition_state(
+                    self.current_state,
+                    _empty_style_state(False),
+                    self.cell_chunks
+                )
 
                 rich = "".join(self.cell_chunks)
-                rich = re.sub(r"\s*<br>\s*", "<br>", rich).strip()
+                rich = _remove_empty_style_tags(re.sub(r"\s*<br>\s*", "<br>", rich)).strip()
                 plain = plain_from_rich(rich)
                 self.current_row.append(CellValue(plain=plain, rich_html=rich))
 
                 self.in_td = False
                 self.cell_chunks = []
-                self.base_tags = []
                 self.frames = []
+                self.current_state = _empty_style_state(False)
 
             def handle_starttag(self, tag, attrs):
                 tag = tag.lower()
@@ -746,8 +821,16 @@ class LibreOffice:
                     self.seen_table_cell = True
                     self.cell_chunks = []
                     self.frames = []
-                    self.base_tags = self._tags_for_tag(tag, attrs)
-                    self._open_tags(self.base_tags, self.cell_chunks)
+                    self.current_state = _empty_style_state(False)
+                    base_state = _merge_style_states(
+                        self.current_state,
+                        self._state_for_tag(tag, attrs)
+                    )
+                    self.current_state = self._transition_state(
+                        self.current_state,
+                        base_state,
+                        self.cell_chunks
+                    )
                     return
 
                 if self.in_td:
@@ -755,7 +838,7 @@ class LibreOffice:
                         self.cell_chunks.append("<br>")
                         return
 
-                    self._push_frame(tag, self._tags_for_tag(tag, attrs))
+                    self._push_frame(tag, self._state_for_tag(tag, attrs))
                     return
 
                 if not self.seen_table_cell:
@@ -763,7 +846,7 @@ class LibreOffice:
                         self.fragment_chunks.append("<br>")
                         return
 
-                    self._push_fragment_frame(tag, self._tags_for_tag(tag, attrs))
+                    self._push_fragment_frame(tag, self._state_for_tag(tag, attrs))
 
             def handle_endtag(self, tag):
                 tag = tag.lower()
@@ -801,12 +884,15 @@ class LibreOffice:
         parser.feed(html or "")
 
         if not parser.grid and parser.fragment_chunks:
-            while parser.fragment_frames:
-                _, tags = parser.fragment_frames.pop()
-                parser._close_tags(tags, parser.fragment_chunks)
+            parser.fragment_state = parser._transition_state(
+                parser.fragment_state,
+                _empty_style_state(False),
+                parser.fragment_chunks
+            )
+            parser.fragment_frames = []
 
             rich = "".join(parser.fragment_chunks)
-            rich = re.sub(r"\s*<br>\s*", "<br>", rich).strip()
+            rich = _remove_empty_style_tags(re.sub(r"\s*<br>\s*", "<br>", rich)).strip()
             plain = plain_from_rich(rich)
             if plain:
                 return [[CellValue(plain=plain, rich_html=rich)]]
@@ -851,11 +937,16 @@ def router(html: str, texto: str) -> List[List[CellValue]]:
         return GoogleSheets.processar(html)
 
     # 2. Triagem Microsoft Excel
-    if "excel.sheet" in html_low or "progid content=excel" in html_low or "class=xl" in html_low:
+    if (
+        "excel.sheet" in html_low
+        or "progid content=excel" in html_low
+        or "class=xl" in html_low
+        or "microsoft excel" in html_low
+    ):
         return Excel.processar(html)
 
     # 3. Triagem LibreOffice Calc
-    if "libreoffice" in html_low or 'content="libreoffice' in html_low or "generator content=" in html_low:
+    if "libreoffice" in html_low or "openoffice" in html_low:
         return LibreOffice.processar(html)
 
     # 4. Fallback de Segurança: Se possui tags de tabela genéricas, usa o parser do Excel
