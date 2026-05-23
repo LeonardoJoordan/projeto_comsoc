@@ -1,10 +1,12 @@
+import re
+
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
                                QTableWidgetItem, QApplication, QMenu, QPushButton, QSpinBox,
                                QAbstractItemView)
 from PySide6.QtGui import QKeySequence, QFontMetrics, QAction
 from PySide6.QtCore import Qt, QTimer
 
-from .clipboard import parse_clipboard_html_table, parse_tsv
+from .clipboard import parse_clipboard_html_table, parse_tsv, parse_clipboard_html_fragment
 from .delegates import HTMLDelegate
 
 class RichTableWidget(QTableWidget):
@@ -167,18 +169,12 @@ class RichTableWidget(QTableWidget):
         grid_struct = []
         grid_style = []
 
-        if md.hasHtml():
-            try:
-                parsed = parse_clipboard_html_table(md.html())
-                if parsed:
-                    grid_struct = parsed
-                    grid_style = parsed
-            except Exception:
-                pass
-
-        if not grid_struct:
-            text_raw = md.text() if md.hasText() else ""
-            grid_struct = parse_tsv(text_raw)
+        # Chama diretamente o nosso Porteiro (router), passando HTML e Texto
+        html_raw = md.html() if md.hasHtml() else ""
+        text_raw = md.text() if md.hasText() else ""
+        
+        from .clipboard import router
+        grid_struct = router(html_raw, text_raw)
 
         if not grid_struct: return
 
@@ -191,7 +187,7 @@ class RichTableWidget(QTableWidget):
         
         if is_single_cell and len(selected_indexes) > 1:
             val_plain = grid_struct[0][0].plain
-            val_rich = grid_style[0][0].rich_html if (grid_style and len(grid_style) > 0 and len(grid_style[0]) > 0) else grid_struct[0][0].rich_html
+            val_rich = grid_struct[0][0].rich_html
             
             affected_cols_logical = set()
             for idx in selected_indexes:
@@ -247,7 +243,6 @@ class RichTableWidget(QTableWidget):
 
         for r, row_data in enumerate(grid_struct):
             dest_row = start_row + r
-            style_row = grid_style[r] if r < len(grid_style) else []
 
             # 1. Garante a inicialização da Coluna Qtd (Index 0)
             if has_qty_col:
@@ -261,7 +256,6 @@ class RichTableWidget(QTableWidget):
             if has_sig_col:
                 sig_item = self.item(dest_row, 1)
                 if sig_item is None:
-                    # Tenta copiar o estado da primeira linha ou assume Checked
                     default_chk = Qt.CheckState.Checked
                     if self.rowCount() > 0 and self.item(0, 1):
                         default_chk = self.item(0, 1).checkState()
@@ -272,7 +266,7 @@ class RichTableWidget(QTableWidget):
                     sig_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                     self.setItem(dest_row, 1, sig_item)
 
-            for c, cell_plain in enumerate(row_data):
+            for c, cell_data in enumerate(row_data):
                 target_visual_col = start_visual_col + c
                 if target_visual_col >= self.columnCount():
                     break
@@ -282,14 +276,10 @@ class RichTableWidget(QTableWidget):
                     item = QTableWidgetItem()
                     self.setItem(dest_row, dest_col_logical, item)
 
-                txt_val = cell_plain.plain
-                item.setText(txt_val)
+                item.setText(cell_data.plain)
+                item.setData(self.RICH_ROLE, cell_data.rich_html)
 
-                if c < len(style_row):
-                    rich_val = style_row[c].rich_html
-                    item.setData(self.RICH_ROLE, rich_val)
-                else:
-                    item.setData(self.RICH_ROLE, cell_plain.rich_html)
+                affected_cols_logical.add(dest_col_logical)
 
                 affected_cols_logical.add(dest_col_logical)
 

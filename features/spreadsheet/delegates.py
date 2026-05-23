@@ -2,7 +2,6 @@ import re
 from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QApplication, QTextEdit)
 from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont)
 from PySide6.QtCore import Qt
-from .clipboard import sanitize_inline_html
 
 class RichTextEditor(QTextEdit):
     def __init__(self, parent=None):
@@ -98,12 +97,10 @@ class HTMLDelegate(QStyledItemDelegate):
     def setModelData(self, editor, model, index):
         raw_html = editor.toHtml()
         html_content_only = re.sub(r'<(head|style|script)[^>]*>.*?</\1>', '', raw_html, flags=re.IGNORECASE | re.DOTALL)
-        clean_html = sanitize_inline_html(html_content_only)
         plain = editor.toPlainText()
         
-        model.setData(index, clean_html.strip(), Qt.ItemDataRole.UserRole)
-        model.setData(index, plain, Qt.ItemDataRole.DisplayRole)
+        # Como o editor do Qt gera um HTML muito poluído internamente ao editar,
+        # limpamos as tags estruturais pesadas e salvamos o fragmento direto
+        clean_html = re.sub(r'</?(html|body|meta|p)[^>]*>', '', html_content_only, flags=re.IGNORECASE).strip()
         
-        # Garante que o alinhamento central persista no modelo após a edição na coluna 0
-        if index.column() == 0:
-            model.setData(index, Qt.AlignmentFlag.AlignCenter, Qt.ItemDataRole.TextAlignmentRole)    
+        model.setData(index, clean_html, Qt.ItemDataRole.UserRole)
