@@ -2,6 +2,7 @@ from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont,
                            QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush,
                            QFontMetrics, QImageReader)
 from PySide6.QtCore import Qt, QPointF, QRectF
+from html import unescape
 import re
 from pathlib import Path
 from core.render_cache import get_background_proxy_path, infer_model_dir
@@ -114,7 +115,7 @@ class NativeRenderer:
         painter = QPainter(image)
         try:
             is_dynamic = (self._static_base_cache is not None)
-            self._paint_card(painter, row_rich, out_links, dynamic_only=is_dynamic)
+            self._paint_card(painter, row_rich, out_links, dynamic_only=is_dynamic, row_plain=row_plain)
         finally:
             painter.end()
         return image
@@ -127,7 +128,22 @@ class NativeRenderer:
         return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
     
 
-    def _paint_card(self, painter: QPainter, row_rich: dict, out_links: list = None, static_only: bool = False, dynamic_only: bool = False):
+    @staticmethod
+    def _normalize_link_url(raw_url) -> str:
+        if raw_url is None:
+            return ""
+
+        url = re.sub(r"<[^>]+>", "", str(raw_url))
+        url = unescape(url).strip()
+        if url and not url.startswith(("http://", "https://", "mailto:", "tel:")):
+            url = "https://" + url
+        return url
+
+    def _resolve_link_url(self, link_key: str, row_rich: dict, row_plain: dict = None) -> str:
+        values = row_plain if row_plain is not None and link_key in row_plain else row_rich
+        return self._normalize_link_url(values.get(link_key, ""))
+
+    def _paint_card(self, painter: QPainter, row_rich: dict, out_links: list = None, static_only: bool = False, dynamic_only: bool = False, row_plain: dict = None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
@@ -214,10 +230,8 @@ class NativeRenderer:
                     )
 
                     if img.get("has_link") and img.get("link_key"):
-                        url = row_rich.get(img["link_key"], "").strip()
+                        url = self._resolve_link_url(img["link_key"], row_rich, row_plain)
                         if url and out_links is not None:
-                            if not url.startswith(("http://", "https://", "mailto:", "tel:")):
-                                url = "https://" + url
                             out_links.append({"url": url, "rect": rect})
 
         def _is_empty_placeholder_value(var_name: str) -> bool:
@@ -284,7 +298,7 @@ class NativeRenderer:
             try:
                 html_resolved = self.resolve_html(html_processado, row_rich)
                 painter.setOpacity(box.get("opacity", 1.0))
-                self._draw_html_box(painter, box, html_resolved, row_rich, out_links)
+                self._draw_html_box(painter, box, html_resolved, row_rich, out_links, row_plain)
                 painter.setOpacity(1.0)
             except Exception as e:
                 print(f"[WARN] Erro ao desenhar caixa de texto: {e}")
@@ -336,7 +350,7 @@ class NativeRenderer:
                     )
     
     
-    def _draw_html_box(self, painter, box_data, html_text, row_rich=None, out_links=None):
+    def _draw_html_box(self, painter, box_data, html_text, row_rich=None, out_links=None, row_plain=None):
         painter.save()
         try:
             doc = QTextDocument()
@@ -450,11 +464,9 @@ class NativeRenderer:
             doc.drawContents(painter)
             
             # Mapeamento do Hiperlink isolado
-            if box_data.get("has_link") and box_data.get("link_key") and row_rich and out_links is not None:
-                url = row_rich.get(box_data["link_key"], "").strip()
+            if box_data.get("has_link") and box_data.get("link_key") and out_links is not None:
+                url = self._resolve_link_url(box_data["link_key"], row_rich or {}, row_plain)
                 if url:
-                    if not url.startswith(("http://", "https://", "mailto:", "tel:")):
-                        url = "https://" + url
                     ideal_w = min(doc.idealWidth(), w)
                     # Calcula x_start baseado no alinhamento horizontal
                     if align_str == "center":
