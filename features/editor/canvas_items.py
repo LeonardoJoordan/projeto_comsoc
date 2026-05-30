@@ -661,6 +661,7 @@ class Guideline(QGraphicsLineItem):
     def __init__(self, position_px, is_vertical=True):
         super().__init__()
         self.is_vertical = is_vertical
+        self._is_mouse_dragging = False
         
         if is_vertical:
             self.setLine(0, -20000, 0, 40000)
@@ -698,27 +699,29 @@ class Guideline(QGraphicsLineItem):
     
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionChange and self.scene():
-            if getattr(self, '_keyboard_move', False):
-                return value
             new_pos = value
-            rect = _document_rect(self.scene())
-            snap_dist = _get_dynamic_snap_distance(self.scene())
             
             if self.is_vertical:
                 x = new_pos.x()
-                candidates = [0, rect.width() / 2, rect.width()]
-                for c in candidates:
-                    if abs(x - c) < snap_dist:
-                        x = c
-                        break 
+                if self._is_mouse_dragging:
+                    rect = _document_rect(self.scene())
+                    snap_dist = _get_dynamic_snap_distance(self.scene())
+                    candidates = [0, rect.width() / 2, rect.width()]
+                    for c in candidates:
+                        if abs(x - c) < snap_dist:
+                            x = c
+                            break
                 return QPointF(x, 0)
             else:
                 y = new_pos.y()
-                candidates = [0, rect.height() / 2, rect.height()]
-                for c in candidates:
-                    if abs(y - c) < snap_dist:
-                        y = c
-                        break
+                if self._is_mouse_dragging:
+                    rect = _document_rect(self.scene())
+                    snap_dist = _get_dynamic_snap_distance(self.scene())
+                    candidates = [0, rect.height() / 2, rect.height()]
+                    for c in candidates:
+                        if abs(y - c) < snap_dist:
+                            y = c
+                            break
                 return QPointF(0, y)
             
         # --- Feedback visual: Muda apenas a cor quando selecionada ---
@@ -732,7 +735,14 @@ class Guideline(QGraphicsLineItem):
                 
         return super().itemChange(change, value)
 
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_mouse_dragging = True
+        super().mousePressEvent(event)
+
     def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._is_mouse_dragging = False
         super().mouseReleaseEvent(event)
         # Salva snapshot após mover a guia, igual aos outros itens
         scene = self.scene()
