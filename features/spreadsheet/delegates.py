@@ -104,3 +104,4 @@ class HTMLDelegate(QStyledItemDelegate):
         clean_html = re.sub(r'</?(html|body|meta|p)[^>]*>', '', html_content_only, flags=re.IGNORECASE).strip()
         
         model.setData(index, clean_html, Qt.ItemDataRole.UserRole)
+        model.setData(index, plain, Qt.ItemDataRole.DisplayRole)
