@@ -413,6 +413,7 @@ class MainWindow(QMainWindow):
 
     def _on_add_model(self):
         self.editor_window = EditorWindow(self)
+        self.editor_window.setWindowModality(Qt.WindowModality.WindowModal)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
         self.editor_window.show()
 
@@ -867,6 +868,7 @@ class MainWindow(QMainWindow):
                 return
 
         self.editor_window = EditorWindow(self)
+        self.editor_window.setWindowModality(Qt.WindowModality.WindowModal)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
 
         if json_path.exists():
