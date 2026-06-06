@@ -500,7 +500,19 @@ class EditorWindow(QMainWindow):
         self.btn_save.setMinimumHeight(50)
         self.btn_save.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; font-size: 14px;")
         self.btn_save.clicked.connect(self.export_to_json)
-        right_layout.addWidget(self.btn_save)
+
+        self.btn_close_editor = QPushButton("✕")
+        self.btn_close_editor.setMinimumHeight(50)
+        self.btn_close_editor.setFixedWidth(50)
+        self.btn_close_editor.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; font-size: 16px;")
+        self.btn_close_editor.setToolTip("Fechar editor sem salvar")
+        self.btn_close_editor.clicked.connect(self.close)
+
+        save_row = QHBoxLayout()
+        save_row.setSpacing(6)
+        save_row.addWidget(self.btn_save)
+        save_row.addWidget(self.btn_close_editor)
+        right_layout.addLayout(save_row)
 
         main_layout.addWidget(right_container)
 
