@@ -48,9 +48,9 @@ def build_app():
     elif sistema == "Darwin": # macOS
         cmd.append("--macos-create-app-bundle")
         cmd.append("--macos-app-mode=gui") 
-        cmd.append("--static-libpython=no") # Resolve o problema da biblioteca estática ausente no Python do Mac
+        cmd.append("--static-libpython=no") 
+        cmd.append(f"--output-filename={exe_name}") # Garante o nome correto da pasta .app
         
-        # Verifica se o arquivo .icns existe na raiz
         icon_path = base_dir / "icone.icns"
         if icon_path.exists():
             cmd.append(f"--macos-app-icon={icon_path}")
@@ -60,29 +60,29 @@ def build_app():
     
     try:
         os.makedirs("build", exist_ok=True)
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True)  # <-- ESSA LINHA PRECISA ESTAR AQUI PARA COMPILAR
         print(f"\n✅ Compilação Nuitka concluída! O executável base está na pasta 'build'.")
         
         if sistema == "Darwin":
-            print("\n🍎 Iniciando a criação do .DMG para macOS...")
-            # O create-dmg precisa ser instalado no Mac M1 emprestado rodando: brew install create-dmg
+            print("\n🍎 Iniciando a criação do .DMG nativo para macOS...")
+            app_path = Path("build") / f"{exe_name}.app"
+            dmg_output = "Projeto_COMSOC_Instalador.dmg"
+            
+            # Garante a renomeação caso o Nuitka ignore a flag externa
+            if not app_path.exists() and Path("build/main.app").exists():
+                os.rename("build/main.app", app_path)
+            
             try:
                 subprocess.run([
-                    "create-dmg",
-                    "--volname", "Instalador COMSOC",
-                    "--window-pos", "200", "120",
-                    "--window-size", "800", "400",
-                    "--icon-size", "100",
-                    "--hide-extension", f"{exe_name}.app",
-                    "--app-drop-link", "600", "185",
-                    "Projeto_ComSoc_Instalador.dmg",
-                    "build/"
+                    "hdiutil", "create",
+                    "-volname", "Instalador COMSOC",
+                    "-srcfolder", str(app_path),
+                    "-ov", "-format", "UDZO",
+                    dmg_output
                 ], check=True)
-                print("✅ DMG gerado com sucesso na raiz do projeto!")
-            except FileNotFoundError:
-                print("⚠️ Aviso: 'create-dmg' não encontrado. Instale rodando no terminal do Mac: brew install create-dmg")
+                print(f"✅ DMG simplificado gerado com sucesso: {dmg_output}")
             except Exception as e:
-                print(f"❌ Erro ao criar DMG (se o arquivo .dmg já existir, apague-o antes de recompilar): {e}")
+                print(f"❌ Erro ao criar o DMG via hdiutil: {e}")
 
     except subprocess.CalledProcessError as e:
         print(f"\n❌ Erro durante a compilação: {e}")
