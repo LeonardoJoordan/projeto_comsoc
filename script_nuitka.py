@@ -69,7 +69,10 @@ def build_app():
             dmg_output = "Projeto_COMSOC_Instalador.dmg"
             
             # Garante a renomeação caso o Nuitka ignore a flag externa
-            if not app_path.exists() and Path("build/main.app").exists():
+            if Path("build/main.app").exists():
+                if app_path.exists():
+                    import shutil
+                    shutil.rmtree(app_path)
                 os.rename("build/main.app", app_path)
             
             try:
