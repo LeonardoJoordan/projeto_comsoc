@@ -47,6 +47,8 @@ def build_app():
 
     elif sistema == "Darwin": # macOS
         cmd.append("--macos-create-app-bundle")
+        cmd.append("--macos-app-mode=gui") 
+        cmd.append("--static-libpython=no") # Resolve o problema da biblioteca estática ausente no Python do Mac
         
         # Verifica se o arquivo .icns existe na raiz
         icon_path = base_dir / "icone.icns"
@@ -59,7 +61,29 @@ def build_app():
     try:
         os.makedirs("build", exist_ok=True)
         subprocess.run(cmd, check=True)
-        print(f"\n✅ Missão Cumprida! O executável '{exe_name}' está pronto na pasta 'build'.")
+        print(f"\n✅ Compilação Nuitka concluída! O executável base está na pasta 'build'.")
+        
+        if sistema == "Darwin":
+            print("\n🍎 Iniciando a criação do .DMG para macOS...")
+            # O create-dmg precisa ser instalado no Mac M1 emprestado rodando: brew install create-dmg
+            try:
+                subprocess.run([
+                    "create-dmg",
+                    "--volname", "Instalador COMSOC",
+                    "--window-pos", "200", "120",
+                    "--window-size", "800", "400",
+                    "--icon-size", "100",
+                    "--hide-extension", f"{exe_name}.app",
+                    "--app-drop-link", "600", "185",
+                    "Projeto_ComSoc_Instalador.dmg",
+                    "build/"
+                ], check=True)
+                print("✅ DMG gerado com sucesso na raiz do projeto!")
+            except FileNotFoundError:
+                print("⚠️ Aviso: 'create-dmg' não encontrado. Instale rodando no terminal do Mac: brew install create-dmg")
+            except Exception as e:
+                print(f"❌ Erro ao criar DMG (se o arquivo .dmg já existir, apague-o antes de recompilar): {e}")
+
     except subprocess.CalledProcessError as e:
         print(f"\n❌ Erro durante a compilação: {e}")
 

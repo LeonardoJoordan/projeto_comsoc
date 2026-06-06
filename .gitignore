@@ -25,6 +25,7 @@ dist/
 .flatpak-builder/
 build-dir/
 repo/
+*.dmg
 
 
 # Sistema Operacional / IDE
