@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidg
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
                                QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut,
-                           QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap)
+                           QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
+                           QFont, QFontDatabase, QFontInfo)
 from PySide6.QtCore import Qt, Signal, QEvent, QRectF
 
 from .canvas_items import (DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem,
@@ -26,6 +27,19 @@ from core.render_cache import ensure_background_proxy
 
 class EditorWindow(QMainWindow):
     modelSaved = Signal(str, list, str)
+
+    @staticmethod
+    def _normalized_font_name(name: str) -> str:
+        return " ".join(str(name or "").strip().casefold().split())
+
+    @classmethod
+    def _resolve_editor_font_family(cls, family: str, available_fonts: set[str]) -> str:
+        requested = str(family or "Arial").strip() or "Arial"
+        if cls._normalized_font_name(requested) in available_fonts:
+            return requested
+
+        resolved = QFontInfo(QFont(requested)).family().strip()
+        return resolved or requested
 
     def _apply_tooltip(self, widget, text):
         """Aplica tooltip e garante que labels estáticos capturem o evento no motor customizado."""
@@ -2144,6 +2158,7 @@ class EditorWindow(QMainWindow):
                     img.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
         # Caixas de Texto
+        available_fonts = {self._normalized_font_name(family) for family in QFontDatabase.families()}
         for b in data.get("boxes", []):
             box = DesignerBox(
                 x=b.get("x", 0), 
@@ -2158,7 +2173,7 @@ class EditorWindow(QMainWindow):
             if "html" in b:
                 box.state.html_content = b["html"]
                 
-            box.state.font_family = b.get("font_family", "Arial")
+            box.state.font_family = self._resolve_editor_font_family(b.get("font_family", "Arial"), available_fonts)
             box.state.font_size = b.get("font_size", 16)
             box.state.font_color = b.get("font_color", "#000000")
             box.state.vertical_align = b.get("vertical_align", "top")
