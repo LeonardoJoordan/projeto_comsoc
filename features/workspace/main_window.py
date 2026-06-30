@@ -21,6 +21,7 @@ from features.generator.renderer import NativeRenderer
 from features.editor.editor_window import EditorWindow
 from features.generator.manager import RenderManager
 from features.generator.export_dialog import ConfigDialog
+from features.generator.preset_warnings import warning_display_name, warning_tooltip
 from features.workspace.import_models_dialog import ImportModelsDialog
 from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
@@ -192,10 +193,12 @@ class MainWindow(QMainWindow):
             "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
         row_presets_main.addWidget(lbl_layout)
         row_presets_main.addWidget(self.cbo_presets_main, 1)
-        self._apply_tooltip(self.cbo_presets_main,
+        self._presets_main_base_tooltip = (
             "<b>PREDEFINIÇÃO DE IMPRESSÃO</b><br><br>"
             "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
+            "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>"
+        )
+        self._apply_tooltip(self.cbo_presets_main, self._presets_main_base_tooltip)
         col_right_footer.addLayout(row_presets_main)
 
         ly_footer.addWidget(widget_right_footer, 0) # Adiciona o Widget em vez do Layout isolado
@@ -1265,21 +1268,28 @@ class MainWindow(QMainWindow):
         self.cbo_presets_main.clear()
 
         # O preset de sistema sempre existe, mesmo sem modelo carregado
-        self.cbo_presets_main.addItem(SYSTEM_PRESET)
+        self.cbo_presets_main.addItem(SYSTEM_PRESET, SYSTEM_PRESET)
         self.cbo_presets_main.setEnabled(True)
 
         if self.cached_model_data:
             imp_settings = self.cached_model_data.setdefault("imposition_settings", {})
             presets = imp_settings.get("presets", {}) or {}
             active_name = imp_settings.get("active_preset_name", "")
+            model_w, model_h = self._get_model_base_print_size_mm()
 
             user_presets = sorted(k for k in presets.keys() if k != SYSTEM_PRESET)
             for name in user_presets:
-                self.cbo_presets_main.addItem(name)
+                preset = presets.get(name, {}) or {}
+                label = warning_display_name(name, preset, model_w, model_h)
+                self.cbo_presets_main.addItem(label, name)
+                idx = self.cbo_presets_main.count() - 1
+                tooltip = warning_tooltip(name, preset, model_w, model_h)
+                if tooltip:
+                    self.cbo_presets_main.setItemData(idx, tooltip, Qt.ItemDataRole.ToolTipRole)
 
             # Sincroniza a seleção com o preset ativo salvo
             if active_name and active_name != SYSTEM_PRESET:
-                idx = self.cbo_presets_main.findText(active_name)
+                idx = self.cbo_presets_main.findData(active_name, Qt.ItemDataRole.UserRole)
                 if idx >= 0:
                     self.cbo_presets_main.setCurrentIndex(idx)
                 else:
@@ -1295,13 +1305,14 @@ class MainWindow(QMainWindow):
                     self._update_template_json({"imposition_settings": imp_settings})
 
         self.cbo_presets_main.blockSignals(False)
+        self._refresh_main_preset_tooltip()
 
     def _on_main_preset_changed(self, index):
         """Atualiza qual predefinição será usada, sem sobrescrever o modelo base."""
         SYSTEM_PRESET = self.SYSTEM_IMPOSITION_PRESET
         if not self.cached_model_data or index < 0: return
         
-        name = self.cbo_presets_main.itemText(index)
+        name = self._main_preset_name_at(index)
         
         imp = self.cached_model_data.setdefault("imposition_settings", {})
 
@@ -1310,6 +1321,7 @@ class MainWindow(QMainWindow):
             imp["active_preset_name"] = SYSTEM_PRESET
             self._update_template_json({"imposition_settings": imp})
             self.log_panel.append(f"⚡ Layout aplicado: <b>{SYSTEM_PRESET}</b>")
+            self._refresh_main_preset_tooltip()
             return
 
         presets = imp.get("presets", {}) or {}
@@ -1317,6 +1329,23 @@ class MainWindow(QMainWindow):
             imp["active_preset_name"] = name
             self._update_template_json({"imposition_settings": imp})
             self.log_panel.append(f"⚡ Layout aplicado: <b>{name}</b>")
+        self._refresh_main_preset_tooltip()
+
+    def _main_preset_name_at(self, index):
+        name = self.cbo_presets_main.itemData(index, Qt.ItemDataRole.UserRole)
+        return name if name else self.cbo_presets_main.itemText(index)
+
+    def _refresh_main_preset_tooltip(self):
+        if not self.cached_model_data:
+            self.cbo_presets_main.setToolTip(self._presets_main_base_tooltip)
+            return
+
+        name = self._main_preset_name_at(self.cbo_presets_main.currentIndex())
+        imp_settings = self.cached_model_data.get("imposition_settings", {}) or {}
+        preset = (imp_settings.get("presets", {}) or {}).get(name, {})
+        model_w, model_h = self._get_model_base_print_size_mm()
+        tooltip = warning_tooltip(name, preset, model_w, model_h)
+        self.cbo_presets_main.setToolTip(tooltip or self._presets_main_base_tooltip)
     
 
    

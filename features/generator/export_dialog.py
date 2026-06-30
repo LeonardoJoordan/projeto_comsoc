@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
                                QComboBox, QMessageBox, QInputDialog)
 from PySide6.QtCore import Qt
 from .imposition import SheetAssembler
+from .preset_warnings import warning_display_name, warning_tooltip, with_model_ratio_snapshot
 
 class ConfigDialog(QDialog):
     def __init__(self, parent, model_slug: str, available_vars: list[str], 
@@ -131,13 +132,15 @@ class ConfigDialog(QDialog):
             "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
             "<small style='color: #A0A0A0;'>Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>")
         ly_combo_row.addWidget(lbl_preset)
-        self.cmb_presets.setToolTip(
+        self._preset_combo_base_tooltip = (
             "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
             "Atalho para carregar e salvar conjuntos completos de configurações de impressão:<br>"
             "• <b>Salvar Novo:</b> Cria uma predefinição com as configurações atuais da tela.<br>"
             "• <b>Atualizar:</b> Sobrescreve a predefinição selecionada com as configurações atuais.<br>"
             "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>")
+            "<small style='color: #A0A0A0;'>Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>"
+        )
+        self.cmb_presets.setToolTip(self._preset_combo_base_tooltip)
         ly_combo_row.addWidget(self.cmb_presets, 1)
         
         ly_buttons_row = QHBoxLayout()
@@ -433,14 +436,20 @@ class ConfigDialog(QDialog):
         self.cmb_presets.blockSignals(True)
         self.cmb_presets.clear()
         
-        self.cmb_presets.addItem(self.SYSTEM_PRESET_NAME)
+        self.cmb_presets.addItem(self.SYSTEM_PRESET_NAME, self.SYSTEM_PRESET_NAME)
 
         user_presets = sorted(k for k in self.presets.keys() if k != self.SYSTEM_PRESET_NAME)
         for name in user_presets:
-            self.cmb_presets.addItem(name)
+            preset = self.presets.get(name, {}) or {}
+            label = warning_display_name(name, preset, self.model_print_w_mm, self.model_print_h_mm)
+            self.cmb_presets.addItem(label, name)
+            idx = self.cmb_presets.count() - 1
+            tooltip = warning_tooltip(name, preset, self.model_print_w_mm, self.model_print_h_mm)
+            if tooltip:
+                self.cmb_presets.setItemData(idx, tooltip, Qt.ItemDataRole.ToolTipRole)
 
         if self.active_preset_name and self.active_preset_name in self.presets:
-            idx = self.cmb_presets.findText(self.active_preset_name)
+            idx = self.cmb_presets.findData(self.active_preset_name, Qt.ItemDataRole.UserRole)
             if idx >= 0:
                 self.cmb_presets.setCurrentIndex(idx)
             else:
@@ -455,10 +464,11 @@ class ConfigDialog(QDialog):
         self.btn_del_preset.setEnabled(not is_system)
 
         self.cmb_presets.blockSignals(False)
+        self._refresh_preset_combo_tooltip()
 
     def _on_preset_selected(self, index):
         if index < 0: return
-        name = self.cmb_presets.itemText(index)
+        name = self._preset_name_at(index)
 
         if name == self.SYSTEM_PRESET_NAME:
             self.chk_imposition.setChecked(False)
@@ -485,10 +495,11 @@ class ConfigDialog(QDialog):
             self.active_preset_name = name
             self.btn_rename_preset.setEnabled(True)
             self.btn_del_preset.setEnabled(True)
+        self._refresh_preset_combo_tooltip()
 
     def _get_current_settings(self):
         """Coleta as configurações atuais da tela."""
-        return {
+        settings = {
             "sheet_w": self.spin_sheet_w_mm.value(),
             "sheet_h": self.spin_sheet_h_mm.value(),
             "enabled": self.chk_imposition.isChecked(),
@@ -497,6 +508,17 @@ class ConfigDialog(QDialog):
             "crop": self.chk_crop_marks.isChecked(),
             "bleed": self.chk_bleed.isChecked()
         }
+        return with_model_ratio_snapshot(settings, self.model_print_w_mm, self.model_print_h_mm)
+
+    def _preset_name_at(self, index):
+        name = self.cmb_presets.itemData(index, Qt.ItemDataRole.UserRole)
+        return name if name else self.cmb_presets.itemText(index)
+
+    def _refresh_preset_combo_tooltip(self):
+        name = self._preset_name_at(self.cmb_presets.currentIndex())
+        preset = self.presets.get(name, {}) if name != self.SYSTEM_PRESET_NAME else {}
+        tooltip = warning_tooltip(name, preset, self.model_print_w_mm, self.model_print_h_mm)
+        self.cmb_presets.setToolTip(tooltip or self._preset_combo_base_tooltip)
 
     def _save_new_preset(self, default_name=""):
         # Se chamado pelo clique do botão, default_name será um booleano (checked state)
