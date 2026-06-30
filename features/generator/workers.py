@@ -154,8 +154,8 @@ class PageRenderWorker(QThread):
                 # A folha física agora é gerada com precisão em milímetros baseada na montagem final
                 writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
                 layout = writer.pageLayout()
-                w_sheet_mm = (self.assembler.sheet_w * 25.4) / 300.0
-                h_sheet_mm = (self.assembler.sheet_h * 25.4) / 300.0
+                w_sheet_mm = self.assembler.sheet_w_mm
+                h_sheet_mm = self.assembler.sheet_h_mm
                 layout.setPageSize(QPageSize(QSizeF(w_sheet_mm, h_sheet_mm), QPageSize.Unit.Millimeter))
                 layout.setOrientation(self.assembler.orientation)
                 layout.setMargins(QMarginsF(0, 0, 0, 0))
@@ -190,8 +190,8 @@ class PageRenderWorker(QThread):
                         # Mesmo cálculo milimétrico para os PDFs Avulsos do modo de Imposição
                         writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
                         layout_single = writer_single.pageLayout()
-                        w_sheet_mm = (self.assembler.sheet_w * 25.4) / 300.0
-                        h_sheet_mm = (self.assembler.sheet_h * 25.4) / 300.0
+                        w_sheet_mm = self.assembler.sheet_w_mm
+                        h_sheet_mm = self.assembler.sheet_h_mm
                         layout_single.setPageSize(QPageSize(QSizeF(w_sheet_mm, h_sheet_mm), QPageSize.Unit.Millimeter))
                         layout_single.setMargins(QMarginsF(0, 0, 0, 0))
                         writer_single.setPageLayout(layout_single)
