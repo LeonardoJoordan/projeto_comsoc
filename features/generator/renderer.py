@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt, QPointF, QRectF
 from html import unescape
 import re
 from pathlib import Path
+from core.html_utils import normalize_text_decoration
 from core.render_cache import get_background_proxy_path, infer_model_dir
 
 class NativeRenderer:
@@ -359,7 +360,7 @@ class NativeRenderer:
             # Limpeza Retroativa
             clean_html = re.sub(r"color\s*:[^;\"]+;?", "", html_text)
             clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
-            clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+            clean_html = normalize_text_decoration(clean_html)
             clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
             clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", clean_html)
             clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)

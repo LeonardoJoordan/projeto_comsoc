@@ -9,6 +9,7 @@ from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
                            QImageReader, QPainterPath, QFontMetrics, QPainter,
                            QImageIOHandler)
+from core.html_utils import normalize_text_decoration
 from core.text_state import TextState
 
 DPI = 300
@@ -1132,7 +1133,7 @@ class DesignerBox(QGraphicsRectItem):
         html = re.sub(r"font-size\s*:[^;\"]+;?", "", html)
         html = re.sub(r"color\s*:[^;\"]+;?", "", html)
         html = re.sub(r"background-color\s*:[^;\"]+;?", "", html)
-        html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", html)
+        html = normalize_text_decoration(html)
         html = re.sub(r"(?i)<a\b[^>]*>", "", html)
         html = re.sub(r"(?i)</a>", "", html)
         html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", html)

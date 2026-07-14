@@ -8,6 +8,7 @@ import re
 
 from .canvas_items import DesignerBox, SignatureItem, ImageItem, BackgroundItem, px_to_mm
 from core.custom_widgets import MathDoubleSpinBox
+from core.html_utils import normalize_text_decoration
 
 
 class CleanTextEdit(QTextEdit):
@@ -26,7 +27,7 @@ class CleanTextEdit(QTextEdit):
             clean = re.sub(r"font-size\s*:[^;\"]+;?", "", clean)
             clean = re.sub(r"color\s*:[^;\"]+;?", "", clean)
             clean = re.sub(r"background-color\s*:[^;\"]+;?", "", clean)
-            clean = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean)
+            clean = normalize_text_decoration(clean)
             clean = re.sub(r"line-height\s*:[^;\"]+;?", "", clean)
             clean = re.sub(r"(?i)<a\b[^>]*>", "", clean)
             clean = re.sub(r"(?i)</a>", "", clean)
@@ -734,7 +735,7 @@ class EditorDeTextoPanel(QWidget):
         clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"color\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
-        clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+        clean_html = normalize_text_decoration(clean_html)
         clean_html = re.sub(r"line-height\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
         clean_html = re.sub(r"(?i)</a>", "", clean_html)
@@ -849,7 +850,7 @@ class EditorDeTextoPanel(QWidget):
         clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"color\s*:[^;\"]+;?", "", clean_html)
         clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
-        clean_html = re.sub(r"text-decoration\s*:[^;\"]+;?", "", clean_html)
+        clean_html = normalize_text_decoration(clean_html)
         clean_html = re.sub(r"line-height\s*:[^;\"]+;?", "", clean_html)
         
         # Extermina Hiperlinks fantasmas (tags <a>) mantendo apenas o texto limpo
