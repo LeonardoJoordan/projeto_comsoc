@@ -173,7 +173,7 @@ O sistema pode gerar arquivos de saída em diferentes formatos conforme a finali
 
 - **PNG:** ideal para envio por WhatsApp, e-mail, redes internas ou publicação digital.
 - **PDF único e multipágina:** indicado para impressão, arquivamento, envio formal e produção gráfica. O sistema permite consolidar centenas de cartões, diplomas ou documentos personalizados em um único arquivo PDF, distribuídos em múltiplas páginas. Quando configurado para impressão em lote, o C.O.M.S.O.C. pode organizar vários itens por página, já com marcas de corte, facilitando o processo de produção física. Dessa forma, o usuário precisa apenas abrir um único documento e enviar todas as páginas para impressão, evitando o trabalho manual de abrir e imprimir arquivo por arquivo.
-- **PDF interativo com hiperlinks vivos:** quando aplicável, elementos visuais do layout podem receber links clicáveis reais por meio da integração com PyMuPDF. Esse recurso permite criar convites digitais, cartões institucionais e documentos interativos com botões para confirmação de presença via Google Forms, WhatsApp ou e-mail, além de mapas ou ícones de localização que direcionam o destinatário ao Google Maps ou a aplicativos de GPS para traçar a rota até o local do evento com apenas um clique.
+- **PDF interativo com hiperlinks vivos:** quando aplicável, elementos visuais do layout podem receber links clicáveis reais por meio da integração com pypdf. Esse recurso permite criar convites digitais, cartões institucionais e documentos interativos com botões para confirmação de presença via Google Forms, WhatsApp ou e-mail, além de mapas ou ícones de localização que direcionam o destinatário ao Google Maps ou a aplicativos de GPS para traçar a rota até o local do evento com apenas um clique.
 
 ### 5.7 Processamento em lote com multithreading
 
@@ -265,7 +265,7 @@ Embora o projeto tenha origem em uma demanda ligada à Comunicação Social e ao
 - **Modelo de operação:** local/offline-first
 - **Plataformas-alvo:** Windows, Linux e macOS
 - **Processamento:** geração em lote com suporte a multithreading
-- **PDF:** exportação e injeção de hiperlinks por PyMuPDF, quando aplicável
+- **PDF:** exportação pelo Qt e injeção de hiperlinks por pypdf, quando aplicável
 
 ### 7.2 Componentes conceituais
 

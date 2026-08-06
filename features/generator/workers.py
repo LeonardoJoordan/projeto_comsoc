@@ -1,10 +1,10 @@
 import traceback
 import shutil
-import fitz 
 from PySide6.QtCore import QThread, Signal, QSizeF, QMarginsF
 from PySide6.QtGui import QImage, QPainter, QPdfWriter, QPageLayout, QPageSize
 
 from .imposition import SheetAssembler
+from .pdf_links import inject_pdf_links
 
 
 class DirectRenderWorker(QThread):
@@ -72,33 +72,14 @@ class DirectRenderWorker(QThread):
                         # --- PÓS-PROCESSAMENTO: Injeção de Hiperlinks ---
                         if local_links and not self.single_pdf:
                             try:
-                                pdf_doc = fitz.open(str(out_path))
-                                page = pdf_doc[0]
-                                
-                                page_rect = page.rect
                                 canvas_w = self.renderer.tpl.get("canvas_size", {}).get("w", 1000)
                                 canvas_h = self.renderer.tpl.get("canvas_size", {}).get("h", 1000)
-                                
-                                scale_x = page_rect.width / canvas_w
-                                scale_y = page_rect.height / canvas_h
-                                
-                                for link_data in local_links:
-                                    r = link_data["rect"]
-                                    url = link_data["url"]
-                                    
-                                    x0 = r.x() * scale_x
-                                    y0 = r.y() * scale_y
-                                    x1 = (r.x() + r.width()) * scale_x
-                                    y1 = (r.y() + r.height()) * scale_y
-                                    
-                                    link_rect = fitz.Rect(x0, y0, x1, y1)
-                                    page.insert_link({"kind": fitz.LINK_URI, "from": link_rect, "uri": url})
-                                
-                                # TRUQUE: Salva em um arquivo .tmp e move por cima. Burla 100% o File Lock.
-                                tmp_path = str(out_path) + ".tmp"
-                                pdf_doc.save(tmp_path)
-                                pdf_doc.close()
-                                shutil.move(tmp_path, str(out_path))
+                                inject_pdf_links(
+                                    out_path,
+                                    {0: local_links},
+                                    canvas_w,
+                                    canvas_h,
+                                )
                                 
                             except Exception as e:
                                 self.error_occurred.emit(f"Falha ao injetar links no PDF {out_path.name}: {e}")
@@ -286,34 +267,12 @@ class HybridAssemblerWorker(QThread):
             # --- PÓS-PROCESSAMENTO: Injeção de Hiperlinks no PDF Único ---
             if not self.is_imposition and self.all_links:
                 try:
-                    pdf_doc = fitz.open(str(out_path_single))
-                    # O PDF único terá várias páginas, uma para cada cartão
-                    for page_idx, links in self.all_links.items():
-                        if page_idx >= len(pdf_doc): continue
-                        
-                        page = pdf_doc[page_idx]
-                        page_rect = page.rect
-                        
-                        # Cálculo de escala (assumindo que todas as páginas têm o mesmo tamanho)
-                        # Buscamos o canvas_size do template via manager se necessário, ou usamos proporção
-                        # Como é o modo híbrido, a imagem original foi gerada no tamanho do canvas
-                        # Aqui usamos uma lógica de proporção simples baseada no rect da página
-                        scale_x = page_rect.width / self.canvas_w
-                        scale_y = page_rect.height / self.canvas_h
-
-                        for link_data in links:
-                            r = link_data["rect"]
-                            url = link_data["url"]
-                            link_rect = fitz.Rect(
-                                r.x() * scale_x, 
-                                r.y() * scale_y, 
-                                (r.x() + r.width()) * scale_x, 
-                                (r.y() + r.height()) * scale_y
-                            )
-                            page.insert_link({"kind": fitz.LINK_URI, "from": link_rect, "uri": url})
-                    
-                    pdf_doc.saveIncr()
-                    pdf_doc.close()
+                    inject_pdf_links(
+                        out_path_single,
+                        self.all_links,
+                        self.canvas_w,
+                        self.canvas_h,
+                    )
                 except Exception as e:
                     print(f"[WARN] Erro ao injetar links no PDF Híbrido: {e}")
 

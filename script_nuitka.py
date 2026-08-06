@@ -25,8 +25,7 @@ def build_app():
         "--include-package=features",
         "--include-package=core",
         "--include-package=shared",
-        "--include-package=fitz",
-        "--include-package=pymupdf",
+        "--include-package=pypdf",
         "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
         "--lto=no",                     
         "--jobs=32",                    # Deixa o Ryzen 9 brilhar
