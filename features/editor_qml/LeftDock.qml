@@ -8,11 +8,7 @@ Rectangle {
     id: root
 
     property int selectedLayer: 0
-    property bool guidesVisible: true
-    property bool guidesLocked: false
-
-    signal guidesVisibilityRequested(bool visible)
-    signal guidesLockRequested(bool locked)
+    signal layerSelected(int layerIndex, string kind, string title, string content)
 
     color: Theme.panel
     border.width: 1
@@ -56,7 +52,7 @@ Rectangle {
             Layout.rightMargin: 10
             Layout.topMargin: 10
             Layout.bottomMargin: 10
-            columns: 2
+            columns: 1
             columnSpacing: 7
             rowSpacing: 7
 
@@ -68,19 +64,19 @@ Rectangle {
                         detail: "Campo dinâmico"
                     },
                     {
+                        icon: "shape",
+                        title: "Formas",
+                        detail: "Preenchimento e borda"
+                    },
+                    {
                         icon: "image",
-                        title: "Imagem",
+                        title: "Imagens",
                         detail: "Foto, logo ou QR"
                     },
                     {
                         icon: "signature",
                         title: "Assinatura",
                         detail: "Imagem opcional"
-                    },
-                    {
-                        icon: "image",
-                        title: "Fundo",
-                        detail: "Base do documento"
                     }
                 ]
 
@@ -90,8 +86,12 @@ Rectangle {
                     required property var modelData
 
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 58
+                    Layout.preferredHeight: 43.5
+                    enabled: modelData.icon !== "shape"
                     hoverEnabled: true
+                    ToolTip.visible: hovered
+                    ToolTip.text: modelData.icon === "shape" ? "Formas: integração pendente" : modelData.title
+                    onClicked: editor.addItem(modelData.icon === "signature" ? "signature" : modelData.icon)
 
                     contentItem: RowLayout {
                         spacing: 8
@@ -154,107 +154,6 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 82
-            color: Theme.panel
-
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 10
-                anchors.topMargin: 8
-                anchors.bottomMargin: 8
-                spacing: 7
-
-                RowLayout {
-                    Layout.fillWidth: true
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "GUIAS"
-                        color: Theme.textMuted
-                        font.pixelSize: 9
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0.7
-                    }
-
-                    ToolButton {
-                        id: guideEyeButton
-                        Layout.preferredWidth: 26
-                        Layout.preferredHeight: 26
-                        checkable: true
-                        checked: root.guidesVisible
-                        hoverEnabled: true
-                        onClicked: root.guidesVisibilityRequested(checked)
-                        ToolTip.visible: hovered
-                        ToolTip.text: checked ? "Ocultar guias" : "Mostrar guias"
-
-                        contentItem: EditorIcon {
-                            anchors.centerIn: parent
-                            width: 13
-                            height: 13
-                            name: "eye"
-                            color: guideEyeButton.checked ? Theme.guide : Theme.textDisabled
-                        }
-
-                        background: Rectangle {
-                            radius: 5
-                            color: guideEyeButton.hovered ? Theme.panelHover : "transparent"
-                        }
-                    }
-
-                    ToolButton {
-                        id: guideLockButton
-                        Layout.preferredWidth: 26
-                        Layout.preferredHeight: 26
-                        checkable: true
-                        checked: root.guidesLocked
-                        hoverEnabled: true
-                        onClicked: root.guidesLockRequested(checked)
-                        ToolTip.visible: hovered
-                        ToolTip.text: checked ? "Desbloquear guias" : "Bloquear guias"
-
-                        contentItem: EditorIcon {
-                            anchors.centerIn: parent
-                            width: 13
-                            height: 13
-                            name: "lock"
-                            color: guideLockButton.checked ? Theme.warning : Theme.textDisabled
-                        }
-
-                        background: Rectangle {
-                            radius: 5
-                            color: guideLockButton.hovered ? Theme.panelHover : "transparent"
-                        }
-                    }
-                }
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 7
-
-                    UiButton {
-                        Layout.fillWidth: true
-                        text: "Guia vertical"
-                        compact: true
-                    }
-
-                    UiButton {
-                        Layout.fillWidth: true
-                        text: "Guia horizontal"
-                        compact: true
-                    }
-                }
-            }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            color: Theme.borderStrong
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
             Layout.preferredHeight: 42
             color: Theme.chrome
 
@@ -298,6 +197,11 @@ Rectangle {
 
                     delegate: ToolButton {
                         id: layerAction
+                        onClicked: {
+                            if (modelData.tip === "Renomear camada") editor.renameSelected();
+                            else if (modelData.tip === "Duplicar camada") editor.duplicateSelected();
+                            else editor.deleteSelected();
+                        }
 
                         required property var modelData
 
@@ -338,38 +242,7 @@ Rectangle {
                 spacing: 3
 
                 Repeater {
-                    model: [
-                        {
-                            kind: "T",
-                            title: "Nome completo",
-                            detail: "Texto variável",
-                            locked: false
-                        },
-                        {
-                            kind: "T",
-                            title: "Descrição do curso",
-                            detail: "Texto",
-                            locked: false
-                        },
-                        {
-                            kind: "T",
-                            title: "Certificado",
-                            detail: "Texto",
-                            locked: true
-                        },
-                        {
-                            kind: "✍",
-                            title: "Assinatura da coordenação",
-                            detail: "Assinatura",
-                            locked: false
-                        },
-                        {
-                            kind: "▧",
-                            title: "Fundo do certificado",
-                            detail: "Imagem de fundo",
-                            locked: true
-                        }
-                    ]
+                    model: editor.state.layers
 
                     delegate: LayerRow {
                         required property int index
@@ -380,8 +253,11 @@ Rectangle {
                         title: modelData.title
                         detail: modelData.detail
                         locked: modelData.locked
-                        selected: root.selectedLayer === index
-                        onActivated: root.selectedLayer = index
+                        visibleLayer: modelData.visible
+                        selected: editor.state.selected.key === modelData.key
+                        onVisibilityRequested: { editor.select(modelData.key); editor.setValue("visible", !modelData.visible); }
+                        onLockRequested: { editor.select(modelData.key); editor.setValue("locked", !modelData.locked); }
+                        onActivated: editor.select(modelData.key)
                     }
                 }
             }
@@ -399,13 +275,13 @@ Rectangle {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "5 elementos"
+                    text: editor.state.layers.length + " elementos"
                     color: Theme.textSubtle
                     font.pixelSize: 9
                 }
 
                 Text {
-                    text: "Arraste para reordenar"
+                    text: "Ordem de renderização"
                     color: Theme.textDisabled
                     font.pixelSize: 8
                 }

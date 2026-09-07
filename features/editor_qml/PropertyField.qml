@@ -8,6 +8,8 @@ ColumnLayout {
     property string value: ""
     property string suffix: ""
     property bool enabledField: true
+    signal edited(string value)
+    onValueChanged: field.text = value
 
     spacing: 5
     Layout.fillWidth: true
@@ -37,6 +39,7 @@ ColumnLayout {
             anchors.leftMargin: 10
             anchors.rightMargin: 6
             text: root.value
+            onEditingFinished: root.edited(text)
             color: Theme.text
             selectByMouse: true
             enabled: root.enabledField

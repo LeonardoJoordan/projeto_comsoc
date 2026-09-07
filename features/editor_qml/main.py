@@ -8,16 +8,19 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import QTimer, QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtWidgets import QApplication
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
 
 
 ROOT = Path(__file__).resolve().parent
+sys.path.insert(0, str(ROOT.parents[1]))
+from features.editor_qml.bridge import EditorBridge, PreviewProvider
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Abre o protótipo visual do editor QML.")
+    parser.add_argument("--model", type=Path, help="Arquivo template_v3.json a abrir")
     parser.add_argument(
         "--check",
         action="store_true",
@@ -35,11 +38,19 @@ def main() -> int:
     args = parse_args()
 
     QQuickStyle.setStyle("Basic")
-    app = QGuiApplication(sys.argv)
-    app.setApplicationName("C.O.M.S.O.C. — Protótipo do Editor QML")
+    app = QApplication(sys.argv)
+    app.setApplicationName("C.O.M.S.O.C. — Editor QML")
     app.setOrganizationName("C.O.M.S.O.C.")
 
     engine = QQmlApplicationEngine()
+    provider = PreviewProvider()
+    bridge = EditorBridge(provider)
+    if args.model and not bridge.load(str(args.model)):
+        print(bridge.state["message"], file=sys.stderr)
+        return 1
+    bridge.render()
+    engine.addImageProvider("model", provider)
+    engine.rootContext().setContextProperty("editor", bridge)
     engine.addImportPath(os.fspath(ROOT))
     engine.load(QUrl.fromLocalFile(os.fspath(ROOT / "Main.qml")))
 
@@ -69,4 +80,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

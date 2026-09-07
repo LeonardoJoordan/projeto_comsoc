@@ -7,6 +7,21 @@ import QtQuick.Layouts
 Rectangle {
     id: root
 
+    property string selectionKind: "text"
+    property string selectionIndex: ""
+    property string selectionName: "Nome completo"
+    property string selectionContent: "{Nome completo}"
+    readonly property bool linkAvailable: isText || selectionKind === "image" || isShape
+
+    function collapseSections() {
+        propertiesSection.expanded = false;
+        textSection.expanded = false;
+    }
+    onSelectionIndexChanged: collapseSections()
+    onSelectionKindChanged: collapseSections()
+    readonly property bool isText: selectionKind === "text"
+    readonly property bool isShape: selectionKind === "shape"
+
     color: Theme.panel
     border.width: 1
     border.color: Theme.divider
@@ -17,69 +32,29 @@ Rectangle {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 46
-            color: Theme.chrome
+            Layout.preferredHeight: 48
+            color: Theme.panel
 
-            RowLayout {
+            ColumnLayout {
                 anchors.fill: parent
                 anchors.leftMargin: 14
-                anchors.rightMargin: 10
-                spacing: 8
-
-                EditorIcon {
-                    Layout.preferredWidth: 16
-                    Layout.preferredHeight: 16
-                    name: "sliders"
-                    color: Theme.accentHover
-                }
-
-                ColumnLayout {
+                anchors.rightMargin: 14
+                anchors.topMargin: 8
+                anchors.bottomMargin: 8
+                spacing: 2
+                Text {
                     Layout.fillWidth: true
-                    spacing: 1
-
-                    Text {
-                        text: "PROPRIEDADES"
-                        color: Theme.text
-                        font.pixelSize: 10
-                        font.weight: Font.Bold
-                        font.letterSpacing: 0.9
-                    }
-
-                    Text {
-                        text: "Texto selecionado"
-                        color: Theme.textSubtle
-                        font.pixelSize: 9
-                    }
+                    text: root.selectionName
+                    color: Theme.textMuted
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
                 }
-
-                ToolButton {
-                    id: collapseButton
-                    Layout.preferredWidth: 28
-                    Layout.preferredHeight: 28
-                    hoverEnabled: true
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Recolher propriedades"
-
-                    contentItem: Text {
-                        text: "»"
-                        color: collapseButton.hovered ? Theme.text : Theme.textMuted
-                        font.pixelSize: 15
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
-                    }
-
-                    background: Rectangle {
-                        radius: 5
-                        color: collapseButton.hovered ? Theme.panelHover : "transparent"
-                    }
+                Text {
+                    text: !root.selectionKind ? "Selecione uma camada" : (root.isText ? "Texto" : (root.isShape ? "Forma" : (root.selectionKind === "signature" ? "Assinatura" : "Imagem")))
+                    color: Theme.textSubtle
+                    font.pixelSize: 9
                 }
             }
-        }
-
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            color: Theme.borderStrong
         }
 
         ScrollView {
@@ -92,379 +67,164 @@ Rectangle {
                 width: root.width
                 spacing: 0
 
-                Rectangle {
+                PanelSection {
+                    id: propertiesSection
+                    objectName: "propertiesSection"
                     width: parent.width
-                    height: 67
-                    color: Theme.panelRaised
+                    title: "Propriedades"
+                    expanded: false
+                    available: !!editor.state.selected.key
+                    collapsible: true
+                    topPadding: 0
+                    bottomPadding: expanded ? 14 : 0
 
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
-                        spacing: 10
+                    PanelSection {
+                        Layout.fillWidth: true
+                        topPadding: 0
+                        bottomPadding: 4
+                        title: "Comportamento"
+                        horizontalPadding: 0
 
-                        Rectangle {
-                            Layout.preferredWidth: 36
-                            Layout.preferredHeight: 36
-                            radius: 8
-                            color: Theme.accentSoft
+                        RowLayout {
+                            Layout.fillWidth: true
+                            spacing: 8
+                            enabled: root.linkAvailable
+                            opacity: enabled ? 1 : 0.4
 
-                            Text {
-                                anchors.centerIn: parent
-                                text: "T"
-                                color: Theme.accentHover
-                                font.pixelSize: 16
-                                font.weight: Font.Bold
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 2
+
+                                Text {
+                                    text: "Link no PDF"
+                                    color: Theme.text
+                                    font.pixelSize: 11
+                                    font.weight: Font.Medium
+                                }
+
+                                Text {
+                                    text: "Usar valor informado na tabela"
+                                    color: Theme.textSubtle
+                                    font.pixelSize: 9
+                                }
+                            }
+
+                            CompactSwitch {
+                                Layout.preferredWidth: 42
+                                Layout.preferredHeight: 24
+                                checked: editor.state.selected.has_link || false
+                                enabled: !editor.state.selected.locked
+                                onClicked: editor.setValue("has_link", checked)
                             }
                         }
 
-                        ColumnLayout {
+                    }
+                    ColumnLayout {
+                        visible: root.isShape
+                        Layout.fillWidth: true
+                        spacing: 8
+                        Text {
+                            text: "Forma"
+                            color: Theme.textMuted
+                            font.pixelSize: 11
+                        }
+                        ComboBox {
+                            id: shapeSelector
                             Layout.fillWidth: true
-                            spacing: 2
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: "Nome completo"
+                            model: ["Retângulo", "Quadrado", "Elipse", "Círculo"]
+                            Accessible.name: "Forma básica"
+                            contentItem: Text {
+                                text: shapeSelector.displayText
                                 color: Theme.text
                                 font.pixelSize: 12
-                                font.weight: Font.DemiBold
-                                elide: Text.ElideRight
+                                verticalAlignment: Text.AlignVCenter
+                                leftPadding: 10
                             }
-
-                            Text {
-                                Layout.fillWidth: true
-                                text: "Caixa de texto dinâmica"
-                                color: Theme.textSubtle
-                                font.pixelSize: 9
-                                elide: Text.ElideRight
+                            background: Rectangle {
+                                implicitHeight: 34
+                                radius: Theme.radiusSmall
+                                color: Theme.field
+                                border.color: shapeSelector.activeFocus ? Theme.accent : Theme.border
                             }
                         }
-
-                        Rectangle {
-                            Layout.preferredWidth: 64
-                            Layout.preferredHeight: 22
-                            radius: 11
-                            color: "#273D35"
-                            border.width: 1
-                            border.color: "#365E4D"
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "VARIÁVEL"
-                                color: Theme.success
-                                font.pixelSize: 8
-                                font.weight: Font.Bold
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Theme.divider
-                }
-
-                PanelSection {
-                    width: parent.width
-                    topPadding: 14
-                    bottomPadding: 14
-                    title: "Conteúdo"
-                    caption: "Campo dinâmico"
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 70
-                        radius: 7
-                        color: Theme.field
-                        border.width: 1
-                        border.color: Theme.border
-
-                        TextEdit {
-                            anchors.fill: parent
-                            anchors.margins: 10
-                            text: "{Nome completo}"
-                            color: Theme.text
-                            font.pixelSize: 12
-                            selectByMouse: true
-                            wrapMode: TextEdit.Wrap
-                            selectionColor: Theme.accentSoft
-                            selectedTextColor: Theme.text
+                        ColorField {
+                            label: "Preenchimento"
+                            value: "#FFFFFF"
                         }
                     }
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 7
-
-                        UiButton {
-                            Layout.fillWidth: true
-                            text: "Inserir variável"
-                            compact: true
-                        }
-
-                        UiButton {
-                            Layout.fillWidth: true
-                            text: "Trecho opcional"
-                            compact: true
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Theme.divider
-                }
-
-                PanelSection {
-                    width: parent.width
-                    topPadding: 14
-                    bottomPadding: 14
-                    title: "Tipografia"
-                    caption: "Aplicada à seleção"
-
-                    PropertyField {
-                        Layout.fillWidth: true
-                        label: "Fonte"
-                        value: "DejaVu Serif"
-                    }
-
-                    GridLayout {
-                        Layout.fillWidth: true
-                        columns: 2
-                        columnSpacing: 8
-                        rowSpacing: 8
-
-                        PropertyField {
-                            Layout.fillWidth: true
-                            label: "Peso"
-                            value: "Medium"
-                        }
-
-                        PropertyField {
-                            Layout.fillWidth: true
-                            label: "Tamanho"
-                            value: "31 px"
-                        }
-
-                        PropertyField {
-                            Layout.fillWidth: true
-                            label: "Entrelinha"
-                            value: "Automática"
-                        }
-
-                        PropertyField {
-                            Layout.fillWidth: true
-                            label: "Recuo"
-                            value: "0 px"
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 5
-
-                        Repeater {
-                            model: [
-                                {
-                                    label: "B",
-                                    tip: "Negrito"
-                                },
-                                {
-                                    label: "I",
-                                    tip: "Itálico"
-                                },
-                                {
-                                    label: "U",
-                                    tip: "Sublinhado"
-                                }
-                            ]
-
-                            delegate: ToolButton {
-                                id: styleButton
-
-                                required property var modelData
-
-                                Layout.preferredWidth: 34
-                                Layout.preferredHeight: 31
-                                checkable: true
-                                hoverEnabled: true
-                                ToolTip.visible: hovered
-                                ToolTip.text: modelData.tip
-
-                                contentItem: Text {
-                                    text: styleButton.modelData.label
-                                    color: styleButton.checked ? Theme.accentHover : Theme.textMuted
-                                    font.pixelSize: 12
-                                    font.bold: styleButton.modelData.label === "B"
-                                    font.italic: styleButton.modelData.label === "I"
-                                    font.underline: styleButton.modelData.label === "U"
-                                    horizontalAlignment: Text.AlignHCenter
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                background: Rectangle {
-                                    radius: 5
-                                    color: styleButton.checked ? Theme.accentSoft : (styleButton.hovered ? Theme.panelHover : Theme.field)
-                                    border.width: 1
-                                    border.color: styleButton.checked ? Theme.accent : Theme.border
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            Layout.preferredWidth: 1
-                            Layout.preferredHeight: 22
-                            Layout.leftMargin: 2
-                            Layout.rightMargin: 2
-                            color: Theme.divider
-                        }
-
-                        Repeater {
-                            model: [
-                                {
-                                    label: "≡",
-                                    tip: "Alinhar texto à esquerda"
-                                },
-                                {
-                                    label: "≣",
-                                    tip: "Centralizar texto"
-                                },
-                                {
-                                    label: "≡",
-                                    tip: "Alinhar texto à direita",
-                                    mirror: true
-                                },
-                                {
-                                    label: "☷",
-                                    tip: "Justificar texto"
-                                }
-                            ]
-
-                            delegate: ToolButton {
-                                id: textAlignButton
-
-                                required property int index
-                                required property var modelData
-
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 31
-                                checkable: true
-                                checked: index === 1
-                                hoverEnabled: true
-                                ToolTip.visible: hovered
-                                ToolTip.text: modelData.tip
-
-                                contentItem: Text {
-                                    text: textAlignButton.modelData.label
-                                    color: textAlignButton.checked ? Theme.accentHover : Theme.textMuted
-                                    font.pixelSize: 13
-                                    horizontalAlignment: textAlignButton.modelData.mirror ? Text.AlignRight : (textAlignButton.index === 1 ? Text.AlignHCenter : Text.AlignLeft)
-                                    verticalAlignment: Text.AlignVCenter
-                                }
-
-                                background: Rectangle {
-                                    radius: 5
-                                    color: textAlignButton.checked ? Theme.accentSoft : (textAlignButton.hovered ? Theme.panelHover : Theme.field)
-                                    border.width: 1
-                                    border.color: textAlignButton.checked ? Theme.accent : Theme.border
-                                }
-                            }
-                        }
-                    }
-
-                    RowLayout {
+                    ColumnLayout {
+                        visible: root.isText || root.isShape
+                        enabled: false
+                        opacity: 0.4
                         Layout.fillWidth: true
                         spacing: 8
-
-                        PropertyField {
+                        RowLayout {
                             Layout.fillWidth: true
-                            label: "Alinhamento vertical"
-                            value: "Meio"
-                        }
-
-                        Rectangle {
-                            Layout.preferredWidth: 36
-                            Layout.preferredHeight: 34
-                            Layout.alignment: Qt.AlignBottom
-                            radius: 6
-                            color: "#26232E"
-                            border.width: 1
-                            border.color: Theme.borderStrong
-                        }
-                    }
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 1
-                    color: Theme.divider
-                }
-
-                PanelSection {
-                    width: parent.width
-                    topPadding: 14
-                    bottomPadding: 14
-                    title: "Comportamento"
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-
                             Text {
-                                text: "Link no PDF"
+                                Layout.fillWidth: true
+                                text: "Contorno"
                                 color: Theme.text
                                 font.pixelSize: 11
                                 font.weight: Font.Medium
                             }
-
-                            Text {
-                                text: "Usar valor informado na tabela"
-                                color: Theme.textSubtle
-                                font.pixelSize: 9
+                            CompactSwitch {
+                                id: outlineSwitch
+                                ToolTip.visible: hovered
+                                ToolTip.text: "Contorno: não suportado pelo renderer atual"
+                                Accessible.name: "Contorno"
+                                Layout.preferredWidth: 42
+                                Layout.preferredHeight: 24
                             }
                         }
-
-                        Switch {
-                            Layout.preferredWidth: 42
-                            Layout.preferredHeight: 24
-                            checked: false
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        ColumnLayout {
+                        RowLayout {
                             Layout.fillWidth: true
-                            spacing: 2
-
-                            Text {
-                                text: "Manter proporção"
-                                color: Theme.text
-                                font.pixelSize: 11
-                                font.weight: Font.Medium
+                            spacing: 8
+                            ColorField {
+                                label: "Cor do contorno"
+                                value: "#000000"
+                                enabledField: outlineSwitch.checked
                             }
-
-                            Text {
-                                text: "Preservar largura e altura ao redimensionar"
-                                color: Theme.textSubtle
-                                font.pixelSize: 9
+                            PropertyField {
+                                label: "Espessura"
+                                value: "1"
+                                suffix: "px"
+                                enabledField: outlineSwitch.checked
                             }
-                        }
-
-                        Switch {
-                            Layout.preferredWidth: 42
-                            Layout.preferredHeight: 24
-                            checked: true
                         }
                     }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Theme.divider
+                }
+
+                PanelSection {
+                    id: textSection
+                    objectName: "textSection"
+                    width: parent.width
+                    title: "Texto"
+                    iconName: "text"
+                    expanded: false
+                    available: root.isText
+                    unavailableReason: "Selecione uma camada de texto"
+                    collapsible: true
+                    bottomPadding: expanded ? 14 : 0
+                    TypographyControls { Layout.fillWidth: true }
+                }
+
+                PanelSection {
+                    width: parent.width
+                    objectName: "tableFieldsSection"
+                    title: "Campos da tabela"
+                    caption: "Ordem na tabela"
+                    iconName: "grid"
+                    expanded: false
+                    collapsible: true
+                    bottomPadding: expanded ? 14 : 0
+                    TableFieldOrder { Layout.fillWidth: true }
                 }
             }
         }

@@ -8,6 +8,8 @@ Rectangle {
     property string value: "0"
     property string suffix: ""
     property int fieldWidth: 78
+    signal edited(string value)
+    onValueChanged: input.text = value
 
     implicitWidth: fieldWidth
     implicitHeight: 30
@@ -33,6 +35,7 @@ Rectangle {
             id: input
             Layout.fillWidth: true
             text: root.value
+            onEditingFinished: root.edited(text)
             color: Theme.text
             selectByMouse: true
             font.pixelSize: 11

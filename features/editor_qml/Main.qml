@@ -8,10 +8,14 @@ import QtQuick.Window
 ApplicationWindow {
     id: window
 
-    property real zoomValue: 82
+    property real zoomValue: 100
     property bool showGrid: false
-    property bool showGuides: true
-    property bool guidesLocked: false
+    property bool showGuides: editor.state.guidesVisible
+    property bool guidesLocked: editor.state.guidesLocked
+    property string selectionKind: editor.state.selected.type || ""
+    property string selectionIndex: editor.state.selected.key || ""
+    property string selectionName: editor.state.selected.title || "Nenhuma seleção"
+    property string selectionContent: editor.state.selected.html || ""
 
     width: 1500
     height: 930
@@ -19,7 +23,16 @@ ApplicationWindow {
     minimumHeight: 700
     visible: true
     color: Theme.window
-    title: "COMSOC Studio — Certificado editorial"
+    title: "COMSOC Studio — " + editor.state.name
+    onClosing: close => close.accepted = editor.canClose()
+    Shortcut { sequence: "Ctrl+S"; onActivated: { canvasWorkspace.finishEditing(); editor.save(); } }
+    Shortcut { sequence: "Ctrl+Shift+S"; onActivated: editor.saveAs() }
+    Shortcut { sequence: "Ctrl+O"; onActivated: editor.openDialog() }
+    Shortcut { sequence: "Ctrl+N"; onActivated: editor.newDocument() }
+    Shortcut { sequence: "Ctrl+Z"; enabled: !canvasWorkspace.editingText; onActivated: editor.undo() }
+    Shortcut { sequence: "Ctrl+Shift+Z"; enabled: !canvasWorkspace.editingText; onActivated: editor.redo() }
+    Connections { target: editor; function onError(message) { errorText.text = message; errorDialog.open(); } }
+    Dialog { id: errorDialog; anchors.centerIn: parent; width: 480; title: "COMSOC"; modal: true; standardButtons: Dialog.Ok; Text { id: errorText; width: parent.width; wrapMode: Text.WordWrap; color: Theme.text } }
     font.family: "Inter, Segoe UI, sans-serif"
 
     ColumnLayout {
@@ -42,6 +55,14 @@ ApplicationWindow {
 
                 ToolButton {
                     id: backButton
+                    onClicked: fileMenu.open()
+                    Menu {
+                        id: fileMenu
+                        y: backButton.height
+                        MenuItem { text: "Novo modelo  Ctrl+N"; onTriggered: editor.newDocument() }
+                        MenuItem { text: "Abrir modelo…  Ctrl+O"; onTriggered: editor.openDialog() }
+                        MenuItem { text: "Salvar como…  Ctrl+Shift+S"; onTriggered: editor.saveAs() }
+                    }
                     Layout.preferredWidth: 84
                     Layout.preferredHeight: 32
                     hoverEnabled: true
@@ -98,7 +119,7 @@ ApplicationWindow {
                         spacing: 6
 
                         Text {
-                            text: "Certificado editorial"
+                            text: editor.state.name
                             color: Theme.text
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -109,6 +130,7 @@ ApplicationWindow {
                             Layout.preferredHeight: 6
                             radius: 3
                             color: Theme.warning
+                            visible: editor.state.dirty
                         }
                     }
 
@@ -124,13 +146,15 @@ ApplicationWindow {
                 }
 
                 Text {
-                    text: "Alterações não salvas"
+                    text: editor.state.dirty ? "Alterações não salvas" : "Salvo"
                     color: Theme.textSubtle
                     font.pixelSize: 9
                 }
 
                 ToolButton {
                     id: undoButton
+                    enabled: editor.state.canUndo
+                    onClicked: editor.undo()
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     hoverEnabled: true
@@ -153,6 +177,8 @@ ApplicationWindow {
 
                 ToolButton {
                     id: redoButton
+                    enabled: editor.state.canRedo
+                    onClicked: editor.redo()
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
                     hoverEnabled: true
@@ -176,6 +202,7 @@ ApplicationWindow {
                 UiButton {
                     Layout.preferredWidth: 128
                     text: "Salvar modelo"
+                    onClicked: editor.save()
                     tone: "primary"
                     compact: true
                 }
@@ -259,7 +286,7 @@ ApplicationWindow {
 
                     Text {
                         anchors.centerIn: parent
-                        text: "T"
+                        text: window.selectionKind === "text" ? "T" : (window.selectionKind === "shape" ? "□" : "▧")
                         color: Theme.accentHover
                         font.pixelSize: 13
                         font.weight: Font.Bold
@@ -279,7 +306,7 @@ ApplicationWindow {
                     }
 
                     Text {
-                        text: "Nome completo"
+                        text: window.selectionName
                         color: Theme.text
                         font.pixelSize: 10
                         font.weight: Font.Medium
@@ -295,29 +322,37 @@ ApplicationWindow {
 
                 CompactField {
                     label: "X"
-                    value: "46,57"
-                    suffix: "mm"
+                    value: Number((editor.state.selected.x || 0) * 1).toFixed(2)
+                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    onEdited: value => editor.setValue("x", Number(value.replace(",", ".")) / 1)
+                    suffix: "px"
                     fieldWidth: 94
                 }
 
                 CompactField {
                     label: "Y"
-                    value: "70,11"
-                    suffix: "mm"
+                    value: Number((editor.state.selected.y || 0) * 1).toFixed(2)
+                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    onEdited: value => editor.setValue("y", Number(value.replace(",", ".")) / 1)
+                    suffix: "px"
                     fieldWidth: 94
                 }
 
                 CompactField {
                     label: "L"
-                    value: "107,95"
-                    suffix: "mm"
+                    value: Number((editor.state.selected.w || 0) * 1).toFixed(2)
+                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    onEdited: value => editor.setValue("w", Number(value.replace(",", ".")) / 1)
+                    suffix: "px"
                     fieldWidth: 100
                 }
 
                 CompactField {
                     label: "A"
-                    value: "15,35"
-                    suffix: "mm"
+                    value: Number((editor.state.selected.h || 0) * 1).toFixed(2)
+                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    onEdited: value => editor.setValue("h", Number(value.replace(",", ".")) / 1)
+                    suffix: "px"
                     fieldWidth: 94
                 }
 
@@ -326,35 +361,48 @@ ApplicationWindow {
                     Layout.preferredWidth: 30
                     Layout.preferredHeight: 30
                     checkable: true
-                    checked: true
+                    checked: editor.state.selected.keep_proportion || false
+                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    onClicked: editor.setValue("keep_proportion", checked)
                     hoverEnabled: true
+                    Accessible.name: "Manter proporção"
+                    Accessible.description: checked ? "Largura e altura vinculadas" : "Largura e altura independentes"
                     ToolTip.visible: hovered
-                    ToolTip.text: "Manter proporção"
+                    ToolTip.text: checked ? "Proporção vinculada — clique para desvincular" : "Proporção livre — clique para vincular"
+                    ToolTip.delay: 450
 
-                    contentItem: Text {
-                        text: "⌁"
-                        color: proportionButton.checked ? Theme.accentHover : Theme.textMuted
-                        font.pixelSize: 16
-                        horizontalAlignment: Text.AlignHCenter
-                        verticalAlignment: Text.AlignVCenter
+                    contentItem: Item {
+                        EditorIcon {
+                            anchors.centerIn: parent
+                            width: 19
+                            height: 19
+                            name: proportionButton.checked ? "link" : "unlink"
+                            color: proportionButton.checked ? Theme.accentHover : Theme.textMuted
+                        }
                     }
 
                     background: Rectangle {
                         radius: 6
-                        color: proportionButton.checked ? Theme.accentSoft : (proportionButton.hovered ? Theme.panelHover : "transparent")
+                        color: proportionButton.down ? Theme.accentFaint : (proportionButton.checked ? Theme.accentSoft : (proportionButton.hovered ? Theme.panelHover : Theme.field))
+                        border.width: 1
+                        border.color: proportionButton.activeFocus ? Theme.accentHover : (proportionButton.checked ? Theme.accent : Theme.border)
                     }
                 }
 
                 CompactField {
                     label: "↻"
-                    value: "0"
+                    value: Number((editor.state.selected.rotation || 0) * 1).toFixed(2)
+                    enabled: !!editor.state.selected.key && !editor.state.selected.locked && editor.state.selected.type !== "background"
+                    onEdited: value => editor.setValue("rotation", Number(value.replace(",", ".")) / 1)
                     suffix: "°"
                     fieldWidth: 72
                 }
 
                 CompactField {
                     label: "α"
-                    value: "100"
+                    value: Number((editor.state.selected.opacity || 0) * 100).toFixed(0)
+                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    onEdited: value => editor.setValue("opacity", Number(value.replace(",", ".")) / 100)
                     suffix: "%"
                     fieldWidth: 78
                 }
@@ -365,18 +413,74 @@ ApplicationWindow {
                     color: Theme.divider
                 }
 
-                UiButton {
-                    Layout.preferredWidth: 88
-                    text: "Alinhar  ▾"
-                    compact: true
+                Text {
+                    text: "GUIAS"
+                    color: Theme.textSubtle
+                    font.pixelSize: 8
+                    font.weight: Font.Bold
                 }
+
+                Repeater {
+                    model: [
+                        {
+                            icon: "guide-horizontal",
+                            tip: "Adicionar guia horizontal"
+                        },
+                        {
+                            icon: "guide-vertical",
+                            tip: "Adicionar guia vertical"
+                        },
+                        {
+                            icon: "eye",
+                            tip: "Mostrar ou ocultar guias"
+                        },
+                        {
+                            icon: "lock",
+                            tip: "Bloquear ou desbloquear guias"
+                        }
+                    ]
+                    delegate: ToolButton {
+                        id: guideControl
+                        required property var modelData
+                        Layout.preferredWidth: 30
+                        Layout.preferredHeight: 30
+                        hoverEnabled: true
+                        checkable: modelData.icon === "eye" || modelData.icon === "lock"
+                        checked: modelData.icon === "eye" ? window.showGuides : (modelData.icon === "lock" && window.guidesLocked)
+                        Accessible.name: modelData.tip
+                        ToolTip.visible: hovered
+                        ToolTip.text: modelData.tip
+                        onClicked: {
+                            if (modelData.icon === "eye")
+                                editor.guideOption("guidelines_visible", checked);
+                            else if (modelData.icon === "lock")
+                                editor.guideOption("guidelines_locked", checked);
+                            else editor.addGuide(modelData.icon === "guide-vertical");
+                        }
+                        contentItem: EditorIcon {
+                            name: guideControl.modelData.icon
+                            color: guideControl.checked ? Theme.guide : Theme.textMuted
+                        }
+                        background: Rectangle {
+                            radius: 6
+                            color: guideControl.checked ? Theme.accentSoft : (guideControl.hovered ? Theme.panelHover : "transparent")
+                        }
+                    }
+                }
+
+                Rectangle {
+                    Layout.preferredWidth: 1
+                    Layout.preferredHeight: 27
+                    color: Theme.divider
+                }
+
 
                 Item {
                     Layout.fillWidth: true
                 }
 
                 Text {
-                    visible: window.width >= 1320
+                    visible: window.width >= 1550
                     text: "Arraste o objeto ou informe medidas exatas"
                     color: Theme.textDisabled
                     font.pixelSize: 9
@@ -410,13 +514,11 @@ ApplicationWindow {
                 SplitView.minimumWidth: 226
                 SplitView.preferredWidth: 262
                 SplitView.maximumWidth: 350
-                guidesVisible: window.showGuides
-                guidesLocked: window.guidesLocked
-                onGuidesVisibilityRequested: visible => window.showGuides = visible
-                onGuidesLockRequested: locked => window.guidesLocked = locked
+
             }
 
             CanvasWorkspace {
+                id: canvasWorkspace
                 SplitView.minimumWidth: 470
                 SplitView.fillWidth: true
                 zoomValue: window.zoomValue
@@ -426,6 +528,10 @@ ApplicationWindow {
             }
 
             InspectorDock {
+                selectionKind: window.selectionKind
+                selectionIndex: window.selectionIndex
+                selectionName: window.selectionName
+                selectionContent: window.selectionContent
                 SplitView.minimumWidth: 292
                 SplitView.preferredWidth: 322
                 SplitView.maximumWidth: 390
@@ -446,7 +552,7 @@ ApplicationWindow {
                 spacing: 9
 
                 Text {
-                    text: "Texto selecionado: Nome completo"
+                    text: "Camada selecionada: " + window.selectionName
                     color: Theme.textMuted
                     font.pixelSize: 9
                 }
@@ -458,7 +564,7 @@ ApplicationWindow {
                 }
 
                 Text {
-                    text: "Documento 148 × 105 mm"
+                    text: "Documento " + editor.state.width + " × " + editor.state.height + " px"
                     color: Theme.textSubtle
                     font.pixelSize: 9
                 }
@@ -467,30 +573,6 @@ ApplicationWindow {
                     Layout.fillWidth: true
                 }
 
-                ToolButton {
-                    id: guidesButton
-                    Layout.preferredWidth: 30
-                    Layout.preferredHeight: 24
-                    checkable: true
-                    checked: window.showGuides
-                    onClicked: window.showGuides = checked
-                    hoverEnabled: true
-                    ToolTip.visible: hovered
-                    ToolTip.text: "Guias inteligentes"
-
-                    contentItem: EditorIcon {
-                        anchors.centerIn: parent
-                        width: 14
-                        height: 14
-                        name: "guide"
-                        color: guidesButton.checked ? Theme.guide : Theme.textMuted
-                    }
-
-                    background: Rectangle {
-                        radius: 5
-                        color: guidesButton.checked ? "#23383E" : (guidesButton.hovered ? Theme.panelHover : "transparent")
-                    }
-                }
 
                 ToolButton {
                     id: gridButton

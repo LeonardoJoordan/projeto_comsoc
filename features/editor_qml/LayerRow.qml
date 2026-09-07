@@ -12,6 +12,8 @@ Rectangle {
     property bool visibleLayer: true
 
     signal activated
+    signal visibilityRequested
+    signal lockRequested
 
     implicitHeight: 46
     radius: Theme.radiusSmall
@@ -81,6 +83,7 @@ Rectangle {
             Layout.preferredWidth: 14
             Layout.preferredHeight: 14
             name: "eye"
+            MouseArea { anchors.fill: parent; onClicked: root.visibilityRequested() }
             color: root.visibleLayer ? Theme.textMuted : Theme.textDisabled
             opacity: root.visibleLayer ? 1 : 0.35
         }
@@ -89,6 +92,7 @@ Rectangle {
             Layout.preferredWidth: 13
             Layout.preferredHeight: 13
             name: "lock"
+            MouseArea { anchors.fill: parent; onClicked: root.lockRequested() }
             color: root.locked ? Theme.warning : Theme.textDisabled
             opacity: root.locked ? 1 : 0.28
         }
