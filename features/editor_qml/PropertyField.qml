@@ -39,7 +39,7 @@ ColumnLayout {
             anchors.leftMargin: 10
             anchors.rightMargin: 6
             text: root.value
-            onEditingFinished: root.edited(text)
+            onEditingFinished: { root.edited(text); text = root.value; }
             color: Theme.text
             selectByMouse: true
             enabled: root.enabledField

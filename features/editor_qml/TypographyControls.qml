@@ -4,7 +4,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 
 ColumnLayout {
-    readonly property var selected: editor.state.selected
+    readonly property var selected: editor.uiState.selected
     enabled: selected.type === "text" && !selected.locked
     spacing: 12
     Text {
@@ -16,8 +16,13 @@ ColumnLayout {
         id: fontSelector
         objectName: "fontSelector"
         Layout.fillWidth: true
-        model: Qt.fontFamilies()
-        currentIndex: Math.max(0, find(editor.state.selected.font_family || "Arial"))
+        model: {
+            const families = Qt.fontFamilies();
+            const requested = editor.uiTextFormat.font_family || "Arial";
+            if (families.indexOf(requested) < 0) families.unshift(requested);
+            return families;
+        }
+        currentIndex: find(editor.uiTextFormat.font_family || "Arial")
         onActivated: editor.setValue("font_family", currentText)
         Accessible.name: "Fonte"
         contentItem: Text {
@@ -73,8 +78,8 @@ ColumnLayout {
     }
     RowLayout {
         spacing: 8
-        PropertyField { label: "Tamanho"; value: String(editor.state.selected.font_size || 16); suffix: "pt"; onEdited: value => editor.setValue("font_size", value) }
-        ColorField { label: "Cor do texto"; externallyManaged: true; value: editor.state.selected.font_color || "#000000"; onEdited: value => editor.setValue("font_color", value) }
+        PropertyField { label: "Tamanho"; value: String(editor.uiTextFormat.font_size || 16); suffix: "pt"; onEdited: value => editor.setValue("font_size", value) }
+        ColorField { label: "Cor do texto"; externallyManaged: true; value: editor.uiTextFormat.font_color || "#000000"; onEdited: value => editor.setValue("font_color", value) }
     }
     RowLayout {
         spacing: 5
@@ -87,7 +92,7 @@ ColumnLayout {
                 Layout.preferredWidth: 34
                 Layout.preferredHeight: 32
                 onClicked: editor.formatText(modelData)
-                readonly property bool active: !!editor.state.selected[["bold", "italic", "underline"][index]]
+                readonly property bool active: !!editor.uiTextFormat[["bold", "italic", "underline"][index]]
                 hoverEnabled: true
                 Accessible.name: modelData
                 ToolTip.visible: hovered
@@ -110,12 +115,12 @@ ColumnLayout {
             }
         }
     }
-    AlignmentControl { Layout.fillWidth: true; selectedIndex: ["left","center","right","justify"].indexOf(editor.state.selected.align || "left"); onChosen: index => editor.setValue("align", ["left","center","right","justify"][index]) }
-    AlignmentControl { Layout.fillWidth: true; vertical: true; selectedIndex: ["top","center","bottom"].indexOf(editor.state.selected.vertical_align || "top"); onChosen: index => editor.setValue("vertical_align", ["top","center","bottom"][index]) }
+    AlignmentControl { Layout.fillWidth: true; selectedIndex: ["left","center","right","justify"].indexOf(editor.uiTextFormat.align || "left"); onChosen: index => editor.setValue("align", ["left","center","right","justify"][index]) }
+    AlignmentControl { Layout.fillWidth: true; vertical: true; selectedIndex: ["top","center","bottom"].indexOf(editor.uiTextFormat.vertical_align || "top"); onChosen: index => editor.setValue("vertical_align", ["top","center","bottom"][index]) }
     RowLayout {
         Layout.fillWidth: true
         spacing: 8
-        PropertyField { Layout.preferredWidth: 1; label: "Entrelinha"; value: String(editor.state.selected.line_height || 1.15); onEdited: value => editor.setValue("line_height", value) }
-        PropertyField { Layout.preferredWidth: 1; label: "Recuo"; value: String(editor.state.selected.indent_px || 0); suffix: "px"; onEdited: value => editor.setValue("indent_px", value) }
+        PropertyField { Layout.preferredWidth: 1; label: "Entrelinha"; value: String(editor.uiTextFormat.line_height || 1.15); onEdited: value => editor.setValue("line_height", value) }
+        PropertyField { Layout.preferredWidth: 1; label: "Recuo"; value: String(editor.uiTextFormat.indent_px || 0); suffix: "px"; onEdited: value => editor.setValue("indent_px", value) }
     }
 }

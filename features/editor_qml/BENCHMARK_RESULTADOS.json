@@ -1,0 +1,834 @@
+{
+  "date": "2026-09-08",
+  "method": "90 atualizações programáticas por gesto, timer solicitado de 16 ms; processos separados; proxies Qt não medem a latência física do monitor.",
+  "baseline_heavy_qml": {
+    "editor": "qml",
+    "model": "synthetic",
+    "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+    "qt": "6.11.0",
+    "pyside": "6.11.0",
+    "qpa": "xcb",
+    "screen_hz": 59.99953443620224,
+    "canvas": {
+      "w": 2400,
+      "h": 3300
+    },
+    "objects": {
+      "boxes": 150,
+      "images": 0,
+      "signatures": 0,
+      "shapes": 0
+    },
+    "has_background": true,
+    "model_directory_bytes": 103992,
+    "presentation_proxy": "frameSwapped recebido no loop da GUI",
+    "open_api_ms": 10420.251,
+    "move": {
+      "api": {
+        "samples": 90,
+        "median_ms": 14.492,
+        "p95_ms": 16.983,
+        "max_ms": 1318.262
+      },
+      "presentation_proxy": {
+        "samples": 58,
+        "median_ms": 30.022,
+        "p95_ms": 117.1,
+        "max_ms": 1318.595
+      },
+      "delivery_intervals": {
+        "samples": 89,
+        "median_ms": 16.145,
+        "p95_ms": 42.519,
+        "max_ms": 1318.602
+      },
+      "recordings": 0,
+      "commit_ms": 5851.517
+    },
+    "resize": {
+      "api": {
+        "samples": 90,
+        "median_ms": 17.519,
+        "p95_ms": 19.563,
+        "max_ms": 1361.379
+      },
+      "presentation_proxy": {
+        "samples": 39,
+        "median_ms": 40.321,
+        "p95_ms": 59.698,
+        "max_ms": 1381.987
+      },
+      "delivery_intervals": {
+        "samples": 89,
+        "median_ms": 19.188,
+        "p95_ms": 21.523,
+        "max_ms": 1363.73
+      },
+      "recordings": 90,
+      "commit_ms": 5851.638
+    },
+    "peak_rss_mib": 2606.2
+  },
+  "final_runs": {
+    "heavy-legacy": {
+      "editor": "legacy",
+      "model": "synthetic",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "objects": {
+        "boxes": 150,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 103992,
+      "presentation_proxy": "callback após evento Paint do viewport Widgets",
+      "opened_canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "open_api_ms": 1556.35,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.067,
+          "p95_ms": 0.084,
+          "max_ms": 0.114
+        },
+        "presentation_proxy": {
+          "samples": 90,
+          "median_ms": 11.8,
+          "p95_ms": 13.068,
+          "max_ms": 13.743
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 15.891,
+          "p95_ms": 16.739,
+          "max_ms": 16.844
+        },
+        "commit_ms": 5.396
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.822,
+          "p95_ms": 0.889,
+          "max_ms": 1.002
+        },
+        "presentation_proxy": {
+          "samples": 89,
+          "median_ms": 12.374,
+          "p95_ms": 13.51,
+          "max_ms": 16.126
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.117,
+          "p95_ms": 16.572,
+          "max_ms": 16.724
+        },
+        "commit_ms": 5.878
+      },
+      "peak_rss_mib": 157.0
+    },
+    "heavy-qml": {
+      "editor": "qml",
+      "model": "synthetic",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "objects": {
+        "boxes": 150,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 103992,
+      "presentation_proxy": "frameSwapped recebido no loop da GUI",
+      "open_api_ms": 1164.711,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.641,
+          "p95_ms": 0.878,
+          "max_ms": 7.008
+        },
+        "presentation_proxy": {
+          "samples": 86,
+          "median_ms": 16.604,
+          "p95_ms": 16.877,
+          "max_ms": 17.566
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.616,
+          "p95_ms": 16.81,
+          "max_ms": 25.062
+        },
+        "recordings": 0,
+        "commit_ms": 45.577
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 3.99,
+          "p95_ms": 4.519,
+          "max_ms": 9.66
+        },
+        "presentation_proxy": {
+          "samples": 87,
+          "median_ms": 11.616,
+          "p95_ms": 16.792,
+          "max_ms": 20.661
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 15.922,
+          "p95_ms": 16.783,
+          "max_ms": 18.728
+        },
+        "recordings": 90,
+        "commit_ms": 42.566
+      },
+      "peak_rss_mib": 324.9
+    },
+    "heavy-r2-legacy": {
+      "editor": "legacy",
+      "model": "synthetic",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "objects": {
+        "boxes": 150,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 103992,
+      "presentation_proxy": "callback após evento Paint do viewport Widgets",
+      "opened_canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "open_api_ms": 1557.37,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.067,
+          "p95_ms": 0.098,
+          "max_ms": 0.161
+        },
+        "presentation_proxy": {
+          "samples": 90,
+          "median_ms": 11.853,
+          "p95_ms": 12.756,
+          "max_ms": 13.804
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 15.913,
+          "p95_ms": 16.819,
+          "max_ms": 16.953
+        },
+        "commit_ms": 5.334
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.821,
+          "p95_ms": 1.099,
+          "max_ms": 1.191
+        },
+        "presentation_proxy": {
+          "samples": 89,
+          "median_ms": 12.756,
+          "p95_ms": 13.861,
+          "max_ms": 16.519
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 15.973,
+          "p95_ms": 16.598,
+          "max_ms": 16.8
+        },
+        "commit_ms": 5.247
+      },
+      "peak_rss_mib": 157.4
+    },
+    "heavy-r2-qml": {
+      "editor": "qml",
+      "model": "synthetic",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "objects": {
+        "boxes": 150,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 103992,
+      "presentation_proxy": "frameSwapped recebido no loop da GUI",
+      "open_api_ms": 1146.944,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.621,
+          "p95_ms": 0.908,
+          "max_ms": 7.265
+        },
+        "presentation_proxy": {
+          "samples": 85,
+          "median_ms": 16.588,
+          "p95_ms": 16.817,
+          "max_ms": 17.253
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.597,
+          "p95_ms": 16.872,
+          "max_ms": 23.116
+        },
+        "recordings": 0,
+        "commit_ms": 40.596
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 3.962,
+          "p95_ms": 4.555,
+          "max_ms": 9.604
+        },
+        "presentation_proxy": {
+          "samples": 87,
+          "median_ms": 12.346,
+          "p95_ms": 16.733,
+          "max_ms": 19.106
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.065,
+          "p95_ms": 16.814,
+          "max_ms": 18.599
+        },
+        "recordings": 90,
+        "commit_ms": 43.271
+      },
+      "peak_rss_mib": 324.6
+    },
+    "heavy-r3-legacy": {
+      "editor": "legacy",
+      "model": "synthetic",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "objects": {
+        "boxes": 150,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 103992,
+      "presentation_proxy": "callback após evento Paint do viewport Widgets",
+      "opened_canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "open_api_ms": 1553.424,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.065,
+          "p95_ms": 0.083,
+          "max_ms": 0.108
+        },
+        "presentation_proxy": {
+          "samples": 90,
+          "median_ms": 11.914,
+          "p95_ms": 12.738,
+          "max_ms": 14.129
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 15.961,
+          "p95_ms": 16.784,
+          "max_ms": 16.95
+        },
+        "commit_ms": 5.383
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.892,
+          "p95_ms": 1.062,
+          "max_ms": 1.15
+        },
+        "presentation_proxy": {
+          "samples": 89,
+          "median_ms": 12.796,
+          "p95_ms": 13.865,
+          "max_ms": 22.054
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 15.94,
+          "p95_ms": 16.651,
+          "max_ms": 21.282
+        },
+        "commit_ms": 5.468
+      },
+      "peak_rss_mib": 157.1
+    },
+    "heavy-r3-qml": {
+      "editor": "qml",
+      "model": "synthetic",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2400,
+        "h": 3300
+      },
+      "objects": {
+        "boxes": 150,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 103992,
+      "presentation_proxy": "frameSwapped recebido no loop da GUI",
+      "open_api_ms": 1108.532,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.601,
+          "p95_ms": 0.712,
+          "max_ms": 7.392
+        },
+        "presentation_proxy": {
+          "samples": 87,
+          "median_ms": 16.6,
+          "p95_ms": 16.795,
+          "max_ms": 17.376
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.619,
+          "p95_ms": 16.754,
+          "max_ms": 16.911
+        },
+        "recordings": 0,
+        "commit_ms": 41.142
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 3.976,
+          "p95_ms": 4.583,
+          "max_ms": 10.19
+        },
+        "presentation_proxy": {
+          "samples": 86,
+          "median_ms": 13.107,
+          "p95_ms": 16.778,
+          "max_ms": 22.432
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.069,
+          "p95_ms": 16.75,
+          "max_ms": 16.871
+        },
+        "recordings": 90,
+        "commit_ms": 43.34
+      },
+      "peak_rss_mib": 325.1
+    },
+    "library-legacy": {
+      "editor": "legacy",
+      "model": "/home/leonardo/.local/share/com.leobelisario.ProjetoComSoc/models/111_cartao_aniversario_pessoal_do_rgt/template_v3.json",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 1748,
+        "h": 1240
+      },
+      "objects": {
+        "boxes": 10,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 5455099,
+      "presentation_proxy": "callback após evento Paint do viewport Widgets",
+      "opened_canvas": {
+        "w": 1748,
+        "h": 1240
+      },
+      "open_api_ms": 174.56,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.059,
+          "p95_ms": 0.083,
+          "max_ms": 0.098
+        },
+        "presentation_proxy": {
+          "samples": 90,
+          "median_ms": 1.885,
+          "p95_ms": 2.185,
+          "max_ms": 2.522
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 15.963,
+          "p95_ms": 16.919,
+          "max_ms": 16.992
+        },
+        "commit_ms": 0.653
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.252,
+          "p95_ms": 0.286,
+          "max_ms": 0.386
+        },
+        "presentation_proxy": {
+          "samples": 90,
+          "median_ms": 2.04,
+          "p95_ms": 2.179,
+          "max_ms": 2.539
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.105,
+          "p95_ms": 16.254,
+          "max_ms": 16.992
+        },
+        "commit_ms": 0.654
+      },
+      "peak_rss_mib": 122.0
+    },
+    "library-qml": {
+      "editor": "qml",
+      "model": "/home/leonardo/.local/share/com.leobelisario.ProjetoComSoc/models/111_cartao_aniversario_pessoal_do_rgt/template_v3.json",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 1748,
+        "h": 1240
+      },
+      "objects": {
+        "boxes": 10,
+        "images": 0,
+        "signatures": 0,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 5455099,
+      "presentation_proxy": "frameSwapped recebido no loop da GUI",
+      "open_api_ms": 998.645,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.656,
+          "p95_ms": 0.748,
+          "max_ms": 1.343
+        },
+        "presentation_proxy": {
+          "samples": 86,
+          "median_ms": 16.603,
+          "p95_ms": 16.804,
+          "max_ms": 17.164
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.619,
+          "p95_ms": 16.811,
+          "max_ms": 24.708
+        },
+        "recordings": 0,
+        "commit_ms": 10.113
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 1.557,
+          "p95_ms": 1.795,
+          "max_ms": 2.94
+        },
+        "presentation_proxy": {
+          "samples": 87,
+          "median_ms": 14.325,
+          "p95_ms": 16.889,
+          "max_ms": 17.226
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.31,
+          "p95_ms": 16.894,
+          "max_ms": 16.94
+        },
+        "recordings": 90,
+        "commit_ms": 10.631
+      },
+      "peak_rss_mib": 257.0
+    },
+    "real-legacy": {
+      "editor": "legacy",
+      "model": "models/teste2/template_v3.json",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2484,
+        "h": 3512
+      },
+      "objects": {
+        "boxes": 3,
+        "images": 0,
+        "signatures": 1,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 1603935,
+      "presentation_proxy": "callback após evento Paint do viewport Widgets",
+      "opened_canvas": {
+        "w": 2480,
+        "h": 3507
+      },
+      "open_api_ms": 222.154,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.066,
+          "p95_ms": 0.092,
+          "max_ms": 0.15
+        },
+        "presentation_proxy": {
+          "samples": 90,
+          "median_ms": 1.963,
+          "p95_ms": 2.301,
+          "max_ms": 2.534
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.02,
+          "p95_ms": 16.266,
+          "max_ms": 16.923
+        },
+        "commit_ms": 0.425
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.239,
+          "p95_ms": 0.298,
+          "max_ms": 0.369
+        },
+        "presentation_proxy": {
+          "samples": 90,
+          "median_ms": 2.182,
+          "p95_ms": 2.362,
+          "max_ms": 2.869
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.176,
+          "p95_ms": 16.36,
+          "max_ms": 16.745
+        },
+        "commit_ms": 0.449
+      },
+      "peak_rss_mib": 151.3
+    },
+    "real-qml": {
+      "editor": "qml",
+      "model": "models/teste2/template_v3.json",
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "cpu_count": 32,
+      "render_loop": "threaded",
+      "qt": "6.11.0",
+      "pyside": "6.11.0",
+      "qpa": "xcb",
+      "screen_hz": 59.99953443620224,
+      "canvas": {
+        "w": 2484,
+        "h": 3512
+      },
+      "objects": {
+        "boxes": 3,
+        "images": 0,
+        "signatures": 1,
+        "shapes": 0
+      },
+      "has_background": true,
+      "model_directory_bytes": 1603935,
+      "presentation_proxy": "frameSwapped recebido no loop da GUI",
+      "open_api_ms": 1117.594,
+      "window_size": [
+        1500,
+        930
+      ],
+      "target_adjustments": "Texto escolhido desbloqueado e proporção livre nas cópias de ambos os editores",
+      "move": {
+        "api": {
+          "samples": 90,
+          "median_ms": 0.618,
+          "p95_ms": 0.72,
+          "max_ms": 1.311
+        },
+        "presentation_proxy": {
+          "samples": 86,
+          "median_ms": 16.578,
+          "p95_ms": 16.934,
+          "max_ms": 17.54
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.62,
+          "p95_ms": 16.935,
+          "max_ms": 26.687
+        },
+        "recordings": 0,
+        "commit_ms": 7.612
+      },
+      "resize": {
+        "api": {
+          "samples": 90,
+          "median_ms": 1.44,
+          "p95_ms": 1.743,
+          "max_ms": 3.392
+        },
+        "presentation_proxy": {
+          "samples": 88,
+          "median_ms": 10.594,
+          "p95_ms": 16.741,
+          "max_ms": 18.199
+        },
+        "delivery_intervals": {
+          "samples": 89,
+          "median_ms": 16.016,
+          "p95_ms": 16.748,
+          "max_ms": 16.994
+        },
+        "recordings": 90,
+        "commit_ms": 7.42
+      },
+      "peak_rss_mib": 288.0
+    }
+  }
+}

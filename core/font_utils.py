@@ -1,4 +1,6 @@
 from PySide6.QtGui import QFontDatabase
+import re
+from html import unescape
 
 
 def _normalized_font_name(name: str) -> str:
@@ -20,11 +22,17 @@ def template_font_families(template_data: dict) -> list[str]:
     seen = set()
 
     for box in template_data.get("boxes", []):
-        family = str(box.get("font_family", "")).strip()
-        normalized = _normalized_font_name(family)
-        if family and normalized not in seen:
-            fonts.append(family)
-            seen.add(normalized)
+        families = [str(box.get("font_family", "")).strip()]
+        if box.get("rich_text_version") == 1:
+            for match in re.findall(r'font-family\s*:\s*([^;]+)', unescape(box.get("html", "")), re.I):
+                families.extend(part.strip(" '\"") for part in match.split(","))
+        for family in families:
+            normalized = _normalized_font_name(family)
+            if normalized in ("serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui"):
+                continue
+            if family and normalized not in seen:
+                fonts.append(family)
+                seen.add(normalized)
 
     return fonts
 

@@ -10,12 +10,11 @@ ApplicationWindow {
 
     property real zoomValue: 100
     property bool showGrid: false
-    property bool showGuides: editor.state.guidesVisible
-    property bool guidesLocked: editor.state.guidesLocked
-    property string selectionKind: editor.state.selected.type || ""
-    property string selectionIndex: editor.state.selected.key || ""
-    property string selectionName: editor.state.selected.title || "Nenhuma seleção"
-    property string selectionContent: editor.state.selected.html || ""
+    property bool showGuides: editor.uiState.guidesVisible
+    property bool guidesLocked: editor.uiState.guidesLocked
+    property string selectionKind: editor.uiState.selected.type || ""
+    property string selectionIndex: editor.uiState.selected.key || ""
+    property string selectionName: editor.uiState.selected.title || "Nenhuma seleção"
 
     width: 1500
     height: 930
@@ -23,21 +22,65 @@ ApplicationWindow {
     minimumHeight: 700
     visible: true
     color: Theme.window
-    title: "COMSOC Studio — " + editor.state.name
+    title: "COMSOC Studio — " + editor.uiState.name
     onClosing: close => close.accepted = editor.canClose()
     Shortcut { sequence: "Ctrl+S"; onActivated: { canvasWorkspace.finishEditing(); editor.save(); } }
     Shortcut { sequence: "Ctrl+Shift+S"; onActivated: editor.saveAs() }
     Shortcut { sequence: "Ctrl+O"; onActivated: editor.openDialog() }
     Shortcut { sequence: "Ctrl+N"; onActivated: editor.newDocument() }
-    Shortcut { sequence: "Ctrl+Z"; enabled: !canvasWorkspace.editingText; onActivated: editor.undo() }
-    Shortcut { sequence: "Ctrl+Shift+Z"; enabled: !canvasWorkspace.editingText; onActivated: editor.redo() }
+    readonly property bool inputHasFocus: activeFocusItem instanceof TextInput || activeFocusItem instanceof TextEdit
+    Shortcut { sequence: "Ctrl+Z"; enabled: !canvasWorkspace.editingText && !inputHasFocus; onActivated: editor.undo() }
+    Shortcut { sequence: "Ctrl+Shift+Z"; enabled: !canvasWorkspace.editingText && !inputHasFocus; onActivated: editor.redo() }
+    Shortcut { sequence: "Ctrl+Y"; enabled: !canvasWorkspace.editingText && !inputHasFocus; onActivated: editor.redo() }
+    Shortcut { sequence: "Ctrl+D"; enabled: !canvasWorkspace.editingText && !inputHasFocus && !!editor.uiState.selected.key; onActivated: editor.duplicateSelected() }
     Connections { target: editor; function onError(message) { errorText.text = message; errorDialog.open(); } }
     Dialog { id: errorDialog; anchors.centerIn: parent; width: 480; title: "COMSOC"; modal: true; standardButtons: Dialog.Ok; Text { id: errorText; width: parent.width; wrapMode: Text.WordWrap; color: Theme.text } }
     font.family: "Inter, Segoe UI, sans-serif"
+    Dialog {
+        id: documentDialog
+        title: "Dimensões do documento"
+        anchors.centerIn: parent
+        modal: true
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onOpened: {
+            pageWidth.text = String(editor.documentSize.w);
+            pageHeight.text = String(editor.documentSize.h);
+            printWidth.text = String(editor.documentSize.widthMm);
+            printHeight.text = String(editor.documentSize.heightMm);
+        }
+        onAccepted: editor.setDocumentSize(pageWidth.text, pageHeight.text, printWidth.text, printHeight.text)
+        GridLayout {
+            columns: 2
+            Label { text: "Largura da página (px)" }
+            TextField { id: pageWidth; selectByMouse: true }
+            Label { text: "Altura da página (px)" }
+            TextField { id: pageHeight; selectByMouse: true }
+            Label { text: "Largura de saída (mm)" }
+            TextField { id: printWidth; selectByMouse: true }
+            Label { text: "Altura de saída (mm)" }
+            TextField { id: printHeight; selectByMouse: true }
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: fontWarning.implicitHeight + 16
+            visible: editor.uiState.missingFonts.length > 0
+            color: Theme.panelRaised
+            Text {
+                id: fontWarning
+                anchors.left: parent.left; anchors.right: parent.right
+                anchors.margins: 14; anchors.verticalCenter: parent.verticalCenter
+                text: "Fontes ausentes: " + editor.uiState.missingFonts.join(", ") + ". A prévia usa substituição do sistema; os nomes originais serão preservados ao salvar."
+                wrapMode: Text.WordWrap
+                color: Theme.warning
+                font.pixelSize: 11
+            }
+        }
 
         // Only the actions that truly belong to the model editor remain visible.
         Rectangle {
@@ -62,6 +105,8 @@ ApplicationWindow {
                         MenuItem { text: "Novo modelo  Ctrl+N"; onTriggered: editor.newDocument() }
                         MenuItem { text: "Abrir modelo…  Ctrl+O"; onTriggered: editor.openDialog() }
                         MenuItem { text: "Salvar como…  Ctrl+Shift+S"; onTriggered: editor.saveAs() }
+                        MenuSeparator {}
+                        MenuItem { text: "Dimensões do documento…"; onTriggered: documentDialog.open() }
                     }
                     Layout.preferredWidth: 84
                     Layout.preferredHeight: 32
@@ -119,7 +164,7 @@ ApplicationWindow {
                         spacing: 6
 
                         Text {
-                            text: editor.state.name
+                            text: editor.uiState.name
                             color: Theme.text
                             font.pixelSize: 12
                             font.weight: Font.DemiBold
@@ -130,7 +175,7 @@ ApplicationWindow {
                             Layout.preferredHeight: 6
                             radius: 3
                             color: Theme.warning
-                            visible: editor.state.dirty
+                            visible: editor.uiState.dirty
                         }
                     }
 
@@ -146,14 +191,14 @@ ApplicationWindow {
                 }
 
                 Text {
-                    text: editor.state.dirty ? "Alterações não salvas" : "Salvo"
+                    text: editor.uiState.dirty ? "Alterações não salvas" : "Salvo"
                     color: Theme.textSubtle
                     font.pixelSize: 9
                 }
 
                 ToolButton {
                     id: undoButton
-                    enabled: editor.state.canUndo
+                    enabled: editor.editingText ? editor.uiTextFormat.canUndo : editor.uiState.canUndo
                     onClicked: editor.undo()
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
@@ -177,7 +222,7 @@ ApplicationWindow {
 
                 ToolButton {
                     id: redoButton
-                    enabled: editor.state.canRedo
+                    enabled: editor.editingText ? editor.uiTextFormat.canRedo : editor.uiState.canRedo
                     onClicked: editor.redo()
                     Layout.preferredWidth: 32
                     Layout.preferredHeight: 32
@@ -322,8 +367,8 @@ ApplicationWindow {
 
                 CompactField {
                     label: "X"
-                    value: Number((editor.state.selected.x || 0) * 1).toFixed(2)
-                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    value: Number((editor.uiState.selected.x || 0) * 1).toFixed(2)
+                    enabled: !!editor.uiState.selected.key && !editor.uiState.selected.locked
                     onEdited: value => editor.setValue("x", Number(value.replace(",", ".")) / 1)
                     suffix: "px"
                     fieldWidth: 94
@@ -331,8 +376,8 @@ ApplicationWindow {
 
                 CompactField {
                     label: "Y"
-                    value: Number((editor.state.selected.y || 0) * 1).toFixed(2)
-                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    value: Number((editor.uiState.selected.y || 0) * 1).toFixed(2)
+                    enabled: !!editor.uiState.selected.key && !editor.uiState.selected.locked
                     onEdited: value => editor.setValue("y", Number(value.replace(",", ".")) / 1)
                     suffix: "px"
                     fieldWidth: 94
@@ -340,8 +385,8 @@ ApplicationWindow {
 
                 CompactField {
                     label: "L"
-                    value: Number((editor.state.selected.w || 0) * 1).toFixed(2)
-                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    value: Number((editor.uiState.selected.w || 0) * 1).toFixed(2)
+                    enabled: !!editor.uiState.selected.key && !editor.uiState.selected.locked
                     onEdited: value => editor.setValue("w", Number(value.replace(",", ".")) / 1)
                     suffix: "px"
                     fieldWidth: 100
@@ -349,8 +394,8 @@ ApplicationWindow {
 
                 CompactField {
                     label: "A"
-                    value: Number((editor.state.selected.h || 0) * 1).toFixed(2)
-                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    value: Number((editor.uiState.selected.h || 0) * 1).toFixed(2)
+                    enabled: !!editor.uiState.selected.key && !editor.uiState.selected.locked
                     onEdited: value => editor.setValue("h", Number(value.replace(",", ".")) / 1)
                     suffix: "px"
                     fieldWidth: 94
@@ -361,8 +406,8 @@ ApplicationWindow {
                     Layout.preferredWidth: 30
                     Layout.preferredHeight: 30
                     checkable: true
-                    checked: editor.state.selected.keep_proportion || false
-                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    checked: editor.uiState.selected.keep_proportion || false
+                    enabled: !!editor.uiState.selected.key && !editor.uiState.selected.locked
                     onClicked: editor.setValue("keep_proportion", checked)
                     hoverEnabled: true
                     Accessible.name: "Manter proporção"
@@ -391,8 +436,8 @@ ApplicationWindow {
 
                 CompactField {
                     label: "↻"
-                    value: Number((editor.state.selected.rotation || 0) * 1).toFixed(2)
-                    enabled: !!editor.state.selected.key && !editor.state.selected.locked && editor.state.selected.type !== "background"
+                    value: Number((editor.uiState.selected.rotation || 0) * 1).toFixed(2)
+                    enabled: !!editor.uiState.selected.key && !editor.uiState.selected.locked && editor.uiState.selected.type !== "background"
                     onEdited: value => editor.setValue("rotation", Number(value.replace(",", ".")) / 1)
                     suffix: "°"
                     fieldWidth: 72
@@ -400,8 +445,8 @@ ApplicationWindow {
 
                 CompactField {
                     label: "α"
-                    value: Number((editor.state.selected.opacity || 0) * 100).toFixed(0)
-                    enabled: !!editor.state.selected.key && !editor.state.selected.locked
+                    value: Number((editor.uiState.selected.opacity || 0) * 100).toFixed(0)
+                    enabled: !!editor.uiState.selected.key && !editor.uiState.selected.locked
                     onEdited: value => editor.setValue("opacity", Number(value.replace(",", ".")) / 100)
                     suffix: "%"
                     fieldWidth: 78
@@ -509,6 +554,7 @@ ApplicationWindow {
             }
 
             LeftDock {
+                onCanvasFocusRequested: canvasWorkspace.forceActiveFocus()
                 id: leftDock
 
                 SplitView.minimumWidth: 226
@@ -531,7 +577,6 @@ ApplicationWindow {
                 selectionKind: window.selectionKind
                 selectionIndex: window.selectionIndex
                 selectionName: window.selectionName
-                selectionContent: window.selectionContent
                 SplitView.minimumWidth: 292
                 SplitView.preferredWidth: 322
                 SplitView.maximumWidth: 390
@@ -564,7 +609,7 @@ ApplicationWindow {
                 }
 
                 Text {
-                    text: "Documento " + editor.state.width + " × " + editor.state.height + " px"
+                    text: editor.uiState.previewBusy ? "Atualizando prévia…" : (editor.uiState.message || ("Documento " + editor.uiState.width + " × " + editor.uiState.height + " px"))
                     color: Theme.textSubtle
                     font.pixelSize: 9
                 }

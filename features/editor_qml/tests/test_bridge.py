@@ -24,7 +24,7 @@ class BridgeTest(unittest.TestCase):
         self.bridge.error.connect(self.errors.append)
 
     def tearDown(self):
-        self.bridge._render_timer.stop()
+        self.bridge.shutdown()
         self.temp.cleanup()
 
     def fixture(self, name="teste2"):
@@ -38,11 +38,12 @@ class BridgeTest(unittest.TestCase):
         data["future_metadata"] = {"keep": [1, 2, 3]}
         path.write_text(json.dumps(data))
         self.assertTrue(self.bridge.load(str(path)))
-        self.bridge.select("text:0")
+        self.bridge.select(self.bridge._data["boxes"][0]["object_id"])
         self.bridge.setValue("font_color", "#123456")
         self.assertTrue(self.bridge.save())
         saved = json.loads(path.read_text())
-        self.assertEqual(saved["background_path"], data["background_path"])
+        self.assertIsNone(saved["background_path"])
+        self.assertEqual(saved["images"][0]["path"], data["background_path"])
         self.assertEqual(saved.get("bg_props"), data.get("bg_props"))
         self.assertEqual(saved["future_metadata"], data["future_metadata"])
         self.assertEqual(saved.get("imposition_settings"), data.get("imposition_settings"))
@@ -56,7 +57,7 @@ class BridgeTest(unittest.TestCase):
     def test_geometry_history_lock_and_duplicate(self):
         self.bridge.addItem("text")
         self.bridge.moveSelected(90, 100)
-        self.bridge.resizeItem("text:0", 600, 500)
+        self.bridge.resizeItem(self.bridge._data["boxes"][0]["object_id"], 600, 500)
         self.assertEqual(self.bridge.state["selected"]["h"], 200)
         self.bridge.setValue("locked", True)
         self.bridge.moveSelected(500, 500)
@@ -81,7 +82,8 @@ class BridgeTest(unittest.TestCase):
         self.assertTrue(self.bridge.save_to(target, "Cópia"), self.errors)
         self.assertEqual(source.read_bytes(), original)
         saved = json.loads(target.read_text())
-        self.assertTrue((target.parent / saved["background_path"]).exists())
+        self.assertIsNone(saved["background_path"])
+        self.assertTrue((target.parent / saved["images"][0]["path"]).exists())
         for item in saved["signatures"]:
             self.assertTrue((target.parent / item["path"]).exists())
         self.assertTrue(self.bridge.load(str(target)))
@@ -137,6 +139,22 @@ class BridgeTest(unittest.TestCase):
         self.assertFalse(self.bridge.save())
         self.assertEqual(path.read_bytes(), externally_changed)
         self.assertTrue(self.bridge.state["dirty"])
+
+    def test_layer_order_is_global_with_stable_ids(self):
+        self.bridge.addItem("text")
+        first = self.bridge._selected
+        self.bridge.insert_item("image", {"path": "missing.png", "width": 100, "height": 100})
+        second = self.bridge._selected
+        self.bridge.insert_item("signature", {"path": "missing.png", "width": 100, "height": 100})
+        third = self.bridge._selected
+        self.bridge.moveLayer(third, first)
+        self.assertEqual(self.bridge._data["layer_order"], [third, first, second])
+        self.bridge.undo()
+        self.assertEqual(self.bridge._data["layer_order"], [first, second, third])
+        self.bridge.redo()
+        self.assertEqual(self.bridge._data["layer_order"], [third, first, second])
+        self.assertEqual(self.bridge._data["boxes"][0]["object_id"], first)
+        self.assertFalse(self.errors)
 
     def test_invalid_load_keeps_current_document(self):
         self.bridge.addItem("text")

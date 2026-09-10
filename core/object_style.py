@@ -1,0 +1,93 @@
+"""Estilo vetorial compartilhado por formas e contorno de texto."""
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QColor, QPen, QPainterPath, QPainter, QPainterPathStroker
+
+
+def style_color(item, part):
+    color = QColor(item.get(part + '_color', '#ffffff' if part == 'fill' else '#000000'))
+    color.setAlphaF(color.alphaF() * max(0, min(1, float(item.get(part + '_opacity', 1)))))
+    return color
+
+
+def outline_pen(item):
+    if not item.get("outline_enabled", False):
+        return QPen(Qt.NoPen)
+    pen = QPen(style_color(item, 'outline'))
+    pen.setWidthF(max(0.1, float(item.get("outline_width", 1))))
+    pen.setJoinStyle(Qt.MiterJoin if item.get('outline_join') == 'miter' else Qt.RoundJoin)
+    return pen
+
+
+def outline_margin(item):
+    if item.get('outline_enabled') and item.get('outline_position') == 'inside':
+        return 1
+    if item.get('outline_enabled') and item.get('outline_position') == 'outside':
+        return max(0.1, float(item.get('outline_width', 1))) + 1
+    return outline_pen(item).widthF()/2 + 1 if item.get("outline_enabled", False) else 0
+
+
+def paint_shape_path(painter, path, item):
+    """Posicionamento opt-in; documentos sem a opção mantêm o desenho antigo."""
+    if item.get('shape_type') == 'line':
+        radius = max(0, float(item.get('corner_radius', 0)))
+        if radius:
+            bounds = path.boundingRect()
+            width = max(0.1, float(item.get('outline_width', 1)))
+            bounds = QRectF(bounds.left(), bounds.center().y()-width/2, bounds.width(), width)
+            radius = min(radius, width/2, bounds.width()/2)
+            rounded = QPainterPath()
+            rounded.addRoundedRect(bounds, radius, radius)
+            painter.fillPath(rounded, style_color(item, 'outline'))
+            return
+        pen = QPen(style_color(item, 'outline'))
+        pen.setWidthF(max(0.1, float(item.get('outline_width', 1))))
+        pen.setCapStyle(Qt.FlatCap)
+        painter.setPen(pen)
+        painter.setBrush(Qt.NoBrush)
+        painter.drawPath(path)
+        return
+    position = item.get('outline_position')
+    if not item.get('outline_enabled') or position not in ('inside', 'outside', 'center'):
+        painter.setPen(outline_pen(item))
+        painter.setBrush(style_color(item, 'fill'))
+        painter.drawPath(path)
+        return
+    painter.fillPath(path, style_color(item, 'fill'))
+    stroker = QPainterPathStroker()
+    width = max(0.1, float(item.get('outline_width', 1)))
+    stroker.setWidth(width if position == 'center' else width * 2)
+    stroker.setJoinStyle(Qt.MiterJoin if item.get('outline_join') == 'miter' else Qt.RoundJoin)
+    stroke = stroker.createStroke(path)
+    if position == 'inside':
+        stroke = stroke.intersected(path)
+    elif position == 'outside':
+        stroke = stroke.subtracted(path)
+    painter.fillPath(stroke, style_color(item, 'outline'))
+
+
+def draw_shape(painter, item):
+    if not item.get("visible", True):
+        return
+    w, h = item.get("width", 200), item.get("height", 120)
+    if w <= 0 or h <= 0:
+        return
+    painter.save()
+    try:
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setOpacity(item.get("opacity", 1))
+        painter.translate(item.get("x", 0)+w/2, item.get("y", 0)+h/2)
+        painter.rotate(item.get("rotation", 0))
+        path = QPainterPath()
+        bounds = QRectF(-w/2, -h/2, w, h)
+        if item.get('shape_type') == 'line':
+            path.moveTo(bounds.left(), 0)
+            path.lineTo(bounds.right(), 0)
+        elif item.get("shape_type", "rectangle") in ("ellipse", "circle"):
+            path.addEllipse(bounds)
+        else:
+            radius = min(max(0, float(item.get('corner_radius', 0))), w/2, h/2)
+            path.addRoundedRect(bounds, radius, radius)
+        paint_shape_path(painter, path, item)
+        return painter.transform().mapRect(bounds)
+    finally:
+        painter.restore()

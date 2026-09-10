@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
                                   QInputDialog, QComboBox, QCheckBox, QTableWidgetItem)
-from PySide6.QtCore import Qt, QSettings
+from PySide6.QtCore import Qt, QSettings, QSignalBlocker
 from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
 
 from features.preview.preview_panel import PreviewPanel
@@ -240,6 +240,10 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
 
         self.settings = QSettings("Projeto ComSoc", "MainApp")
+        self._qml_editors = set()
+        self.preview_panel.cbo_editor.setCurrentIndex(max(0, self.preview_panel.cbo_editor.findData(self.settings.value("model_editor", "legacy"))))
+        self.preview_panel.cbo_editor.currentIndexChanged.connect(
+            lambda: self.settings.setValue("model_editor", self.preview_panel.cbo_editor.currentData()))
         
         # Restaura a geometria e o estado da janela (posição e tamanho)
         geometry = self.settings.value("geometry")
@@ -373,6 +377,10 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
+        for session in tuple(self._qml_editors):
+            if not session.close():
+                event.ignore()
+                return
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("splitterState", self.splitter.saveState())
         super().closeEvent(event)
@@ -415,6 +423,9 @@ class MainWindow(QMainWindow):
             self._on_model_changed("")
 
     def _on_add_model(self):
+        if self.preview_panel.cbo_editor.currentData() == "qml":
+            self._open_qml_editor()
+            return
         self.editor_window = EditorWindow(self)
         self.editor_window.setWindowModality(Qt.WindowModality.WindowModal)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
@@ -680,12 +691,18 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Erro na Exportação", f"Falha ao gerar o arquivo ZIP:\n{e}")
 
     def _on_model_changed(self, name: str):
+        self._preview_generation = getattr(self, "_preview_generation", 0) + 1
+        generation = self._preview_generation
+        self.preview_renderer = None
+        self.cached_model_data = None
         self.preview_panel.set_preview_text(f"Prévia do modelo selecionado:\n{name}")
         self.log_panel.append(f"Modelo ativo: {name}")
         self.active_model_name = name
         self.current_filename_suffix = ""
 
-        if not name: return
+        if not name:
+            self._update_table_columns([])
+            return
 
         slug = slugify_model_name(name)
         json_path = get_models_dir() / slug / "template_v3.json"
@@ -758,7 +775,7 @@ class MainWindow(QMainWindow):
                             # Anexa à janela para o Garbage Collector não matar a Thread no meio do processo
                             worker.setParent(self) 
                             
-                            worker.preview_ready.connect(self._on_preview_ready)
+                            worker.preview_ready.connect(lambda model, path, revision=generation: self._on_preview_ready(model, path) if revision == self._preview_generation else None)
                             worker.error_occurred.connect(lambda msg: self.log_panel.append(f"Erro preview background: {msg}"))
                             worker.finished.connect(worker.deleteLater) # Autolimpeza imediata ao terminar
                         
@@ -858,11 +875,23 @@ class MainWindow(QMainWindow):
 
         slug = slugify_model_name(current_model_name)
         json_path = get_models_dir() / slug / "template_v3.json"
+        if self.preview_panel.cbo_editor.currentData() == "qml":
+            if json_path.exists():
+                self._open_qml_editor(json_path)
+            else:
+                QMessageBox.warning(self, "Modelo ausente", "O arquivo do modelo não foi encontrado. Atualize a biblioteca.")
+            return
 
         if json_path.exists():
             try:
                 with open(json_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
+                if data.get("layer_order") or data.get("shapes") or any(box.get("rich_text_version") or box.get("outline_enabled") for box in data.get("boxes", [])):
+                    answer = QMessageBox.warning(self, "Modelo do novo editor",
+                        "O editor legado não preserva formas, contornos, ordem livre e estilos por trecho ao salvar este modelo. Prefira o Novo editor QML.\n\nAbrir no legado mesmo assim?",
+                        QMessageBox.Ok | QMessageBox.Cancel, QMessageBox.Cancel)
+                    if answer != QMessageBox.Ok:
+                        return
                 missing_fonts = missing_template_fonts(data)
             except Exception:
                 missing_fonts = []
@@ -902,11 +931,57 @@ class MainWindow(QMainWindow):
 
         return msg_box.clickedButton() == btn_open
 
-    def _on_editor_saved(self, model_name, placeholders, file_path):
+    def _on_editor_saved(self, model_name, placeholders, file_path, *, previous_name=None):
+        table = self.table_panel.table
+        old_name = self.preview_panel.cbo_models.currentText()
+        target_name = old_name if previous_name and old_name not in (previous_name, model_name) else model_name
+        current_row = table.currentRow()
+        saved_rows = []
+        if old_name == target_name or old_name == previous_name:
+            for row in range(table.rowCount()):
+                saved_rows.append({table.horizontalHeaderItem(col).text(): table.item(row, col).clone()
+                                   for col in range(table.columnCount()) if table.item(row, col)})
+        blocker = QSignalBlocker(table)
         # Formata o log conforme o seu novo padrão
         self.log_panel.append(f"<b>Modelo '{model_name}' salvo com sucesso em:</b> {file_path}")
         self.log_panel.append("Atualizando lista...")
-        self._reload_models_from_disk(select_name=model_name)
+        self._reload_models_from_disk(select_name=target_name)
+        if saved_rows and self.preview_panel.cbo_models.currentText() == target_name:
+            defaults = [table.item(0, col).clone() if table.item(0, col) else None for col in range(table.columnCount())]
+            table.setRowCount(len(saved_rows))
+            for row, values in enumerate(saved_rows):
+                for col in range(table.columnCount()):
+                    name = table.horizontalHeaderItem(col).text()
+                    item = values.get(name, defaults[col])
+                    if item:
+                        table.setItem(row, col, item.clone())
+            if current_row >= 0:
+                table.setCurrentCell(min(current_row, table.rowCount()-1), 0)
+        del blocker
+        self._on_table_selection()
+
+    def _open_qml_editor(self, path=None):
+        from features.editor_qml.session import EditorSession
+        if path:
+            for session in self._qml_editors:
+                if session.bridge._path == Path(path).resolve():
+                    session.window.raise_()
+                    session.window.requestActivate()
+                    return session
+        try:
+            session = EditorSession(path, self)
+        except (ValueError, RuntimeError) as exc:
+            QMessageBox.warning(self, "Editor QML", str(exc))
+            return None
+        self._qml_editors.add(session)
+        session.bridge.library_mode = True
+        session.workspace_model_name = session.bridge.state["name"] if path else ""
+        def saved(name, fields, filename):
+            self._on_editor_saved(name, fields, filename, previous_name=session.workspace_model_name)
+            session.workspace_model_name = name
+        session.modelSaved.connect(saved)
+        session.closed.connect(lambda: self._qml_editors.discard(session))
+        return session
 
     def _open_config_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
@@ -930,7 +1005,7 @@ class MainWindow(QMainWindow):
             model_size = (sz.get("w", 1000), sz.get("h", 1000))
             model_print_size_mm = self._get_model_base_print_size_mm()
             current_imposition = self.cached_model_data.get("imposition_settings") 
-            has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", [])))
+            has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", []) + self.cached_model_data.get("shapes", [])))
 
         # Lê o tema atual e envia para a janela de configurações
         is_dark_now = self.settings.value("dark_mode", True, type=bool)
@@ -1157,7 +1232,7 @@ class MainWindow(QMainWindow):
         export_format = self.cbo_export_format.currentText()
         has_any_link = False
         if self.cached_model_data:
-            has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", [])))
+            has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", []) + self.cached_model_data.get("shapes", [])))
 
         if export_format == "PNG" and has_any_link:
             resp = QMessageBox.question(

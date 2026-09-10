@@ -41,6 +41,11 @@ class RenderManager(QObject):
         self.cards_done = 0
         self.generated_files = []
         self.workers = []
+        self.all_cards_links = {}
+
+        if not self.total_cards or len(self.rows_rich) != self.total_cards:
+            self._on_worker_error("Não há registros válidos para gerar.")
+            return
         
         self.log_updated.emit("📋 Planejando produção...")
         
@@ -98,7 +103,7 @@ class RenderManager(QObject):
         capacity = temp_asm.capacity
         
         if capacity <= 0:
-            self.error_occurred.emit("Erro: O modelo é grande demais para as margens da folha.")
+            self._on_worker_error("Erro: O modelo é grande demais para as margens da folha.")
             return
             
         total_pages = math.ceil(len(all_data) / capacity)
@@ -133,7 +138,7 @@ class RenderManager(QObject):
             
             w = PageRenderWorker(worker_tasks, self.renderer, self.work_dir, self.imposition_settings, self.worker_format, False)
             w.page_finished.connect(self._on_page_finished)
-            w.error_occurred.connect(self.error_occurred)
+            w.error_occurred.connect(self._on_worker_error)
             
             self.workers.append(w)
             w.start()
@@ -152,7 +157,7 @@ class RenderManager(QObject):
             
             w = DirectRenderWorker(chunk, self.renderer, self.work_dir, self.worker_format, False, self.target_w_mm, self.target_h_mm)
             w.card_finished.connect(self._on_direct_card_finished)
-            w.error_occurred.connect(self.error_occurred)
+            w.error_occurred.connect(self._on_worker_error)
             
             self.workers.append(w)
             w.start()
@@ -198,7 +203,14 @@ class RenderManager(QObject):
         self.log_updated.emit("✅ Processo finalizado com sucesso!")
 
     def _on_hybrid_assembly_error(self, error_msg):
-        self.error_occurred.emit(f"Erro na montagem do PDF: {error_msg}")
+        self._on_worker_error(f"Erro na montagem do PDF: {error_msg}")
+
+    def _on_worker_error(self, error_msg):
+        if not self._is_running:
+            return
+        self._finish_emitted = True
+        self.stop()
+        self.error_occurred.emit(error_msg)
         self.finished_process.emit()
 
     def _check_completion(self):

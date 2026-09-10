@@ -7,6 +7,19 @@ from .imposition import SheetAssembler
 from .pdf_links import inject_pdf_links
 
 
+def physical_page(width_mm, height_mm):
+    # Evita que medidas personalizadas próximas de A4 sejam arredondadas para A4.
+    return QPageSize(QSizeF(width_mm, height_mm), QPageSize.Unit.Millimeter,
+                     "", QPageSize.SizeMatchPolicy.ExactMatch)
+
+
+def pdf_painter(writer):
+    painter = QPainter(writer)
+    if not painter.isActive():
+        raise OSError("Não foi possível abrir o PDF para gravação.")
+    return painter
+
+
 class DirectRenderWorker(QThread):
     card_finished = Signal(str, int, list)
     error_occurred = Signal(str)
@@ -36,10 +49,10 @@ class DirectRenderWorker(QThread):
                 writer = QPdfWriter(str(out_path_single))
                 writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
                 layout = writer.pageLayout()
-                layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
+                layout.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
                 layout.setMargins(QMarginsF(0, 0, 0, 0))
                 writer.setPageLayout(layout)
-                painter = QPainter(writer)
+                painter = pdf_painter(writer)
 
             for i, (original_idx, row_plain, row_rich, filename) in enumerate(self.chunk_data):
                 if not self._is_running: break
@@ -58,10 +71,10 @@ class DirectRenderWorker(QThread):
                         writer_single = QPdfWriter(str(out_path))
                         writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
                         layout_single = writer_single.pageLayout()
-                        layout_single.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
+                        layout_single.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
                         layout_single.setMargins(QMarginsF(0, 0, 0, 0))
                         writer_single.setPageLayout(layout_single)
-                        painter_single = QPainter(writer_single)
+                        painter_single = pdf_painter(writer_single)
                         painter_single.drawImage(layout_single.paintRectPixels(writer_single.resolution()), img)
                         painter_single.end()
                         
@@ -87,7 +100,8 @@ class DirectRenderWorker(QThread):
                         self.card_finished.emit(out_path.name, original_idx, local_links)
                 else:
                     out_path = self.output_dir / f"{filename}.png"
-                    self.renderer.render_row(row_plain, row_rich, out_path, out_links=local_links)
+                    self.renderer.render_row(row_plain, row_rich, out_path, out_links=local_links,
+                                             target_w_mm=self.target_w_mm, target_h_mm=self.target_h_mm)
                     self.card_finished.emit(out_path.name, original_idx, local_links)
             
             if painter:
@@ -137,11 +151,10 @@ class PageRenderWorker(QThread):
                 layout = writer.pageLayout()
                 w_sheet_mm = self.assembler.sheet_w_mm
                 h_sheet_mm = self.assembler.sheet_h_mm
-                layout.setPageSize(QPageSize(QSizeF(w_sheet_mm, h_sheet_mm), QPageSize.Unit.Millimeter))
-                layout.setOrientation(self.assembler.orientation)
+                layout.setPageSize(physical_page(w_sheet_mm, h_sheet_mm))
                 layout.setMargins(QMarginsF(0, 0, 0, 0))
                 writer.setPageLayout(layout)
-                painter = QPainter(writer)
+                painter = pdf_painter(writer)
 
             for i, page_task in enumerate(self.tasks):
                 if not self._is_running: break
@@ -173,15 +186,19 @@ class PageRenderWorker(QThread):
                         layout_single = writer_single.pageLayout()
                         w_sheet_mm = self.assembler.sheet_w_mm
                         h_sheet_mm = self.assembler.sheet_h_mm
-                        layout_single.setPageSize(QPageSize(QSizeF(w_sheet_mm, h_sheet_mm), QPageSize.Unit.Millimeter))
+                        layout_single.setPageSize(physical_page(w_sheet_mm, h_sheet_mm))
                         layout_single.setMargins(QMarginsF(0, 0, 0, 0))
                         writer_single.setPageLayout(layout_single)
-                        painter_single = QPainter(writer_single)
+                        painter_single = pdf_painter(writer_single)
                         painter_single.drawImage(layout_single.paintRectPixels(writer_single.resolution()), sheet_img)
                         painter_single.end()
+                        del painter_single
+                        del layout_single
+                        del writer_single
                         final_name = out_path.name
                 else:
-                    sheet_img.save(str(out_path))
+                    if not sheet_img.save(str(out_path), "PNG"):
+                        raise OSError(f"Não foi possível gravar {out_path}.")
                     final_name = out_path.name
                 
                 msg = f"🖨️ FOLHA {page_task['page_num']:02d} OK ({len(card_images)} itens)"
@@ -236,13 +253,12 @@ class HybridAssemblerWorker(QThread):
 
                 # Recalcula a orientação vencedora para o PDF final
                 temp_asm = SheetAssembler(tw, th, sheet_w, sheet_h, marks, bleed)
-                layout.setPageSize(QPageSize(QSizeF(sheet_w, sheet_h), QPageSize.Unit.Millimeter))
-                layout.setOrientation(temp_asm.orientation)
+                layout.setPageSize(physical_page(temp_asm.sheet_w_mm, temp_asm.sheet_h_mm))
             else:
-                layout.setPageSize(QPageSize(QSizeF(self.target_w_mm, self.target_h_mm), QPageSize.Unit.Millimeter))
+                layout.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
                 
             writer.setPageLayout(layout)
-            painter = QPainter(writer)
+            painter = pdf_painter(writer)
 
             # Os arquivos já virão ordenados perfeitamente pelo índice
             sorted_files = sorted(self.generated_files)
@@ -251,9 +267,10 @@ class HybridAssemblerWorker(QThread):
                 if i > 0:
                     writer.newPage()
                 img_path = self.work_dir / filename
-                if not img_path.exists(): continue
-                
                 img = QImage(str(img_path))
+                if img.isNull():
+                    painter.end()
+                    raise OSError(f"Imagem ausente ou inválida na montagem: {img_path.name}")
                 painter.drawImage(layout.paintRectPixels(writer.resolution()), img)
                 del img 
             
@@ -274,7 +291,7 @@ class HybridAssemblerWorker(QThread):
                         self.canvas_h,
                     )
                 except Exception as e:
-                    print(f"[WARN] Erro ao injetar links no PDF Híbrido: {e}")
+                    raise OSError(f"Erro ao injetar links no PDF Híbrido: {e}") from e
 
             shutil.rmtree(self.work_dir, ignore_errors=True)
             self.finished_assembly.emit()
@@ -291,6 +308,9 @@ class PreviewRenderWorker(QThread):
         self.model_name = model_name
         self.template_data = template_data
         self.model_dir = model_dir
+        import hashlib
+        source = model_dir / "template_v3.json"
+        self._source_hash = hashlib.sha256(source.read_bytes()).digest() if source.is_file() else None
 
     def run(self):
         try:
@@ -307,20 +327,14 @@ class PreviewRenderWorker(QThread):
             placeholders = self.template_data.get("placeholders", [])
             row_rich = {p: f"{{{p}}}" for p in placeholders}
             
-            # Gera a imagem usando QImage nativo (Thread-Safe)
-            img = renderer.render_to_qimage({}, row_rich)
-            
-            # Aplica a mesma escala do render_to_pixmap original
-            w = self.template_data.get("canvas_size", {}).get("w", 1000)
-            h = self.template_data.get("canvas_size", {}).get("h", 1000)
-            max_side = 1600
-            
-            if max(w, h) > max_side:
-                scale = max_side / max(w, h)
-                img = img.scaled(int(w * scale), int(h * scale), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
-                
-            img.save(str(thumb_path), "PNG")
-            
+            img = renderer.render_preview_image(row_rich, max_side=1600)
+            import hashlib
+            source = self.model_dir / "template_v3.json"
+            if self._source_hash is not None and (not source.is_file() or hashlib.sha256(source.read_bytes()).digest() != self._source_hash):
+                return
+            if not img.save(str(thumb_path), "PNG"):
+                raise OSError("Não foi possível gravar a miniatura.")
+
             # Avisa a Janela Principal que terminou
             self.preview_ready.emit(self.model_name, str(thumb_path))
             

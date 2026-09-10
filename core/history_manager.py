@@ -16,8 +16,6 @@ class HistoryManager(QObject):
         """Salva um novo estado na pilha. Ignora se for idêntico ao atual."""
         # Se estamos no meio da pilha e o usuário faz uma nova ação, 
         # o futuro alternativo (redo) é destruído.
-        if self._current_index < len(self._undo_stack) - 1:
-            self._undo_stack = self._undo_stack[:self._current_index + 1]
 
         # Evita salvar snapshots duplicados (se o usuário não mudou nada)
         if self._undo_stack and self._current_index >= 0:
@@ -26,6 +24,8 @@ class HistoryManager(QObject):
             if json.dumps(current_state, sort_keys=True) == json.dumps(state, sort_keys=True):
                 return
 
+        if self._current_index < len(self._undo_stack) - 1:
+            self._undo_stack = self._undo_stack[:self._current_index + 1]
         self._undo_stack.append(state)
         
         # Limpa o histórico mais antigo se exceder o limite de RAM

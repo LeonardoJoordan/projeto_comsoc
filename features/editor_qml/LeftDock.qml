@@ -6,9 +6,8 @@ import QtQuick.Layouts
 
 Rectangle {
     id: root
+    signal canvasFocusRequested()
 
-    property int selectedLayer: 0
-    signal layerSelected(int layerIndex, string kind, string title, string content)
 
     color: Theme.panel
     border.width: 1
@@ -87,10 +86,10 @@ Rectangle {
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 43.5
-                    enabled: modelData.icon !== "shape"
+                    opacity: enabled ? 1 : 0.4
                     hoverEnabled: true
                     ToolTip.visible: hovered
-                    ToolTip.text: modelData.icon === "shape" ? "Formas: integração pendente" : modelData.title
+                    ToolTip.text: modelData.title
                     onClicked: editor.addItem(modelData.icon === "signature" ? "signature" : modelData.icon)
 
                     contentItem: RowLayout {
@@ -205,6 +204,8 @@ Rectangle {
 
                         required property var modelData
 
+                        enabled: !!editor.uiState.selected.key && !editor.editingText && (modelData.tip === "Duplicar camada" || !editor.uiState.selected.locked)
+
                         Layout.preferredWidth: 28
                         Layout.preferredHeight: 28
                         hoverEnabled: true
@@ -242,11 +243,12 @@ Rectangle {
                 spacing: 3
 
                 Repeater {
-                    model: editor.state.layers
+                    model: editor.layerList
 
                     delegate: LayerRow {
                         required property int index
-                        required property var modelData
+                        required property QtObject layerData
+                        readonly property var modelData: layerData.uiView
 
                         width: parent.width - 16
                         kind: modelData.kind
@@ -254,10 +256,14 @@ Rectangle {
                         detail: modelData.detail
                         locked: modelData.locked
                         visibleLayer: modelData.visible
-                        selected: editor.state.selected.key === modelData.key
+                        selected: editor.uiState.selected.key === modelData.key
+                        onReorderRequested: offset => {
+                            const targetIndex = Math.max(0, Math.min(editor.layers.length - 1, index + Math.round(offset / 49)));
+                            editor.moveLayer(modelData.key, editor.layers[targetIndex].key);
+                        }
                         onVisibilityRequested: { editor.select(modelData.key); editor.setValue("visible", !modelData.visible); }
                         onLockRequested: { editor.select(modelData.key); editor.setValue("locked", !modelData.locked); }
-                        onActivated: editor.select(modelData.key)
+                        onActivated: { editor.select(modelData.key); root.canvasFocusRequested(); }
                     }
                 }
             }
@@ -275,13 +281,13 @@ Rectangle {
 
                 Text {
                     Layout.fillWidth: true
-                    text: editor.state.layers.length + " elementos"
+                    text: editor.uiState.layerCount + " elementos"
                     color: Theme.textSubtle
                     font.pixelSize: 9
                 }
 
                 Text {
-                    text: "Ordem de renderização"
+                    text: "Arraste para reordenar"
                     color: Theme.textDisabled
                     font.pixelSize: 8
                 }

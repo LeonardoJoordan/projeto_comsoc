@@ -1,6 +1,6 @@
 import math
 
-from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPixmap, QPageLayout
+from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPageLayout
 from PySide6.QtCore import Qt, QPointF
 
 DPI = 300
@@ -88,6 +88,8 @@ class SheetAssembler:
 
     def render_sheet(self, cards: list[QImage]) -> QImage:
         sheet = QImage(self.sheet_w, self.sheet_h, QImage.Format_ARGB32)
+        sheet.setDotsPerMeterX(round(DPI / 0.0254))
+        sheet.setDotsPerMeterY(round(DPI / 0.0254))
         sheet.fill(Qt.GlobalColor.white)
         
         painter = QPainter(sheet)
@@ -119,12 +121,12 @@ class SheetAssembler:
                 cell_w = max(1, self._grid_x(c + 1) - x)
                 cell_h = max(1, self._grid_y(r + 1) - y)
                 
-                scaled_pix = QPixmap.fromImage(original_img).scaled(
+                scaled_image = original_img.scaled(
                     cell_w, cell_h,
                     Qt.AspectRatioMode.IgnoreAspectRatio, 
                     Qt.TransformationMode.SmoothTransformation
                 )
-                painter.drawPixmap(x, y, scaled_pix)
+                painter.drawImage(x, y, scaled_image)
                 idx += 1
 
         if self.crop_marks:

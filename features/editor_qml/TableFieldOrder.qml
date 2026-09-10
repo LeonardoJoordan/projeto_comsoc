@@ -11,10 +11,10 @@ ColumnLayout {
     ListModel { id: fields }
     function syncFields() {
         fields.clear();
-        for (const label of editor.state.fields) fields.append({label: label});
+        for (const label of editor.uiState.fields) fields.append({label: label});
     }
     Component.onCompleted: syncFields()
-    Connections { target: editor; function onChanged() { root.syncFields(); } }
+    Connections { target: editor; function onDocumentChanged() { root.syncFields(); } }
     Text {
         Layout.fillWidth: true
         text: "Segure e arraste os campos para mudar a ordem."

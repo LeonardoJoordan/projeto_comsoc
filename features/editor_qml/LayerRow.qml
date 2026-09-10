@@ -14,6 +14,10 @@ Rectangle {
     signal activated
     signal visibilityRequested
     signal lockRequested
+    signal reorderRequested(real offset)
+    property real dragOffset: 0
+    transform: Translate { y: root.dragOffset }
+    z: dragOffset !== 0 ? 1 : 0
 
     implicitHeight: 46
     radius: Theme.radiusSmall
@@ -31,7 +35,22 @@ Rectangle {
         id: mouse
         anchors.fill: parent
         hoverEnabled: true
-        onClicked: root.activated()
+        preventStealing: true
+        property real pressY
+        onPressed: mouse => pressY = mapToItem(null, mouse.x, mouse.y).y
+        onPositionChanged: mouse => {
+            if (pressed && !root.locked) {
+                const offset = mapToItem(null, mouse.x, mouse.y).y - pressY;
+                if (Math.abs(offset) > Qt.styleHints.startDragDistance) root.dragOffset = offset;
+            }
+        }
+        onReleased: {
+            const offset = root.dragOffset;
+            root.dragOffset = 0;
+            if (Math.abs(offset) > Qt.styleHints.startDragDistance) root.reorderRequested(offset);
+            else root.activated();
+        }
+        onCanceled: root.dragOffset = 0
     }
 
     RowLayout {

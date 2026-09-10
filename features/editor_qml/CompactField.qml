@@ -35,7 +35,7 @@ Rectangle {
             id: input
             Layout.fillWidth: true
             text: root.value
-            onEditingFinished: root.edited(text)
+            onEditingFinished: { root.edited(text); text = root.value; }
             color: Theme.text
             selectByMouse: true
             font.pixelSize: 11

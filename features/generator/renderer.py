@@ -1,12 +1,12 @@
-from PySide6.QtGui import (QPainter, QImage, QPixmap, QTextDocument, QFont, 
-                           QTextCursor, QTextBlockFormat, QTextCharFormat, QColor, QBrush,
-                           QFontMetrics, QImageReader)
+from PySide6.QtGui import QPainter, QImage, QPixmap, QFont, QImageReader
 from PySide6.QtCore import Qt, QPointF, QRectF
 from html import unescape
 import re
 from pathlib import Path
-from core.html_utils import normalize_text_decoration
 from core.render_cache import get_background_proxy_path, infer_model_dir
+from core.document_layers import layer_entries
+from core.object_style import draw_shape, outline_margin
+from core.text_layout import build_document, text_geometry, resolve_rich_text
 
 class NativeRenderer:
     def __init__(self, template_data: dict):
@@ -65,12 +65,23 @@ class NativeRenderer:
         finally:
             painter.end()
 
-    def render_row(self, row_plain: dict, row_rich: dict, out_path: Path, out_links: list = None):
+    def render_row(self, row_plain: dict, row_rich: dict, out_path: Path, out_links: list = None,
+                   target_w_mm=None, target_h_mm=None):
         image = self.render_to_qimage(row_plain, row_rich, out_links=out_links)
-        image.save(str(out_path), "PNG")
+        # Metadados físicos somente depois da pintura: o layout de texto usa 96 DPI.
+        w_mm = target_w_mm or self.tpl.get("target_w_mm") or image.width() * 25.4 / 300
+        h_mm = target_h_mm or self.tpl.get("target_h_mm") or image.height() * 25.4 / 300
+        image.setDotsPerMeterX(round(image.width() * 1000 / w_mm))
+        image.setDotsPerMeterY(round(image.height() * 1000 / h_mm))
+        if not image.save(str(out_path), "PNG"):
+            raise OSError(f"Não foi possível gravar {out_path}.")
 
     
-    def render_to_pixmap(self, row_rich: dict = None, max_side: int = None) -> QPixmap:
+    def render_to_pixmap(self, row_rich: dict = None, max_side: int = None, transparent=False) -> QPixmap:
+        return QPixmap.fromImage(self.render_preview_image(row_rich, max_side, transparent))
+
+    def render_preview_image(self, row_rich=None, max_side=None, transparent=False) -> QImage:
+        """Prévia em QImage, utilizável em workers sem criar QPixmap."""
         w = self.tpl["canvas_size"]["w"]
         h = self.tpl["canvas_size"]["h"]
 
@@ -86,7 +97,7 @@ class NativeRenderer:
         image = QImage(render_w, render_h, QImage.Format_ARGB32)
         image.setDotsPerMeterX(3780) # Trava o Gerador em exatos 96 DPI
         image.setDotsPerMeterY(3780)
-        image.fill(Qt.GlobalColor.white)
+        image.fill(Qt.GlobalColor.transparent if transparent else Qt.GlobalColor.white)
 
         painter = QPainter(image)
         try:
@@ -99,7 +110,7 @@ class NativeRenderer:
         finally:
             painter.end()
         
-        return QPixmap.fromImage(image)
+        return image
     
 
     def render_to_qimage(self, row_plain: dict, row_rich: dict, out_links: list = None) -> QImage:
@@ -144,7 +155,37 @@ class NativeRenderer:
         values = row_plain if row_plain is not None and link_key in row_plain else row_rich
         return self._normalize_link_url(values.get(link_key, ""))
 
-    def _paint_card(self, painter: QPainter, row_rich: dict, out_links: list = None, static_only: bool = False, dynamic_only: bool = False, row_plain: dict = None):
+    def _paint_card(self, painter, row_rich, out_links=None, static_only=False, dynamic_only=False, row_plain=None):
+        if "layer_order" not in self.tpl and not self.tpl.get("shapes"):
+            return self._paint_card_legacy(painter, row_rich, out_links, static_only, dynamic_only, row_plain)
+        entries = layer_entries(self.tpl)
+        prefix = 0
+        for _, kind, item in entries:
+            if kind not in ("image", "shape") or (item.get("has_link") and item.get("link_key")):
+                break
+            prefix += 1
+        for index, (_, kind, item) in enumerate(entries):
+            if static_only and index >= prefix:
+                break
+            if dynamic_only and index < prefix:
+                continue
+            if kind == "shape":
+                rect = draw_shape(painter, item)
+                if rect is not None and item.get("has_link") and item.get("link_key") and out_links is not None:
+                    url = self._resolve_link_url(item["link_key"], row_rich, row_plain)
+                    if url:
+                        out_links.append({"url": url, "rect": rect})
+                continue
+            # A child view avoids mutating a renderer shared by batch workers.
+            layer = {**self.tpl, "images": [], "boxes": [], "signatures": [], "background_path": None}
+            layer.pop("layer_order", None)
+            layer[{"image": "images", "text": "boxes", "signature": "signatures"}[kind]] = [item]
+            child = NativeRenderer(layer)
+            child.model_dir = self.model_dir
+            child._image_cache = self._image_cache
+            child._paint_card_legacy(painter, row_rich, out_links, row_plain=row_plain)
+
+    def _paint_card_legacy(self, painter: QPainter, row_rich: dict, out_links: list = None, static_only: bool = False, dynamic_only: bool = False, row_plain: dict = None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         painter.setRenderHint(QPainter.RenderHint.TextAntialiasing)
@@ -170,7 +211,10 @@ class NativeRenderer:
                         )
                         proxy_drawn = True
                 if not proxy_drawn:
-                    bg = self._get_image(self.tpl["background_path"])
+                    bg_path = Path(self.tpl["background_path"])
+                    if not bg_path.is_absolute() and self.model_dir:
+                        bg_path = self.model_dir / bg_path
+                    bg = self._get_image(bg_path)
                     if not bg.isNull():
                         w = bg_props.get("w", self.tpl["canvas_size"]["w"])
                         h = bg_props.get("h", self.tpl["canvas_size"]["h"])
@@ -191,6 +235,8 @@ class NativeRenderer:
             
             raw_path = img.get("path", "")
             img_path = Path(raw_path)
+            if not img_path.is_absolute() and self.model_dir:
+                img_path = self.model_dir / img_path
             
             # Fallback de resolução de caminho (resolve assets relativos quando acionado via gerador)
             if not img_path.exists():
@@ -278,6 +324,13 @@ class NativeRenderer:
                 continue
 
             html_original = box["html"]
+            if box.get("rich_text_version") == 1:
+                resolved = resolve_rich_text(box, row_rich)
+                if resolved is not None:
+                    painter.setOpacity(box.get("opacity", 1.0))
+                    self._draw_html_box(painter, box, resolved, row_rich, out_links, row_plain)
+                    painter.setOpacity(1.0)
+                continue
 
             # 1. Primeiro resolve os blocos opcionais | ... |
             html_processado = _process_optional_blocks(html_original)
@@ -317,6 +370,8 @@ class NativeRenderer:
 
             raw_sig = sig["path"]
             sig_path = Path(raw_sig)
+            if not sig_path.is_absolute() and self.model_dir:
+                sig_path = self.model_dir / sig_path
 
             if not sig_path.exists():
                 try:
@@ -354,104 +409,11 @@ class NativeRenderer:
     def _draw_html_box(self, painter, box_data, html_text, row_rich=None, out_links=None, row_plain=None):
         painter.save()
         try:
-            doc = QTextDocument()
-            doc.setDocumentMargin(0) 
-            
-            # Limpeza Retroativa
-            clean_html = re.sub(r"color\s*:[^;\"]+;?", "", html_text)
-            clean_html = re.sub(r"background-color\s*:[^;\"]+;?", "", clean_html)
-            clean_html = normalize_text_decoration(clean_html)
-            clean_html = re.sub(r"font-size\s*:[^;\"]+;?", "", clean_html)
-            clean_html = re.sub(r"font-family\s*:[^;\"]+;?", "", clean_html)
-            clean_html = re.sub(r"(?i)<a\b[^>]*>", "", clean_html)
-            clean_html = re.sub(r"(?i)</a>", "", clean_html)
-            
-            doc.setHtml(clean_html)
-
-            font_family = box_data.get("font_family", "Arial")
-            font_size = box_data.get("font_size", 16)
-            font = QFont(font_family, font_size)
-            doc.setDefaultFont(font)
-            
-            font_color = box_data.get("font_color", "#000000")
-            
-            cursor_color = QTextCursor(doc)
-            cursor_color.select(QTextCursor.SelectionType.Document)
-            char_fmt = QTextCharFormat()
-            char_fmt.setForeground(QBrush(QColor(font_color)))
-            cursor_color.mergeCharFormat(char_fmt)
-
-            align_str = box_data.get("align", "left")
-            opts = doc.defaultTextOption()
-            if align_str == "center":
-                opts.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            elif align_str == "right":
-                opts.setAlignment(Qt.AlignmentFlag.AlignRight)
-            elif align_str == "justify":
-                opts.setAlignment(Qt.AlignmentFlag.AlignJustify)
-            else:
-                opts.setAlignment(Qt.AlignmentFlag.AlignLeft)
-            doc.setDefaultTextOption(opts)
-            
-            cursor = QTextCursor(doc)
-            cursor.select(QTextCursor.SelectionType.Document)
-            fmt = QTextBlockFormat()
-            fmt.setTextIndent(box_data.get("indent_px", 0.0))
-            fmt.setLineHeight(box_data.get("line_height", 1.15) * 100.0, 1)
-            cursor.mergeBlockFormat(fmt)
-
-            root_frame = doc.rootFrame()
-            frame_fmt = root_frame.frameFormat()
-            frame_fmt.setMargin(0)
-            root_frame.setFrameFormat(frame_fmt)
-            
-            w = box_data.get("w", 300)
-            h = box_data.get("h", 100)
+            doc = build_document(box_data, html_text)
+            w, h = box_data.get("w", 300), box_data.get("h", 100)
             rotation = box_data.get("rotation", 0)
-            doc.setTextWidth(w)
-                    
-            layout = doc.documentLayout()
-            logical_h = layout.documentSize().height()
-            fm = QFontMetrics(font)
-            
-            real_top = 0
-            real_bottom = logical_h
-            
-            first_block = doc.begin()
-            if first_block.isValid():
-                text_layout = first_block.layout()
-                if text_layout.lineCount() > 0:
-                    first_line = text_layout.lineAt(0)
-                    text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
-                    if text_str.strip():
-                        tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
-                        real_top = first_line.y() + first_line.ascent() + tight_rect.top()
-
-            last_block = doc.begin()
-            last_valid_block = last_block
-            while last_block.isValid():
-                if last_block.text().strip(): last_valid_block = last_block
-                last_block = last_block.next()
-                
-            if last_valid_block.isValid():
-                text_layout = last_valid_block.layout()
-                if text_layout.lineCount() > 0:
-                    last_line = text_layout.lineAt(text_layout.lineCount() - 1)
-                    text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
-                    if text_str.strip():
-                        tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
-                        block_y = layout.blockBoundingRect(last_valid_block).y()
-                        real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
-                        
-            content_h = real_bottom - real_top
-            
-            y_offset = 0
-            if box_data.get("vertical_align") == "center":
-                y_offset = (h - content_h) / 2 - real_top
-            elif box_data.get("vertical_align") == "bottom":
-                y_offset = h - content_h - real_top
-            else: 
-                y_offset = -real_top
+            align_str = box_data.get("align", "left")
+            y_offset, real_top, content_h = text_geometry(doc, box_data)
 
             center_x = box_data.get("x", 0) + (w / 2)
             center_y = box_data.get("y", 0) + (h / 2)
@@ -460,7 +422,8 @@ class NativeRenderer:
             painter.rotate(rotation)
             painter.translate(-w / 2, -h / 2)
             
-            painter.setClipRect(0, -10000, w, 20000)
+            margin = outline_margin(box_data)
+            painter.setClipRect(QRectF(-margin, -10000, w+2*margin, 20000))
             painter.translate(0, y_offset)
             doc.drawContents(painter)
             

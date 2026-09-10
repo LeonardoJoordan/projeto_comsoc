@@ -10,7 +10,6 @@ Rectangle {
     property string selectionKind: "text"
     property string selectionIndex: ""
     property string selectionName: "Nome completo"
-    property string selectionContent: "{Nome completo}"
     readonly property bool linkAvailable: isText || selectionKind === "image" || isShape
 
     function collapseSections() {
@@ -73,7 +72,7 @@ Rectangle {
                     width: parent.width
                     title: "Propriedades"
                     expanded: false
-                    available: !!editor.state.selected.key
+                    available: !!editor.uiState.selected.key
                     collapsible: true
                     topPadding: 0
                     bottomPadding: expanded ? 14 : 0
@@ -112,15 +111,31 @@ Rectangle {
                             CompactSwitch {
                                 Layout.preferredWidth: 42
                                 Layout.preferredHeight: 24
-                                checked: editor.state.selected.has_link || false
-                                enabled: !editor.state.selected.locked
+                                checked: editor.uiState.selected.has_link || false
+                                enabled: !editor.uiState.selected.locked
                                 onClicked: editor.setValue("has_link", checked)
                             }
                         }
 
                     }
+                    PropertyField {
+                        Layout.fillWidth: true
+                        visible: root.linkAvailable && !!editor.uiState.selected.has_link
+                        label: "Coluna do link"
+                        value: editor.uiState.selected.link_key || ""
+                        enabledField: !editor.uiState.selected.locked
+                        onEdited: value => editor.setValue("link_key", value)
+                    }
+                    Button {
+                        Layout.fillWidth: true
+                        visible: root.selectionKind === "image" || root.selectionKind === "signature"
+                        enabled: !editor.uiState.selected.locked
+                        text: "Substituir imagem…"
+                        onClicked: editor.replaceAsset()
+                    }
                     ColumnLayout {
                         visible: root.isShape
+                        enabled: !editor.uiState.selected.locked
                         Layout.fillWidth: true
                         spacing: 8
                         Text {
@@ -130,8 +145,11 @@ Rectangle {
                         }
                         ComboBox {
                             id: shapeSelector
+                            objectName: "shapeSelector"
                             Layout.fillWidth: true
                             model: ["Retângulo", "Quadrado", "Elipse", "Círculo"]
+                            currentIndex: ["rectangle", "square", "ellipse", "circle"].indexOf(editor.uiState.selected.shape_type || "rectangle")
+                            onActivated: editor.setValue("shape_type", ["rectangle", "square", "ellipse", "circle"][currentIndex])
                             Accessible.name: "Forma básica"
                             contentItem: Text {
                                 text: shapeSelector.displayText
@@ -149,14 +167,16 @@ Rectangle {
                         }
                         ColorField {
                             label: "Preenchimento"
-                            value: "#FFFFFF"
+                            externallyManaged: true
+                            value: editor.uiState.selected.fill_color || "#FFFFFF"
+                            onEdited: value => editor.setValue("fill_color", value)
                         }
                     }
 
                     ColumnLayout {
                         visible: root.isText || root.isShape
-                        enabled: false
-                        opacity: 0.4
+                        enabled: !editor.uiState.selected.locked
+                        opacity: enabled ? 1 : 0.4
                         Layout.fillWidth: true
                         spacing: 8
                         RowLayout {
@@ -170,8 +190,11 @@ Rectangle {
                             }
                             CompactSwitch {
                                 id: outlineSwitch
+                                objectName: "outlineSwitch"
                                 ToolTip.visible: hovered
-                                ToolTip.text: "Contorno: não suportado pelo renderer atual"
+                                ToolTip.text: "Aplicar contorno ao texto ou à forma"
+                                checked: editor.uiState.selected.outline_enabled || false
+                                onClicked: editor.setValue("outline_enabled", checked)
                                 Accessible.name: "Contorno"
                                 Layout.preferredWidth: 42
                                 Layout.preferredHeight: 24
@@ -182,12 +205,15 @@ Rectangle {
                             spacing: 8
                             ColorField {
                                 label: "Cor do contorno"
-                                value: "#000000"
+                                externallyManaged: true
+                                value: editor.uiState.selected.outline_color || "#000000"
+                                onEdited: value => editor.setValue("outline_color", value)
                                 enabledField: outlineSwitch.checked
                             }
                             PropertyField {
                                 label: "Espessura"
-                                value: "1"
+                                value: String(editor.uiState.selected.outline_width || 1)
+                                onEdited: value => editor.setValue("outline_width", value)
                                 suffix: "px"
                                 enabledField: outlineSwitch.checked
                             }

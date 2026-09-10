@@ -1,0 +1,134 @@
+"""Layout de texto compartilhado pelo renderer e pela edição no canvas."""
+import re
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QFont, QFontMetrics, QTextDocument, QTextCursor, QTextCharFormat, QTextBlockFormat, QColor, QBrush
+from core.html_utils import normalize_text_decoration
+from core.object_style import outline_pen
+
+ALIGNMENTS = {"left": Qt.AlignLeft, "center": Qt.AlignHCenter, "right": Qt.AlignRight, "justify": Qt.AlignJustify}
+
+
+def variables_in_html(content):
+    doc = QTextDocument()
+    doc.setHtml(content)
+    return re.findall(r"\{([a-zA-Z0-9_]+)\}", doc.toPlainText())
+
+
+def resolve_rich_text(box, values):
+    """Substitui marcações por posições no documento, mesmo entre spans de estilo."""
+    doc = build_document(box, box.get("html", ""))
+    cursor = QTextCursor(doc)
+
+    def select(text, start, end):
+        # QTextCursor usa offsets UTF-16; índices Python contam code points.
+        cursor.setPosition(len(text[:start].encode("utf-16-le")) // 2)
+        cursor.setPosition(len(text[:end].encode("utf-16-le")) // 2, QTextCursor.KeepAnchor)
+
+    def empty(name):
+        return not re.sub(r"<[^>]+>", "", str(values.get(name, ""))).strip()
+
+    plain = doc.toPlainText()
+    for match in reversed(list(re.finditer(r"\|([^|]*\{[a-zA-Z0-9_]+\}[^|]*)\|", plain))):
+        if any(empty(name) for name in re.findall(r"\{([a-zA-Z0-9_]+)\}", match[1])):
+            select(plain, match.start(), match.end())
+            cursor.removeSelectedText()
+        else:
+            select(plain, match.end()-1, match.end())
+            cursor.removeSelectedText()
+            select(plain, match.start(), match.start()+1)
+            cursor.removeSelectedText()
+    plain = doc.toPlainText()
+    matches = list(re.finditer(r"\{([a-zA-Z0-9_]+)\}", plain))
+    if any(empty(match[1]) for match in matches):
+        return None
+    for match in reversed(matches):
+        select(plain, match.start(), match.end())
+        cursor.insertHtml(str(values[match[1]]))
+    return doc.toHtml()
+
+def build_document(box, content):
+    doc = QTextDocument()
+    doc.setDocumentMargin(0)
+    rich = box.get("rich_text_version") == 1
+    cleaned = content
+    if not rich:
+        for name in ("color", "background-color", "font-size", "font-family"):
+            cleaned = re.sub(name + r'\s*:[^;"]+;?', "", cleaned)
+    cleaned = normalize_text_decoration(cleaned)
+    cleaned = re.sub(r"(?i)</?a\b[^>]*>", "", cleaned)
+    font = QFont(box.get("font_family", "Arial"), int(box.get("font_size", 16)))
+    doc.setDefaultFont(font)
+    if rich:
+        doc.setDefaultStyleSheet("body { color: " + box.get("font_color", "#000000") + "; }")
+    doc.setHtml(cleaned)
+    options = doc.defaultTextOption()
+    options.setAlignment(ALIGNMENTS.get(box.get("align", "left"), Qt.AlignLeft))
+    doc.setDefaultTextOption(options)
+    cursor = QTextCursor(doc)
+    cursor.select(QTextCursor.Document)
+    if not rich:
+        color = QTextCharFormat()
+        color.setForeground(QBrush(QColor(box.get("font_color", "#000000"))))
+        cursor.mergeCharFormat(color)
+        block = QTextBlockFormat()
+        block.setTextIndent(box.get("indent_px", 0.0))
+        block.setLineHeight(box.get("line_height", 1.15) * 100, 1)
+        cursor.mergeBlockFormat(block)
+    outline = QTextCharFormat()
+    outline.setTextOutline(outline_pen(box))
+    cursor.mergeCharFormat(outline)
+    frame = doc.rootFrame()
+    fmt = frame.frameFormat()
+    fmt.setMargin(0)
+    frame.setFrameFormat(fmt)
+    doc.setTextWidth(box.get("w", 300))
+    return doc
+
+def text_geometry(doc, box_data):
+    h = box_data.get("h", 100)
+    font = doc.defaultFont()
+    layout = doc.documentLayout()
+    logical_h = layout.documentSize().height()
+    fm = QFontMetrics(font)
+    
+    real_top = 0
+    real_bottom = logical_h
+    
+    first_block = doc.begin()
+    if first_block.isValid():
+        text_layout = first_block.layout()
+        if text_layout.lineCount() > 0:
+            first_line = text_layout.lineAt(0)
+            text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
+            if text_str.strip():
+                tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
+                real_top = first_line.y() + first_line.ascent() + tight_rect.top()
+
+    last_block = doc.begin()
+    last_valid_block = last_block
+    while last_block.isValid():
+        if last_block.text().strip(): last_valid_block = last_block
+        last_block = last_block.next()
+        
+    if last_valid_block.isValid():
+        text_layout = last_valid_block.layout()
+        if text_layout.lineCount() > 0:
+            last_line = text_layout.lineAt(text_layout.lineCount() - 1)
+            text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
+            if text_str.strip():
+                tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
+                block_y = layout.blockBoundingRect(last_valid_block).y()
+                real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
+                
+    content_h = real_bottom - real_top
+    
+    y_offset = 0
+    if box_data.get("vertical_align") == "center":
+        y_offset = (h - content_h) / 2 - real_top
+    elif box_data.get("vertical_align") == "bottom":
+        y_offset = h - content_h - real_top
+    else: 
+        y_offset = -real_top
+
+
+    return y_offset, real_top, content_h
