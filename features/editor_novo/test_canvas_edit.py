@@ -39,6 +39,28 @@ class CanvasEditingTest(unittest.TestCase):
         w.close()
         w.deleteLater()
 
+    def test_double_click_empty_area_appends(self):
+        from PySide6.QtCore import QPointF, QEvent
+        from PySide6.QtWidgets import QGraphicsSceneMouseEvent
+        w = EditorWindow()
+        w.show()
+        w.add_new_box()
+        box = w.scene.selectedItems()[0]
+        for content in ('', 'abc'):
+            w.canvas_edit.finish()
+            box.state.html_content = content
+            box.apply_state()
+            event = QGraphicsSceneMouseEvent(QEvent.GraphicsSceneMouseDoubleClick)
+            event.setButton(Qt.LeftButton)
+            event.setPos(QPointF(290, 50))
+            box.mouseDoubleClickEvent(event)
+            self.assertEqual(box.text_item.textCursor().position(), len(content))
+            QTest.keyClicks(w.view.viewport(), 'z')
+            self.assertEqual(box.text_item.toPlainText(), content+'z')
+        w.canvas_edit.finish()
+        w._last_saved_state = w.get_current_scene_state()
+        w.close()
+
 
 if __name__ == '__main__':
     unittest.main()

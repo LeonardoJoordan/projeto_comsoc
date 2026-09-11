@@ -914,7 +914,7 @@ class RectangleItem(ImageItem):
         self.outline_color = '#000000'
         self.outline_width = 1.0
         self.outline_position = 'inside'
-        self.outline_join = 'round'
+        self.outline_join = 'miter'
         self.corner_radius = 0.0
         self.fill_opacity = 1.0
         self.outline_opacity = 1.0
@@ -1163,6 +1163,17 @@ class BleedTextItem(QGraphicsTextItem):
         rect.adjust(0, -200, 0, 200)
         return rect
 
+    def mouseDoubleClickEvent(self, event):
+        if self.textInteractionFlags() & Qt.TextInteractionFlag.TextEditable:
+            if self.document().documentLayout().hitTest(event.pos(), Qt.HitTestAccuracy.ExactHit) < 0 or not self.toPlainText():
+                cursor = self.textCursor()
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                self.setTextCursor(cursor)
+                self.setFocus()
+                event.accept()
+                return
+        super().mouseDoubleClickEvent(event)
+
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
             self.scene().views()[0].window().canvas_edit.finish()
@@ -1177,6 +1188,10 @@ class DesignerBox(QGraphicsRectItem):
     def mouseDoubleClickEvent(self, event):
         if self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable:
             self.scene().views()[0].window().canvas_edit.begin(self)
+            cursor = self.text_item.textCursor()
+            cursor.movePosition(QTextCursor.MoveOperation.End)
+            self.text_item.setTextCursor(cursor)
+            self.text_item.setFocus()
             event.accept()
         else:
             super().mouseDoubleClickEvent(event)

@@ -1187,7 +1187,7 @@ class EditorWindow(QMainWindow):
         self.save_snapshot()
 
     def toggle_guides_lock(self, locked):
-        self.btn_lock_guides.setText("🔒" if locked else "🔓")
+        self.btn_lock_guides.setText("🔒")
         self.op_lock.setOpacity(1.0 if locked else 0.2)
         self.btn_clear_guides.setEnabled(not locked)
         for item in self.scene.items():
@@ -1515,19 +1515,7 @@ class EditorWindow(QMainWindow):
     _DOC_PROPORTION_OFF_HOVER   = "rgba(220, 53, 69, 130)"
 
     def _doc_proportion_button_style(self, active: bool):
-        if active:
-            return """
-                QPushButton { background-color: #3a3a3a; border: 1px solid #555555; font-size: 16px; border-radius: 4px; }
-                QPushButton:hover { background-color: #444444; }
-                QPushButton:pressed { background-color: #222222; }
-                QPushButton:disabled { color: #555555; }
-            """
-        return """
-            QPushButton { background-color: transparent; border: none; font-size: 16px; border-radius: 4px; }
-            QPushButton:hover { background-color: #444444; }
-            QPushButton:pressed { background-color: #222222; }
-            QPushButton:disabled { color: #555555; }
-        """
+        return CaixaDeTextoPanel._proportion_button_style(active)
 
     def _refresh_doc_proportion_button(self):
         checked = self.chk_doc_proporcao.isChecked()
@@ -2289,7 +2277,7 @@ class EditorWindow(QMainWindow):
         is_locked = data.get("guidelines_locked", False)
         self.btn_lock_guides.blockSignals(True)
         self.btn_lock_guides.setChecked(is_locked)
-        self.btn_lock_guides.setText("🔒" if is_locked else "🔓")
+        self.btn_lock_guides.setText("🔒")
         self.op_lock.setOpacity(1.0 if is_locked else 0.2)
         self.btn_lock_guides.blockSignals(False)
         

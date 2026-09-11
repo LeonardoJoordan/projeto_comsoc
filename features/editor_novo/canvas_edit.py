@@ -1,6 +1,6 @@
 """Sessão de edição textual nativa no canvas Widgets."""
 from PySide6.QtCore import QObject, QEvent, Qt
-from PySide6.QtGui import QKeySequence, QTextCharFormat, QFont
+from PySide6.QtGui import QKeySequence, QTextCharFormat, QFont, QTextCursor
 from PySide6.QtWidgets import QGraphicsItem, QApplication
 from .canvas_items import DesignerBox, _set_resize_handles_visible
 
@@ -32,6 +32,9 @@ class CanvasEdit(QObject):
         text.document().contentsChanged.connect(self.changed)
         self.window.view.setFocus()
         text.setFocus(Qt.FocusReason.MouseFocusReason)
+        cursor = text.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        text.setTextCursor(cursor)
         for name in ('shortcut_delete', 'shortcut_dup', 'shortcut_rename', 'shortcut_undo', 'shortcut_redo', 'shortcut_redo_alt'):
             shortcut = getattr(self.window, name, None)
             if shortcut:

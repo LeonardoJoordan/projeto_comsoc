@@ -1,4 +1,5 @@
 """Apresentação Widgets independente; reutiliza controles e sinais do legado."""
+from pathlib import Path
 from PySide6.QtCore import Qt, QSize
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -7,7 +8,7 @@ from .canvas_items import mm_to_px, px_to_mm
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QSplitter, QFrame, QLineEdit, QAbstractSpinBox, QColorDialog,
-    QCheckBox, QDoubleSpinBox, QComboBox, QMenu,
+    QCheckBox, QDoubleSpinBox, QComboBox, QMenu, QRadioButton, QSizePolicy, QListView,
 )
 
 
@@ -26,6 +27,10 @@ QPushButton:hover { background: #2a2c35; border-color: #454854; }
 QPushButton:checked { background: #343159; border-color: #7c73f2; }
 QPushButton:disabled { color: #777b87; background: #1a1b21; }
 QPushButton#primary { background: #7c73f2; color: white; border: none; }
+QPushButton[squareControl="true"] {
+ padding: 0; min-width: 28px; max-width: 28px;
+ min-height: 28px; max-height: 28px; border: 1px solid #30323b;
+}
 QPushButton#section { text-align: left; background: #15161b;
  border: none; border-bottom: 1px solid #30323b; border-radius: 0;
  padding: 12px; font-weight: 600; }
@@ -33,6 +38,20 @@ QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit { background: #121318;
  border: 1px solid #30323b; border-radius: 5px; padding: 5px; min-height: 20px;
  selection-background-color: #343159; }
 QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus, QTextEdit:focus { border-color: #7c73f2; }
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+ subcontrol-origin: border; subcontrol-position: top right; width: 20px;
+ background: #30323b; border-left: 1px solid #454854; border-bottom: 1px solid #454854;
+}
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+ subcontrol-origin: border; subcontrol-position: bottom right; width: 20px;
+ background: #30323b; border-left: 1px solid #454854;
+}
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover { background: #343159; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url(__ICONS__/spin-up.svg); width: 10px; height: 6px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url(__ICONS__/spin-down.svg); width: 10px; height: 6px; }
+QSpinBox::up-button:disabled, QDoubleSpinBox::up-button:disabled,
+QSpinBox::down-button:disabled, QDoubleSpinBox::down-button:disabled { background: #1a1b21; }
 QWidget:disabled { color: #777b87; }
 QListWidget { background: #1a1b21; border: none; outline: none; }
 QListWidget::item { padding: 7px; border-bottom: 1px solid #292a31; }
@@ -66,6 +85,11 @@ def column():
     return widget, layout
 
 
+def square_control(button):
+    button.setProperty('squareControl', True)
+    button.setFixedSize(30, 30)
+
+
 def row(layout, *widgets):
     line = QHBoxLayout()
     line.setSpacing(8)
@@ -77,6 +101,7 @@ def row(layout, *widgets):
 
 def field(name, control):
     widget, layout = column()
+    widget.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
     layout.setContentsMargins(0, 0, 0, 0)
     layout.setSpacing(4)
     label = QLabel(name)
@@ -89,7 +114,9 @@ def field(name, control):
 def compact(name, control, suffix='', width=100):
     widget = QFrame()
     widget.setObjectName('compact')
-    widget.setFixedSize(width, 30)
+    widget.setFixedHeight(30)
+    if width is not None:
+        widget.setFixedWidth(width)
     layout = QHBoxLayout(widget)
     layout.setContentsMargins(8, 0, 7, 0)
     layout.setSpacing(5)
@@ -132,7 +159,7 @@ def install_frontend(w):
     w._original_ui = old
     for child in old.findChildren(QWidget):
         child.setStyleSheet('')
-    w.setStyleSheet(STYLE)
+    w.setStyleSheet(STYLE.replace('__ICONS__', (Path(__file__).parent / 'icons').as_posix()))
     w.resize(1500, 930)
     root, outer = column()
     root.setObjectName('root')
@@ -183,15 +210,26 @@ def install_frontend(w):
     selection.setFixedWidth(138)
     selection.setStyleSheet('color: #a8abb5; font-size: 10px;')
     tools.addWidget(selection)
+    def toolbar_separator():
+        separator = QFrame()
+        separator.setObjectName('toolbarSeparator')
+        separator.setFixedSize(1, 24)
+        separator.setStyleSheet('QFrame#toolbarSeparator { background: #30323b; border: none; }')
+        tools.addWidget(separator)
     moved = [p.spin_w, p.spin_h, p.chk_proporcao, p.spin_rot, p.spin_opacity]
     for name, control in [('X', w.spin_pos_x), ('Y', w.spin_pos_y), ('L', p.spin_w), ('A', p.spin_h)]:
+        if name == 'L':
+            toolbar_separator()
         tools.addWidget(compact(name, control, 'mm'))
     p.chk_proporcao.setText('')
     p.chk_proporcao.setIcon(icon('<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/>'))
     p.chk_proporcao.setFixedSize(30, 30)
+    p._refresh_proportion_button(p.isEnabled())
     tools.addWidget(p.chk_proporcao)
+    toolbar_separator()
     tools.addWidget(compact('↻', p.spin_rot, '°', 78))
     tools.addWidget(compact('Op.', p.spin_opacity, '%', 88))
+    toolbar_separator()
     guide_label = QLabel('GUIAS')
     guide_label.setObjectName('muted')
     tools.addWidget(guide_label)
@@ -203,9 +241,16 @@ def install_frontend(w):
         button.setToolTip(label)
         button.clicked.connect(lambda checked=False, v=vertical: w.add_guide(v))
         tools.addWidget(button)
-    w.btn_toggle_guides.setText('Guias')
-    w.btn_toggle_guides.setFixedSize(70, 34)
-    tools.addWidget(w.btn_toggle_guides)
+    for button, symbol, tip in (
+        (w.btn_toggle_guides, '👁️', 'Exibir ou ocultar guias'),
+        (w.btn_lock_guides, '🔒', 'Bloquear ou desbloquear a movimentação das guias'),
+    ):
+        button.setText(symbol)
+        button.setToolTip(tip)
+        button.setStyleSheet('QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
+                            'min-height: 28px; max-height: 28px; font-size: 14px; }')
+        button.setFixedSize(30, 30)
+        tools.addWidget(button)
     tools.addStretch()
     scroll = QScrollArea()
     scroll.setWidgetResizable(True)
@@ -280,8 +325,8 @@ def install_frontend(w):
         b.setToolTip(label)
         b.setMinimumSize(0, 0)
         b.setMaximumSize(16777215, 16777215)
-        b.setStyleSheet('padding: 6px 3px;')
-        b.setFixedSize(28, 28)
+        b.setStyleSheet('')
+        square_control(b)
         paths = {'Renomear': '<path d="m4 17 3-1L19 4l2 2L9 18l-5 1z"/>', 'Duplicar': '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>', 'Excluir': '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>'}
         b.setIcon(icon(paths[label]))
         layer_heading.addWidget(b)
@@ -308,7 +353,8 @@ def install_frontend(w):
     fill_alpha.setDecimals(0)
     fill_alpha.setKeyboardTracking(False)
     shape_swatch = QPushButton()
-    shape_swatch.setFixedSize(32, 32)
+    shape_swatch.setObjectName('shapeFillSwatch')
+    square_control(shape_swatch)
     shape_controls, shape_layout = column()
     shape_layout.setContentsMargins(0, 0, 0, 0)
     fill_controls, fill_layout = column()
@@ -346,7 +392,8 @@ def install_frontend(w):
     outline_alpha.setDecimals(0)
     outline_alpha.setKeyboardTracking(False)
     outline_swatch = QPushButton()
-    outline_swatch.setFixedSize(32, 32)
+    outline_swatch.setObjectName('shapeOutlineSwatch')
+    square_control(outline_swatch)
     outline_width = QDoubleSpinBox()
     outline_width.setObjectName('shapeOutlineWidth')
     outline_width.setDecimals(2)
@@ -360,10 +407,12 @@ def install_frontend(w):
     outline_position.setToolTip('Interno: para dentro. Externo: para fora. Centralizado: metade para cada lado.')
     shape_layout.addWidget(outline_enabled)
     row(shape_layout, outline_swatch, outline_color, compact('α', outline_alpha, '%', 85))
-    outline_join = QComboBox()
+    outline_join, join_layout = column()
+    join_layout.setContentsMargins(0, 0, 0, 0)
     outline_join.setObjectName('shapeOutlineJoin')
-    outline_join.addItem('Arredondados', 'round')
-    outline_join.addItem('Retos', 'miter')
+    join_straight = QRadioButton('Retos')
+    join_round = QRadioButton('Arredondados')
+    row(join_layout, join_straight, join_round)
     join_field = field('Cantos do contorno', outline_join)
     shape_layout.addWidget(join_field)
     radius = QDoubleSpinBox()
@@ -372,9 +421,9 @@ def install_frontend(w):
     radius.setRange(0, 1000)
     radius.setSingleStep(0.1)
     radius.setKeyboardTracking(False)
-    radius_field = field('Raio de arredondamento', compact('', radius, 'mm'))
+    radius_field = field('Raio', compact('', radius, 'mm'))
     radius_field.setToolTip('Zero mantém os cantos retos. Na linha, o raio é limitado à metade da espessura; no retângulo, à metade do menor lado.')
-    shape_layout.addWidget(radius_field)
+    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), radius_field)
     def apply_radius():
         selected = w.scene.selectedItems()
         if len(selected) == 1 and getattr(selected[0], 'shape_type', '') in ('rectangle', 'line'):
@@ -385,23 +434,24 @@ def install_frontend(w):
             w.save_snapshot()
     radius.editingFinished.connect(apply_radius)
     position_field = field('Posição', outline_position)
-    row(shape_layout, field('Espessura', compact('', outline_width, 'mm')), position_field)
+    thickness_row = row(shape_layout, field('Espessura', compact('', outline_width, 'mm')), position_field)
+    thickness_row.setStretch(0, 1)
+    thickness_row.setStretch(1, 1)
     line_geometry, line_layout = column()
     line_layout.setContentsMargins(0, 0, 0, 0)
     line_length = QDoubleSpinBox()
     line_length.setObjectName('lineLength')
     line_length.setDecimals(2)
     line_length.setRange(0.01, 5000)
-    line_length.setSuffix(' mm')
     line_length.setKeyboardTracking(False)
     line_angle = QDoubleSpinBox()
     line_angle.setObjectName('lineAngle')
     line_angle.setRange(0, 359.99)
     line_angle.setDecimals(2)
-    line_angle.setSuffix(' °')
     line_angle.setWrapping(True)
     line_angle.setKeyboardTracking(False)
-    row(line_layout, field('Comprimento', line_length), field('Ângulo', line_angle))
+    row(line_layout, field('Comprimento', compact('', line_length, 'mm')),
+        field('Ângulo', compact('', line_angle, '°')))
     shape_layout.addWidget(line_geometry)
     def apply_line_geometry():
         selected = w.scene.selectedItems()
@@ -436,7 +486,7 @@ def install_frontend(w):
         item.outline_enabled = is_line or outline_enabled.isChecked()
         item.outline_color = color.name()
         item.outline_opacity = outline_alpha.value() / 100
-        item.outline_join = outline_join.currentData()
+        item.outline_join = 'miter' if join_straight.isChecked() else 'round'
         # Não arredondar a medida original ao alterar apenas cor/posição.
         if outline_width.value() != round(px_to_mm(item.outline_width), 2):
             item.outline_width = mm_to_px(outline_width.value())
@@ -456,7 +506,8 @@ def install_frontend(w):
     outline_enabled.toggled.connect(apply_outline)
     outline_width.editingFinished.connect(apply_outline)
     outline_position.activated.connect(apply_outline)
-    outline_join.activated.connect(apply_outline)
+    join_straight.clicked.connect(apply_outline)
+    join_round.clicked.connect(apply_outline)
     outline_alpha.editingFinished.connect(apply_outline)
     p.btn_restore.setText('Restaurar original')
     p.btn_restore.setMinimumSize(0, 0)
@@ -465,51 +516,117 @@ def install_frontend(w):
     prop_section = Section('Propriedades', props, True)
     il.addWidget(prop_section)
     t = w.editor_texto_panel
+    square_control(t.btn_color)
     text_body, tl = column()
     hint = QLabel('Duplo clique no texto para editar no canvas.')
     hint.setWordWrap(True)
     hint.setObjectName('muted')
     tl.addWidget(hint)
-    row(tl, field('Fonte', t.cbo_font), field('Tamanho', t.spin_size))
-    row(tl, t.btn_bold, t.btn_italic, t.btn_underline)
+    font_row = row(tl, field('Fonte', t.cbo_font), field('Tamanho', t.spin_size))
+    font_row.setStretch(0, 3)
+    font_row.setStretch(1, 1)
+    styles = row(tl, t.btn_bold, t.btn_italic, t.btn_underline)
+    styles.setSpacing(6)
+    for button in (t.btn_bold, t.btn_italic, t.btn_underline):
+        button.setStyleSheet('QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
+                            'min-height: 28px; max-height: 28px; }')
+        button.setFixedSize(30, 30)
+    styles.addStretch()
     t.color_hex = QLineEdit('#000000')
     t.color_hex.setMaxLength(7)
     t.color_hex.setPlaceholderText('#RRGGBB')
+    t.color_hex.setMaximumWidth(110)
+    text_alpha = QDoubleSpinBox()
+    text_alpha.setObjectName('textColorAlpha')
+    text_alpha.setRange(0, 100)
+    text_alpha.setDecimals(0)
+    text_alpha.setValue(100)
+    text_alpha.setKeyboardTracking(False)
     color_row, color_layout = column()
     color_layout.setContentsMargins(0, 0, 0, 0)
-    row(color_layout, t.btn_color, t.color_hex)
+    row(color_layout, t.btn_color, t.color_hex, compact('α', text_alpha, '%', 85))
     tl.addWidget(field('Cor', color_row))
     def apply_hex():
         value = t.color_hex.text().strip()
         color = QColor(value)
         if len(value) == 7 and value.startswith('#') and color.isValid():
             t.btn_color.setStyleSheet(f'background: {color.name()}; border: 1px solid #454854;')
-            t.fontColorChanged.emit(color.name())
+            color.setAlphaF(text_alpha.value()/100)
+            t.fontColorChanged.emit(color.name(QColor.NameFormat.HexArgb))
             t.snapshotRequested.emit()
         else:
             t.color_hex.setText(t.color_hex.property('lastColor') or '#000000')
     t.color_hex.editingFinished.connect(apply_hex)
+    text_alpha.editingFinished.connect(apply_hex)
     def color_changed(value):
-        t.color_hex.setText(value)
-        t.color_hex.setProperty('lastColor', value)
+        color = QColor(value)
+        t.color_hex.setText(color.name())
+        t.color_hex.setProperty('lastColor', color.name())
+        text_alpha.setValue(round(color.alphaF()*100))
     t.fontColorChanged.connect(color_changed)
-    row(tl, field('Horizontal', t.cbo_align), field('Vertical', t.cbo_valign))
-    spacing = row(tl, field('Entrelinha', t.spin_lh), field('Recuo · px', t.spin_indent))
+    alignment_heading = QLabel('ALINHAMENTO')
+    alignment_heading.setStyleSheet('color: #a8abb5; font-size: 10px; font-weight: 600; margin-top: 6px;')
+    tl.addWidget(alignment_heading)
+    for control in (t.cbo_align, t.cbo_valign, t.spin_lh, t.spin_indent, t.spin_size):
+        selector = 'QComboBox' if isinstance(control, QComboBox) else 'QAbstractSpinBox'
+        control.setStyleSheet(selector + ' { min-height: 18px; max-height: 18px; padding-top: 5px; padding-bottom: 5px; }')
+        control.setFixedHeight(30)
+        control.setMinimumWidth(0)
+    for control in (t.cbo_align, t.cbo_valign):
+        popup = QListView(control)
+        popup.setObjectName('alignmentOptions')
+        popup.setStyleSheet('''
+            QListView#alignmentOptions {
+                background: #22232b; color: #f3f5f8;
+                border: 1px solid #454854; border-radius: 8px;
+                padding: 6px; outline: none;
+            }
+            QListView#alignmentOptions::item {
+                padding: 9px 12px; border: 1px solid transparent;
+                border-radius: 5px; background: transparent;
+            }
+            QListView#alignmentOptions::item:selected,
+            QListView#alignmentOptions::item:hover {
+                background: #343159; border-color: #7c73f2; color: #f3f5f8;
+            }
+        ''')
+        popup.setMouseTracking(True)
+        control.setView(popup)
+    alignments = row(tl, field('Horizontal', t.cbo_align), field('Vertical', t.cbo_valign))
+    alignments.setStretch(0, 1)
+    alignments.setStretch(1, 1)
+    spacing = row(tl, field('Entrelinha', t.spin_lh), field('Recuo', t.spin_indent))
+    t.spin_indent.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
     spacing.setStretch(0, 1)
     spacing.setStretch(1, 1)
     text_section = Section('Texto', text_body)
     il.addWidget(text_section)
-    table, table_layout = column()
-    table_layout.addWidget(QLabel('Ordem na tabela · arraste para reorganizar'))
-    table_layout.addWidget(w.lst_placeholders)
-    il.addWidget(Section('Campos da tabela', table))
     doc, dl = column()
+    def document_heading(title):
+        label = QLabel(title)
+        label.setStyleSheet('color: #a8abb5; font-size: 10px; font-weight: 600; margin-top: 6px;')
+        dl.addWidget(label)
+    document_heading('DIMENSÕES')
     w.chk_doc_proporcao.setText('')
     w.chk_doc_proporcao.setIcon(p.chk_proporcao.icon())
     w.chk_doc_proporcao.setFixedSize(30, 30)
+    w._refresh_doc_proportion_button()
     dimensions = row(dl, compact('L', w.spin_phys_w, 'mm'),
                      compact('A', w.spin_phys_h, 'mm'), w.chk_doc_proporcao)
     dimensions.addStretch()
+    document_heading('CAMPOS DA TABELA')
+    order_hint = QLabel('Segure e arraste para ajustar a ordem')
+    order_hint.setWordWrap(True)
+    order_hint.setStyleSheet('color: #777b87; font-size: 10px;')
+    dl.addWidget(order_hint)
+    w.lst_placeholders.setObjectName('tableFields')
+    w.lst_placeholders.setStyleSheet('''
+        QListWidget#tableFields { background: #1a1b21; border: none; outline: none; }
+        QListWidget#tableFields::item { padding: 4px 5px; border: none; }
+        QListWidget#tableFields::item:selected { background: #343159; color: #f3f5f8; }
+        QListWidget#tableFields::item:hover { background: #2a2c35; }
+    ''')
+    dl.addWidget(w.lst_placeholders)
     w.btn_fit_bg.hide()
     w.btn_add_bg.hide()
     il.insertWidget(0, Section('Documento', doc))
@@ -540,6 +657,8 @@ def install_frontend(w):
         props.setEnabled(p.isEnabled())
         text_section.setEnabled(t.isEnabled())
         text_body.setEnabled(t.isEnabled())
+        if t.isEnabled():
+            text_section.header.setChecked(True)
         selected = w.scene.selectedItems()
         from .canvas_items import RectangleItem
         is_shape = len(selected) == 1 and isinstance(selected[0], RectangleItem)
@@ -550,6 +669,7 @@ def install_frontend(w):
         w.btn_dup_layer.setEnabled(bool(selected) and not background_selected)
         w.btn_del_layer.setEnabled(bool(selected) and not background_selected)
         shape_controls.setVisible(is_shape)
+        p.btn_restore.setVisible(not is_shape)
         if is_shape:
             item = selected[0]
             is_line = item.shape_type == 'line'
@@ -557,6 +677,13 @@ def install_frontend(w):
             outline_enabled.setVisible(not is_line)
             position_field.setVisible(not is_line)
             join_field.setVisible(item.shape_type == 'rectangle')
+            # Um único campo de raio acompanha o contexto, sem duplicar estado.
+            shape_layout.removeWidget(radius_field)
+            thickness_row.removeWidget(radius_field)
+            if is_line:
+                thickness_row.addWidget(radius_field, 1)
+            else:
+                shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), radius_field)
             radius_field.setVisible(item.shape_type in ('rectangle', 'line'))
             radius.setValue(px_to_mm(item.corner_radius))
             line_geometry.setVisible(is_line)
@@ -574,7 +701,8 @@ def install_frontend(w):
             outline_color.setText(item.outline_color)
             fill_alpha.setValue(item.fill_opacity * 100)
             outline_alpha.setValue(item.outline_opacity * 100)
-            outline_join.setCurrentIndex(max(0, outline_join.findData(item.outline_join)))
+            join_straight.setChecked(item.outline_join == 'miter')
+            join_round.setChecked(item.outline_join != 'miter')
             outline_swatch.setStyleSheet(f'background: {item.outline_color};')
             outline_width.setValue(px_to_mm(item.outline_width))
             for index in range(outline_position.count()):

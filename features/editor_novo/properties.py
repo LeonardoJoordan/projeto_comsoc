@@ -316,15 +316,19 @@ class CaixaDeTextoPanel(QWidget):
             QPushButton:disabled { color: #555555; }
         """
 
-    def _proportion_button_style(self, active: bool):
-        if active:
-            return """
-                QPushButton { background-color: #3a3a3a; border: 1px solid #555555; font-size: 16px; border-radius: 4px; }
-                QPushButton:hover { background-color: #444444; }
-                QPushButton:pressed { background-color: #222222; }
-                QPushButton:disabled { color: #555555; }
-            """
-        return self._tool_button_style()
+    @staticmethod
+    def _proportion_button_style(active: bool):
+        return """
+            QPushButton {
+                padding: 0; min-width: 28px; max-width: 28px;
+                min-height: 28px; max-height: 28px;
+                background-color: #22232b; border: 1px solid #30323b;
+                border-radius: 6px;
+            }
+            QPushButton:hover { background-color: #2a2c35; border-color: #454854; }
+            QPushButton:checked { background-color: #343159; border-color: #7c73f2; }
+            QPushButton:disabled { background-color: #1a1b21; color: #777b87; }
+        """
 
     def _make_tool_button(self, text, tooltip="", checkable=False):
         btn = QPushButton(text)
@@ -833,6 +837,10 @@ class EditorDeTextoPanel(QWidget):
         color = QColorDialog.getColor()
         if color.isValid():
             hex_color = color.name()
+            alpha_control = self.window().findChild(QDoubleSpinBox, 'textColorAlpha')
+            if alpha_control:
+                color.setAlphaF(alpha_control.value()/100)
+                hex_color = color.name(color.NameFormat.HexArgb)
             self.btn_color.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #aaa; border-radius: 3px;")
             self.fontColorChanged.emit(hex_color)
             self.snapshotRequested.emit()

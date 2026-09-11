@@ -1,0 +1,11 @@
+.venv/
+venv/
+.flatpak-builder/
+build/
+build-dir/
+__pycache__/
+*.pyc
+*.flatpak
+*.png
+*.jpg
+*.svg
