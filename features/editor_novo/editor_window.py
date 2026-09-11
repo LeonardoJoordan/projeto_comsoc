@@ -7,7 +7,8 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidg
                                QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton,
                                QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
-                               QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout)
+                               QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout,
+                               QSizePolicy)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
                            QFont, QFontDatabase, QFontInfo)
@@ -21,6 +22,28 @@ from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
 from core.render_cache import ensure_background_proxy
+
+
+class ElidedLayerLabel(QLabel):
+    """Nome de camada que aproveita a largura disponível sem criar rolagem."""
+    def __init__(self, text="", parent=None):
+        super().__init__(parent)
+        self._full_text = str(text)
+        self.setMinimumWidth(0)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self._update_visible_text()
+
+    def _update_visible_text(self):
+        available = max(0, self.contentsRect().width())
+        visible = self.fontMetrics().elidedText(
+            self._full_text, Qt.TextElideMode.ElideRight, available
+        )
+        self.setText(visible)
+        self.setToolTip(self._full_text if visible != self._full_text else "")
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._update_visible_text()
 
 
 
@@ -515,17 +538,9 @@ class EditorWindow(QMainWindow):
         self.btn_save.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; font-size: 14px;")
         self.btn_save.clicked.connect(self.export_to_json)
 
-        self.btn_close_editor = QPushButton("✕")
-        self.btn_close_editor.setMinimumHeight(50)
-        self.btn_close_editor.setFixedWidth(50)
-        self.btn_close_editor.setStyleSheet("background-color: #c0392b; color: white; font-weight: bold; font-size: 16px;")
-        self.btn_close_editor.setToolTip("Fechar editor sem salvar")
-        self.btn_close_editor.clicked.connect(self.close)
-
         save_row = QHBoxLayout()
         save_row.setSpacing(6)
         save_row.addWidget(self.btn_save)
-        save_row.addWidget(self.btn_close_editor)
         right_layout.addLayout(save_row)
 
         main_layout.addWidget(right_container)
@@ -1147,6 +1162,7 @@ class EditorWindow(QMainWindow):
         
         box = DesignerBox(x, y, w, h, "{campo}")
         box.keep_proportion = False
+        box.custom_name = self._unique_layer_name("Texto")
         
         # Força o Z-Value para o topo do grupo de Textos
         base_z = 101
@@ -1257,21 +1273,16 @@ class EditorWindow(QMainWindow):
             new_item.layer_id = None
             new_item.keep_proportion = getattr(original, 'keep_proportion', True)
             base_name = self._generate_layer_name(getattr(original, 'layer_id', None), original)
-
-            # Remove qualquer sufixo de cópia anterior para sempre partir do nome limpo
-            base_name = re.sub(r' - Cópia(\s\d+)?$', '', base_name)
-
-            existing_names = [
-                getattr(i, 'custom_name', '') or self._generate_layer_name(getattr(i, 'layer_id', None), i)
-                for i in self.scene.items()
-                if hasattr(i, 'layer_id')
-            ]
-            copy_name = f"{base_name} - Cópia"
-            counter = 2
-            while copy_name in existing_names:
-                copy_name = f"{base_name} - Cópia {counter}"
-                counter += 1
-            new_item.custom_name = copy_name
+            numbered = re.fullmatch(r'(.+?)\s+(\d+)', base_name)
+            if numbered:
+                possible_base = numbered.group(1).strip()
+                existing_names = {
+                    str(getattr(i, 'custom_name', '')).strip().casefold()
+                    for i in self.scene.items()
+                }
+                if possible_base.casefold() in existing_names:
+                    base_name = possible_base
+            new_item.custom_name = self._unique_layer_name(base_name)
 
             self.scene.addItem(new_item)
             new_item.setSelected(True)
@@ -1606,6 +1617,7 @@ class EditorWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Assinatura", "", "Imagens (*.png)")
         if path:
             sig = SignatureItem(path)
+            sig.custom_name = self._unique_layer_name(Path(path).stem or "Assinatura")
             center = self.view.mapToScene(self.view.viewport().rect().center())
             sig.setPos(center.x() - (sig._current_w / 2), center.y() - (sig._current_h / 2))
             
@@ -1624,6 +1636,7 @@ class EditorWindow(QMainWindow):
         path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg)")
         if path:
             img = ImageItem(path)
+            img.custom_name = self._unique_layer_name(Path(path).stem or "Imagem")
             center = self.view.mapToScene(self.view.viewport().rect().center())
             img.setPos(center.x() - (img._current_w / 2), center.y() - (img._current_h / 2))
             
@@ -1896,7 +1909,7 @@ class EditorWindow(QMainWindow):
                 ly.addWidget(btn_vis)
                 
                 # --- Nome da Camada (CENTRO) ---
-                lbl = QLabel(name)
+                lbl = ElidedLayerLabel(name)
                 is_locked = not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                 if is_locked:
                     lbl.setStyleSheet("color: #888888; font-style: italic;")
@@ -2587,6 +2600,38 @@ class EditorWindow(QMainWindow):
             i += 1
         return i
 
+    def _unique_layer_name(self, base_name, exclude=None):
+        """Retorna um nome de exibição livre, sem usar o ID interno da camada."""
+        base = str(base_name or "Objeto").strip() or "Objeto"
+        used = {
+            str(getattr(item, 'custom_name', '')).strip().casefold()
+            for item in self.scene.items()
+            if item is not exclude and str(getattr(item, 'custom_name', '')).strip()
+        }
+        if base.casefold() not in used:
+            return base
+        suffix = 2
+        while f"{base} {suffix}".casefold() in used:
+            suffix += 1
+        return f"{base} {suffix}"
+
+    def _default_layer_name(self, item):
+        if getattr(item, 'is_document_background', False) or isinstance(item, BackgroundItem):
+            return "Plano de fundo"
+        if isinstance(item, DesignerBox):
+            return "Texto"
+        if isinstance(item, RectangleItem):
+            return {
+                'rectangle': 'Quadrado',
+                'ellipse': 'Círculo',
+                'circle': 'Círculo',
+                'line': 'Linha',
+            }.get(getattr(item, 'shape_type', 'rectangle'), 'Forma')
+        if isinstance(item, (SignatureItem, ImageItem)):
+            path_name = Path(getattr(item, '_original_path', '') or '').stem.strip()
+            return path_name or ('Assinatura' if isinstance(item, SignatureItem) else 'Imagem')
+        return "Objeto"
+
     def _generate_layer_name(self, layer_id, item):
         if hasattr(item, 'custom_name') and item.custom_name:
             return item.custom_name
@@ -2596,19 +2641,10 @@ class EditorWindow(QMainWindow):
             if hasattr(item, 'layer_id'):
                 item.layer_id = layer_id
 
-        prefix = f"{layer_id:02d}"
-        if isinstance(item, DesignerBox):
-            raw = item.text_item.toPlainText().strip().replace("\n", " ")
-            if len(raw) > 15: raw = raw[:12] + "..."
-            if not raw: raw = "{vazio}"
-            return f"{prefix}_{raw}"
-        elif isinstance(item, SignatureItem):
-            return f"{prefix}_Assinatura"
-        elif isinstance(item, BackgroundItem):
-            return f"{prefix}_Fundo"
-        elif isinstance(item, ImageItem):
-            return f"{prefix}_Imagem"
-        return f"{prefix}_Objeto"
+        name = self._unique_layer_name(self._default_layer_name(item), exclude=item)
+        if hasattr(item, 'custom_name'):
+            item.custom_name = name
+        return name
     
     def _add_separator(self, layout):
         sep = QFrame()

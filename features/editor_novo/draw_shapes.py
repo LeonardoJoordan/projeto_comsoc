@@ -82,7 +82,8 @@ class ShapeDrawing(QObject):
                 if distance * self.w.view.transform().m11() >= 3 and (self.kind == 'line' or min(rect.width(), rect.height()) > 0):
                     item = RectangleItem(distance if self.kind == 'line' else rect.width(), 1 if self.kind == 'line' else rect.height(), '#d9d9d9')
                     item.shape_type = self.kind
-                    item.custom_name = {'rectangle': 'Quadrado', 'ellipse': 'Círculo', 'line': 'Linha'}[self.kind]
+                    base_name = {'rectangle': 'Quadrado', 'ellipse': 'Círculo', 'line': 'Linha'}[self.kind]
+                    item.custom_name = self.w._unique_layer_name(base_name)
                     if self.kind == 'line':
                         center = (self.start + end)/2
                         item.setPos(center.x()-distance/2, center.y()-0.5)

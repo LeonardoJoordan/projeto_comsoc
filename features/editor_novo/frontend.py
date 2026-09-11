@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 STYLE = """
 QWidget { background: #1a1b21; color: #f3f5f8; font-size: 12px; }
 QMainWindow, QWidget#root { background: #0f1014; }
+QFrame#footer { background: #0f1014; border: none; }
 QLabel { background: transparent; }
 QLabel#muted { color: #a8abb5; }
 QFrame#bar { background: #15161b; border-bottom: 1px solid #30323b; }
@@ -59,9 +60,20 @@ QListWidget::item:selected { background: #343159; color: #f3f5f8; }
 QListWidget#layers::item { padding: 0; border: none; }
 QListWidget#layers QWidget { background: transparent; }
 QScrollArea { border: none; }
-QScrollBar:vertical { background: #15161b; width: 8px; }
-QScrollBar::handle:vertical { background: #454854; min-height: 24px; border-radius: 4px; }
+QScrollBar:vertical { background: #24262e; width: 8px; margin: 0; }
+QScrollBar:horizontal { background: #24262e; height: 8px; margin: 0; }
+QScrollBar::handle:vertical {
+ background: #5b5f6d; min-height: 24px; border-radius: 2px;
+}
+QScrollBar::handle:horizontal {
+ background: #5b5f6d; min-width: 24px; border-radius: 2px;
+}
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: #747989; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
+QAbstractScrollArea::corner { background: #24262e; border: none; }
 QSplitter::handle { background: #30323b; width: 1px; }
 QToolTip { background: #22232b; color: #f3f5f8; border: 1px solid #454854; padding: 6px; }
 """
@@ -171,32 +183,15 @@ def install_frontend(w):
     header.setObjectName('bar')
     header.setFixedHeight(64)
     h = QHBoxLayout(header)
-    w.btn_close_editor.setText('‹  Modelos')
-    w.btn_close_editor.setFixedSize(90, 34)
-    h.addWidget(w.btn_close_editor)
-    badge = QLabel('C')
-    badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    badge.setFixedSize(28, 28)
-    badge.setStyleSheet('background: #343159; color: #9087ff; border-radius: 7px; font-weight: bold;')
-    h.addWidget(badge)
-    title_block, title_layout = column()
-    title_layout.setContentsMargins(8, 0, 0, 0)
-    title_layout.setSpacing(3)
-    title = QLabel(w._current_model_name or 'Novo modelo')
-    title.setStyleSheet('font-size: 13px; font-weight: 600;')
-    title_layout.addWidget(title)
-    subtitle = QLabel('Editor de modelo')
-    subtitle.setObjectName('muted')
-    title_layout.addWidget(subtitle)
-    w.windowTitleChanged.connect(lambda _: title.setText(w._current_model_name or 'Novo modelo'))
-    h.addWidget(title_block)
     h.addStretch()
-    for button, text in [(w.btn_undo, '↶'), (w.btn_redo, '↷'), (w.btn_save, 'Salvar modelo')]:
-        button.setText(text)
-        button.setMinimumSize(0, 0)
-        button.setMaximumSize(16777215, 16777215)
-        button.setFixedHeight(34)
-        h.addWidget(button)
+    model_title = QLabel(w._current_model_name or 'Novo modelo')
+    model_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    model_title.setStyleSheet('font-size: 16px; font-weight: 600;')
+    w.windowTitleChanged.connect(
+        lambda _, label=model_title: label.setText(w._current_model_name or 'Novo modelo')
+    )
+    h.addWidget(model_title)
+    h.addStretch()
     w.btn_save.setObjectName('primary')
     outer.addWidget(header)
 
@@ -211,11 +206,16 @@ def install_frontend(w):
     selection.setStyleSheet('color: #a8abb5; font-size: 10px;')
     tools.addWidget(selection)
     def toolbar_separator():
-        separator = QFrame()
+        # O layout já fornece 8 px externamente; os 12 px internos completam
+        # os 20 px de respiro desejados em cada lado da linha de 1 px.
+        spacing = QWidget()
+        spacing.setFixedSize(25, 24)
+        spacing.setStyleSheet('background: transparent;')
+        separator = QFrame(spacing)
         separator.setObjectName('toolbarSeparator')
-        separator.setFixedSize(1, 24)
+        separator.setGeometry(12, 0, 1, 24)
         separator.setStyleSheet('QFrame#toolbarSeparator { background: #30323b; border: none; }')
-        tools.addWidget(separator)
+        tools.addWidget(spacing)
     moved = [p.spin_w, p.spin_h, p.chk_proporcao, p.spin_rot, p.spin_opacity]
     for name, control in [('X', w.spin_pos_x), ('Y', w.spin_pos_y), ('L', p.spin_w), ('A', p.spin_h)]:
         if name == 'L':
@@ -251,7 +251,23 @@ def install_frontend(w):
                             'min-height: 28px; max-height: 28px; font-size: 14px; }')
         button.setFixedSize(30, 30)
         tools.addWidget(button)
+    toolbar_separator()
+    for button, symbol, tip in (
+        (w.btn_undo, '↶', 'Desfazer'),
+        (w.btn_redo, '↷', 'Refazer'),
+    ):
+        button.setText(symbol)
+        button.setToolTip(tip)
+        button.setMinimumSize(0, 0)
+        button.setMaximumSize(16777215, 16777215)
+        button.setStyleSheet('padding: 0; font-size: 16px;')
+        button.setFixedSize(30, 30)
+        tools.addWidget(button)
     tools.addStretch()
+    fit = QPushButton('Ajustar à janela')
+    fit.setFixedSize(116, 34)
+    fit.clicked.connect(w._zoom_to_fit)
+    tools.addWidget(fit)
     scroll = QScrollArea()
     scroll.setWidgetResizable(True)
     scroll.setWidget(toolbar)
@@ -332,6 +348,7 @@ def install_frontend(w):
         layer_heading.addWidget(b)
     ll.addLayout(layer_heading)
     w.layer_list.setObjectName('layers')
+    w.layer_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     ll.addWidget(w.layer_list, 1)
     split.addWidget(left)
     w.view.setBackgroundBrush(QColor('#26272c'))
@@ -513,7 +530,7 @@ def install_frontend(w):
     p.btn_restore.setMinimumSize(0, 0)
     p.btn_restore.setMaximumSize(16777215, 16777215)
     row(pl, p.btn_restore, p.chk_link)
-    prop_section = Section('Propriedades', props, True)
+    prop_section = Section('Propriedades', props)
     il.addWidget(prop_section)
     t = w.editor_texto_panel
     square_control(t.btn_color)
@@ -626,10 +643,13 @@ def install_frontend(w):
         QListWidget#tableFields::item:selected { background: #343159; color: #f3f5f8; }
         QListWidget#tableFields::item:hover { background: #2a2c35; }
     ''')
+    w.lst_placeholders.setFixedHeight(180)
+    w.lst_placeholders.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
     dl.addWidget(w.lst_placeholders)
     w.btn_fit_bg.hide()
     w.btn_add_bg.hide()
-    il.insertWidget(0, Section('Documento', doc))
+    document_section = Section('Documento', doc, True)
+    il.insertWidget(0, document_section)
     il.addStretch()
     right = QScrollArea()
     right.setWidgetResizable(True)
@@ -639,14 +659,64 @@ def install_frontend(w):
     split.setSizes([262, 916, 322])
     split.setStretchFactor(1, 1)
     split.setChildrenCollapsible(False)
-    footer = QHBoxLayout()
+    footer_bar = QFrame()
+    footer_bar.setObjectName('footer')
+    footer_bar.setFixedHeight(44)
+    footer = QHBoxLayout(footer_bar)
     footer.setContentsMargins(14, 5, 14, 5)
     footer.addWidget(QLabel('Página 1 de 1'))
     footer.addStretch()
-    fit = QPushButton('Ajustar à janela')
-    fit.clicked.connect(w._zoom_to_fit)
-    footer.addWidget(fit)
-    outer.addLayout(footer)
+    w.btn_save.setText('Salvar modelo')
+    w.btn_save.setMinimumSize(0, 0)
+    w.btn_save.setMaximumSize(16777215, 16777215)
+    w.btn_save.setFixedSize(116, 34)
+    footer.addWidget(w.btn_save)
+    w.btn_close_editor = QPushButton('✕')
+    w.btn_close_editor.setObjectName('closeEditor')
+    w.btn_close_editor.setToolTip('Fechar editor')
+    w.btn_close_editor.setStyleSheet('''
+        QPushButton#closeEditor {
+            background: #b83a3a; border: 1px solid #d04a4a;
+            color: white; font-size: 16px; font-weight: 700; padding: 0;
+        }
+        QPushButton#closeEditor:hover { background: #cf4545; border-color: #e45a5a; }
+        QPushButton#closeEditor:pressed { background: #963030; }
+    ''')
+    # Aplicar depois do QSS impede que o mínimo global reduza o botão.
+    w.btn_close_editor.setFixedSize(34, 34)
+    w.btn_close_editor.clicked.connect(w.close)
+    footer.addWidget(w.btn_close_editor)
+    outer.addWidget(footer_bar)
+
+    selection_state = {'kind': None}
+
+    def clear_text_presentation():
+        """Limpa somente os controles visuais; o texto continua no item da cena."""
+        controls = (
+            t.txt_content, t.cbo_font, t.spin_size, t.btn_bold,
+            t.btn_italic, t.btn_underline, t.cbo_align, t.cbo_valign,
+            t.spin_lh, t.spin_indent, t.btn_color, t.color_hex, text_alpha,
+        )
+        previous = [(control, control.blockSignals(True)) for control in controls]
+        try:
+            t.txt_content.clear()
+            t.cbo_font.setCurrentIndex(-1)
+            t.spin_size.lineEdit().clear()
+            t.btn_bold.setChecked(False)
+            t.btn_italic.setChecked(False)
+            t.btn_underline.setChecked(False)
+            t.cbo_align.setCurrentIndex(-1)
+            t.cbo_valign.setCurrentIndex(-1)
+            t.spin_lh.lineEdit().clear()
+            t.spin_indent.lineEdit().clear()
+            t.color_hex.clear()
+            text_alpha.lineEdit().clear()
+            t.btn_color.setStyleSheet(
+                'background: #121318; border: 1px solid #30323b; border-radius: 5px;'
+            )
+        finally:
+            for control, was_blocked in previous:
+                control.blockSignals(was_blocked)
 
     def sync_enabled():
         from shiboken6 import isValid
@@ -655,11 +725,25 @@ def install_frontend(w):
         for control in moved:
             control.setEnabled(p.isEnabled())
         props.setEnabled(p.isEnabled())
-        text_section.setEnabled(t.isEnabled())
+        text_available = t.isEnabled()
+        properties_available = p.isEnabled()
+        prop_section.setEnabled(properties_available)
+        text_section.setEnabled(text_available)
         text_body.setEnabled(t.isEnabled())
-        if t.isEnabled():
-            text_section.header.setChecked(True)
         selected = w.scene.selectedItems()
+        current_kind = 'text' if text_available else ('object' if selected else 'none')
+        if current_kind != selection_state['kind']:
+            if current_kind != 'text':
+                clear_text_presentation()
+            if properties_available:
+                prop_section.header.setChecked(True)
+            else:
+                prop_section.header.setChecked(False)
+            if text_available:
+                text_section.header.setChecked(True)
+            else:
+                text_section.header.setChecked(False)
+            selection_state['kind'] = current_kind
         from .canvas_items import RectangleItem
         is_shape = len(selected) == 1 and isinstance(selected[0], RectangleItem)
         background_selected = any(getattr(item, 'is_document_background', False) for item in selected)
@@ -723,4 +807,7 @@ def install_frontend(w):
     # O seletor legado bloqueia os sinais da cena enquanto seleciona pela lista.
     # Atualizar depois dele também cobre o único acesso ao plano de fundo.
     w.layer_list.itemSelectionChanged.connect(sync_enabled)
+    # O editor sempre começa no contexto geral do documento. As seções de
+    # objeto só são habilitadas quando o usuário faz uma seleção explícita.
+    w.scene.clearSelection()
     sync_enabled()
