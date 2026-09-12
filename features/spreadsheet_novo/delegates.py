@@ -1,6 +1,7 @@
 import re
-from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QApplication, QTextEdit)
-from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont)
+from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QStyleOptionViewItem,
+                               QApplication, QTextEdit, QToolTip)
+from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont, QPen, QColor)
 from PySide6.QtCore import Qt
 
 class RichTextEditor(QTextEdit):
@@ -41,21 +42,46 @@ class RichTextEditor(QTextEdit):
         self.mergeCurrentCharFormat(fmt)
 
 class HTMLDelegate(QStyledItemDelegate):
+    def helpEvent(self, event, view, option, index):
+        text = str(index.data(Qt.ItemDataRole.DisplayRole) or '')
+        available = max(0, option.rect.width() - 20)
+        clipped = '\n' in text or option.fontMetrics.horizontalAdvance(text) > available
+        if clipped and text:
+            QToolTip.showText(event.globalPos(), text, view, option.rect)
+            return True
+        QToolTip.hideText()
+        return False
+
     def paint(self, painter, option, index):
         options = option
         self.initStyleOption(options, index)
         style = options.widget.style() if options.widget else QApplication.style()
+
+        # No modo compacto cada célula ocupa uma única linha. O conteúdo real
+        # permanece intacto no modelo, na barra fx e no tooltip.
+        if not options.widget or not options.widget.wordWrap():
+            text = str(index.data(Qt.ItemDataRole.DisplayRole) or '')
+            options.text = re.sub(r'\s*[\r\n]+\s*', ' ', text)
+            options.features &= ~QStyleOptionViewItem.ViewItemFeature.WrapText
+            options.displayAlignment = (
+                options.displayAlignment & Qt.AlignmentFlag.AlignHorizontal_Mask
+            ) | Qt.AlignmentFlag.AlignVCenter
+            style.drawControl(QStyle.ControlElement.CE_ItemViewItem, options, painter, options.widget)
+            self._paint_current(painter, options, index)
+            return
         
         rich_text = index.data(Qt.ItemDataRole.UserRole)
         
         if not rich_text:
             super().paint(painter, options, index)
+            self._paint_current(painter, options, index)
             return
 
         painter.save()
         style.drawPrimitive(QStyle.PrimitiveElement.PE_PanelItemViewItem, options, painter, options.widget)
 
         doc = QTextDocument()
+        doc.setDefaultFont(options.font)
         doc.setHtml(rich_text)
         doc.setTextWidth(options.rect.width())
         doc.setDocumentMargin(2)
@@ -74,6 +100,15 @@ class HTMLDelegate(QStyledItemDelegate):
         painter.setClipRect(0, 0, options.rect.width(), options.rect.height())
         doc.drawContents(painter)
         painter.restore()
+        self._paint_current(painter, options, index)
+
+    def _paint_current(self, painter, option, index):
+        if option.widget and option.widget.currentIndex() == index:
+            painter.save()
+            painter.setPen(QPen(QColor('#8774df'), 2))
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.drawRect(option.rect.adjusted(1, 1, -1, -1))
+            painter.restore()
 
     def createEditor(self, parent, option, index):
         editor = RichTextEditor(parent)

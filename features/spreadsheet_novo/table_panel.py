@@ -298,7 +298,7 @@ class RichTableWidget(QTableWidget):
         else:
             # Força todas as linhas a voltarem ao tamanho compacto padrão
             for r in range(self.rowCount()):
-                self.setRowHeight(r, 30)    
+                self.setRowHeight(r, 25)
 
     def _toggle_format(self, tag: str):
         items = self.selectedItems()

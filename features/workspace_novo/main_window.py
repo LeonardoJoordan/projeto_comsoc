@@ -61,6 +61,7 @@ class MainWindow(QMainWindow):
 
         # --- Painel ESQUERDO ---
         left = QWidget()
+        self.left_panel = left
         left.setObjectName("workspaceLeft")
         left.setMinimumWidth(500) # Ajustado para a nova largura mínima
         self.splitter.addWidget(left)
@@ -76,6 +77,7 @@ class MainWindow(QMainWindow):
 
         # Agrupa Preview e Controls lado a lado
         preview_container = QWidget()
+        self.preview_container = preview_container
         preview_layout = QHBoxLayout(preview_container)
         preview_layout.setContentsMargins(0, 0, 0, 0)
         preview_layout.setSpacing(10)
@@ -106,6 +108,7 @@ class MainWindow(QMainWindow):
 
         # --- CONTAINER DE CONTROLES DE SAÍDA (Rodapé em Duas Colunas) ---
         footer_container = QWidget()
+        self.footer_container = footer_container
         footer_container.setObjectName("outputPanel")
         ly_footer = QHBoxLayout(footer_container)
         ly_footer.setContentsMargins(0, 0, 0, 0)
