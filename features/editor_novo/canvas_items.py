@@ -912,10 +912,15 @@ class RectangleItem(ImageItem):
         self.shape_type = 'rectangle'
         self.outline_enabled = False
         self.outline_color = '#000000'
-        self.outline_width = 1.0
+        self.outline_width = mm_to_px(0.2)
         self.outline_position = 'inside'
         self.outline_join = 'miter'
         self.corner_radius = 0.0
+        self.corner_radii = {
+            'top_left': 0.0, 'top_right': 0.0,
+            'bottom_right': 0.0, 'bottom_left': 0.0,
+        }
+        self.corner_radii_linked = True
         self.fill_opacity = 1.0
         self.outline_opacity = 1.0
         self.custom_name = 'Plano de fundo'
@@ -930,7 +935,11 @@ class RectangleItem(ImageItem):
         paint_shape_path(painter, self.drawing_path(), self.style_data())
 
     def style_data(self):
-        return {key: getattr(self, key) for key in ('shape_type', 'fill_color', 'fill_opacity', 'outline_enabled', 'outline_color', 'outline_opacity', 'outline_width', 'outline_position', 'outline_join', 'corner_radius')}
+        return {key: getattr(self, key) for key in (
+            'shape_type', 'fill_color', 'fill_opacity', 'outline_enabled',
+            'outline_color', 'outline_opacity', 'outline_width',
+            'outline_position', 'outline_join', 'corner_radius',
+            'corner_radii', 'corner_radii_linked')}
 
     def drawing_path(self):
         path = QPainterPath()
@@ -940,8 +949,10 @@ class RectangleItem(ImageItem):
         elif getattr(self, 'shape_type', 'rectangle') in ('ellipse', 'circle'):
             path.addEllipse(self.rect())
         else:
-            radius = min(getattr(self, 'corner_radius', 0), self.rect().width()/2, self.rect().height()/2)
-            path.addRoundedRect(self.rect(), radius, radius)
+            from core.object_style import rounded_rect_path
+            radii = dict(getattr(self, 'corner_radii', {}) or {})
+            radii.setdefault('all', getattr(self, 'corner_radius', 0))
+            path = rounded_rect_path(self.rect(), radii)
         return path
 
     def contains(self, point):
@@ -1300,7 +1311,8 @@ class DesignerBox(QGraphicsRectItem):
         html = re.sub(r"(?i)<h[1-6]([^>]*)>", r"<p\1>", html)
         html = re.sub(r"(?i)</h[1-6]>", "</p>", html)
         
-        self.text_item.setHtml(html)
+        rich = getattr(self.state, 'rich_text_version', 0) == 1
+        self.text_item.setHtml(self.state.html_content if rich else html)
         
         # 2. Aplicar Fonte Global e Cor NATIVA (SEMPRE após o setHtml, pois ele reseta o documento)
         font = QFont(self.state.font_family, self.state.font_size)
@@ -1314,7 +1326,8 @@ class DesignerBox(QGraphicsRectItem):
         cursor_color.select(QTextCursor.SelectionType.Document)
         char_fmt = QTextCharFormat()
         char_fmt.setForeground(QBrush(color))
-        cursor_color.mergeCharFormat(char_fmt)
+        if not rich:
+            cursor_color.mergeCharFormat(char_fmt)
         
         # 3. Aplicar Alinhamento Horizontal
         opt = self.text_item.document().defaultTextOption()

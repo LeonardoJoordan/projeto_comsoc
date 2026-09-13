@@ -1,8 +1,8 @@
 import re
 from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QStyleOptionViewItem,
-                               QApplication, QTextEdit, QToolTip)
+                               QApplication, QTextEdit, QToolTip, QAbstractItemDelegate)
 from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont, QPen, QColor)
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QEvent
 
 class RichTextEditor(QTextEdit):
     def __init__(self, parent=None):
@@ -42,6 +42,17 @@ class RichTextEditor(QTextEdit):
         self.mergeCurrentCharFormat(fmt)
 
 class HTMLDelegate(QStyledItemDelegate):
+    def eventFilter(self, editor, event):
+        if isinstance(editor, RichTextEditor) and event.type() == QEvent.Type.KeyPress:
+            if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                    # A tecla chega ao QTextEdit e vira uma quebra de linha.
+                    return False
+                self.commitData.emit(editor)
+                self.closeEditor.emit(editor, QAbstractItemDelegate.EndEditHint.NoHint)
+                return True
+        return super().eventFilter(editor, event)
+
     def helpEvent(self, event, view, option, index):
         text = str(index.data(Qt.ItemDataRole.DisplayRole) or '')
         available = max(0, option.rect.width() - 20)

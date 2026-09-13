@@ -3,6 +3,43 @@ from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QColor, QPen, QPainterPath, QPainter, QPainterPathStroker
 
 
+def rounded_rect_path(bounds, radii):
+    """Cria um retângulo com raio independente em cada canto."""
+    if not isinstance(radii, dict):
+        radii = {}
+    fallback = max(0.0, float(radii.get('all', 0)))
+    tl = max(0.0, float(radii.get('top_left', fallback)))
+    tr = max(0.0, float(radii.get('top_right', fallback)))
+    br = max(0.0, float(radii.get('bottom_right', fallback)))
+    bl = max(0.0, float(radii.get('bottom_left', fallback)))
+    width, height = max(0.0, bounds.width()), max(0.0, bounds.height())
+    limits = [1.0]
+    for available, used in ((width, tl + tr), (width, bl + br),
+                            (height, tl + bl), (height, tr + br)):
+        if used > 0:
+            limits.append(available / used)
+    scale = min(limits)
+    tl, tr, br, bl = (value * scale for value in (tl, tr, br, bl))
+
+    left, top, right, bottom = bounds.left(), bounds.top(), bounds.right(), bounds.bottom()
+    path = QPainterPath()
+    path.moveTo(left + tl, top)
+    path.lineTo(right - tr, top)
+    if tr:
+        path.quadTo(right, top, right, top + tr)
+    path.lineTo(right, bottom - br)
+    if br:
+        path.quadTo(right, bottom, right - br, bottom)
+    path.lineTo(left + bl, bottom)
+    if bl:
+        path.quadTo(left, bottom, left, bottom - bl)
+    path.lineTo(left, top + tl)
+    if tl:
+        path.quadTo(left, top, left + tl, top)
+    path.closeSubpath()
+    return path
+
+
 def style_color(item, part):
     color = QColor(item.get(part + '_color', '#ffffff' if part == 'fill' else '#000000'))
     color.setAlphaF(color.alphaF() * max(0, min(1, float(item.get(part + '_opacity', 1)))))
@@ -85,8 +122,10 @@ def draw_shape(painter, item):
         elif item.get("shape_type", "rectangle") in ("ellipse", "circle"):
             path.addEllipse(bounds)
         else:
-            radius = min(max(0, float(item.get('corner_radius', 0))), w/2, h/2)
-            path.addRoundedRect(bounds, radius, radius)
+            fallback = max(0, float(item.get('corner_radius', 0)))
+            radii = dict(item.get('corner_radii') or {})
+            radii.setdefault('all', fallback)
+            path = rounded_rect_path(bounds, radii)
         paint_shape_path(painter, path, item)
         return painter.transform().mapRect(bounds)
     finally:

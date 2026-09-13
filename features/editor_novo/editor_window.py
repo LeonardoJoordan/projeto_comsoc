@@ -71,7 +71,10 @@ class EditorWindow(QMainWindow):
         widget.setToolTip(text)
 
     def __init__(self, parent=None):
-        super().__init__(parent)
+        # Janela independente: ocultar o workspace não deve ocultar o editor.
+        super().__init__()
+        self._workspace_window = parent
+        self._workspace_session_active = False
         self._current_model_name = None
         self._current_model_dir = None
         self.setWindowTitle("Editor Visual de Modelo - Projeto COMSOC")
@@ -618,8 +621,25 @@ class EditorWindow(QMainWindow):
 
     def showEvent(self, event):
         super().showEvent(event)
+        workspace = self._workspace_window
+        if workspace is not None and not self._workspace_session_active:
+            self._workspace_session_active = True
+            self.setGeometry(workspace.normalGeometry() if workspace.isMaximized() or workspace.isFullScreen() else workspace.geometry())
+            self.setWindowState(workspace.windowState() & ~Qt.WindowState.WindowMinimized)
+            workspace.hide()
         self._zoom_to_fit()
         self.container_sup.setFixedHeight(self.container_sup.sizeHint().height())
+
+    def _release_workspace_window(self):
+        workspace = self._workspace_window
+        if workspace is None or not self._workspace_session_active:
+            return
+        self._workspace_session_active = False
+        workspace.setGeometry(self.normalGeometry() if self.isMaximized() or self.isFullScreen() or self.isMinimized() else self.geometry())
+        workspace.setWindowState(self.windowState() & ~Qt.WindowState.WindowMinimized)
+        workspace.show()
+        workspace.raise_()
+        workspace.activateWindow()
 
     def _state_item_sort_key(self, item):
         """Chave estável para comparar estados recriados via undo/redo."""
@@ -670,11 +690,13 @@ class EditorWindow(QMainWindow):
                     event.ignore()
                     self.export_to_json(skip_close_dialog=True)
                     return
-                elif msg_box.clickedButton() == btn_cancel:
+                elif msg_box.clickedButton() != btn_discard:
                     event.ignore()
                     return
         self._cleanup_unused_assets_on_close()
         super().closeEvent(event)
+        if event.isAccepted():
+            self._release_workspace_window()
 
     def _current_model_directory(self) -> Path | None:
         if self._current_model_dir:
@@ -1256,6 +1278,7 @@ class EditorWindow(QMainWindow):
                     new_item = RectangleItem(original.rect().width(), original.rect().height(), original.fill_color)
                     for key, value in original.style_data().items():
                         setattr(new_item, key, value)
+                    new_item.has_link = getattr(original, 'has_link', False)
                 elif isinstance(original, ImageItem):
                     new_item = ImageItem(getattr(original, '_original_path', ''))
                     new_item.has_link = getattr(original, 'has_link', False)
@@ -1401,18 +1424,27 @@ class EditorWindow(QMainWindow):
             box.apply_state()
     
     def update_font_family(self, font):
+        if self.canvas_edit.format('family', font.family()):
+            self.canvas_edit.checkpoint()
+            return
         box = self._get_selected()
         if box:
             box.state.font_family = font.family()
             box.apply_state()
 
     def update_font_size(self, size):
+        if self.canvas_edit.format('size', size):
+            self.canvas_edit.checkpoint()
+            return
         box = self._get_selected()
         if box:
             box.state.font_size = size
             box.apply_state()
 
     def update_font_color(self, color_hex):
+        if self.canvas_edit.format('color', color_hex):
+            self.canvas_edit.checkpoint()
+            return
         box = self._get_selected()
         if box:
             box.state.font_color = color_hex
@@ -1974,6 +2006,7 @@ class EditorWindow(QMainWindow):
                     "custom_name": getattr(item, "custom_name", ""),
                     "id": item.text_item.toPlainText().replace("{", "").replace("}", "").strip(),
                     "html": item.state.html_content,
+                    "rich_text_version": getattr(item.state, 'rich_text_version', 0),
                     "visible": item.isVisible(),
                     "opacity": round(float(item.opacity()), 2),
                     "locked": not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
@@ -2238,6 +2271,7 @@ class EditorWindow(QMainWindow):
                 text=b.get("id", "Placeholder") 
             )
             box.custom_name = b.get("custom_name", "")
+            box.state.rich_text_version = b.get('rich_text_version', 0)
             box.layer_id = b.get("layer_id")
             
             if "html" in b:
@@ -2306,6 +2340,11 @@ class EditorWindow(QMainWindow):
             for key in item.style_data():
                 if key in entry:
                     setattr(item, key, entry[key])
+            item.has_link = entry.get('has_link', False)
+            if 'corner_radii' not in entry:
+                radius = max(0.0, float(entry.get('corner_radius', 0)))
+                item.corner_radii = {key: radius for key in (
+                    'top_left', 'top_right', 'bottom_right', 'bottom_left')}
             item.layer_id = entry.get('layer_id')
             item.custom_name = entry.get('custom_name', 'Plano de fundo')
             item.setPos(entry.get('x', 0), entry.get('y', 0))
@@ -2352,18 +2391,27 @@ class EditorWindow(QMainWindow):
 
     def save_snapshot(self):
         """Dispara um salvamento na memória (chamado ao soltar o mouse ou terminar uma edição)."""
+        if getattr(self, '_restoring_history', False):
+            return
         state = self.get_current_scene_state()
         self.history.push(state)
 
     def undo(self):
         state = self.history.undo()
         if state:
-            self.apply_scene_state(state, is_undo_redo=True)
+            self._restore_history_state(state)
 
     def redo(self):
         state = self.history.redo()
         if state:
+            self._restore_history_state(state)
+
+    def _restore_history_state(self, state):
+        self._restoring_history = True
+        try:
             self.apply_scene_state(state, is_undo_redo=True)
+        finally:
+            self._restoring_history = False
 
     def _setup_layer_toolbar(self) -> QWidget:
         """Cria a barra de ferramentas compacta acima da lista de camadas."""

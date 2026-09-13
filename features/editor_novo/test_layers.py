@@ -108,8 +108,9 @@ class UnifiedLayersTest(unittest.TestCase):
             self.assertAlmostEqual(image.pixelColor(11, 11).alpha(), corner, delta=1)
 
     def test_background_properties_from_layer_click(self):
-        from PySide6.QtWidgets import QCheckBox, QComboBox
+        from PySide6.QtWidgets import QCheckBox, QComboBox, QDoubleSpinBox
         from PySide6.QtTest import QTest
+        from .canvas_items import px_to_mm
         w = EditorWindow()
         w.show()
         self.app.processEvents()
@@ -119,9 +120,14 @@ class UnifiedLayersTest(unittest.TestCase):
         self.app.processEvents()
         toggle = w.findChild(QCheckBox, 'shapeOutlineEnabled')
         position = w.findChild(QComboBox, 'shapeOutlinePosition')
+        width = w.findChild(QDoubleSpinBox, 'shapeOutlineWidth')
         self.assertTrue(toggle.isVisible())
         self.assertTrue(toggle.isEnabled())
+        self.assertFalse(position.isVisible())
+        self.assertAlmostEqual(px_to_mm(row.data(Qt.ItemDataRole.UserRole).outline_width), 0.2)
+        self.assertAlmostEqual(width.value(), 0.2)
         toggle.click()
+        self.assertTrue(position.isVisible())
         self.assertTrue(position.isEnabled())
         self.assertEqual(position.currentData(), 'inside')
         self.assertFalse(position.model().item(1).isEnabled())

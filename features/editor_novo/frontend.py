@@ -1,6 +1,6 @@
 """Apresentação Widgets independente; reutiliza controles e sinais do legado."""
 from pathlib import Path
-from PySide6.QtCore import Qt, QSize
+from PySide6.QtCore import Qt, QSize, QObject, QEvent, QPoint, QTimer
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtGui import QPainter
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QSplitter, QFrame, QLineEdit, QAbstractSpinBox, QColorDialog,
     QCheckBox, QDoubleSpinBox, QComboBox, QMenu, QRadioButton, QSizePolicy, QListView,
+    QGridLayout,
 )
 
 
@@ -142,6 +143,45 @@ def compact(name, control, suffix='', width=100):
     if suffix:
         layout.addWidget(QLabel(suffix))
     return widget
+
+
+class FooterSaveAlignment(QObject):
+    """Mantém o botão do rodapé centralizado sob o inspetor lateral."""
+    def __init__(self, window, sidebar, footer_bar, footer_layout, button):
+        super().__init__(window)
+        self.window = window
+        self.sidebar = sidebar
+        self.footer_bar = footer_bar
+        self.footer_layout = footer_layout
+        self.button = button
+        self._update_pending = False
+        for watched in (window, sidebar, footer_bar):
+            watched.installEventFilter(self)
+
+    def schedule(self):
+        if self._update_pending:
+            return
+        self._update_pending = True
+        QTimer.singleShot(0, self.align)
+
+    def align(self):
+        self._update_pending = False
+        if not self.sidebar.isVisible() or self.footer_bar.width() <= 0:
+            return
+        sidebar_center_global = self.sidebar.mapToGlobal(
+            QPoint(self.sidebar.width() // 2, 0)
+        )
+        sidebar_center = self.footer_bar.mapFromGlobal(sidebar_center_global).x()
+        right_margin = round(
+            self.footer_bar.width() - sidebar_center - self.button.width() / 2
+        )
+        self.footer_layout.setContentsMargins(14, 5, max(14, right_margin), 5)
+        self.footer_layout.activate()
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
+            self.schedule()
+        return False
 
 
 class Section(QWidget):
@@ -363,7 +403,6 @@ def install_frontend(w):
     props, pl = column()
     shape_color = QLineEdit('#ffffff')
     shape_color.setMaxLength(7)
-    shape_color.setMaximumWidth(110)
     fill_alpha = QDoubleSpinBox()
     fill_alpha.setObjectName('shapeFillAlpha')
     fill_alpha.setRange(0, 100)
@@ -376,8 +415,12 @@ def install_frontend(w):
     shape_layout.setContentsMargins(0, 0, 0, 0)
     fill_controls, fill_layout = column()
     fill_layout.setContentsMargins(0, 0, 0, 0)
-    fill_layout.addWidget(QLabel('Preenchimento'))
-    row(fill_layout, shape_swatch, shape_color, compact('α', fill_alpha, '%', 85))
+    fill_heading = QLabel('PREENCHIMENTO')
+    fill_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    fill_heading.setStyleSheet('color: #c5c3df; font-size: 11px; font-weight: 600;')
+    fill_layout.addWidget(fill_heading)
+    fill_row = row(fill_layout, shape_swatch, shape_color, compact('α', fill_alpha, '%', 85))
+    fill_row.setStretch(1, 1)
     shape_layout.addWidget(fill_controls)
     pl.addWidget(shape_controls)
     def set_shape_color(value):
@@ -402,7 +445,6 @@ def install_frontend(w):
     outline_enabled.setObjectName('shapeOutlineEnabled')
     outline_color = QLineEdit('#000000')
     outline_color.setMaxLength(7)
-    outline_color.setMaximumWidth(110)
     outline_alpha = QDoubleSpinBox()
     outline_alpha.setObjectName('shapeOutlineAlpha')
     outline_alpha.setRange(0, 100)
@@ -423,7 +465,10 @@ def install_frontend(w):
         outline_position.addItem(title, value)
     outline_position.setToolTip('Interno: para dentro. Externo: para fora. Centralizado: metade para cada lado.')
     shape_layout.addWidget(outline_enabled)
-    row(shape_layout, outline_swatch, outline_color, compact('α', outline_alpha, '%', 85))
+    outline_details, outline_details_layout = column()
+    outline_details_layout.setContentsMargins(0, 0, 0, 0)
+    outline_color_row = row(outline_details_layout, outline_swatch, outline_color, compact('α', outline_alpha, '%', 85))
+    outline_color_row.setStretch(1, 1)
     outline_join, join_layout = column()
     join_layout.setContentsMargins(0, 0, 0, 0)
     outline_join.setObjectName('shapeOutlineJoin')
@@ -431,29 +476,105 @@ def install_frontend(w):
     join_round = QRadioButton('Arredondados')
     row(join_layout, join_straight, join_round)
     join_field = field('Cantos do contorno', outline_join)
-    shape_layout.addWidget(join_field)
+    outline_details_layout.addWidget(join_field)
+    rectangle_radius, rectangle_radius_layout = column()
+    rectangle_radius_layout.setContentsMargins(0, 0, 0, 0)
+    radius_heading = QLabel('ARREDONDAMENTO DE BORDAS')
+    radius_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    radius_heading.setStyleSheet('color: #c5c3df; font-size: 11px; font-weight: 600;')
+    rectangle_radius_layout.addWidget(radius_heading)
+    sync_radii = QPushButton()
+    sync_radii.setObjectName('syncCornerRadii')
+    sync_radii.setCheckable(True)
+    sync_radii.setChecked(True)
+    sync_radii.setIcon(icon('<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/>'))
+    sync_radii.setToolTip('Sincronizar o arredondamento dos quatro cantos')
+    square_control(sync_radii)
+    corner_grid = QGridLayout()
+    corner_grid.setContentsMargins(0, 0, 0, 0)
+    corner_grid.setHorizontalSpacing(8)
+    corner_grid.setVerticalSpacing(8)
+    corner_spins = {}
+    for index, (key, title) in enumerate((
+        ('top_left', 'Sup. esquerdo'), ('top_right', 'Sup. direito'),
+        ('bottom_left', 'Inf. esquerdo'), ('bottom_right', 'Inf. direito'),
+    )):
+        spin = QDoubleSpinBox()
+        spin.setObjectName('shapeCornerRadius_' + key)
+        spin.setDecimals(2)
+        spin.setRange(0, 1000)
+        spin.setSingleStep(0.1)
+        spin.setKeyboardTracking(False)
+        control = field(title, compact('', spin, 'mm', None))
+        corner_grid.addWidget(control, index // 2, index % 2)
+        corner_spins[key] = spin
+    corner_grid.setColumnStretch(0, 1)
+    corner_grid.setColumnStretch(1, 1)
+    corner_grid.addWidget(sync_radii, 0, 2, 2, 1, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+    rectangle_radius_layout.addLayout(corner_grid)
+    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), rectangle_radius)
+
     radius = QDoubleSpinBox()
     radius.setObjectName('shapeCornerRadius')
     radius.setDecimals(2)
     radius.setRange(0, 1000)
     radius.setSingleStep(0.1)
     radius.setKeyboardTracking(False)
-    radius_field = field('Raio', compact('', radius, 'mm'))
-    radius_field.setToolTip('Zero mantém os cantos retos. Na linha, o raio é limitado à metade da espessura; no retângulo, à metade do menor lado.')
-    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), radius_field)
-    def apply_radius():
+    radius_field = field('Arredondamento', compact('', radius, 'mm', None))
+    radius_field.setToolTip('Arredonda as extremidades da linha, limitado à metade da espessura.')
+    def apply_line_radius():
         selected = w.scene.selectedItems()
-        if len(selected) == 1 and getattr(selected[0], 'shape_type', '') in ('rectangle', 'line'):
+        if len(selected) == 1 and getattr(selected[0], 'shape_type', '') == 'line':
             item = selected[0]
             item.prepareGeometryChange()
             item.corner_radius = mm_to_px(radius.value())
             item.update()
             w.save_snapshot()
-    radius.editingFinished.connect(apply_radius)
+    radius.editingFinished.connect(apply_line_radius)
+    updating_radii = {'active': False}
+    def apply_corner_radius(changed_key):
+        if updating_radii['active']:
+            return
+        selected = w.scene.selectedItems()
+        if len(selected) != 1 or getattr(selected[0], 'shape_type', '') != 'rectangle':
+            return
+        updating_radii['active'] = True
+        try:
+            if sync_radii.isChecked():
+                value = corner_spins[changed_key].value()
+                for spin in corner_spins.values():
+                    spin.setValue(value)
+            item = selected[0]
+            item.corner_radii = {key: mm_to_px(spin.value()) for key, spin in corner_spins.items()}
+            item.corner_radii_linked = sync_radii.isChecked()
+            item.corner_radius = item.corner_radii['top_left']
+            item.update()
+            w.save_snapshot()
+        finally:
+            updating_radii['active'] = False
+    for key, spin in corner_spins.items():
+        spin.editingFinished.connect(lambda key=key: apply_corner_radius(key))
+    def toggle_radius_sync(checked):
+        if updating_radii['active']:
+            return
+        selected = w.scene.selectedItems()
+        if len(selected) == 1 and getattr(selected[0], 'shape_type', '') == 'rectangle':
+            selected[0].corner_radii_linked = checked
+            if checked:
+                apply_corner_radius('top_left')
+            else:
+                w.save_snapshot()
+    sync_radii.toggled.connect(toggle_radius_sync)
     position_field = field('Posição', outline_position)
-    thickness_row = row(shape_layout, field('Espessura', compact('', outline_width, 'mm')), position_field)
+    thickness_row = row(outline_details_layout, field('Espessura', compact('', outline_width, 'mm')), position_field)
     thickness_row.setStretch(0, 1)
     thickness_row.setStretch(1, 1)
+    for layout_index in range(outline_details_layout.count()):
+        if outline_details_layout.itemAt(layout_index).layout() is thickness_row:
+            outline_details_layout.takeAt(layout_index)
+            break
+    outline_details_layout.insertLayout(0, thickness_row)
+    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled) + 1, outline_details)
     line_geometry, line_layout = column()
     line_layout.setContentsMargins(0, 0, 0, 0)
     line_length = QDoubleSpinBox()
@@ -467,8 +588,10 @@ def install_frontend(w):
     line_angle.setDecimals(2)
     line_angle.setWrapping(True)
     line_angle.setKeyboardTracking(False)
-    row(line_layout, field('Comprimento', compact('', line_length, 'mm')),
-        field('Ângulo', compact('', line_angle, '°')))
+    line_dimensions = row(line_layout, field('Comprimento', compact('', line_length, 'mm')),
+                          field('Ângulo', compact('', line_angle, '°')))
+    line_dimensions.setStretch(0, 1)
+    line_dimensions.setStretch(1, 1)
     shape_layout.addWidget(line_geometry)
     def apply_line_geometry():
         selected = w.scene.selectedItems()
@@ -520,6 +643,7 @@ def install_frontend(w):
             apply_outline()
     outline_swatch.clicked.connect(choose_outline_color)
     outline_color.editingFinished.connect(apply_outline)
+    outline_enabled.toggled.connect(outline_details.setVisible)
     outline_enabled.toggled.connect(apply_outline)
     outline_width.editingFinished.connect(apply_outline)
     outline_position.activated.connect(apply_outline)
@@ -552,7 +676,6 @@ def install_frontend(w):
     t.color_hex = QLineEdit('#000000')
     t.color_hex.setMaxLength(7)
     t.color_hex.setPlaceholderText('#RRGGBB')
-    t.color_hex.setMaximumWidth(110)
     text_alpha = QDoubleSpinBox()
     text_alpha.setObjectName('textColorAlpha')
     text_alpha.setRange(0, 100)
@@ -561,7 +684,8 @@ def install_frontend(w):
     text_alpha.setKeyboardTracking(False)
     color_row, color_layout = column()
     color_layout.setContentsMargins(0, 0, 0, 0)
-    row(color_layout, t.btn_color, t.color_hex, compact('α', text_alpha, '%', 85))
+    text_color_row = row(color_layout, t.btn_color, t.color_hex, compact('α', text_alpha, '%', 85))
+    text_color_row.setStretch(1, 1)
     tl.addWidget(field('Cor', color_row))
     def apply_hex():
         value = t.color_hex.text().strip()
@@ -652,6 +776,7 @@ def install_frontend(w):
     il.insertWidget(0, document_section)
     il.addStretch()
     right = QScrollArea()
+    right.setObjectName('inspectorScroll')
     right.setWidgetResizable(True)
     right.setWidget(inspector)
     right.setMinimumWidth(322)
@@ -671,22 +796,12 @@ def install_frontend(w):
     w.btn_save.setMaximumSize(16777215, 16777215)
     w.btn_save.setFixedSize(116, 34)
     footer.addWidget(w.btn_save)
-    w.btn_close_editor = QPushButton('✕')
-    w.btn_close_editor.setObjectName('closeEditor')
-    w.btn_close_editor.setToolTip('Fechar editor')
-    w.btn_close_editor.setStyleSheet('''
-        QPushButton#closeEditor {
-            background: #b83a3a; border: 1px solid #d04a4a;
-            color: white; font-size: 16px; font-weight: 700; padding: 0;
-        }
-        QPushButton#closeEditor:hover { background: #cf4545; border-color: #e45a5a; }
-        QPushButton#closeEditor:pressed { background: #963030; }
-    ''')
-    # Aplicar depois do QSS impede que o mínimo global reduza o botão.
-    w.btn_close_editor.setFixedSize(34, 34)
-    w.btn_close_editor.clicked.connect(w.close)
-    footer.addWidget(w.btn_close_editor)
     outer.addWidget(footer_bar)
+    w._footer_save_alignment = FooterSaveAlignment(
+        w, right, footer_bar, footer, w.btn_save
+    )
+    split.splitterMoved.connect(lambda *_: w._footer_save_alignment.schedule())
+    w._footer_save_alignment.schedule()
 
     selection_state = {'kind': None}
 
@@ -744,16 +859,23 @@ def install_frontend(w):
             else:
                 text_section.header.setChecked(False)
             selection_state['kind'] = current_kind
-        from .canvas_items import RectangleItem
+        from .canvas_items import RectangleItem, ImageItem, BackgroundItem, SignatureItem
         is_shape = len(selected) == 1 and isinstance(selected[0], RectangleItem)
         background_selected = any(getattr(item, 'is_document_background', False) for item in selected)
+        restore_visible = len(selected) == 1 and (
+            isinstance(selected[0], SignatureItem)
+            or (
+                isinstance(selected[0], ImageItem)
+                and not isinstance(selected[0], (RectangleItem, BackgroundItem))
+            )
+        )
         if background_selected:
             for control in (w.spin_pos_x, w.spin_pos_y, p.spin_w, p.spin_h, p.spin_rot, p.chk_proporcao):
                 control.setEnabled(False)
         w.btn_dup_layer.setEnabled(bool(selected) and not background_selected)
         w.btn_del_layer.setEnabled(bool(selected) and not background_selected)
         shape_controls.setVisible(is_shape)
-        p.btn_restore.setVisible(not is_shape)
+        p.btn_restore.setVisible(restore_visible)
         if is_shape:
             item = selected[0]
             is_line = item.shape_type == 'line'
@@ -761,15 +883,25 @@ def install_frontend(w):
             outline_enabled.setVisible(not is_line)
             position_field.setVisible(not is_line)
             join_field.setVisible(item.shape_type == 'rectangle')
-            # Um único campo de raio acompanha o contexto, sem duplicar estado.
+            rectangle_radius.setVisible(item.shape_type == 'rectangle')
+            # A linha mantém um único arredondamento para suas duas extremidades.
             shape_layout.removeWidget(radius_field)
             thickness_row.removeWidget(radius_field)
             if is_line:
                 thickness_row.addWidget(radius_field, 1)
-            else:
-                shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), radius_field)
-            radius_field.setVisible(item.shape_type in ('rectangle', 'line'))
-            radius.setValue(px_to_mm(item.corner_radius))
+            radius_field.setVisible(is_line)
+            if is_line:
+                radius.setValue(px_to_mm(item.corner_radius))
+            elif item.shape_type == 'rectangle':
+                stored_radii = dict(getattr(item, 'corner_radii', {}) or {})
+                fallback = getattr(item, 'corner_radius', 0)
+                updating_radii['active'] = True
+                try:
+                    sync_radii.setChecked(getattr(item, 'corner_radii_linked', True))
+                    for key, spin in corner_spins.items():
+                        spin.setValue(px_to_mm(stored_radii.get(key, fallback)))
+                finally:
+                    updating_radii['active'] = False
             line_geometry.setVisible(is_line)
             if is_line:
                 line_length.setValue(px_to_mm(item.rect().width()))
@@ -782,6 +914,7 @@ def install_frontend(w):
             outline_enabled.blockSignals(True)
             outline_enabled.setChecked(item.outline_enabled)
             outline_enabled.blockSignals(False)
+            outline_details.setVisible(is_line or item.outline_enabled)
             outline_color.setText(item.outline_color)
             fill_alpha.setValue(item.fill_opacity * 100)
             outline_alpha.setValue(item.outline_opacity * 100)
@@ -799,10 +932,12 @@ def install_frontend(w):
             shape_color.setText(selected[0].fill_color)
             shape_swatch.setStyleSheet(f'background: {selected[0].fill_color};')
             p.btn_restore.setEnabled(False)
-            p.chk_link.setEnabled(False)
+            p.set_link_available(not background_selected)
         selection.setText('SELEÇÃO\n' + (getattr(selected[0], 'layer_name', '') or 'Objeto selecionado' if selected else 'Nenhum objeto'))
         if t.isEnabled() and len(selected) == 1:
             color_changed(getattr(selected[0].state, 'font_color', '#000000'))
+            if hasattr(w, 'canvas_edit'):
+                w.canvas_edit.sync_panel()
     w.scene.selectionChanged.connect(sync_enabled)
     # O seletor legado bloqueia os sinais da cena enquanto seleciona pela lista.
     # Atualizar depois dele também cobre o único acesso ao plano de fundo.

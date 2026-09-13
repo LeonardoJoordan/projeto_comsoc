@@ -9,7 +9,7 @@ from datetime import datetime
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
-                                  QInputDialog, QComboBox, QCheckBox, QTableWidgetItem)
+                                  QInputDialog, QComboBox, QTableWidgetItem)
 from PySide6.QtCore import Qt, QSettings, QSignalBlocker
 from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
 
@@ -20,7 +20,7 @@ from features.spreadsheet_novo.table_panel import TablePanel
 from features.generator.renderer import NativeRenderer
 from features.editor_novo.editor_window import EditorWindow
 from features.generator.manager import RenderManager
-from features.generator.export_dialog import ConfigDialog
+from features.workspace_novo.settings_dialogs import ExportConfigDialog, ThemeDialog
 from features.generator.preset_warnings import warning_display_name, warning_tooltip
 from features.workspace_novo.import_models_dialog import ImportModelsDialog
 from features.workspace_novo.export_models_dialog import ExportModelsDialog
@@ -156,34 +156,37 @@ class MainWindow(QMainWindow):
         # Linha de Formato e Configs
         row_format_cfg = QHBoxLayout()
         self.cbo_export_format = QComboBox()
-        self.cbo_export_format.addItems(["PNG", "PDF"])
-        self.cbo_export_format.setFixedWidth(65)
+        self.cbo_export_format.addItem("PNG", "png")
+        self.cbo_export_format.addItem("PDF por item", "pdf_item")
+        self.cbo_export_format.addItem("PDF agrupado", "pdf_grouped")
+        self.cbo_export_format.setFixedWidth(150)
+        self._export_mode_tooltips = {
+            "png": "<b>PNG</b><br>Gera uma imagem PNG para cada item da tabela.",
+            "pdf_item": "<b>PDF por item</b><br>Gera um arquivo PDF separado para cada item da tabela.",
+            "pdf_grouped": "<b>PDF agrupado</b><br>Reúne todos os itens gerados em um único arquivo PDF com várias páginas.",
+        }
+        for index in range(self.cbo_export_format.count()):
+            mode = self.cbo_export_format.itemData(index)
+            self.cbo_export_format.setItemData(
+                index, self._export_mode_tooltips[mode], Qt.ItemDataRole.ToolTipRole
+            )
         self._apply_tooltip(self.cbo_export_format, 
             "<b>FORMATO DE SAÍDA</b><br><br>"
             "Escolha o tipo de arquivo final:<br>"
-            "• <b>PNG:</b> Ideal para imagens estáticas de alta qualidade.<br>"
-            "• <b>PDF:</b> Formato padrão para documentos e impressões, permitindo o uso de links interativos.")
+            "• <b>PNG:</b> uma imagem para cada item.<br>"
+            "• <b>PDF por item:</b> um PDF separado para cada item.<br>"
+            "• <b>PDF agrupado:</b> todos os itens em um único PDF.")
         
-        self.chk_single_pdf = QCheckBox("Arquivo Único")
-        self.chk_single_pdf.setVisible(True)  # Layout estático
-        self.chk_single_pdf.setEnabled(False) # Bloqueado por padrão (PNG)
-        self._apply_tooltip(self.chk_single_pdf, 
-            "<b>ARQUIVO ÚNICO (PDF)</b><br><br>"
-            "Agrupa todo o lote gerado em um único documento de múltiplas páginas, em vez de criar arquivos separados.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Ideal para impressões em massa. Você abre apenas um arquivo e envia todas as páginas para a impressora de uma só vez, economizando tempo.</small>")
-        
-        self.btn_config_name = QPushButton("Configurações")
+        self.btn_config_name = QPushButton("Exportação")
         self.btn_config_name.clicked.connect(self._open_config_dialog)
         self._apply_tooltip(self.btn_config_name, 
-            "<b>CONFIGURAÇÕES GERAIS</b><br><br>"
-            "Acesso aos ajustes avançados do projeto e do sistema:<br>"
+            "<b>CONFIGURAÇÕES DE EXPORTAÇÃO</b><br><br>"
+            "Acesso aos ajustes de geração dos arquivos:<br>"
             "• <b>Nomenclatura:</b> Define o padrão de nome dos arquivos gerados usando as variáveis da tabela.<br>"
-            "• <b>Impressão:</b> Configura o agrupamento de vários cartões em uma folha e ativa marcas de corte.<br>"
-            "• <b>Tema:</b> Alterna a interface do programa entre os modos Claro e Escuro.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Na aba de Impressão, o sistema calcula automaticamente quantos cartões cabem na folha assim que você digita as dimensões.</small>")
+            "• <b>Impressão:</b> Configura o agrupamento de vários cartões em uma folha e ativa marcas de corte.<br><br>"
+            "<small style='color: #A0A0A0;'>Dica: Na seção de Impressão, o sistema calcula automaticamente quantos cartões cabem na folha assim que você digita as dimensões.</small>")
         
         row_format_cfg.addWidget(self.cbo_export_format)
-        row_format_cfg.addWidget(self.chk_single_pdf)
         row_format_cfg.addWidget(self.btn_config_name)
         col_right_footer.addLayout(row_format_cfg)
 
@@ -229,9 +232,7 @@ class MainWindow(QMainWindow):
         self.preview_panel.cbo_models.currentTextChanged.connect(self._on_model_changed)
 
         # Sincronização de preferências e visibilidade
-        self.cbo_export_format.currentTextChanged.connect(self._toggle_single_pdf_option)
-        self.cbo_export_format.currentTextChanged.connect(self._save_export_format_pref)
-        self.chk_single_pdf.toggled.connect(self._save_single_pdf_pref)
+        self.cbo_export_format.currentIndexChanged.connect(self._on_export_mode_changed)
 
         self.table_panel.table.itemSelectionChanged.connect(self._on_table_selection)
 
@@ -379,6 +380,8 @@ class MainWindow(QMainWindow):
             
         if hasattr(self, 'settings'):
             self.settings.setValue("dark_mode", is_dark)
+        if hasattr(self, '_workspace_apply_visual_theme'):
+            self._workspace_apply_visual_theme(is_dark)
 
     def closeEvent(self, event):
         """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
@@ -425,7 +428,6 @@ class MainWindow(QMainWindow):
 
     def _on_add_model(self):
         self.editor_window = EditorWindow(self)
-        self.editor_window.setWindowModality(Qt.WindowModality.WindowModal)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
         self.editor_window.show()
 
@@ -712,23 +714,22 @@ class MainWindow(QMainWindow):
                     
                     self.current_filename_suffix = data.get("output_suffix", "")
 
-                    # Recupera preferências salvas (Formato e Checkbox)
+                    # Recupera o modo novo e também entende as preferências legadas.
                     last_fmt = data.get("last_export_format", "PNG")
                     last_single = data.get("last_single_pdf", False)
+                    last_mode = data.get("last_export_mode")
+                    if last_mode not in {"png", "pdf_item", "pdf_grouped"}:
+                        last_mode = (
+                            "png" if last_fmt == "PNG" else
+                            ("pdf_grouped" if last_single else "pdf_item")
+                        )
 
-                    # Bloqueia sinais para evitar salvamento redundante durante o carregamento
                     self.cbo_export_format.blockSignals(True)
-                    self.chk_single_pdf.blockSignals(True)
-                    
-                    idx = self.cbo_export_format.findText(last_fmt)
+                    idx = self.cbo_export_format.findData(last_mode)
                     if idx >= 0:
                         self.cbo_export_format.setCurrentIndex(idx)
-                    
-                    self.chk_single_pdf.setChecked(last_single)
-                    self._toggle_single_pdf_option(last_fmt)
-                    
                     self.cbo_export_format.blockSignals(False)
-                    self.chk_single_pdf.blockSignals(False)
+                    self._refresh_export_mode_tooltip()
 
                     model_dir = json_path.parent
                     if data.get("background_path") and not Path(data["background_path"]).is_absolute():
@@ -885,7 +886,6 @@ class MainWindow(QMainWindow):
                 return
 
         self.editor_window = EditorWindow(self)
-        self.editor_window.setWindowModality(Qt.WindowModality.WindowModal)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
 
         if json_path.exists():
@@ -969,24 +969,14 @@ class MainWindow(QMainWindow):
             current_imposition = self.cached_model_data.get("imposition_settings") 
             has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", []) + self.cached_model_data.get("shapes", [])))
 
-        # Lê o tema atual e envia para a janela de configurações
-        is_dark_now = self.settings.value("dark_mode", True, type=bool)
-        
-        dlg = ConfigDialog(self, slug, vars_available, self.current_filename_suffix, 
+        dlg = ExportConfigDialog(self, slug, vars_available, self.current_filename_suffix,
                            model_size_px=model_size, 
                            model_print_size_mm=model_print_size_mm,
-                           current_imposition=current_imposition,
-                           is_dark=is_dark_now)
+                           current_imposition=current_imposition)
         
         dlg.set_link_warning_visible(has_any_link)
         
         if dlg.exec():
-            # 1. Verifica e aplica o tema IMEDIATAMENTE caso o usuário tenha alterado
-            new_is_dark = dlg.radio_dark.isChecked()
-            if new_is_dark != is_dark_now:
-                self._apply_theme(new_is_dark)
-
-            # 2. Continua salvando as configurações de Nomenclatura e Imposição
             new_suffix = dlg.get_pattern()
             new_imposition = dlg.get_imposition_settings() 
             self.current_filename_suffix = new_suffix
@@ -1015,8 +1005,13 @@ class MainWindow(QMainWindow):
             else:
                 self.log_panel.append(f"Configuração salva: Sequencial automático{msg_imp}")
 
-            # 3. Atualiza a combobox de presets da tela principal para refletir mudanças feitas no diálogo
             self._refresh_imposition_presets()
+
+    def _open_theme_dialog(self):
+        is_dark_now = self.settings.value("dark_mode", True, type=bool)
+        dlg = ThemeDialog(self, is_dark=is_dark_now)
+        if dlg.exec():
+            self._apply_theme(dlg.is_dark_theme())
 
     def _select_output_folder(self):
         start_dir = self.txt_output_path.text() or ""
@@ -1043,20 +1038,23 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 print(f"Erro ao atualizar JSON do modelo: {e}")
 
-    def _save_export_format_pref(self, fmt):
-        """Salva a escolha do formato (PNG/PDF) no JSON do modelo."""
-        self._update_template_json({"last_export_format": fmt})
+    def _current_export_mode(self):
+        mode = self.cbo_export_format.currentData()
+        export_format = "PNG" if mode == "png" else "PDF"
+        return mode, export_format, mode == "pdf_grouped"
 
-    def _save_single_pdf_pref(self, checked):
-        """Salva o estado da checkbox de Arquivo Único no JSON do modelo."""
-        self._update_template_json({"last_single_pdf": checked})
+    def _refresh_export_mode_tooltip(self):
+        mode = self.cbo_export_format.currentData()
+        self.cbo_export_format.setToolTip(self._export_mode_tooltips.get(mode, ""))
 
-    def _toggle_single_pdf_option(self, fmt):
-        """Gerencia a disponibilidade do checkbox de arquivo único."""
-        is_pdf = (fmt == "PDF")
-        self.chk_single_pdf.setEnabled(is_pdf) # Apenas habilita/desabilita
-        if not is_pdf:
-            self.chk_single_pdf.setChecked(False)
+    def _on_export_mode_changed(self, _index):
+        self._refresh_export_mode_tooltip()
+        mode, export_format, single_pdf = self._current_export_mode()
+        self._update_template_json({
+            "last_export_mode": mode,
+            "last_export_format": export_format,
+            "last_single_pdf": single_pdf,
+        })
 
     def _scrape_table_data(self):
         table = self.table_panel.table
@@ -1191,7 +1189,7 @@ class MainWindow(QMainWindow):
             self.log_panel.append("ERRO: Nenhum modelo selecionado.")
             return
         
-        export_format = self.cbo_export_format.currentText()
+        _, export_format, _ = self._current_export_mode()
         has_any_link = False
         if self.cached_model_data:
             has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", []) + self.cached_model_data.get("shapes", [])))
@@ -1257,8 +1255,7 @@ class MainWindow(QMainWindow):
 
         imposition_cfg = self._resolve_imposition_settings()
         model_w_mm, model_h_mm = self._get_model_base_print_size_mm()
-        export_format = self.cbo_export_format.currentText()
-        is_single_pdf = self.chk_single_pdf.isChecked() and export_format == "PDF"
+        _, export_format, is_single_pdf = self._current_export_mode()
 
         self.manager = RenderManager(
             renderer, 

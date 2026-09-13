@@ -17,7 +17,18 @@ class RichTableWidget(QTableWidget):
         self.setItemDelegate(HTMLDelegate(self))
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        self._full_content_mode = False
+        self._pending_height_rows = set()
+        self._row_height_timer = QTimer(self)
+        self._row_height_timer.setSingleShot(True)
+        self._row_height_timer.setInterval(60)
+        self._row_height_timer.timeout.connect(self._resize_pending_rows)
         self.itemChanged.connect(self._force_qty_alignment)
+        self.itemChanged.connect(lambda item: self._queue_row_height_update({item.row()}))
+        self.horizontalHeader().sectionResized.connect(self._queue_all_row_heights)
+        self.model().rowsInserted.connect(
+            lambda parent, first, last: self._queue_row_height_update(range(first, last + 1))
+        )
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -289,16 +300,52 @@ class RichTableWidget(QTableWidget):
             ))
 
     def _toggle_word_wrap(self, state: bool):
+        self._full_content_mode = bool(state)
         self.setWordWrap(state)
         if state:
-            self.resizeRowsToContents()
-            # Adiciona 15px de "respiro" para evitar o scroll interno nas células
-            for r in range(self.rowCount()):
-                self.setRowHeight(r, self.rowHeight(r) + 15)
+            self.setTextElideMode(Qt.TextElideMode.ElideNone)
+            self._queue_all_row_heights()
         else:
-            # Força todas as linhas a voltarem ao tamanho compacto padrão
+            self._row_height_timer.stop()
+            self._pending_height_rows.clear()
+            self.setTextElideMode(Qt.TextElideMode.ElideRight)
             for r in range(self.rowCount()):
                 self.setRowHeight(r, 25)
+
+    def _queue_row_height_update(self, rows):
+        if not self._full_content_mode:
+            return
+        self._pending_height_rows.update(
+            row for row in rows if 0 <= row < self.rowCount()
+        )
+        self._row_height_timer.start()
+
+    def _queue_all_row_heights(self, *_):
+        self._queue_row_height_update(range(self.rowCount()))
+
+    def _resize_pending_rows(self):
+        if not self._full_content_mode:
+            return
+        rows = sorted(self._pending_height_rows)
+        self._pending_height_rows.clear()
+        for row in rows:
+            if row >= self.rowCount():
+                continue
+            needs_expansion = False
+            for column in range(self.columnCount()):
+                item = self.item(row, column)
+                if not item:
+                    continue
+                text = item.text()
+                available = max(1, self.columnWidth(column) - 20)
+                if '\n' in text or self.fontMetrics().horizontalAdvance(text) > available:
+                    needs_expansion = True
+                    break
+            if not needs_expansion:
+                self.setRowHeight(row, 25)
+                continue
+            self.resizeRowToContents(row)
+            self.setRowHeight(row, max(25, self.rowHeight(row) + 8))
 
     def _toggle_format(self, tag: str):
         items = self.selectedItems()

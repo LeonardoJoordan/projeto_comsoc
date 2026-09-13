@@ -707,7 +707,7 @@ class EditorDeTextoPanel(QWidget):
 
         self.spin_lh = MathDoubleSpinBox()
         self.spin_lh.setRange(0.5, 5.0)
-        self.spin_lh.setSingleStep(0.1)
+        self.spin_lh.setSingleStep(0.05)
         self.spin_lh.setValue(1.15)
         self.spin_lh.valueChanged.connect(lambda val: self.lineHeightChanged.emit(val))
         form_space.addRow(lbl_lh, self.spin_lh)

@@ -16,6 +16,7 @@ class CanvasEditingTest(unittest.TestCase):
         w.show()
         w.add_new_box()
         self.app.processEvents()
+        self.assertFalse(w.caixa_texto_panel.btn_restore.isVisible())
         box = w.scene.selectedItems()[0]
         original = box.state.html_content
         position = box.pos()

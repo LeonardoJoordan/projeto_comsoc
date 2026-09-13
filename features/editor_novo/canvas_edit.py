@@ -1,7 +1,7 @@
 """Sessão de edição textual nativa no canvas Widgets."""
-from PySide6.QtCore import QObject, QEvent, Qt
-from PySide6.QtGui import QKeySequence, QTextCharFormat, QFont, QTextCursor
-from PySide6.QtWidgets import QGraphicsItem, QApplication
+from PySide6.QtCore import QObject, QEvent, Qt, QSignalBlocker
+from PySide6.QtGui import QKeySequence, QTextCharFormat, QFont, QTextCursor, QColor
+from PySide6.QtWidgets import QGraphicsItem, QApplication, QDoubleSpinBox
 from .canvas_items import DesignerBox, _set_resize_handles_visible
 
 
@@ -30,6 +30,7 @@ class CanvasEdit(QObject):
         text.setTextInteractionFlags(Qt.TextInteractionFlag.TextEditorInteraction)
         text.document().clearUndoRedoStacks()
         text.document().contentsChanged.connect(self.changed)
+        text.document().cursorPositionChanged.connect(self.sync_panel)
         self.window.view.setFocus()
         text.setFocus(Qt.FocusReason.MouseFocusReason)
         cursor = text.textCursor()
@@ -43,6 +44,7 @@ class CanvasEdit(QObject):
 
     def changed(self):
         if self.box:
+            self.box.state.rich_text_version = 1
             self.box.state.html_content = self.box.text_item.toHtml()
 
     def checkpoint(self):
@@ -60,6 +62,7 @@ class CanvasEdit(QObject):
         self.changed()
         self.box = None
         box.text_item.document().contentsChanged.disconnect(self.changed)
+        box.text_item.document().cursorPositionChanged.disconnect(self.sync_panel)
         box.text_item.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
         _set_resize_handles_visible(box, box.isSelected())
         for shortcut, enabled in self.shortcuts:
@@ -76,21 +79,68 @@ class CanvasEdit(QObject):
             self.finish()
 
     def format(self, kind, enabled):
-        if not self.box:
+        box = self.box
+        if box is None:
+            selected = self.window.scene.selectedItems()
+            box = selected[0] if len(selected) == 1 and isinstance(selected[0], DesignerBox) else None
+        if box is None:
             return False
-        cursor = self.box.text_item.textCursor()
+        cursor = box.text_item.textCursor()
+        if not self.box:
+            cursor.select(QTextCursor.SelectionType.Document)
         fmt = QTextCharFormat()
         if kind == 'bold':
             fmt.setFontWeight(QFont.Weight.Bold if enabled else QFont.Weight.Normal)
         elif kind == 'italic':
             fmt.setFontItalic(enabled)
-        else:
+        elif kind == 'underline':
             fmt.setFontUnderline(enabled)
+        elif kind == 'family':
+            fmt.setFontFamilies([enabled])
+        elif kind == 'size':
+            fmt.setFontPointSize(enabled)
+        elif kind == 'color':
+            fmt.setForeground(QColor(enabled))
         cursor.mergeCharFormat(fmt)
-        self.box.text_item.setTextCursor(cursor)
-        self.window.view.setFocus()
-        self.box.text_item.setFocus()
+        box.state.rich_text_version = 1
+        box.state.html_content = box.text_item.toHtml()
+        if self.box:
+            box.text_item.setTextCursor(cursor)
+            self.window.view.setFocus()
+            box.text_item.setFocus()
+        else:
+            self.window.save_snapshot()
+        box.recalculate_text_position()
+        self.sync_panel()
         return True
+
+    def sync_panel(self, *_):
+        selected = self.window.scene.selectedItems()
+        box = self.box or (selected[0] if len(selected) == 1 and isinstance(selected[0], DesignerBox) else None)
+        if box is None:
+            return
+        cursor = QTextCursor(box.text_item.document())
+        source = box.text_item.textCursor()
+        pos = source.selectionStart() if self.box else 0
+        cursor.setPosition(pos)
+        cursor.movePosition(QTextCursor.MoveOperation.NextCharacter, QTextCursor.MoveMode.KeepAnchor)
+        fmt = cursor.charFormat() if source.hasSelection() or not self.box else source.charFormat()
+        panel = self.window.editor_texto_panel
+        controls = [panel, panel.cbo_font, panel.spin_size, panel.btn_bold, panel.btn_italic, panel.btn_underline]
+        blockers = [QSignalBlocker(c) for c in controls]
+        panel.cbo_font.setCurrentFont(fmt.font())
+        panel.spin_size.setValue(round(fmt.fontPointSize() or box.state.font_size))
+        panel.btn_bold.setChecked(fmt.fontWeight() >= QFont.Weight.Bold)
+        panel.btn_italic.setChecked(fmt.fontItalic())
+        panel.btn_underline.setChecked(fmt.fontUnderline())
+        color = fmt.foreground().color()
+        panel.btn_color.setStyleSheet(f'background: {color.name()};')
+        if hasattr(panel, 'color_hex'):
+            panel.color_hex.setText(color.name())
+        alpha = self.window.findChild(QDoubleSpinBox, 'textColorAlpha')
+        if alpha:
+            with QSignalBlocker(alpha):
+                alpha.setValue(round(color.alphaF()*100))
 
     def eventFilter(self, source, event):
         if event.type() == QEvent.Type.ShortcutOverride and self.box:

@@ -1,10 +1,26 @@
 """Apresentação da planilha; preserva os controles e as operações da tabela."""
-from PySide6.QtCore import Qt, QSize, QSignalBlocker
-from PySide6.QtWidgets import QFrame, QLabel, QHBoxLayout, QPushButton, QPlainTextEdit
+from PySide6.QtCore import Qt, QSize, QSignalBlocker, Signal
+from PySide6.QtWidgets import (
+    QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QPlainTextEdit,
+)
 from PySide6.QtGui import QIcon, QPixmap, QPainter
 from shiboken6 import isValid
 from pathlib import Path
 from features.editor_novo.frontend import icon
+
+
+class CellContentEditor(QPlainTextEdit):
+    """Campo superior: Enter confirma; Shift+Enter cria uma nova linha."""
+
+    commitRequested = Signal()
+
+    def keyPressEvent(self, event):
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if not event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                self.commitRequested.emit()
+                event.accept()
+                return
+        super().keyPressEvent(event)
 
 
 def sheet_icon(path):
@@ -34,42 +50,91 @@ def install_frontend(panel):
     heading.setObjectName('sheetHeading')
     head = QHBoxLayout(heading)
     head.setContentsMargins(14, 14, 14, 14)
-    title = QLabel('Dados')
+    title = QLabel('Dados para o modelo')
     title.setObjectName('sheetTitle')
+    title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    head.addSpacing(70)
+    head.addStretch(1)
     head.addWidget(title)
-    head.addStretch()
+    head.addStretch(1)
     count = QLabel()
     count.setObjectName('sheetCount')
+    count.setFixedWidth(70)
+    count.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     head.addWidget(count)
     layout.addWidget(heading)
 
     toolbar = QFrame()
     toolbar.setObjectName('sheetToolbar')
-    actions = QHBoxLayout(toolbar)
-    actions.setContentsMargins(12, 10, 12, 10)
-    actions.setSpacing(8)
-    panel.spin_add_rows.setFixedWidth(58)
+    toolbar_layout = QVBoxLayout(toolbar)
+    toolbar_layout.setContentsMargins(0, 0, 0, 0)
+    toolbar_layout.setSpacing(0)
+    line_tools_title = QLabel('LINHAS')
+    line_tools_title.setObjectName('sheetSectionTitle')
+    line_tools_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    line_tools_title.setContentsMargins(14, 9, 14, 0)
+    toolbar_layout.addWidget(line_tools_title)
+    actions = QHBoxLayout()
+    actions.setContentsMargins(4, 5, 4, 9)
+    actions.setSpacing(4)
+    panel.spin_add_rows.setFixedWidth(46)
     panel.spin_add_rows.setAccessibleName('Quantidade de linhas a adicionar')
-    actions.addWidget(panel.spin_add_rows)
     specs = (
-        (panel.btn_add_rows, 'Adicionar', 'Adicionar linhas', '<path d="M12 5v14M5 12h14"/>'),
-        (panel.btn_duplicate_row, '', 'Duplicar linhas selecionadas', '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>'),
-        (panel.btn_delete_rows, '', 'Excluir linhas selecionadas', '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>'),
+        (panel.btn_add_rows, 'Adicionar', 'Adicionar linhas', None),
+        (panel.btn_duplicate_row, 'Duplicar', 'Duplicar linhas selecionadas', None),
+        (panel.btn_delete_rows, 'Excluir', 'Excluir linhas selecionadas', None),
     )
     for button, text, tip, path in specs:
         button.setText(text)
         button.setToolTip(tip)
         button.setAccessibleName(tip)
-        button.setIcon(sheet_icon(path))
+        button.setIcon(sheet_icon(path) if path else QIcon())
         button.setIconSize(QSize(18, 18))
-        button.setObjectName('sheetAction' if text else 'sheetSquare')
+        button.setObjectName('sheetLineAction' if text else 'sheetSquare')
         if not text:
             button.setFixedSize(30, 30)
-        actions.addWidget(button)
+    actions.addWidget(panel.spin_add_rows)
+    actions.addWidget(panel.btn_add_rows)
     separator = QFrame()
     separator.setFixedSize(1, 20)
     separator.setStyleSheet('background: #30323b; border: none;')
     actions.addWidget(separator)
+    actions.addWidget(panel.btn_duplicate_row)
+    actions.addWidget(panel.btn_delete_rows)
+    actions.addStretch()
+    panel.btn_toggle_wrap.setText('Exibir conteúdo completo')
+    panel.btn_toggle_wrap.setToolTip(
+        'Alterna entre linhas compactas e altura automática para mostrar todo o conteúdo'
+    )
+    panel.btn_toggle_wrap.setIcon(sheet_icon('<path d="M4 6h16M4 11h12a4 4 0 0 1 0 8h-4m3-3-3 3 3 3M4 16h3"/>'))
+    panel.btn_toggle_wrap.setObjectName('sheetLineAction')
+    actions.addWidget(panel.btn_toggle_wrap)
+    toolbar_layout.addLayout(actions)
+    layout.addWidget(toolbar)
+
+    formula_bar = QFrame()
+    formula_bar.setObjectName('formulaBar')
+    formula_layout = QVBoxLayout(formula_bar)
+    formula_layout.setContentsMargins(0, 0, 0, 0)
+    formula_layout.setSpacing(0)
+    editor_row = QHBoxLayout()
+    editor_row.setContentsMargins(12, 8, 12, 5)
+    editor_row.setSpacing(8)
+    formula_label = QLabel('fx')
+    formula_label.setObjectName('formulaLabel')
+    formula_label.setFixedWidth(24)
+    formula_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    editor_row.addWidget(formula_label)
+    cell_editor = CellContentEditor()
+    cell_editor.setObjectName('cellEditor')
+    cell_editor.setPlaceholderText('Selecione uma célula para visualizar ou editar seu conteúdo')
+    cell_editor.setFixedHeight(58)
+    cell_editor.setEnabled(False)
+    editor_row.addWidget(cell_editor, 1)
+    formula_layout.addLayout(editor_row)
+    format_row = QHBoxLayout()
+    format_row.setContentsMargins(44, 0, 12, 8)
+    format_row.setSpacing(8)
     for caption, tag, tooltip in [('B', 'b', 'Negrito · Ctrl+B'), ('I', 'i', 'Itálico · Ctrl+I'), ('U', 'u', 'Sublinhado · Ctrl+U')]:
         button = QPushButton(caption)
         button.setObjectName('sheetSquare')
@@ -81,39 +146,20 @@ def install_frontend(panel):
         font.setUnderline(tag == 'u')
         button.setFont(font)
         button.clicked.connect(lambda checked=False, t=tag: panel.table._toggle_format(t))
-        actions.addWidget(button)
-    actions.addStretch()
-    panel.btn_toggle_wrap.setText('Quebrar texto')
-    panel.btn_toggle_wrap.setIcon(sheet_icon('<path d="M4 6h16M4 11h12a4 4 0 0 1 0 8h-4m3-3-3 3 3 3M4 16h3"/>'))
-    panel.btn_toggle_wrap.setObjectName('sheetAction')
-    actions.addWidget(panel.btn_toggle_wrap)
-    layout.addWidget(toolbar)
-
-    formula_bar = QFrame()
-    formula_bar.setObjectName('formulaBar')
-    formula_layout = QHBoxLayout(formula_bar)
-    formula_layout.setContentsMargins(12, 8, 12, 8)
-    formula_layout.setSpacing(8)
-    formula_label = QLabel('fx')
-    formula_label.setObjectName('formulaLabel')
-    formula_label.setFixedWidth(24)
-    formula_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    formula_layout.addWidget(formula_label)
-    cell_editor = QPlainTextEdit()
-    cell_editor.setObjectName('cellEditor')
-    cell_editor.setPlaceholderText('Selecione uma célula para visualizar ou editar seu conteúdo')
-    cell_editor.setFixedHeight(58)
-    cell_editor.setEnabled(False)
-    formula_layout.addWidget(cell_editor, 1)
+        format_row.addWidget(button)
+    format_row.addStretch(1)
+    formula_layout.addLayout(format_row)
     layout.addWidget(formula_bar)
 
     hint = QLabel('Selecione uma célula para começar · Cole do Excel ou Google Sheets com Ctrl+V')
     hint.setObjectName('sheetHint')
     layout.addWidget(hint)
     table = panel.table
+    cell_editor.commitRequested.connect(lambda: table.setFocus(Qt.FocusReason.OtherFocusReason))
     table.setObjectName('dataGrid')
     table.setAlternatingRowColors(False)
     table.verticalHeader().setDefaultSectionSize(25)
+    table.verticalHeader().setMinimumSectionSize(25)
     table.verticalHeader().setMinimumWidth(38)
     table.horizontalHeader().setMinimumSectionSize(64)
     table.horizontalHeader().setDefaultSectionSize(150)
@@ -162,6 +208,10 @@ def install_frontend(panel):
 
     def refresh_formula_from_item(item):
         if item.row() == table.currentRow() and item.column() == table.currentColumn():
+            # A edição no campo superior já contém este mesmo valor. Recarregá-lo
+            # a cada tecla levaria o cursor para o início e inverteria a digitação.
+            if cell_editor.toPlainText() == item.text():
+                return
             with QSignalBlocker(cell_editor):
                 cell_editor.setPlainText(item.text())
 
@@ -173,9 +223,11 @@ def install_frontend(panel):
         QFrame#sheetHeading, QFrame#sheetToolbar { background: #15161b; border: none; border-bottom: 1px solid #30323b; }
         QLabel#sheetTitle { color: #f3f5f8; font-size: 12px; font-weight: 600; }
         QLabel#sheetCount { color: #a8abb5; font-size: 11px; }
+        QLabel#sheetSectionTitle { color: #8f939f; font-size: 10px; font-weight: 600; }
         QLabel#sheetHint { background: #1a1b21; color: #8f939f; padding: 10px 14px; font-size: 11px; }
         QPushButton#sheetSquare { padding: 0; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; }
         QPushButton#sheetAction { padding: 0 10px; min-height: 28px; max-height: 28px; }
+        QPushButton#sheetLineAction { padding: 0 3px; min-height: 28px; max-height: 28px; }
         QSpinBox { padding: 0 5px; min-height: 28px; max-height: 28px; }
         QSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 18px; background: #30323b; border-left: 1px solid #454854; }
         QSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 18px; background: #30323b; border-left: 1px solid #454854; }
@@ -190,6 +242,7 @@ def install_frontend(panel):
         QFrame#sheetHeading { background: #15161b; border: none; }
         QLabel#sheetTitle { color: #f3f5f8; font-size: 18px; font-weight: 600; }
         QLabel#sheetCount { color: #a8abb5; font-size: 12px; }
+        QLabel#sheetSectionTitle { color: #8f939f; font-size: 10px; font-weight: 600; }
         QFrame#sheetToolbar { background: #1a1b21; border: none; border-bottom: 1px solid #30323b; }
         QFrame#formulaBar { background: #15161b; border: none; border-bottom: 1px solid #30323b; }
         QLabel#formulaLabel { color: #9087ff; font-size: 13px; font-style: italic; }
@@ -197,9 +250,9 @@ def install_frontend(panel):
         QPlainTextEdit#cellEditor:focus { border-color: #7c73f2; }
         QPlainTextEdit#cellEditor:disabled { color: #777b87; background: #15161b; }
         QLabel#sheetHint { background: #15161b; color: #8f939f; padding: 9px 14px; font-size: 11px; border-bottom: 1px solid #30323b; }
-        QPushButton#sheetSquare, QPushButton#sheetAction { background: transparent; color: #c9cbd3; border: 1px solid transparent; border-radius: 5px; }
-        QPushButton#sheetSquare:hover, QPushButton#sheetAction:hover { background: #2a2c35; }
-        QPushButton#sheetSquare:pressed, QPushButton#sheetAction:checked { background: #343159; color: #f3f5f8; }
+        QPushButton#sheetSquare, QPushButton#sheetAction, QPushButton#sheetLineAction { background: transparent; color: #c9cbd3; border: 1px solid transparent; border-radius: 5px; }
+        QPushButton#sheetSquare:hover, QPushButton#sheetAction:hover, QPushButton#sheetLineAction:hover { background: #2a2c35; }
+        QPushButton#sheetSquare:pressed, QPushButton#sheetAction:checked, QPushButton#sheetLineAction:checked { background: #343159; color: #f3f5f8; }
         QPushButton#sheetSquare:disabled { color: #777b87; }
         QSpinBox { background: #121318; color: #f3f5f8; border: 1px solid #30323b; border-radius: 5px; }
         QSpinBox::up-button, QSpinBox::down-button { background: #30323b; border: none; }

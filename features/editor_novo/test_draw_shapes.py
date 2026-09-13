@@ -1,6 +1,6 @@
 import unittest
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtWidgets import QApplication, QDoubleSpinBox
+from PySide6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton
 from PySide6.QtTest import QTest
 from .editor_window import EditorWindow
 from .canvas_items import RectangleItem
@@ -96,3 +96,43 @@ class DrawShapesTest(unittest.TestCase):
         release = QGraphicsSceneMouseEvent(QEvent.GraphicsSceneMouseRelease)
         release.setButton(Qt.LeftButton)
         handle.mouseReleaseEvent(release)
+
+    def test_independent_and_synchronized_corner_radii(self):
+        rectangle = self.draw('rectangle', QPoint(350, 330))
+        top_left = self.w.findChild(QDoubleSpinBox, 'shapeCornerRadius_top_left')
+        top_right = self.w.findChild(QDoubleSpinBox, 'shapeCornerRadius_top_right')
+        sync = self.w.findChild(QPushButton, 'syncCornerRadii')
+        self.assertTrue(sync.isChecked())
+        top_left.setValue(4)
+        top_left.editingFinished.emit()
+        self.assertEqual(top_right.value(), 4)
+        sync.click()
+        top_right.setValue(8)
+        top_right.editingFinished.emit()
+        self.assertEqual(top_left.value(), 4)
+        self.assertEqual(top_right.value(), 8)
+        state = self.w.get_current_scene_state()
+        self.w.apply_scene_state(state)
+        restored = next(i for i in self.w.scene.items()
+                        if getattr(i, 'shape_type', '') == 'rectangle'
+                        and not getattr(i, 'is_document_background', False))
+        self.assertFalse(restored.corner_radii_linked)
+        self.assertAlmostEqual(restored.corner_radii['top_left'], rectangle.corner_radii['top_left'])
+        self.assertAlmostEqual(restored.corner_radii['top_right'], rectangle.corner_radii['top_right'])
+
+    def test_shape_link_is_available_and_persisted(self):
+        rectangle = self.draw('rectangle', QPoint(350, 330))
+        self.assertFalse(self.w.caixa_texto_panel.btn_restore.isVisible())
+        link = self.w.caixa_texto_panel.chk_link
+        self.assertTrue(link.isEnabled())
+        link.click()
+        self.assertTrue(rectangle.has_link)
+        state = self.w.get_current_scene_state()
+        self.assertTrue(next(shape for shape in state['shapes']
+                             if not shape.get('is_document_background'))['has_link'])
+        self.w.apply_scene_state(state)
+        restored = next(i for i in self.w.scene.items()
+                        if getattr(i, 'shape_type', '') == 'rectangle'
+                        and not getattr(i, 'is_document_background', False))
+        self.assertTrue(restored.has_link)
+        self.assertIn('Link - Quadrado', self.w.get_all_model_placeholders())

@@ -90,7 +90,7 @@ class ShapeDrawing(QObject):
                         item.setRotation(math.degrees(math.atan2(end.y()-self.start.y(), end.x()-self.start.x())))
                         item.outline_enabled = True
                         item.outline_position = 'center'
-                        item.outline_width = mm_to_px(0.3)
+                        item.outline_width = mm_to_px(0.2)
                     else:
                         item.setPos(rect.topLeft())
                     item.setZValue(self.w._next_object_z())
