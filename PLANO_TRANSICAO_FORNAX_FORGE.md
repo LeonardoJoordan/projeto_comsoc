@@ -9,7 +9,7 @@ Versão em português: **FORNAX Forge — Geração de material personalizado em
 - A branch `main` é a referência histórica indicada pelo responsável pelo projeto. Não foi alterada, nem foi consultado o GitHub nesta análise.
 - [x] Mapear dependências e escrever este plano.
 - [x] Etapa 1: retirar implementações antigas e consolidar documentação/testes. Concluída em 13/09/2026.
-- [ ] Etapa 2: oficializar entrada e nomes de diretórios.
+- [x] Etapa 2: oficializar entrada e nomes de diretórios. Concluída em 13/09/2026.
 - [ ] Etapa 3: aplicar identidade FORNAX Forge, migrar preferências com segurança e validar.
 - [ ] Encaminhar à lapidação final e preparação da distribuição.
 
@@ -109,7 +109,7 @@ O arquivo `novo_editor.md` chama o QML de “novo editor” e descreve um estág
 3. [x] Substituir a entrada raiz pelo fluxo de `workspace_novo/main.py`.
 4. [x] Retirar as três interfaces antigas e o QML após resolver seus consumidores. Backup temporário: `/tmp/fornax-legacy-backup-20260913`.
 5. [x] Buscar referências residuais e validar entrada raiz, editor e geração. Resultado: 23 testes aprovados e importação raiz apontando para `features.workspace_novo.main_window`.
-6. [ ] Registrar commit e resultado antes das renomeações.
+6. [x] Registrar commit e resultado antes das renomeações. Checkpoint: `51fd2fa`.
 
 ## Etapa 2 — Diretórios oficiais
 
@@ -123,12 +123,12 @@ O arquivo `novo_editor.md` chama o QML de “novo editor” e descreve um estág
 
 Manter `core/`, `shared/`, `features/generator/` e `features/preview/` em seus locais nesta fase. Separar futuramente recursos visuais compartilhados em `shared/` pode melhorar a organização, mas não é necessário para oficializar o aplicativo. Não combinar essa mudança com reescrita do motor gráfico.
 
-- [ ] Mover as pastas somente após retirar os destinos legados, sem mesclar árvores antigas e novas.
-- [ ] Corrigir todos os imports absolutos, inclusive em testes e strings de `unittest.mock.patch`.
-- [ ] Corrigir o caminho literal `editor_novo/icons` na tabela; manter os SVG junto dos módulos que os usam.
-- [ ] Manter uma entrada raiz oficial; preservar a entrada independente do editor para diagnóstico, com instruções atualizadas.
-- [ ] Atualizar comandos nos README e testes transferidos. Não usar substituição global dentro de documentos de histórico.
-- [ ] Validar ausência de dependência de pastas `_novo` e QML com análise de imports e execução em ambiente isolado.
+- [x] Mover as pastas somente após retirar os destinos legados, sem mesclar árvores antigas e novas.
+- [x] Corrigir todos os imports absolutos, inclusive em testes e strings de `unittest.mock.patch`.
+- [x] Corrigir o caminho literal dos ícones na tabela; manter os SVG junto dos módulos que os usam.
+- [x] Manter uma entrada raiz oficial e preservar a entrada independente do editor para diagnóstico.
+- [x] Atualizar comandos nos README e testes transferidos sem alterar documentos históricos.
+- [x] Validar ausência de dependência de pastas `_novo` e QML com busca de referências, compilação e execução.
 
 ## Etapa 3 — Identidade, compatibilidade e validação
 
@@ -194,5 +194,6 @@ Essa validação não cobre todos os fluxos do workspace, impressão física, in
 | --- | --- | --- | --- |
 | 13/09/2026 | Mapa estático de 40 módulos, conferência de recursos, caminhos, distribuição e testes | Plano criado; 19 testes aprovados no `.venv`; nenhum código removido | Iniciar etapa 1 pelo baseline isolado e pela triagem de cobertura QML |
 | 13/09/2026 | Etapa 1: baseline, cobertura compartilhada, troca da entrada e retirada das interfaces antigas | 23 testes aprovados; prévias e hashes de `teste`, `teste2` e `teste3` idênticos; legado recuperável em `/tmp/fornax-legacy-backup-20260913` | Registrar checkpoint Git e iniciar as renomeações oficiais |
+| 13/09/2026 | Etapa 2: `workspace_novo`, `editor_novo` e `spreadsheet_novo` oficializados sem os sufixos | Imports, mocks, ícones e README corrigidos; 23 testes aprovados; editor independente aprovado em modo offscreen | Registrar checkpoint Git e iniciar identidade/migração da Etapa 3 |
 
 Ao retomar, ler este documento e o diff atual, confirmar branch e commit, executar somente o próximo item pendente. Se o código mudou desde `5f0199f`, atualizar o mapa antes de excluir. A limpeza de arquivos locais não versionados permanece separada da limpeza de código rastreado.

@@ -51,7 +51,7 @@ class EditorWindowLifecycleTest(unittest.TestCase):
         editor.show()
         editor.add_new_box()
         try:
-            with patch('features.editor_novo.editor_window.QMessageBox.exec', return_value=0):
+            with patch('features.editor.editor_window.QMessageBox.exec', return_value=0):
                 self.assertFalse(editor.close())
             self.assertTrue(editor.isVisible())
             self.assertFalse(workspace.isVisible())

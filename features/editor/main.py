@@ -1,4 +1,4 @@
-"""Execute: .venv/bin/python features/editor_novo/main.py [--model arquivo.json]."""
+"""Execute: .venv/bin/python features/editor/main.py [--model arquivo.json]."""
 import argparse
 import sys
 from pathlib import Path
@@ -7,7 +7,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QApplication
-from features.editor_novo.editor_window import EditorWindow
+from features.editor.editor_window import EditorWindow
 
 
 def main():

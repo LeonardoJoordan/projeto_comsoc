@@ -14,16 +14,16 @@ from PySide6.QtCore import Qt, QSettings, QSignalBlocker
 from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
 
 from features.preview.preview_panel import PreviewPanel
-from features.workspace_novo.controls_panel import ControlsPanel
+from features.workspace.controls_panel import ControlsPanel
 from shared.log_panel import LogPanel
-from features.spreadsheet_novo.table_panel import TablePanel
+from features.spreadsheet.table_panel import TablePanel
 from features.generator.renderer import NativeRenderer
-from features.editor_novo.editor_window import EditorWindow
+from features.editor.editor_window import EditorWindow
 from features.generator.manager import RenderManager
-from features.workspace_novo.settings_dialogs import ExportConfigDialog, ThemeDialog
+from features.workspace.settings_dialogs import ExportConfigDialog, ThemeDialog
 from features.generator.preset_warnings import warning_display_name, warning_tooltip
-from features.workspace_novo.import_models_dialog import ImportModelsDialog
-from features.workspace_novo.export_models_dialog import ExportModelsDialog
+from features.workspace.import_models_dialog import ImportModelsDialog
+from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 from core.font_utils import format_font_list, missing_template_fonts
@@ -246,7 +246,7 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
 
         self.settings = QSettings("Projeto ComSoc", "MainApp")
-        # Esta interface de transição trabalha exclusivamente com editor_novo.
+        # Esta interface de transição trabalha exclusivamente com editor.
         self.preview_panel.cbo_editor.hide()
         
         # Restaura a geometria e o estado da janela (posição e tamanho)

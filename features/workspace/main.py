@@ -1,4 +1,4 @@
-"""Execute: .venv/bin/python features/workspace_novo/main.py"""
+"""Execute: .venv/bin/python features/workspace/main.py"""
 import os
 import sys
 import traceback
@@ -13,7 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from PySide6.QtWidgets import QApplication, QMessageBox
 from core.custom_tooltip import CustomTooltipManager
 from core.paths import get_logs_dir
-from features.workspace_novo.main_window import MainWindow
+from features.workspace.main_window import MainWindow
 
 
 def global_exception_handler(exc_type, exc_value, exc_traceback):

@@ -1,4 +1,4 @@
-"""Identidade visual do workspace de transição, inspirada no editor_novo."""
+"""Identidade visual do workspace de transição, inspirada no editor."""
 import re
 from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
@@ -158,7 +158,7 @@ def install_frontend(window):
     window.preview_panel.cbo_editor.hide()
     window.table_panel.table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
-    # Popups consistentes com o menu de Formas do editor_novo.
+    # Popups consistentes com o menu de Formas do editor.
     workspace_combos = (
         window.preview_panel.cbo_models,
         window.cbo_export_format,

@@ -1,13 +1,12 @@
-# Editor Widgets modernizado
+# Editor visual
 
-Interface inspirada no editor QML, usando exclusivamente Qt Widgets e o canvas
-do legado. Os outros dois editores não são alterados por esta versão.
+Editor oficial construído com Qt Widgets e `QGraphicsScene`.
 
 Na raiz do projeto:
 
 ```bash
-.venv/bin/python features/editor_novo/main.py
-.venv/bin/python features/editor_novo/main.py --model /caminho/template_v3.json
+.venv/bin/python features/editor/main.py
+.venv/bin/python features/editor/main.py --model /caminho/template_v3.json
 ```
 
 O segundo comando abre o modelo real: use uma cópia da pasta do modelo para
@@ -16,11 +15,11 @@ experimentos que envolvam salvar, substituir imagens ou excluir recursos.
 Verificação sem interface gráfica e captura:
 
 ```bash
-QT_QPA_PLATFORM=offscreen .venv/bin/python features/editor_novo/main.py --check
-QT_QPA_PLATFORM=offscreen .venv/bin/python features/editor_novo/main.py --screenshot /tmp/editor-novo.png
+QT_QPA_PLATFORM=offscreen .venv/bin/python features/editor/main.py --check
+QT_QPA_PLATFORM=offscreen .venv/bin/python features/editor/main.py --screenshot /tmp/editor.png
 ```
 
-## Primeira versão visual
+## Estrutura visual
 
 - Barra superior com posição, dimensões, proporção, rotação, opacidade e guias.
 - Ferramentas de criação, camadas e laterais redimensionáveis.
@@ -100,4 +99,4 @@ Ao encerrar, o conteúdo entra no histórico do modelo. Salvar e fechar também
 encerram a sessão. A colagem por Ctrl+V usa texto simples para evitar estilos
 externos incompatíveis. O campo de conteúdo lateral foi retirado da interface.
 
-Teste: `QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest features.editor_novo.test_canvas_edit -v`.
+Teste: `QT_QPA_PLATFORM=offscreen .venv/bin/python -m unittest features.editor.test_canvas_edit -v`.

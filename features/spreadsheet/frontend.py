@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QIcon, QPixmap, QPainter
 from shiboken6 import isValid
 from pathlib import Path
-from features.editor_novo.frontend import icon
+from features.editor.frontend import icon
 
 
 class CellContentEditor(QPlainTextEdit):
@@ -237,7 +237,7 @@ def install_frontend(panel):
         QTableWidget#dataGrid::item { padding: 6px 10px; }
         QHeaderView::section { background: #1e2027; color: #bfc2cf; font-weight: 600; border: none; border-right: 1px solid #30323b; border-bottom: 1px solid #30323b; padding: 6px 10px; }
         QTableCornerButton::section { background: #1e2027; border: none; }
-    '''.replace('__ICONS__', (Path(__file__).resolve().parents[1] / 'editor_novo' / 'icons').as_posix()) + '''
+    '''.replace('__ICONS__', (Path(__file__).resolve().parents[1] / 'editor' / 'icons').as_posix()) + '''
         QWidget#dataPanel { background: #121318; border: 1px solid #30323b; border-radius: 8px; padding: 0; }
         QFrame#sheetHeading { background: #15161b; border: none; }
         QLabel#sheetTitle { color: #f3f5f8; font-size: 18px; font-weight: 600; }
