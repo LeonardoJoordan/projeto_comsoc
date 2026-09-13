@@ -4,10 +4,10 @@ set -e
 echo "🔧 Montando AppDir e gerando AppImage..."
 
 DIST_DIR="build/main.dist"
-APP_DIR="COMSOC.AppDir"
+APP_DIR="FORNAX_Forge.AppDir"
 USR_BIN="$APP_DIR/usr/bin"
 USR_LIB="$APP_DIR/usr/lib"
-PYSIDE6_VENV="venv/lib/python3.13/site-packages/PySide6"
+PYSIDE6_VENV="${PYSIDE6_VENV:-.venv/lib/python3.13/site-packages/PySide6}"
 
 # Limpa e recria o AppDir
 rm -rf "$APP_DIR"
@@ -35,22 +35,22 @@ export PATH="$SELF/usr/bin:$PATH"
 export LD_LIBRARY_PATH="$SELF/usr/lib:$SELF/usr/bin:$LD_LIBRARY_PATH"
 export QT_PLUGIN_PATH="$SELF/usr/bin/PySide6/qt-plugins"
 export QT_QPA_PLATFORM=xcb
-exec "$SELF/usr/bin/COMSOC_OFICIAL" "$@"
+exec "$SELF/usr/bin/FORNAX_Forge" "$@"
 EOF
 chmod +x "$APP_DIR/AppRun"
 
 # Cria o .desktop
 cat > "$APP_DIR/app.desktop" << 'EOF'
 [Desktop Entry]
-Name=COMSOC
-Exec=COMSOC_OFICIAL
+Name=FORNAX Forge
+Exec=FORNAX_Forge
 Icon=app
 Type=Application
 Categories=Utility;
 EOF
 
-# Ícone placeholder
-touch "$APP_DIR/app.png"
+# Ícone do aplicativo
+cp icone.png "$APP_DIR/app.png"
 
 # Mostra tamanho antes de gerar
 echo ""
@@ -59,7 +59,7 @@ echo "📊 Tamanho do AppDir: $(du -sh $APP_DIR | cut -f1)"
 # Gera o AppImage
 echo ""
 echo "📦 Gerando AppImage..."
-ARCH=x86_64 ./appimagetool "$APP_DIR" Projeto_ComSoc.AppImage
+ARCH=x86_64 ./appimagetool "$APP_DIR" FORNAX_Forge.AppImage
 
 echo ""
-echo "✅ Projeto_ComSoc.AppImage gerado com sucesso!"
+echo "✅ FORNAX_Forge.AppImage gerado com sucesso!"

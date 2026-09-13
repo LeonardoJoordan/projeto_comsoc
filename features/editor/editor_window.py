@@ -77,7 +77,7 @@ class EditorWindow(QMainWindow):
         self._workspace_session_active = False
         self._current_model_name = None
         self._current_model_dir = None
-        self.setWindowTitle("Editor Visual de Modelo - Projeto COMSOC")
+        self.setWindowTitle("Editor de modelos — FORNAX Forge")
         self.resize(1200, 800)
 
         central = QWidget()

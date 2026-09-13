@@ -12,7 +12,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 from core.custom_tooltip import CustomTooltipManager
-from core.paths import get_logs_dir
+from core.paths import APP_ID, get_logs_dir
+from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
 from features.workspace.main_window import MainWindow
 
 
@@ -39,6 +40,10 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
 
 def main():
     app = QApplication(sys.argv)
+    app.setOrganizationName(SETTINGS_ORGANIZATION)
+    app.setApplicationName(SETTINGS_APPLICATION)
+    app.setApplicationDisplayName('FORNAX Forge')
+    app.setDesktopFileName(APP_ID)
     app.setStyle('Fusion')
     sys.excepthook = global_exception_handler
     CustomTooltipManager.install(delay_ms=1500)

@@ -1,32 +1,57 @@
 import os
 import platform
+import shutil
 from pathlib import Path
 
-def get_app_data_dir() -> Path:
-    """Retorna o diretório base de dados isolado (Flatpak) ou nativo do SO."""
+
+APP_ID = "com.leobelisario.FornaxForge"
+LEGACY_APP_ID = "com.leobelisario.ProjetoComSoc"
+WINDOWS_APP_DIR = "FornaxForge"
+LEGACY_WINDOWS_APP_DIR = "ProjetoComSoc"
+
+
+def _data_home() -> Path:
     system = platform.system()
-    # Usar o ID reverso é o padrão profissional para Linux/Flatpak
-    app_id = "com.leobelisario.ProjetoComSoc" 
-    
     if system == "Windows":
-        base = os.environ.get("APPDATA") or os.path.expanduser("~")
-        return Path(base) / "ProjetoComSoc"
-    elif system == "Darwin":
-        return Path(os.path.expanduser("~")) / "Library" / "Application Support" / app_id
-    else:
-        # No Flatpak, XDG_DATA_HOME aponta para ~/.var/app/com.leobelisario.ProjetoComSoc/data
-        # Se rodar fora do Flatpak, cai no ~/.local/share padrão
-        base = os.environ.get("XDG_DATA_HOME") or os.path.join(os.path.expanduser("~"), ".local", "share")
-        return Path(base) / app_id
+        return Path(os.environ.get("APPDATA") or Path.home())
+    if system == "Darwin":
+        return Path.home() / "Library" / "Application Support"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share")
+
+
+def get_legacy_app_data_dir() -> Path:
+    """Retorna a antiga pasta de dados sem criá-la ou modificá-la."""
+    name = LEGACY_WINDOWS_APP_DIR if platform.system() == "Windows" else LEGACY_APP_ID
+    return _data_home() / name
+
+
+def _copy_missing(source: Path, destination: Path) -> None:
+    """Copia somente entradas ausentes, preservando origem e conflitos."""
+    if not source.is_dir() or source.resolve() == destination.resolve():
+        return
+    destination.mkdir(parents=True, exist_ok=True)
+    for item in source.iterdir():
+        target = destination / item.name
+        if item.is_dir():
+            _copy_missing(item, target)
+        elif not target.exists():
+            shutil.copy2(item, target)
+
+
+def get_app_data_dir() -> Path:
+    """Retorna os dados do FORNAX e importa, por cópia, dados antigos ausentes."""
+    name = WINDOWS_APP_DIR if platform.system() == "Windows" else APP_ID
+    app_dir = _data_home() / name
+    app_dir.mkdir(parents=True, exist_ok=True)
+    _copy_missing(get_legacy_app_data_dir(), app_dir)
+    return app_dir
 
 def get_logs_dir() -> Path:
-    """Retorna e garante a existência da pasta de logs."""
     logs_dir = get_app_data_dir() / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     return logs_dir
 
 def get_models_dir() -> Path:
-    """Retorna e garante a existência da pasta de modelos."""
     models_dir = get_app_data_dir() / "models"
     models_dir.mkdir(parents=True, exist_ok=True)
     return models_dir

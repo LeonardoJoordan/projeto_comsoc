@@ -5,12 +5,12 @@ import os
 from pathlib import Path
 
 def build_app():
-    print("🚀 Iniciando a blindagem e compilação do C.O.M.S.O.C. com Nuitka...")
+    print("🚀 Iniciando a compilação do FORNAX Forge com Nuitka...")
     
     # Define o ponto de entrada e caminhos
     base_dir = Path(__file__).parent.absolute()
     main_file = base_dir / "main.py"
-    exe_name = "Projeto ComSoc"
+    exe_name = "FORNAX_Forge"
 
    # Base do comando Nuitka com Clang
     cmd = [
@@ -26,6 +26,8 @@ def build_app():
         "--include-package=core",
         "--include-package=shared",
         "--include-package=pypdf",
+        "--include-data-dir=features/editor/icons=features/editor/icons",
+        "--include-data-dir=features/workspace/icons=features/workspace/icons",
         "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
         "--lto=no",                     
         "--jobs=32",                    # Deixa o Ryzen 9 brilhar
@@ -65,7 +67,7 @@ def build_app():
         if sistema == "Darwin":
             print("\n🍎 Iniciando a criação do .DMG nativo para macOS...")
             app_path = Path("build") / f"{exe_name}.app"
-            dmg_output = "Projeto_COMSOC_Instalador.dmg"
+            dmg_output = "FORNAX_Forge_Instalador.dmg"
             
             # Garante a renomeação caso o Nuitka ignore a flag externa
             if Path("build/main.app").exists():
@@ -77,7 +79,7 @@ def build_app():
             try:
                 subprocess.run([
                     "hdiutil", "create",
-                    "-volname", "Instalador COMSOC",
+                    "-volname", "FORNAX Forge",
                     "-srcfolder", str(app_path),
                     "-ov", "-format", "UDZO",
                     dmg_output
@@ -93,6 +95,6 @@ if __name__ == "__main__":
     build_app()
 
 # Assim que a instalação terminar, você pode retomar a sequência de compilação normalmente:
-#    flatpak-builder --repo=repo --force-clean build-dir com.leobelisario.ProjetoComSoc.yaml
-#    flatpak build-bundle repo ProjetoComSoc.flatpak com.leobelisario.ProjetoComSoc
-#    flatpak install --reinstall ProjetoComSoc.flatpak
+#    flatpak-builder --repo=repo --force-clean build-dir com.leobelisario.FornaxForge.yaml
+#    flatpak build-bundle repo FORNAX_Forge.flatpak com.leobelisario.FornaxForge
+#    flatpak install --reinstall FORNAX_Forge.flatpak

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
                                   QInputDialog, QComboBox, QTableWidgetItem)
-from PySide6.QtCore import Qt, QSettings, QSignalBlocker
+from PySide6.QtCore import Qt, QSignalBlocker
 from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
 
 from features.preview.preview_panel import PreviewPanel
@@ -26,6 +26,7 @@ from features.workspace.import_models_dialog import ImportModelsDialog
 from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
+from core.settings import get_app_settings
 from core.font_utils import format_font_list, missing_template_fonts
 from core.render_cache import ensure_background_proxy
 
@@ -43,7 +44,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Projeto COMSOC - Construtor Otimizado de Material Social Oficial e Cerimonial")
+        self.setWindowTitle("FORNAX Forge — Geração de material personalizado em lote")
         self.setMinimumSize(1024, 680)
         self.resize(1280, 720)
 
@@ -121,7 +122,7 @@ class MainWindow(QMainWindow):
         row_out_path = QHBoxLayout()
         row_out_path.addWidget(QLabel("Saída:"))
         self.txt_output_path = QLineEdit()
-        self.txt_output_path.setPlaceholderText("Padrão: Documentos/ProjetoComSoc_Saida/modelo")
+        self.txt_output_path.setPlaceholderText("Selecione a pasta onde os lotes serão gerados")
         row_out_path.addWidget(self.txt_output_path)
         
         self.btn_sel_out = QPushButton("...")
@@ -245,7 +246,7 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_import_models.clicked.connect(self._on_import_models)
         self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
 
-        self.settings = QSettings("Projeto ComSoc", "MainApp")
+        self.settings = get_app_settings()
         # Esta interface de transição trabalha exclusivamente com editor.
         self.preview_panel.cbo_editor.hide()
         
@@ -575,7 +576,7 @@ class MainWindow(QMainWindow):
                         missing_fonts_by_model[zip_slug] = []
                         
                 if not models_in_zip:
-                    QMessageBox.warning(self, "Arquivo Inválido", "Este arquivo ZIP não contém modelos compatíveis com o Projeto ComSoc.")
+                    QMessageBox.warning(self, "Arquivo Inválido", "Este arquivo ZIP não contém modelos compatíveis com o FORNAX Forge.")
                     return
                 
                 # Etapa 2: Checagem de Conflitos e Abertura da Janela de Decisão
@@ -666,7 +667,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Atenção", "Nenhum modelo foi selecionado para exportação.")
             return
             
-        save_path, _ = QFileDialog.getSaveFileName(self, "Exportar Modelos", "Modelos_ProjetoComSoc.zip", "Arquivos ZIP (*.zip)")
+        save_path, _ = QFileDialog.getSaveFileName(self, "Exportar Modelos", "Modelos_FORNAX_Forge.zip", "Arquivos ZIP (*.zip)")
         if not save_path: return
         
         try:
@@ -1237,7 +1238,7 @@ class MainWindow(QMainWindow):
         self.settings.setValue("last_output_dir", custom_path)
 
         timestamp = datetime.now().strftime("%y.%m.%d-%H.%M.%S")
-        folder_name = f"Projeto COMSOC_{timestamp}"
+        folder_name = f"FORNAX_Forge_{timestamp}"
         
         output_dir = base_dir / folder_name
         output_dir.mkdir(parents=True, exist_ok=True)

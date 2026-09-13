@@ -134,9 +134,9 @@ Manter `core/`, `shared/`, `features/generator/` e `features/preview/` em seus l
 
 ### Marca visível
 
-- [ ] Atualizar título do workspace em `main_window.py`, título do editor, descrição do executável de diagnóstico, menu/diálogo Sobre em `frontend.py`.
-- [ ] Atualizar mensagens de importação, nome sugerido `Modelos_ProjetoComSoc.zip`, dica de saída e nome de lote `Projeto COMSOC_<timestamp>` no workspace.
-- [ ] Reescrever README raiz com nome, proposta e comandos oficiais; atualizar documentação operacional.
+- [x] Atualizar título do workspace em `main_window.py`, título do editor, descrição do executável de diagnóstico, menu/diálogo Sobre em `frontend.py`.
+- [x] Atualizar mensagens de importação, nome sugerido `Modelos_ProjetoComSoc.zip`, dica de saída e nome de lote `Projeto COMSOC_<timestamp>` no workspace.
+- [x] Reescrever README raiz com nome, proposta e comandos oficiais; atualizar documentação operacional.
 - [ ] Definir ícones finais e verificar os três formatos existentes de distribuição.
 
 Usar FORNAX Forge como nome curto. Descrição longa em português na interface/documentação em português; versão inglesa na apresentação em inglês. O nome não exige novo formato de documento.
@@ -145,12 +145,12 @@ Usar FORNAX Forge como nome curto. Descrição longa em português na interface/
 
 `core/paths.py` usa atualmente `com.leobelisario.ProjetoComSoc` no Linux/macOS e `ProjetoComSoc` no Windows. `workspace_novo/main_window.py` usa `QSettings("Projeto ComSoc", "MainApp")`. Trocar essas strings sem migração faz biblioteca e preferências parecerem perdidas.
 
-- [ ] Definir identificador técnico FORNAX estável antes do novo pacote; não inferir domínio comercial ou propriedade de marca.
-- [ ] Migrar por cópia verificável, mantendo a origem; em conflito, não sobrescrever silenciosamente modelos de mesmo nome/slug.
-- [ ] Migrar preferências relevantes (tema, geometria, divisão, configurações) antes de salvar no novo namespace.
-- [ ] Considerar os caminhos por sistema e o isolamento Flatpak: a sandbox nova pode não ter acesso automático aos dados da sandbox antiga. Prever importação/exportação de modelos para esse caso.
-- [ ] Preservar `template_v3.json`, assets, chaves de dados e conversões existentes. Rebranding não implica alterar IDs internos dos documentos.
-- [ ] Não renomear automaticamente pastas de saída já geradas pelo usuário.
+- [x] Definir identificador técnico FORNAX estável antes do novo pacote; foi adotado `com.leobelisario.FornaxForge`, preservando o namespace técnico já controlado pelo projeto.
+- [x] Migrar por cópia verificável, mantendo a origem; em conflito, não sobrescrever silenciosamente modelos de mesmo nome/slug.
+- [x] Migrar preferências relevantes (tema, geometria, divisão, configurações) antes de salvar no novo namespace.
+- [x] Considerar os caminhos por sistema e o isolamento Flatpak: a migração nativa cobre Windows, Linux e macOS; o README orienta exportação/importação para sandboxes Flatpak isoladas.
+- [x] Preservar `template_v3.json`, assets, chaves de dados e conversões existentes. Rebranding não implica alterar IDs internos dos documentos.
+- [x] Não renomear automaticamente pastas de saída já geradas pelo usuário.
 
 ### Empacotamento
 
@@ -195,5 +195,6 @@ Essa validação não cobre todos os fluxos do workspace, impressão física, in
 | 13/09/2026 | Mapa estático de 40 módulos, conferência de recursos, caminhos, distribuição e testes | Plano criado; 19 testes aprovados no `.venv`; nenhum código removido | Iniciar etapa 1 pelo baseline isolado e pela triagem de cobertura QML |
 | 13/09/2026 | Etapa 1: baseline, cobertura compartilhada, troca da entrada e retirada das interfaces antigas | 23 testes aprovados; prévias e hashes de `teste`, `teste2` e `teste3` idênticos; legado recuperável em `/tmp/fornax-legacy-backup-20260913` | Registrar checkpoint Git e iniciar as renomeações oficiais |
 | 13/09/2026 | Etapa 2: `workspace_novo`, `editor_novo` e `spreadsheet_novo` oficializados sem os sufixos | Imports, mocks, ícones e README corrigidos; 23 testes aprovados; editor independente aprovado em modo offscreen | Registrar checkpoint Git e iniciar identidade/migração da Etapa 3 |
+| 13/09/2026 | Etapa 3: marca visível, identificador técnico, migração conservadora e nomes de distribuição | Entrada oficial exibe FORNAX Forge; dados e preferências legados são copiados sem sobrescrita; manifesto/scripts renomeados; 25 testes aprovados; hashes dos modelos reais preservados | Criar os ícones definitivos e validar pacotes/controles nativamente em Windows, Linux e macOS antes da publicação |
 
 Ao retomar, ler este documento e o diff atual, confirmar branch e commit, executar somente o próximo item pendente. Se o código mudou desde `5f0199f`, atualizar o mapa antes de excluir. A limpeza de arquivos locais não versionados permanece separada da limpeza de código rastreado.

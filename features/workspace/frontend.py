@@ -388,9 +388,9 @@ def install_frontend(window):
         window.settings.setValue('workspaceDataPanelFixed', bool(fixed))
     fixed_data.toggled.connect(set_data_panel_fixed)
     ajuda = menu.addMenu('Sobre')
-    ajuda.addAction('Sobre o COMSOC', lambda: QMessageBox.about(
-        window, 'Sobre o COMSOC',
-        '<b>COMSOC</b><br>Construtor de materiais gráficos personalizados.<br><br>'
+    ajuda.addAction('Sobre o FORNAX Forge', lambda: QMessageBox.about(
+        window, 'Sobre o FORNAX Forge',
+        '<b>FORNAX Forge</b><br>Geração de material personalizado em lote.<br><br>'
         'Interface desenvolvida com <a href="https://www.qt.io/qt-for-python">Qt for Python (PySide6)</a>.'
     ))
     ajuda.addAction('Licenças de terceiros', lambda: QMessageBox.information(

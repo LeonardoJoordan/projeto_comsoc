@@ -11,7 +11,7 @@ from features.editor.editor_window import EditorWindow
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Editor Widgets independente do COMSOC')
+    parser = argparse.ArgumentParser(description='Editor visual independente do FORNAX Forge')
     parser.add_argument('--model', type=Path)
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--screenshot', type=Path)
