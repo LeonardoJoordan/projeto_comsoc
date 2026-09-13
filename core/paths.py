@@ -1,6 +1,9 @@
 import os
 import platform
 import shutil
+import json
+import hashlib
+import tempfile
 from pathlib import Path
 
 
@@ -25,25 +28,67 @@ def get_legacy_app_data_dir() -> Path:
     return _data_home() / name
 
 
-def _copy_missing(source: Path, destination: Path) -> None:
-    """Copia somente entradas ausentes, preservando origem e conflitos."""
-    if not source.is_dir() or source.resolve() == destination.resolve():
-        return
-    destination.mkdir(parents=True, exist_ok=True)
-    for item in source.iterdir():
-        target = destination / item.name
-        if item.is_dir():
-            _copy_missing(item, target)
-        elif not target.exists():
-            shutil.copy2(item, target)
+MIGRATION_FILE = ".comsoc-migration.json"
+
+
+def _verified_copy(source, target):
+    shutil.copy2(source, target)
+    def digest(path):
+        with open(path, "rb") as stream:
+            return hashlib.file_digest(stream, "sha256").digest()
+    if digest(source) != digest(target):
+        raise OSError(f"Falha ao verificar a cópia de {source}")
+    return target
+
+
+def _save_migration(path, state):
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(state, ensure_ascii=False), encoding="utf-8")
+    temporary.replace(path)
+
+
+def _migrate_data(source, destination):
+    marker = destination / MIGRATION_FILE
+    if marker.exists():
+        state = json.loads(marker.read_text(encoding="utf-8"))
+        if state["complete"]:
+            return
+    else:
+        # Cada modelo é uma unidade: nunca misturar assets de versões distintas.
+        entries = []
+        if source.is_dir():
+            for item in sorted(source.iterdir()):
+                if item.name == "models" and item.is_dir():
+                    entries.extend(str(child.relative_to(source)) for child in sorted(item.iterdir()))
+                elif not item.name.startswith("."):
+                    entries.append(item.name)
+        state = {"complete": False, "pending": entries}
+        _save_migration(marker, state)
+    while state["pending"]:
+        relative = state["pending"][0]
+        original, target = source / relative, destination / relative
+        if not target.exists() and not target.is_symlink():
+            target.parent.mkdir(parents=True, exist_ok=True)
+            # Publicar somente a unidade completamente copiada e verificada.
+            with tempfile.TemporaryDirectory(prefix=".migration-", dir=destination) as temporary:
+                staged = Path(temporary) / "entry"
+                if original.is_dir():
+                    shutil.copytree(original, staged, copy_function=_verified_copy)
+                else:
+                    _verified_copy(original, staged)
+                staged.rename(target)
+        state["pending"].pop(0)
+        _save_migration(marker, state)
+    state["complete"] = True
+    _save_migration(marker, state)
 
 
 def get_app_data_dir() -> Path:
-    """Retorna os dados do FORNAX e importa, por cópia, dados antigos ausentes."""
+    """Migra uma vez; retomadas respeitam unidades concluídas e conflitos."""
     name = WINDOWS_APP_DIR if platform.system() == "Windows" else APP_ID
     app_dir = _data_home() / name
     app_dir.mkdir(parents=True, exist_ok=True)
-    _copy_missing(get_legacy_app_data_dir(), app_dir)
+    _migrate_data(get_legacy_app_data_dir(), app_dir)
     return app_dir
 
 def get_logs_dir() -> Path:

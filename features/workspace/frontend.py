@@ -1,4 +1,4 @@
-"""Identidade visual do workspace de transição, inspirada no editor."""
+"""Identidade visual do workspace, compartilhando o padrão do editor."""
 import re
 from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
@@ -154,8 +154,6 @@ def install_frontend(window):
     window.btn_generate_cards.setMinimumHeight(42)
     window.progress_bar.setStyleSheet('')
 
-    # A seleção de tecnologia pertence somente ao workspace antigo.
-    window.preview_panel.cbo_editor.hide()
     window.table_panel.table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
     # Popups consistentes com o menu de Formas do editor.

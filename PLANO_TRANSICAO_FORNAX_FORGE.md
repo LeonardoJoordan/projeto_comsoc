@@ -198,3 +198,15 @@ Essa validação não cobre todos os fluxos do workspace, impressão física, in
 | 13/09/2026 | Etapa 3: marca visível, identificador técnico, migração conservadora e nomes de distribuição | Entrada oficial exibe FORNAX Forge; dados e preferências legados são copiados sem sobrescrita; manifesto/scripts renomeados; 25 testes aprovados; hashes dos modelos reais preservados | Criar os ícones definitivos e validar pacotes/controles nativamente em Windows, Linux e macOS antes da publicação |
 
 Ao retomar, ler este documento e o diff atual, confirmar branch e commit, executar somente o próximo item pendente. Se o código mudou desde `5f0199f`, atualizar o mapa antes de excluir. A limpeza de arquivos locais não versionados permanece separada da limpeza de código rastreado.
+
+
+## Revisão posterior — correções aplicadas
+
+- [x] Migração de dados com registro persistente, retomada e publicação por unidade após verificação SHA-256; conflitos preservam o modelo inteiro. Modelos excluídos não são restaurados em consultas posteriores.
+- [x] Removida seleção oculta entre QML e legado na prévia.
+- [x] Configuração de exportação construída diretamente com Nomenclatura e Impressão, sem abas antigas e sem controles de tema descartados.
+- [x] AppImage usa dependências do standalone, valida entradas antes de preparar o pacote e não depende do caminho de um ambiente Python 3.13.
+- [x] Nuitka limita paralelismo por padrão (até quatro CPUs), permite FORNAX_BUILD_JOBS e propaga falhas de compilação; novos artefatos incluídos no gitignore.
+- [x] Validação: 27 testes aprovados, incluindo exclusão pós-migração e interrupção de cópia; smoke offscreen de workspace, exportação e tema aprovado; compilação Python, sintaxe shell e diff verificados.
+
+Os pacotes instaláveis não foram gerados nesta revisão. Permanecem pendentes ícones finais, licenças completas e validação nativa/instalada nas três plataformas. Registros anteriores descrevem o estado daquela etapa; a política atual não mistura arquivos de modelos conflitantes.

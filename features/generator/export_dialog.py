@@ -1,7 +1,7 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QHBoxLayout, QFrame, QGridLayout, 
                                QDialogButtonBox, QCheckBox, QGroupBox, QDoubleSpinBox,
-                               QWidget, QRadioButton, QButtonGroup, QTabWidget,
+                               QWidget, QScrollArea,
                                QComboBox, QMessageBox, QInputDialog)
 from PySide6.QtCore import Qt
 from .imposition import SheetAssembler
@@ -11,10 +11,10 @@ class ConfigDialog(QDialog):
     def __init__(self, parent, model_slug: str, available_vars: list[str], 
                  current_pattern: str = "", model_size_px: tuple[int, int] = (1000, 1000),
                  model_print_size_mm: tuple[float, float] = None,
-                 current_imposition: dict = None, is_dark: bool = True):
+                 current_imposition: dict = None):
         super().__init__(parent)
-        self.setWindowTitle("Configurações Gerais")
-        self.resize(550, 450)
+        self.setWindowTitle("Configurações de exportação")
+        self.resize(640, 760)
         
         self.model_slug = model_slug
         self.result_pattern = current_pattern
@@ -38,13 +38,22 @@ class ConfigDialog(QDialog):
         if self.active_preset_name not in self.presets:
             self.active_preset_name = self.SYSTEM_PRESET_NAME
         initial_print = self._settings_for_active_preset()
-        self.current_is_dark = is_dark
 
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
 
-        self.tabs = QTabWidget()
-        main_layout.addWidget(self.tabs)
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(8, 8, 8, 8)
+        content_layout.setSpacing(12)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(content)
+        main_layout.addWidget(scroll, 1)
+        self._export_scroll = scroll
+        self._export_content = content
 
         # --- ABA 1: Nomenclatura ---
         tab_naming = QWidget()
@@ -103,8 +112,11 @@ class ConfigDialog(QDialog):
                 col += 1
                 if col > 3: col, row = 0, row + 1
             ly_naming.addLayout(grid_vars)
-        ly_naming.addStretch()
-        self.tabs.addTab(tab_naming, "Nomenclatura")
+        naming_group = QGroupBox("Nomenclatura")
+        naming_layout = QVBoxLayout(naming_group)
+        naming_layout.setContentsMargins(8, 10, 8, 8)
+        naming_layout.addWidget(tab_naming)
+        content_layout.addWidget(naming_group)
 
         # Banner de Aviso para Hiperlinks
         self.lbl_link_warning = QLabel("⚠️ Hiperlinks ativos detetados. Use PDF (Arquivo Individual) para os manter.")
@@ -270,37 +282,12 @@ class ConfigDialog(QDialog):
         self._load_presets_ui()
         
         ly_print.addWidget(self.container_imposition)
-        ly_print.addStretch()
-        self.tabs.addTab(tab_print, "Impressão")
-
-        # --- ABA 3: Tema do Sistema ---
-        tab_theme = QWidget()
-        ly_theme = QVBoxLayout(tab_theme)
-        ly_theme.setSpacing(10)
-        
-        lbl_theme_title = QLabel("<b>Preferências do Sistema (Global)</b>")
-        lbl_theme_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        lbl_theme_title.setToolTip(
-            "<b>PREFERÊNCIA VISUAL</b><br><br>"
-            "Alterna a aparência de todo o software entre o Modo Claro e o Modo Escuro.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: O Modo Escuro (Mint-Y) é ideal para reduzir o cansaço visual durante longas jornadas de trabalho.</small>"
-        )
-        ly_theme.addWidget(lbl_theme_title)
-        self.radio_light = QRadioButton("☀️ Tema Claro")
-        self.radio_dark = QRadioButton("🌙 Tema Escuro")
-
-        
-        self.theme_group = QButtonGroup(self)
-        self.theme_group.addButton(self.radio_light)
-        self.theme_group.addButton(self.radio_dark)
-        
-        if self.current_is_dark: self.radio_dark.setChecked(True)
-        else: self.radio_light.setChecked(True)
-            
-        ly_theme.addWidget(self.radio_dark)
-        ly_theme.addWidget(self.radio_light)
-        ly_theme.addStretch()
-        self.tabs.addTab(tab_theme, "Tema do Sistema")
+        print_group = QGroupBox("Impressão")
+        print_layout = QVBoxLayout(print_group)
+        print_layout.setContentsMargins(8, 10, 8, 8)
+        print_layout.addWidget(tab_print)
+        content_layout.addWidget(print_group)
+        content_layout.addStretch(1)
 
         # Conexões de Cálculo
         self.spin_sheet_w_mm.valueChanged.connect(self._update_capacity_preview)

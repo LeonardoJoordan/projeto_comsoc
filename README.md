@@ -53,7 +53,7 @@ python features/editor/main.py
 
 ## Dados e compatibilidade com o COMSOC
 
-O FORNAX Forge usa o identificador técnico `com.leobelisario.FornaxForge`. No primeiro acesso, dados encontrados no diretório da instalação COMSOC são copiados para a nova área. Arquivos já existentes no destino nunca são sobrescritos e a origem não é apagada.
+O FORNAX Forge usa o identificador técnico `com.leobelisario.FornaxForge`. No primeiro acesso, dados encontrados no diretório da instalação COMSOC são copiados para a nova área. Modelos já existentes no destino são preservados integralmente, sem mesclar assets. A cópia é verificada antes de ser publicada, sua conclusão fica registrada e a origem não é apagada. Uma interrupção pode ser retomada; modelos excluídos após a migração não são recriados. Conflitos podem ser resolvidos posteriormente pela importação de modelos.
 
 As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Os modelos continuam usando `template_v3.json`; a mudança de marca não altera o formato interno.
 
@@ -77,8 +77,10 @@ Os testes offscreen verificam o comportamento funcional, mas não substituem a v
 ## Distribuição
 
 - `script_nuitka.py`: executável nativo com Nuitka;
-- `script_appimage.sh`: AppImage Linux criado a partir da saída Nuitka;
+- `script_appimage.sh`: AppImage Linux criado a partir da saída Nuitka, incluindo o Qt do próprio standalone;
 - `com.leobelisario.FornaxForge.yaml`: manifesto Flatpak.
+
+O Nuitka usa até quatro tarefas de compilação por padrão, respeitando o número de CPUs. É possível ajustar com `FORNAX_BUILD_JOBS`. O AppImage exige a compilação standalone concluída e `appimagetool` na raiz.
 
 Os ícones atuais foram preservados durante a transição e ainda precisam receber a identidade visual final. Antes da publicação, o inventário e os textos integrais das licenças do pacote devem ser concluídos conforme [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md).
 

@@ -247,8 +247,6 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
 
         self.settings = get_app_settings()
-        # Esta interface de transição trabalha exclusivamente com editor.
-        self.preview_panel.cbo_editor.hide()
         
         # Restaura a geometria e o estado da janela (posição e tamanho)
         geometry = self.settings.value("geometry")

@@ -9,6 +9,7 @@ def build_app():
     
     # Define o ponto de entrada e caminhos
     base_dir = Path(__file__).parent.absolute()
+    os.chdir(base_dir)
     main_file = base_dir / "main.py"
     exe_name = "FORNAX_Forge"
 
@@ -30,7 +31,7 @@ def build_app():
         "--include-data-dir=features/workspace/icons=features/workspace/icons",
         "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
         "--lto=no",                     
-        "--jobs=32",                    # Deixa o Ryzen 9 brilhar
+        f"--jobs={max(1, int(os.environ.get('FORNAX_BUILD_JOBS', min(4, os.cpu_count() or 1))))}",
         "--show-progress",              # Mostra o que está acontecendo no terminal
         "--follow-imports"
     ]
@@ -61,7 +62,7 @@ def build_app():
     
     try:
         os.makedirs("build", exist_ok=True)
-        subprocess.run(cmd, check=True)  # <-- ESSA LINHA PRECISA ESTAR AQUI PARA COMPILAR
+        subprocess.run(cmd, check=True)
         print(f"\n✅ Compilação Nuitka concluída! O executável base está na pasta 'build'.")
         
         if sistema == "Darwin":
@@ -87,9 +88,11 @@ def build_app():
                 print(f"✅ DMG simplificado gerado com sucesso: {dmg_output}")
             except Exception as e:
                 print(f"❌ Erro ao criar o DMG via hdiutil: {e}")
+                raise
 
     except subprocess.CalledProcessError as e:
         print(f"\n❌ Erro durante a compilação: {e}")
+        raise
 
 if __name__ == "__main__":
     build_app()

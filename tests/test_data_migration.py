@@ -1,4 +1,5 @@
 import tempfile
+import shutil
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -26,8 +27,34 @@ class DataMigrationTests(unittest.TestCase):
 
             self.assertEqual(current / "models", result)
             self.assertEqual("fornax", (result / "cartao" / "template_v3.json").read_text())
-            self.assertEqual("asset", (result / "cartao" / "imagem.png").read_text())
+            self.assertFalse((result / "cartao" / "imagem.png").exists())
             self.assertEqual("legado", (legacy / "models" / "cartao" / "template_v3.json").read_text())
+
+    def test_deleted_model_is_not_restored(self):
+        with tempfile.TemporaryDirectory() as root, patch.dict("os.environ", {"XDG_DATA_HOME": root}), patch("core.paths.platform.system", return_value="Linux"):
+            legacy = Path(root) / paths.LEGACY_APP_ID / "models" / "cartao"
+            legacy.mkdir(parents=True)
+            (legacy / "template_v3.json").write_text("original")
+            target = paths.get_models_dir() / "cartao"
+            self.assertEqual("original", (target / "template_v3.json").read_text())
+            shutil.rmtree(target)
+            self.assertFalse((paths.get_models_dir() / "cartao").exists())
+            self.assertTrue(legacy.exists())
+
+    def test_interrupted_copy_is_not_published_and_can_resume(self):
+        with tempfile.TemporaryDirectory() as root, patch.dict("os.environ", {"XDG_DATA_HOME": root}), patch("core.paths.platform.system", return_value="Linux"):
+            legacy = Path(root) / paths.LEGACY_APP_ID / "models" / "cartao"
+            legacy.mkdir(parents=True)
+            (legacy / "template_v3.json").write_text("original")
+            (legacy / "asset").write_text("image")
+            target = Path(root) / paths.APP_ID / "models" / "cartao"
+            with patch("core.paths._verified_copy", side_effect=OSError("disk full")):
+                with self.assertRaises(OSError):
+                    paths.get_models_dir()
+            self.assertFalse(target.exists())
+            paths.get_models_dir()
+            self.assertEqual("original", (target / "template_v3.json").read_text())
+            self.assertEqual("image", (target / "asset").read_text())
 
     def test_settings_migration_preserves_existing_values(self):
         class FakeSettings:
