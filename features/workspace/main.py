@@ -16,6 +16,7 @@ from core.custom_tooltip import CustomTooltipManager
 from core.paths import APP_ID, get_logs_dir
 from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
 from core.resources import app_icon_path
+from core.ui_font import install_ui_font
 from features.workspace.main_window import MainWindow
 
 
@@ -48,6 +49,7 @@ def main():
     app.setDesktopFileName(APP_ID)
     app.setWindowIcon(QIcon(str(app_icon_path())))
     app.setStyle('Fusion')
+    install_ui_font(app)
     from core.themes import theme_manager
     from core.settings import get_app_settings
     theme_manager().initialize(get_app_settings())

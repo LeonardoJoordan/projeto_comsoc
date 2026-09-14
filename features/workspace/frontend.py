@@ -52,10 +52,16 @@ QPushButton:disabled { color: @disabled@; background: @surface@; }
 QPushButton#primary { background: @accent@; border-color: @accent@; color: @on_accent@; font-weight: 600; }
 QPushButton#primary:hover { background: @accent_hover@; }
 QPushButton#danger { color: @danger@; }
+QPushButton#previewPrevious, QPushButton#previewNext {
+    min-height: 0; padding: 0; border-radius: 5px; font-size: 15px;
+}
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit {
     background: @field@; color: @text@; border: 1px solid @border@;
     border-radius: 5px; padding: 5px; min-height: 20px;
     selection-background-color: @selection@;
+}
+QSpinBox#previewNavigationIndex, QComboBox#previewMode {
+    min-height: 0; padding-top: 0; padding-bottom: 0;
 }
 QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QTextEdit:focus {
     border-color: @accent@;
@@ -136,6 +142,7 @@ def install_frontend(window):
     # Popups consistentes com o menu de Formas do editor.
     workspace_combos = (
         window.preview_panel.cbo_models,
+        window.preview_panel.cbo_preview_mode,
         window.cbo_export_format,
         window.cbo_presets_main,
     )
@@ -154,7 +161,7 @@ def install_frontend(window):
     window.splitter.setSizes([590, 850])
     preview_layout = window.preview_panel.layout()
     for label in window.preview_panel.findChildren(QLabel, options=Qt.FindChildOption.FindDirectChildrenOnly):
-        if label is not window.preview_panel.preview:
+        if label is not window.preview_panel.preview and label.objectName() != 'previewNavigationLabel':
             label.hide()
 
     # Barra permanente do modelo.
@@ -331,19 +338,19 @@ def install_frontend(window):
     # Menus conhecidos de aplicativos de criação, reutilizando as ações existentes.
     menu = window.menuBar()
     menu.clear()
-    arquivo = menu.addMenu('Arquivo')
-    arquivo.addAction('Configurações de exportação…', window._open_config_dialog)
-    arquivo.addAction(
-        'Abrir pasta de modelos',
-        lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(get_models_dir())))
-    )
+    programa = menu.addMenu('Programa')
+    programa.addAction('Configuração de exportação…', window._open_config_dialog)
+    programa.addAction('Temas…', window._open_theme_dialog)
     modelo = menu.addMenu('Modelo')
     modelo.addAction('Novo modelo', buttons.btn_add_model.click)
     modelo.addAction('Importar modelos…', buttons.btn_import_models.click)
     modelo.addAction('Exportar modelos…', buttons.btn_export_models.click)
+    modelo.addSeparator()
+    modelo.addAction(
+        'Abrir pasta de modelos',
+        lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(get_models_dir())))
+    )
     exibir = menu.addMenu('Exibir')
-    exibir.addAction('Tema da interface…', window._open_theme_dialog)
-    exibir.addSeparator()
     show_log = exibir.addAction('Log de processamento')
     show_log.setCheckable(True)
     show_log.toggled.connect(toggle_log)
@@ -372,7 +379,7 @@ def install_frontend(window):
         'Os textos completos das licenças serão incluídos no pacote de distribuição.'
     ))
     # Mantém wrappers Python vivos durante toda a janela (necessário no PySide).
-    window._workspace_menus = (arquivo, modelo, exibir, ajuda, model_actions)
+    window._workspace_menus = (programa, modelo, exibir, ajuda, model_actions)
     window._workspace_log_toggle = show_log
     window._workspace_data_toggle = data_toggle
     window._workspace_data_fixed_action = fixed_data

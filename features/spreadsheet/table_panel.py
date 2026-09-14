@@ -8,6 +8,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from .clipboard import parse_clipboard_html_table, parse_tsv, parse_clipboard_html_fragment
 from .delegates import HTMLDelegate
+from .headers import QUANTITY_HEADER, SIGNATURE_HEADER
 
 class RichTableWidget(QTableWidget):
     RICH_ROLE = Qt.ItemDataRole.UserRole
@@ -71,8 +72,8 @@ class RichTableWidget(QTableWidget):
 
     def _add_rows(self, count: int):
         # Detecta a presença das colunas funcionais pelos headers
-        has_qty_col = (self.columnCount() > 0 and self.horizontalHeaderItem(0).text() == "🔢 Qtd")
-        has_sig_col = (self.columnCount() > 1 and self.horizontalHeaderItem(1).text() == "✍️ Ass.")
+        has_qty_col = (self.columnCount() > 0 and self.horizontalHeaderItem(0).text() == QUANTITY_HEADER)
+        has_sig_col = (self.columnCount() > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
         
         for _ in range(count):
             row_idx = self.rowCount()
@@ -103,8 +104,8 @@ class RichTableWidget(QTableWidget):
         cols = self.columnCount()
         
         # Identifica os índices das colunas funcionais pelos headers atuais
-        has_qty_col = (cols > 0 and self.horizontalHeaderItem(0).text() == "🔢 Qtd")
-        has_sig_col = (cols > 1 and self.horizontalHeaderItem(1).text() == "✍️ Ass.")
+        has_qty_col = (cols > 0 and self.horizontalHeaderItem(0).text() == QUANTITY_HEADER)
+        has_sig_col = (cols > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
         
         for r in rows_to_dup:
             new_row = r + 1
@@ -147,7 +148,7 @@ class RichTableWidget(QTableWidget):
         # Se a tabela ficar vazia, recria a linha inicial padrão
         if self.rowCount() == 0:
             self.insertRow(0)
-            has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+            has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == SIGNATURE_HEADER)
             if has_sig_col:
                 item = QTableWidgetItem("")
                 item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -162,7 +163,7 @@ class RichTableWidget(QTableWidget):
                 self.removeRow(r)
             if self.rowCount() == 0:
                 self.insertRow(0)
-                has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Assinatura")
+                has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == SIGNATURE_HEADER)
                 if has_sig_col:
                     item = QTableWidgetItem("")
                     item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
@@ -190,7 +191,7 @@ class RichTableWidget(QTableWidget):
         if not grid_struct: return
 
         header = self.horizontalHeader()
-        has_sig_col = (header.count() > 0 and self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == "✍️ Ass.")
+        has_sig_col = (header.count() > 0 and self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == SIGNATURE_HEADER)
 
         # --- LÓGICA DE PREENCHIMENTO EM MASSA (1 célula copiada -> Várias selecionadas) ---
         is_single_cell = (len(grid_struct) == 1 and len(grid_struct[0]) == 1)
@@ -249,8 +250,8 @@ class RichTableWidget(QTableWidget):
         row_end = start_row + len(grid_struct) - 1
 
         # Identifica os índices das colunas funcionais
-        has_qty_col = (header.count() > 0 and self.horizontalHeaderItem(0).text() == "🔢 Qtd")
-        has_sig_col = (header.count() > 1 and self.horizontalHeaderItem(1).text() == "✍️ Ass.")
+        has_qty_col = (header.count() > 0 and self.horizontalHeaderItem(0).text() == QUANTITY_HEADER)
+        has_sig_col = (header.count() > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
 
         for r, row_data in enumerate(grid_struct):
             dest_row = start_row + r

@@ -37,7 +37,7 @@ class CustomTooltipManager(QObject):
                 border: 1px solid @border_strong@; /* Borda visível */
                 border-radius: 4px;        /* Arredondamento menor para evitar cantos pretos no Linux */
                 padding: 8px 12px;
-                font-family: 'Segoe UI', 'Ubuntu', sans-serif;
+                font-family: 'Inter', sans-serif;
                 font-size: 13px;
             }
         """)

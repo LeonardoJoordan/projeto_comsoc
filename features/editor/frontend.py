@@ -1,6 +1,7 @@
 from core.themes import themed_style, theme_color, theme_manager
 """Apresentação Widgets independente; reutiliza controles e sinais do legado."""
 from pathlib import Path
+from core.resources import object_icon_path, state_icon_path
 from PySide6.QtCore import Qt, QSize, QObject, QEvent, QPoint, QTimer
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -269,19 +270,25 @@ def install_frontend(w):
     guide_label = QLabel('GUIAS')
     guide_label.setObjectName('muted')
     tools.addWidget(guide_label)
-    for vertical, label, path in [(False, 'Adicionar guia horizontal', '<path d="M3 12h18M12 3v4m0 10v4"/>'), (True, 'Adicionar guia vertical', '<path d="M12 3v18M3 12h4m10 0h4"/>')]:
+    for vertical, label, asset_name in [
+        (False, 'Adicionar guia horizontal', 'h.guide'),
+        (True, 'Adicionar guia vertical', 'v.guide'),
+    ]:
         button = QPushButton()
-        button.setIcon(icon(path))
+        button.setIcon(QIcon(str(state_icon_path(asset_name))))
+        button.setIconSize(QSize(20, 20))
         button.setFixedSize(30, 30)
         themed_style(button, 'padding: 0;')
         button.setToolTip(label)
         button.clicked.connect(lambda checked=False, v=vertical: w.add_guide(v))
         tools.addWidget(button)
-    for button, symbol, tip in (
-        (w.btn_toggle_guides, '👁️', 'Exibir ou ocultar guias'),
-        (w.btn_lock_guides, '🔒', 'Bloquear ou desbloquear a movimentação das guias'),
+    for button, asset_name, tip in (
+        (w.btn_toggle_guides, 'guide', 'Exibir ou ocultar guias'),
+        (w.btn_lock_guides, 'l.guide', 'Bloquear ou desbloquear a movimentação das guias'),
     ):
-        button.setText(symbol)
+        button.setText('')
+        button.setIcon(QIcon(str(state_icon_path(asset_name))))
+        button.setIconSize(QSize(20, 20))
         button.setToolTip(tip)
         themed_style(button, 'QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
                             'min-height: 28px; max-height: 28px; font-size: 14px; }')
@@ -348,11 +355,11 @@ def install_frontend(w):
         action = shape_menu.addAction(icon(path), name)
         action.triggered.connect(lambda checked=False, k=kind: w.shape_drawing.activate(k))
     forms.setMenu(shape_menu)
-    for button, label, path in [
-        (w.btn_add, 'Texto', '<path d="M4 5h16M12 5v15M8 20h8"/>'),
-        (forms, 'Formas', '<rect x="4" y="4" width="16" height="16" rx="3"/>'),
-        (w.btn_add_img, 'Imagens', '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 5 5 3-3 5 5"/>'),
-        (w.btn_add_sig, 'Assinatura', '<path d="m4 17 3-1L19 4l2 2L9 18l-5 1zM4 22h16"/>')]:
+    for button, label, path, asset_name in [
+        (w.btn_add, 'Texto', '<path d="M4 5h16M12 5v15M8 20h8"/>', 'text'),
+        (forms, 'Formas', '<rect x="4" y="4" width="16" height="16" rx="3"/>', 'shapes'),
+        (w.btn_add_img, 'Imagens', '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 5 5 3-3 5 5"/>', 'image'),
+        (w.btn_add_sig, 'Assinatura', '<path d="m4 17 3-1L19 4l2 2L9 18l-5 1zM4 22h16"/>', 'signature')]:
         detail = {'Texto': 'Campo dinâmico', 'Formas': 'Preenchimento e borda', 'Imagens': 'Foto, logo ou QR', 'Assinatura': 'Imagem opcional'}[label]
         button.setText('')
         contents = QHBoxLayout(button)
@@ -360,7 +367,7 @@ def install_frontend(w):
         caption = QLabel(f'<b>{label}</b><br><span style="font-size:9px">{detail}</span>')
         caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         contents.addWidget(caption)
-        button.setIcon(icon(path))
+        button.setIcon(QIcon(str(object_icon_path(asset_name))) if asset_name else icon(path))
         button.setIconSize(QSize(20, 20))
         button.setObjectName('add' + label)
         # QSS mede a área de conteúdo: 36 + 12 de padding + 2 de borda = 50.

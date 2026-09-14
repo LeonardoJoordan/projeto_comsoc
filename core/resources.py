@@ -16,3 +16,11 @@ def app_icon_path(size: int = 256) -> Path:
 
 def windows_icon_path() -> Path:
     return ICONS_DIR / "fornax-forge.ico"
+
+
+def object_icon_path(name: str) -> Path:
+    return ICONS_DIR / "ui" / "objects" / f"{name}.svg"
+
+
+def state_icon_path(name: str) -> Path:
+    return ICONS_DIR / "ui" / "state" / f"{name}.svg"

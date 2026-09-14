@@ -4,7 +4,7 @@ import math
 
 # Imports corrigidos para a nova arquitetura
 from core.naming_engine import build_output_filename
-from .imposition import SheetAssembler
+from .production_plan import build_imposition_plan
 from .workers import PageRenderWorker, DirectRenderWorker, HybridAssemblerWorker
 
 class RenderManager(QObject):
@@ -92,32 +92,21 @@ class RenderManager(QObject):
             w.wait()
 
     def _start_imposition_mode(self, all_data, num_threads):
-        w_mm = self.imposition_settings.get("target_w_mm", 100)
-        h_mm = self.imposition_settings.get("target_h_mm", 150)
-        sheet_w = self.imposition_settings.get("sheet_w_mm", 210.0)
-        sheet_h = self.imposition_settings.get("sheet_h_mm", 297.0)
-        crop = self.imposition_settings.get("crop_marks", True)
-        bleed = self.imposition_settings.get("bleed_margin", False)
-        
-        temp_asm = SheetAssembler(w_mm, h_mm, sheet_w, sheet_h, crop, bleed)
-        capacity = temp_asm.capacity
+        plan = build_imposition_plan(all_data, self.imposition_settings)
+        capacity = plan.capacity
         
         if capacity <= 0:
             self._on_worker_error("Erro: O modelo é grande demais para as margens da folha.")
             return
             
-        total_pages = math.ceil(len(all_data) / capacity)
+        total_pages = len(plan.pages)
         self.log_updated.emit(f"📚 Modo Imposição: {len(all_data)} cartões cabem em {total_pages} folhas (Capacidade: {capacity}/fl).")
         self.log_updated.emit(f"🚀 Distribuindo trabalho para {num_threads} threads...")
 
         pages_jobs = []
         safe_pattern = self.pattern.replace("{", "").replace("}", "")
 
-        for page_idx in range(total_pages):
-            start_idx = page_idx * capacity
-            end_idx = min(start_idx + capacity, len(all_data))
-            
-            page_cards = all_data[start_idx:end_idx]
+        for page_idx, page_cards in enumerate(plan.pages):
             page_num = page_idx + 1
             
             job = {

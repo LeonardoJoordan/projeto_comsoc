@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidg
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
                                QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout,
                                QSizePolicy)
-from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon,
+from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
                            QFont, QFontDatabase, QFontInfo)
 from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize
@@ -22,7 +22,29 @@ from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
 from core.render_cache import ensure_background_proxy
-from core.resources import app_icon_path
+from core.resources import app_icon_path, state_icon_path
+
+
+_VISIBILITY_ICONS = {}
+
+
+def _visibility_icon(visible):
+    """Retorna o olho original ou uma cópia neutra para o estado oculto."""
+    if visible not in _VISIBILITY_ICONS:
+        source = QIcon(str(state_icon_path("eye")))
+        if visible:
+            result = source
+        else:
+            image = source.pixmap(16, 16).toImage().convertToFormat(QImage.Format.Format_ARGB32)
+            for y in range(image.height()):
+                for x in range(image.width()):
+                    color = image.pixelColor(x, y)
+                    gray = round(0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue())
+                    color.setRgb(gray, gray, gray, color.alpha())
+                    image.setPixelColor(x, y, color)
+            result = QIcon(QPixmap.fromImage(image))
+        _VISIBILITY_ICONS[visible] = result
+    return _VISIBILITY_ICONS[visible]
 
 
 class ElidedLayerLabel(QLabel):
@@ -1227,7 +1249,7 @@ class EditorWindow(QMainWindow):
         self.save_snapshot()
 
     def toggle_guides_lock(self, locked):
-        self.btn_lock_guides.setText("🔒")
+        self.btn_lock_guides.setText("")
         self.op_lock.setOpacity(1.0 if locked else 0.2)
         self.btn_clear_guides.setEnabled(not locked)
         for item in self.scene.items():
@@ -1872,14 +1894,15 @@ class EditorWindow(QMainWindow):
         textos.sort(key=lambda x: (x.zValue(), -(x.layer_id or 0)), reverse=True)
         imagens.sort(key=lambda x: (x.zValue(), -(x.layer_id or 0)), reverse=True)
 
-        def toggle_item_visibility(item, effect):
+        def toggle_item_visibility(item, effect, button):
             new_vis = not item.isVisible()
             item.setVisible(new_vis)
             # Aplica opacidade 1.0 (visível) ou 0.15 (oculto)
             effect.setOpacity(1.0 if new_vis else 0.15)
+            button.setIcon(_visibility_icon(new_vis))
             self.save_snapshot()
 
-        def toggle_item_lock(item, effect, label):
+        def toggle_item_lock(item, effect, label, button):
             is_locked = not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
             new_locked = not is_locked
             
@@ -1896,6 +1919,7 @@ class EditorWindow(QMainWindow):
                 
             # Aplica opacidade 1.0 (trancado) ou 0.15 (destrancado)
             effect.setOpacity(1.0 if new_locked else 0.15)
+            button.setIcon(QIcon(str(state_icon_path("lock" if new_locked else "unlock"))))
             label.setStyleSheet("color: #888888; font-style: italic;" if new_locked else "")
             self.save_snapshot()
 
@@ -1925,7 +1949,9 @@ class EditorWindow(QMainWindow):
                 ly.setSpacing(2) # Espaçamento curto entre os elementos
                 
                 # --- Botão Visibilidade (Olho - ESQUERDA) ---
-                btn_vis = QPushButton("👁️")
+                btn_vis = QPushButton()
+                btn_vis.setIcon(_visibility_icon(item.isVisible()))
+                btn_vis.setIconSize(QSize(16, 16))
                 btn_vis.setFixedSize(24, 24)
                 btn_vis.setStyleSheet("border: none; background: transparent; padding: 0; min-height: 0; font-size: 14px;")
                 btn_vis.setToolTip(
@@ -1939,7 +1965,7 @@ class EditorWindow(QMainWindow):
                 effect_vis.setOpacity(1.0 if is_visible else 0.15)
                 btn_vis.setGraphicsEffect(effect_vis)
                 
-                btn_vis.clicked.connect(lambda checked=False, itm=item, eff=effect_vis: toggle_item_visibility(itm, eff))
+                btn_vis.clicked.connect(lambda checked=False, itm=item, eff=effect_vis, b=btn_vis: toggle_item_visibility(itm, eff, b))
                 ly.addWidget(btn_vis)
                 
                 # --- Nome da Camada (CENTRO) ---
@@ -1950,7 +1976,9 @@ class EditorWindow(QMainWindow):
                 ly.addWidget(lbl, 1) # Toma todo o espaço restante
                 
                 # --- Botão Bloqueio (Cadeado - DIREITA) ---
-                btn_lock = QPushButton("🔒")
+                btn_lock = QPushButton()
+                btn_lock.setIcon(QIcon(str(state_icon_path("lock" if is_locked else "unlock"))))
+                btn_lock.setIconSize(QSize(14, 14))
                 btn_lock.setFixedSize(24, 24)
                 if getattr(item, 'is_document_background', False):
                     btn_lock.setEnabled(False)
@@ -1965,7 +1993,7 @@ class EditorWindow(QMainWindow):
                 effect_lock.setOpacity(1.0 if is_locked else 0.15) # Sincroniza com sua personalização
                 btn_lock.setGraphicsEffect(effect_lock)
                 
-                btn_lock.clicked.connect(lambda checked=False, itm=item, eff=effect_lock, l=lbl: toggle_item_lock(itm, eff, l))
+                btn_lock.clicked.connect(lambda checked=False, itm=item, eff=effect_lock, l=lbl, b=btn_lock: toggle_item_lock(itm, eff, l, b))
                 ly.addWidget(btn_lock)
                                 
                 # --- Finalização ---
@@ -2326,7 +2354,7 @@ class EditorWindow(QMainWindow):
         is_locked = data.get("guidelines_locked", False)
         self.btn_lock_guides.blockSignals(True)
         self.btn_lock_guides.setChecked(is_locked)
-        self.btn_lock_guides.setText("🔒")
+        self.btn_lock_guides.setText("")
         self.op_lock.setOpacity(1.0 if is_locked else 0.2)
         self.btn_lock_guides.blockSignals(False)
         

@@ -3,6 +3,7 @@ import os
 import shutil
 import json
 import tempfile
+import copy
 import time
 from pathlib import Path
 from datetime import datetime
@@ -10,16 +11,18 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
                                   QInputDialog, QComboBox, QTableWidgetItem)
-from PySide6.QtCore import Qt, QSignalBlocker
-from PySide6.QtGui import QPainter, QImage, QPageLayout, QPalette, QColor
+from PySide6.QtCore import Qt, QSignalBlocker, QTimer, QThread
+from PySide6.QtGui import QPainter, QImage, QIcon, QPageLayout, QPalette, QColor
 
 from features.preview.preview_panel import PreviewPanel
+from features.preview.sheet_preview_worker import SheetPreviewWorker
 from features.workspace.controls_panel import ControlsPanel
 from shared.log_panel import LogPanel
 from features.spreadsheet.table_panel import TablePanel
 from features.generator.renderer import NativeRenderer
 from features.editor.editor_window import EditorWindow
 from features.generator.manager import RenderManager
+from features.generator.production_plan import build_imposition_plan
 from features.workspace.settings_dialogs import ExportConfigDialog, ThemeDialog
 from features.generator.preset_warnings import warning_display_name, warning_tooltip
 from features.workspace.import_models_dialog import ImportModelsDialog
@@ -29,6 +32,8 @@ from core.paths import get_models_dir
 from core.settings import get_app_settings
 from core.font_utils import format_font_list, missing_template_fonts
 from core.render_cache import ensure_background_proxy
+from core.resources import object_icon_path
+from features.spreadsheet.headers import QUANTITY_HEADER, SIGNATURE_HEADER
 
 
 
@@ -72,6 +77,20 @@ class MainWindow(QMainWindow):
         left_stack.setSpacing(10)
 
         self.preview_panel = PreviewPanel()
+        self._preview_mode = "item"
+        self._preview_sheet_index = 0
+        self._sheet_preview_revision = 0
+        self._sheet_preview_worker = None
+        self._sheet_preview_workers = set()
+        self._sheet_preview_dir = None
+        self._sheet_preview_paths = {}
+        self._stale_sheet_preview_dirs = set()
+        self._preview_refresh_timer = QTimer(self)
+        self._preview_refresh_timer.setSingleShot(True)
+        self._preview_refresh_timer.setInterval(100)
+        self._preview_refresh_timer.timeout.connect(self._refresh_preview_after_data_change)
+        self.preview_panel.modeChanged.connect(self._on_preview_mode_changed)
+        self.preview_panel.indexRequested.connect(self._on_preview_index_requested)
         self.controls_panel = ControlsPanel()
         self.controls_panel.setFixedWidth(110) # Trava a largura da sidebar
         self.log_panel = LogPanel()
@@ -236,6 +255,9 @@ class MainWindow(QMainWindow):
         self.cbo_export_format.currentIndexChanged.connect(self._on_export_mode_changed)
 
         self.table_panel.table.itemSelectionChanged.connect(self._on_table_selection)
+        self.table_panel.table.itemChanged.connect(self._on_preview_data_changed)
+        self.table_panel.table.model().rowsInserted.connect(self._on_preview_rows_changed)
+        self.table_panel.table.model().rowsRemoved.connect(self._on_preview_rows_changed)
 
         # --- Conexões dos Botões de Controle ---
         self.controls_panel.btn_add_model.clicked.connect(self._on_add_model)
@@ -313,6 +335,14 @@ class MainWindow(QMainWindow):
         """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("splitterState", self.splitter.saveState())
+        self._stop_sheet_preview_worker(wait=True)
+        for worker in tuple(self._sheet_preview_workers):
+            worker.stop()
+            worker.requestInterruption()
+            worker.wait()
+        for directory in ({self._sheet_preview_dir} | self._stale_sheet_preview_dirs):
+            if directory:
+                shutil.rmtree(directory, ignore_errors=True)
         super().closeEvent(event)
 
     def _reload_models_from_disk(self, select_name: str | None = None):
@@ -621,6 +651,9 @@ class MainWindow(QMainWindow):
         generation = self._preview_generation
         self.preview_renderer = None
         self.cached_model_data = None
+        self._preview_mode = "item"
+        self._preview_sheet_index = 0
+        self._invalidate_sheet_previews()
         self.preview_panel.set_preview_text(f"Prévia do modelo selecionado:\n{name}")
         self.log_panel.append(f"Modelo ativo: {name}")
         self.active_model_name = name
@@ -672,6 +705,7 @@ class MainWindow(QMainWindow):
                     
                     self.cached_model_data = data
                     self._refresh_imposition_presets()
+                    self._refresh_preview_navigation()
 
                     missing_fonts = missing_template_fonts(data)
                     if missing_fonts:
@@ -710,6 +744,7 @@ class MainWindow(QMainWindow):
                     except Exception as e:
                         self.log_panel.append(f"Erro ao gerar preview: {e}")
                         self.preview_panel.set_preview_text("Erro ao gerar preview do modelo")
+                    self._start_sheet_preview_preload()
             except Exception as e:
                 self.log_panel.append(f"Erro ao ler colunas do modelo: {e}")
         else:
@@ -729,16 +764,19 @@ class MainWindow(QMainWindow):
         self.table_panel.table.setRowCount(0)
         self.table_panel.table.setColumnCount(0)
         
-        headers = ["🔢 Qtd"] # Coluna 0
+        headers = [QUANTITY_HEADER] # Coluna 0
         has_sig = bool(signatures)
         
         if has_sig:
-            headers.append("✍️ Ass.") # Coluna 1
+            headers.append(SIGNATURE_HEADER) # Coluna 1
         
         headers.extend(placeholders)
             
         self.table_panel.table.setColumnCount(len(headers))
         self.table_panel.table.setHorizontalHeaderLabels(headers)
+        self.table_panel.table.horizontalHeaderItem(0).setIcon(QIcon(str(object_icon_path("quantity"))))
+        if has_sig:
+            self.table_panel.table.horizontalHeaderItem(1).setIcon(QIcon(str(object_icon_path("signature"))))
         
         # Ajuste de larguras iniciais
         self.table_panel.table.setColumnWidth(0, 50) # Qtd
@@ -768,6 +806,9 @@ class MainWindow(QMainWindow):
 
     def _on_table_selection(self):
         if not self.cached_model_data: return
+        if self._preview_mode == "sheet":
+            self._render_current_sheet_preview()
+            return
         row = self.table_panel.table.currentRow()
         
         # --- LEGO: Fallback para a Thumbnail Estática se não houver linha selecionada ---
@@ -787,8 +828,219 @@ class MainWindow(QMainWindow):
             
             pix = self.preview_renderer.render_to_pixmap(row_rich=row_rich, max_side=1600)
             self.preview_panel.set_preview_pixmap(pix)
+            visible_rows = self._visible_preview_rows()
+            index = visible_rows.index(row) if row in visible_rows else 0
+            self.preview_panel.set_navigation(
+                "item", index, len(visible_rows),
+                sheet_available=self._sheet_preview_available(),
+            )
         except Exception as e:
             print(f"Erro no Live Preview: {e}")
+
+    def _visible_preview_rows(self):
+        table = self.table_panel.table
+        return [row for row in range(table.rowCount()) if not table.isRowHidden(row)]
+
+    def _sheet_preview_available(self):
+        return bool(self.cached_model_data and self._resolve_imposition_settings().get("enabled"))
+
+    def _on_preview_mode_changed(self, mode):
+        previous_mode = self._preview_mode
+        self._preview_mode = mode if mode == "sheet" and self._sheet_preview_available() else "item"
+        if self._preview_mode == "sheet":
+            if previous_mode == "item":
+                self._preview_sheet_index = self._sheet_index_for_table_row(
+                    self.table_panel.table.currentRow()
+                )
+            self._render_current_sheet_preview()
+        else:
+            if previous_mode == "sheet":
+                self._select_first_item_from_sheet(self._preview_sheet_index)
+            self._refresh_preview_navigation()
+            self._on_table_selection()
+
+    def _sheet_index_for_table_row(self, table_row):
+        rows_plain, rows_rich, source_rows = self._scrape_table_data(include_sources=True)
+        plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
+        if not plan.pages or table_row < 0:
+            return 0
+        try:
+            production_index = source_rows.index(table_row)
+        except ValueError:
+            # Uma linha com quantidade zero não está na produção. Usa a ocorrência
+            # válida mais próxima para manter a navegação previsível.
+            production_index = next(
+                (index for index, source in enumerate(source_rows) if source > table_row),
+                max(0, len(source_rows) - 1),
+            )
+        return min(production_index // plan.capacity, len(plan.pages) - 1)
+
+    def _select_first_item_from_sheet(self, sheet_index):
+        rows_plain, rows_rich, source_rows = self._scrape_table_data(include_sources=True)
+        plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
+        if not plan.pages or not source_rows:
+            return
+        sheet_index = min(max(0, sheet_index), len(plan.pages) - 1)
+        production_index = sheet_index * plan.capacity
+        table_row = source_rows[min(production_index, len(source_rows) - 1)]
+        table = self.table_panel.table
+        column = table.currentColumn()
+        if column < 0 or column >= table.columnCount():
+            column = 0
+        table.setCurrentCell(table_row, column)
+
+    def _on_preview_index_requested(self, index):
+        if self._preview_mode == "sheet":
+            rows_plain, rows_rich = self._scrape_table_data()
+            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
+            if not plan.pages:
+                self._render_current_sheet_preview()
+                return
+            self._preview_sheet_index = min(max(0, index), len(plan.pages) - 1)
+            self._render_current_sheet_preview(plan)
+            return
+
+        rows = self._visible_preview_rows()
+        if not rows:
+            self._refresh_preview_navigation()
+            return
+        index = min(max(0, index), len(rows) - 1)
+        table = self.table_panel.table
+        column = table.currentColumn()
+        if column < 0 or column >= table.columnCount():
+            column = 0
+        table.setCurrentCell(rows[index], column)
+
+    def _refresh_preview_navigation(self):
+        sheet_available = self._sheet_preview_available()
+        if self._preview_mode == "sheet" and sheet_available:
+            rows_plain, rows_rich = self._scrape_table_data()
+            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
+            total = len(plan.pages)
+            self._preview_sheet_index = min(self._preview_sheet_index, max(0, total - 1))
+            self.preview_panel.set_navigation(
+                "sheet", self._preview_sheet_index, total, sheet_available=True
+            )
+            return
+
+        if not sheet_available:
+            self._preview_mode = "item"
+        rows = self._visible_preview_rows()
+        current = self.table_panel.table.currentRow()
+        index = rows.index(current) if current in rows else 0
+        self.preview_panel.set_navigation(
+            "item", index, len(rows), sheet_available=sheet_available
+        )
+
+    def _on_preview_data_changed(self, _item=None):
+        self._invalidate_sheet_previews()
+        self._preview_refresh_timer.start()
+
+    def _on_preview_rows_changed(self, *_args):
+        self._invalidate_sheet_previews()
+        self._preview_refresh_timer.start()
+
+    def _refresh_preview_after_data_change(self):
+        self._refresh_preview_navigation()
+        if self._preview_mode == "sheet":
+            self._render_current_sheet_preview()
+        else:
+            self._on_table_selection()
+            self._start_sheet_preview_preload()
+
+    def _invalidate_sheet_previews(self):
+        self._sheet_preview_revision += 1
+        self._sheet_preview_paths.clear()
+        self._stop_sheet_preview_worker()
+        if self._sheet_preview_dir:
+            self._stale_sheet_preview_dirs.add(self._sheet_preview_dir)
+            self._sheet_preview_dir = None
+
+    def _stop_sheet_preview_worker(self, *, wait=False):
+        worker = self._sheet_preview_worker
+        if worker and worker.isRunning():
+            worker.stop()
+            worker.requestInterruption()
+            if wait:
+                worker.wait()
+        self._sheet_preview_worker = None
+
+    def _start_sheet_preview_preload(self, plan=None, first_page=None):
+        if not self._sheet_preview_available():
+            return
+        if self._sheet_preview_worker and self._sheet_preview_worker.isRunning():
+            return
+
+        if plan is None:
+            rows_plain, rows_rich = self._scrape_table_data()
+            rows = list(zip(rows_plain, rows_rich))
+            plan = build_imposition_plan(rows, self._resolve_imposition_settings())
+        else:
+            rows = [entry for page in plan.pages for entry in page]
+        if not plan.pages:
+            return
+
+        first_page = self._preview_sheet_index if first_page is None else first_page
+        output_dir = tempfile.mkdtemp(prefix="fornax_sheet_preview_")
+        self._sheet_preview_dir = output_dir
+        generation = self._sheet_preview_revision
+        worker = SheetPreviewWorker(
+            copy.deepcopy(self.cached_model_data), rows,
+            dict(self._resolve_imposition_settings()), output_dir,
+            generation, first_page=first_page, parent=self,
+        )
+        self._sheet_preview_worker = worker
+        self._sheet_preview_workers.add(worker)
+        worker.pageReady.connect(self._on_sheet_preview_ready)
+        worker.pageFailed.connect(self._on_sheet_preview_failed)
+        worker.finished.connect(lambda directory=output_dir, current=worker: self._on_sheet_preview_finished(current, directory))
+        worker.finished.connect(worker.deleteLater)
+        worker.start(QThread.Priority.LowPriority)
+
+    def _on_sheet_preview_ready(self, page_index, path, generation):
+        if generation != self._sheet_preview_revision:
+            return
+        self._sheet_preview_paths[page_index] = path
+        if self._preview_mode == "sheet" and page_index == self._preview_sheet_index:
+            self.preview_panel.set_preview_image(path)
+
+    def _on_sheet_preview_failed(self, _page_index, message, generation):
+        if generation == self._sheet_preview_revision:
+            self.log_panel.append(f"Erro na prévia da folha: {message}")
+
+    def _on_sheet_preview_finished(self, worker, directory):
+        self._sheet_preview_workers.discard(worker)
+        if self._sheet_preview_worker is worker:
+            self._sheet_preview_worker = None
+        if directory in self._stale_sheet_preview_dirs:
+            shutil.rmtree(directory, ignore_errors=True)
+            self._stale_sheet_preview_dirs.discard(directory)
+
+    def _render_current_sheet_preview(self, plan=None):
+        if not self._sheet_preview_available():
+            self._preview_mode = "item"
+            self._on_table_selection()
+            return
+
+        if plan is None:
+            rows_plain, rows_rich = self._scrape_table_data()
+            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
+        total = len(plan.pages)
+        if not total:
+            self.preview_panel.set_preview_text("Não há itens para montar a folha")
+            self.preview_panel.set_navigation("sheet", 0, 0, sheet_available=True)
+            return
+
+        self._preview_sheet_index = min(max(0, self._preview_sheet_index), total - 1)
+        self.preview_panel.set_navigation(
+            "sheet", self._preview_sheet_index, total, sheet_available=True
+        )
+        path = self._sheet_preview_paths.get(self._preview_sheet_index)
+        if path and Path(path).exists():
+            self.preview_panel.set_preview_image(path)
+            return
+        self.preview_panel.set_preview_text("Carregando preview")
+        self._start_sheet_preview_preload(plan, first_page=self._preview_sheet_index)
 
     def _open_model_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
@@ -932,6 +1184,12 @@ class MainWindow(QMainWindow):
                 self.log_panel.append(f"Configuração salva: Sequencial automático{msg_imp}")
 
             self._refresh_imposition_presets()
+            self._invalidate_sheet_previews()
+            self._refresh_preview_navigation()
+            if self._preview_mode == "sheet":
+                self._render_current_sheet_preview()
+            else:
+                self._start_sheet_preview_preload()
 
     def _open_theme_dialog(self):
         dlg = ThemeDialog(self)
@@ -980,12 +1238,12 @@ class MainWindow(QMainWindow):
             "last_single_pdf": single_pdf,
         })
 
-    def _scrape_table_data(self):
+    def _scrape_table_data(self, *, include_sources=False):
         table = self.table_panel.table
         rows = table.rowCount()
         cols = table.columnCount()
         headers = [table.horizontalHeaderItem(c).text() for c in range(cols)]
-        data_plain, data_rich = [], []
+        data_plain, data_rich, source_rows = [], [], []
 
         for r in range(rows):
             row_p, row_r = {}, {}
@@ -1001,7 +1259,7 @@ class MainWindow(QMainWindow):
                 item = table.item(r, c)
                 
                 # 1. Trata a nova coluna de Quantidade
-                if key == "🔢 Qtd":
+                if key == QUANTITY_HEADER:
                     try:
                         val = int(item.text().strip()) if item else 1
                         multiplier = max(0, val) # Impede números negativos
@@ -1010,7 +1268,7 @@ class MainWindow(QMainWindow):
                     continue
 
                 # 2. Trata a coluna de Assinatura
-                if key == "✍️ Ass.":
+                if key == SIGNATURE_HEADER:
                     use_sig = (item.checkState() == Qt.CheckState.Checked) if item else True
                     row_p["__use_signature__"] = use_sig
                     row_r["__use_signature__"] = use_sig
@@ -1033,7 +1291,10 @@ class MainWindow(QMainWindow):
                 for _ in range(multiplier):
                     data_plain.append(row_p.copy())
                     data_rich.append(row_r.copy())
+                    source_rows.append(r)
                     
+        if include_sources:
+            return data_plain, data_rich, source_rows
         return data_plain, data_rich
     
     def _get_row_data_rich(self, row_idx):
@@ -1047,10 +1308,10 @@ class MainWindow(QMainWindow):
             item = table.item(row_idx, c)
             
             # Ignora a coluna de quantidade no preview técnico do cartão
-            if key == "🔢 Qtd":
+            if key == QUANTITY_HEADER:
                 continue
                 
-            if key == "✍️ Ass.":
+            if key == SIGNATURE_HEADER:
                 row_data["__use_signature__"] = (item.checkState() == Qt.CheckState.Checked) if item else True
                 continue
                 
@@ -1280,6 +1541,10 @@ class MainWindow(QMainWindow):
             self._update_template_json({"imposition_settings": imp})
             self.log_panel.append(f"⚡ Layout aplicado: <b>{SYSTEM_PRESET}</b>")
             self._refresh_main_preset_tooltip()
+            self._invalidate_sheet_previews()
+            self._refresh_preview_navigation()
+            if self._preview_mode == "item":
+                self._on_table_selection()
             return
 
         presets = imp.get("presets", {}) or {}
@@ -1288,6 +1553,12 @@ class MainWindow(QMainWindow):
             self._update_template_json({"imposition_settings": imp})
             self.log_panel.append(f"⚡ Layout aplicado: <b>{name}</b>")
         self._refresh_main_preset_tooltip()
+        self._invalidate_sheet_previews()
+        self._refresh_preview_navigation()
+        if self._preview_mode == "sheet":
+            self._render_current_sheet_preview()
+        else:
+            self._start_sheet_preview_preload()
 
     def _main_preset_name_at(self, index):
         name = self.cbo_presets_main.itemData(index, Qt.ItemDataRole.UserRole)

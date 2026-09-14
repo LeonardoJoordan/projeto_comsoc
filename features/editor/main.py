@@ -10,6 +10,7 @@ from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from core.paths import APP_ID
 from core.resources import app_icon_path
+from core.ui_font import install_ui_font
 from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
 from features.editor.editor_window import EditorWindow
 
@@ -29,6 +30,7 @@ def main():
     app.setDesktopFileName(APP_ID)
     app.setWindowIcon(QIcon(str(app_icon_path())))
     app.setStyle('Fusion')
+    install_ui_font(app)
     from core.themes import theme_manager
     from core.settings import get_app_settings
     theme_manager().initialize(get_app_settings())
