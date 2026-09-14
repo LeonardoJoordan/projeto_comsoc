@@ -6,7 +6,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from PySide6.QtCore import QTimer
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
+from core.paths import APP_ID
+from core.resources import app_icon_path
+from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
 from features.editor.editor_window import EditorWindow
 
 
@@ -19,6 +23,11 @@ def main():
     if args.model and not args.model.is_file():
         parser.error('Modelo não encontrado.')
     app = QApplication(sys.argv)
+    app.setOrganizationName(SETTINGS_ORGANIZATION)
+    app.setApplicationName(SETTINGS_APPLICATION)
+    app.setApplicationDisplayName('FORNAX Forge — Editor')
+    app.setDesktopFileName(APP_ID)
+    app.setWindowIcon(QIcon(str(app_icon_path())))
     app.setStyle('Fusion')
     window = EditorWindow()
     if args.model:

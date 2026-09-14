@@ -27,6 +27,7 @@ def build_app():
         "--include-package=core",
         "--include-package=shared",
         "--include-package=pypdf",
+        "--include-data-dir=assets=assets",
         "--include-data-dir=features/editor/icons=features/editor/icons",
         "--include-data-dir=features/workspace/icons=features/workspace/icons",
         "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
@@ -42,7 +43,7 @@ def build_app():
         cmd.insert(cmd.index("--plugin-enable=pyside6") + 1, "--windows-console-mode=disable")
         
         # Verifica se o arquivo .ico existe na raiz
-        icon_path = base_dir / "icone.ico"
+        icon_path = base_dir / "assets" / "icons" / "fornax-forge.ico"
         if icon_path.exists():
             cmd.append(f"--windows-icon-from-ico={icon_path}")
             print("🎨 Ícone do Windows (.ico) detectado e adicionado.")
@@ -53,10 +54,10 @@ def build_app():
         cmd.append("--static-libpython=no") 
         cmd.append(f"--output-filename={exe_name}") # Garante o nome correto da pasta .app
         
-        icon_path = base_dir / "icone.icns"
+        icon_path = base_dir / "assets" / "icons" / "fornax-forge_1024.png"
         if icon_path.exists():
             cmd.append(f"--macos-app-icon={icon_path}")
-            print("🎨 Ícone do macOS (.icns) detectado e adicionado.")
+            print("🎨 Ícone do macOS (PNG 1024 px) detectado e adicionado.")
     
     cmd.append(str(main_file))
     

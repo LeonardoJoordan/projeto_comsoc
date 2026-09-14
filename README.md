@@ -82,7 +82,7 @@ Os testes offscreen verificam o comportamento funcional, mas não substituem a v
 
 O Nuitka usa até quatro tarefas de compilação por padrão, respeitando o número de CPUs. É possível ajustar com `FORNAX_BUILD_JOBS`. O AppImage exige a compilação standalone concluída e `appimagetool` na raiz.
 
-Os ícones atuais foram preservados durante a transição e ainda precisam receber a identidade visual final. Antes da publicação, o inventário e os textos integrais das licenças do pacote devem ser concluídos conforme [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md).
+Os ícones oficiais ficam em `assets/icons/`: PNGs dimensionados para a interface e Linux, além do ICO multirresolução para Windows. O PNG de 1024 px é usado como fonte do pacote macOS. Antes da publicação, o inventário e os textos integrais das licenças do pacote devem ser concluídos conforme [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md).
 
 ## Tecnologias e licença
 

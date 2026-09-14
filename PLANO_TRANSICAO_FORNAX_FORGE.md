@@ -57,7 +57,7 @@ Dependências que merecem atenção especial:
 | --- | --- |
 | `features/editor_novo/icons/spin-up.svg`, `spin-down.svg` | Necessários às setas de campos no editor e na tabela. Caminhos referenciados por QSS. |
 | `features/workspace_novo/icons/combo-down.svg` | Necessário ao estilo dos seletores do workspace. |
-| `icone.png`, `icone.ico`, `icone.icns` | Recursos atuais de distribuição. Substituir pela identidade aprovada posteriormente, não excluir sem substitutos. |
+| `assets/icons/fornax-forge_*` e `fornax-forge.ico` | Identidade oficial da aplicação, com PNGs por tamanho e ICO multirresolução. |
 | `requirements.txt` | Preservar. Declara PySide6, Nuitka, zstandard e pypdf. Dependência de build não é automaticamente dependência inútil. |
 | `features/editor_novo/main.py` | Entrada independente de diagnóstico do editor; não alcançada pela entrada do workspace por definição. Manter e atualizar imports/documentação. |
 | `features/editor_novo/test_canvas_edit.py`, `test_draw_shapes.py`, `test_layers.py`, `test_window_lifecycle.py` | Preservar os testes; ajustar imports e caminhos de mocks ao mover os módulos. |
@@ -137,7 +137,7 @@ Manter `core/`, `shared/`, `features/generator/` e `features/preview/` em seus l
 - [x] Atualizar título do workspace em `main_window.py`, título do editor, descrição do executável de diagnóstico, menu/diálogo Sobre em `frontend.py`.
 - [x] Atualizar mensagens de importação, nome sugerido `Modelos_ProjetoComSoc.zip`, dica de saída e nome de lote `Projeto COMSOC_<timestamp>` no workspace.
 - [x] Reescrever README raiz com nome, proposta e comandos oficiais; atualizar documentação operacional.
-- [ ] Definir ícones finais e verificar os três formatos existentes de distribuição.
+- [x] Definir ícones finais e ligar os recursos oficiais à interface, Nuitka, AppImage e Flatpak. O macOS usa o PNG de 1024 px como fonte para o bundle; a geração nativa ainda será validada.
 
 Usar FORNAX Forge como nome curto. Descrição longa em português na interface/documentação em português; versão inglesa na apresentação em inglês. O nome não exige novo formato de documento.
 
@@ -157,7 +157,7 @@ Usar FORNAX Forge como nome curto. Descrição longa em português na interface/
 Preservar e corrigir `script_nuitka.py`, `script_appimage.sh` e `com.leobelisario.ProjetoComSoc.yaml`.
 
 - Nuitka usa `main.py`, inclui `features`, `core`, `shared` e pypdf; atualizar nomes de executável, app/DMG e inclusão explícita dos SVG usados por caminho. A inclusão de pacotes Python não comprova que recursos não Python estarão no produto final.
-- AppImage referencia `build/main.dist`, `venv/lib/python3.13/site-packages/PySide6`, executável `COMSOC_OFICIAL` e ícone vazio criado com `touch`. Harmonizar com a saída real do Nuitka e os ícones finais antes de usá-lo para distribuição.
+- AppImage usa `build/main.dist`, o executável `FORNAX_Forge`, as bibliotecas do próprio standalone e `assets/icons/fornax-forge_512.png`. A geração instalada ainda precisa ser validada antes da distribuição.
 - Flatpak copia a árvore `features` inteira e usa o main raiz. Atualizar manifesto/nome do arquivo, app-id, comando, desktop entry, ícone e permissão da pasta de saída de forma coerente.
 - Separar requisitos de desenvolvimento/build de runtime se útil, sem retirar PySide6, seus componentes necessários (incluindo SVG), shiboken6 associado ou pypdf. Não remover componentes Qt por associação superficial com QML sem verificar o pacote gerado.
 - Completar inventário e avisos de terceiros do pacote efetivamente distribuído; o arquivo atual registra essa pendência. Não declarar conformidade de licenças ou prontidão de publicação apenas com este plano.
@@ -209,4 +209,4 @@ Ao retomar, ler este documento e o diff atual, confirmar branch e commit, execut
 - [x] Nuitka limita paralelismo por padrão (até quatro CPUs), permite FORNAX_BUILD_JOBS e propaga falhas de compilação; novos artefatos incluídos no gitignore.
 - [x] Validação: 27 testes aprovados, incluindo exclusão pós-migração e interrupção de cópia; smoke offscreen de workspace, exportação e tema aprovado; compilação Python, sintaxe shell e diff verificados.
 
-Os pacotes instaláveis não foram gerados nesta revisão. Permanecem pendentes ícones finais, licenças completas e validação nativa/instalada nas três plataformas. Registros anteriores descrevem o estado daquela etapa; a política atual não mistura arquivos de modelos conflitantes.
+Os pacotes instaláveis não foram gerados nesta revisão. Permanecem pendentes licenças completas e validação nativa/instalada nas três plataformas. Registros anteriores descrevem o estado daquela etapa; a política atual não mistura arquivos de modelos conflitantes.

@@ -9,7 +9,8 @@ APP_DIR="FORNAX_Forge.AppDir"
 USR_BIN="$APP_DIR/usr/bin"
 # O standalone já contém as bibliotecas e plugins da mesma versão do Qt.
 [[ -x "$DIST_DIR/FORNAX_Forge" ]] || { echo "Compile com script_nuitka.py primeiro." >&2; exit 1; }
-[[ -x ./appimagetool && -f icone.png ]] || { echo "Faltam appimagetool ou icone.png." >&2; exit 1; }
+APP_ICON="assets/icons/fornax-forge_512.png"
+[[ -x ./appimagetool && -f "$APP_ICON" ]] || { echo "Faltam appimagetool ou $APP_ICON." >&2; exit 1; }
 
 # Limpa e recria o AppDir
 rm -rf "$APP_DIR"
@@ -41,7 +42,7 @@ Categories=Utility;
 EOF
 
 # Ícone do aplicativo
-cp icone.png "$APP_DIR/app.png"
+cp "$APP_ICON" "$APP_DIR/app.png"
 
 # Mostra tamanho antes de gerar
 echo ""

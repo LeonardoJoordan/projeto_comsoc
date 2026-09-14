@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidg
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
                                QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout,
                                QSizePolicy)
-from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut,
+from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
                            QFont, QFontDatabase, QFontInfo)
 from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize
@@ -22,6 +22,7 @@ from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
 from core.render_cache import ensure_background_proxy
+from core.resources import app_icon_path
 
 
 class ElidedLayerLabel(QLabel):
@@ -78,6 +79,7 @@ class EditorWindow(QMainWindow):
         self._current_model_name = None
         self._current_model_dir = None
         self.setWindowTitle("Editor de modelos — FORNAX Forge")
+        self.setWindowIcon(QIcon(str(app_icon_path())))
         self.resize(1200, 800)
 
         central = QWidget()

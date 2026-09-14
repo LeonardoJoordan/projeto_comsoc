@@ -28,14 +28,20 @@ modules:
       - mkdir -p /app/share/fornax-forge
       - mkdir -p /app/bin
       - mkdir -p /app/share/applications
-      - mkdir -p /app/share/icons/hicolor/512x512/apps
+      - mkdir -p /app/share/icons/hicolor/32x32/apps /app/share/icons/hicolor/48x48/apps /app/share/icons/hicolor/64x64/apps /app/share/icons/hicolor/128x128/apps /app/share/icons/hicolor/256x256/apps /app/share/icons/hicolor/512x512/apps
       
       # VASSOURA: Apaga os ambientes virtuais e pastas de compilação antes de copiar
       - cp main.py /app/share/fornax-forge/
       - cp -r core /app/share/fornax-forge/
       - cp -r features /app/share/fornax-forge/
       - cp -r shared /app/share/fornax-forge/
-      - cp icone.png /app/share/icons/hicolor/512x512/apps/com.leobelisario.FornaxForge.png
+      - cp -r assets /app/share/fornax-forge/
+      - cp assets/icons/fornax-forge_32.png /app/share/icons/hicolor/32x32/apps/com.leobelisario.FornaxForge.png
+      - cp assets/icons/fornax-forge_48.png /app/share/icons/hicolor/48x48/apps/com.leobelisario.FornaxForge.png
+      - cp assets/icons/fornax-forge_64.png /app/share/icons/hicolor/64x64/apps/com.leobelisario.FornaxForge.png
+      - cp assets/icons/fornax-forge_128.png /app/share/icons/hicolor/128x128/apps/com.leobelisario.FornaxForge.png
+      - cp assets/icons/fornax-forge_256.png /app/share/icons/hicolor/256x256/apps/com.leobelisario.FornaxForge.png
+      - cp assets/icons/fornax-forge_512.png /app/share/icons/hicolor/512x512/apps/com.leobelisario.FornaxForge.png
       
       # Cria o executável
       - |

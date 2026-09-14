@@ -10,10 +10,12 @@ os.environ.setdefault('GTK_IM_MODULE', 'ibus')
 os.environ.setdefault('XMODIFIERS', '@im=ibus')
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 from core.custom_tooltip import CustomTooltipManager
 from core.paths import APP_ID, get_logs_dir
 from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
+from core.resources import app_icon_path
 from features.workspace.main_window import MainWindow
 
 
@@ -44,6 +46,7 @@ def main():
     app.setApplicationName(SETTINGS_APPLICATION)
     app.setApplicationDisplayName('FORNAX Forge')
     app.setDesktopFileName(APP_ID)
+    app.setWindowIcon(QIcon(str(app_icon_path())))
     app.setStyle('Fusion')
     sys.excepthook = global_exception_handler
     CustomTooltipManager.install(delay_ms=1500)

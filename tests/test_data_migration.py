@@ -6,9 +6,17 @@ from unittest.mock import patch
 
 from core import paths
 from core import settings as app_settings
+from core.resources import app_icon_path, windows_icon_path
 
 
 class DataMigrationTests(unittest.TestCase):
+    def test_official_application_icons_are_available(self):
+        for size in (32, 48, 64, 128, 256, 512, 1024):
+            icon = app_icon_path(size)
+            self.assertTrue(icon.is_file(), icon)
+            self.assertEqual(f"fornax-forge_{size}.png", icon.name)
+        self.assertTrue(windows_icon_path().is_file())
+
     def test_legacy_data_is_copied_without_overwriting_destination(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             base = Path(temp_dir)
