@@ -53,6 +53,8 @@ python features/editor/main.py
 
 ## Dados e compatibilidade com o COMSOC
 
+Em **Exibir > Tema da interface**, escolha entre os cinco temas padrão: **Carbono** (preto e cinza profundo), **Marinho** (azul escuro), **Grafite** (cinza médio), **Rosê** (rosa envelhecido e sépia) e **Pérola** (claro). Os perfis personalizados salvos também aparecem nessa lista. O botão **Criar tema**, no rodapé, abre uma segunda janela com os controles avançados de cores e o nome do novo perfil. A interface mostra a prévia imediatamente; Cancelar restaura o tema anterior. Os arquivos oficiais ficam em `assets/themes/` e as personalizações em `themes/` dentro da pasta de dados do aplicativo. As cores dos documentos e arquivos gerados não são alteradas.
+
 O FORNAX Forge usa o identificador técnico `com.leobelisario.FornaxForge`. No primeiro acesso, dados encontrados no diretório da instalação COMSOC são copiados para a nova área. Modelos já existentes no destino são preservados integralmente, sem mesclar assets. A cópia é verificada antes de ser publicada, sua conclusão fica registrada e a origem não é apagada. Uma interrupção pode ser retomada; modelos excluídos após a migração não são recriados. Conflitos podem ser resolvidos posteriormente pela importação de modelos.
 
 As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Os modelos continuam usando `template_v3.json`; a mudança de marca não altera o formato interno.

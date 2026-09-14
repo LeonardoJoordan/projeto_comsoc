@@ -130,7 +130,7 @@ class MainWindow(QMainWindow):
         self._apply_tooltip(self.btn_sel_out, 
             "<b>PASTA DE DESTINO</b><br><br>"
             "Define em qual local do computador os arquivos gerados serão salvos.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: O sistema criará automaticamente uma subpasta com a data e hora atual dentro do local escolhido para manter seus lotes organizados.</small>")
+            "<small >Dica: O sistema criará automaticamente uma subpasta com a data e hora atual dentro do local escolhido para manter seus lotes organizados.</small>")
         self.btn_sel_out.clicked.connect(self._select_output_folder)
         row_out_path.addWidget(self.btn_sel_out)
         col_left_footer.addLayout(row_out_path)
@@ -142,7 +142,7 @@ class MainWindow(QMainWindow):
         self._apply_tooltip(self.btn_generate_cards, 
             "<b>GERAR MATERIAL</b><br><br>"
             "Inicia o processamento da tabela e a construção dos arquivos finais na pasta de saída.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Faça uma checagem rápida nas colunas de Quantidade e Assinatura antes de iniciar a geração de lotes muito grandes para evitar desperdícios.</small>")
+            "<small >Dica: Faça uma checagem rápida nas colunas de Quantidade e Assinatura antes de iniciar a geração de lotes muito grandes para evitar desperdícios.</small>")
         self.btn_generate_cards.clicked.connect(self._generate_cards_async)
         col_left_footer.addWidget(self.btn_generate_cards)
         
@@ -185,7 +185,7 @@ class MainWindow(QMainWindow):
             "Acesso aos ajustes de geração dos arquivos:<br>"
             "• <b>Nomenclatura:</b> Define o padrão de nome dos arquivos gerados usando as variáveis da tabela.<br>"
             "• <b>Impressão:</b> Configura o agrupamento de vários cartões em uma folha e ativa marcas de corte.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Na seção de Impressão, o sistema calcula automaticamente quantos cartões cabem na folha assim que você digita as dimensões.</small>")
+            "<small >Dica: Na seção de Impressão, o sistema calcula automaticamente quantos cartões cabem na folha assim que você digita as dimensões.</small>")
         
         row_format_cfg.addWidget(self.cbo_export_format)
         row_format_cfg.addWidget(self.btn_config_name)
@@ -199,13 +199,13 @@ class MainWindow(QMainWindow):
         self._apply_tooltip(lbl_layout,
             "<b>PREDEFINIÇÃO DE IMPRESSÃO</b><br><br>"
             "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
+            "<small >Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
         row_presets_main.addWidget(lbl_layout)
         row_presets_main.addWidget(self.cbo_presets_main, 1)
         self._presets_main_base_tooltip = (
             "<b>PREDEFINIÇÃO DE IMPRESSÃO</b><br><br>"
             "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>"
+            "<small >Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>"
         )
         self._apply_tooltip(self.cbo_presets_main, self._presets_main_base_tooltip)
         col_right_footer.addLayout(row_presets_main)
@@ -263,8 +263,7 @@ class MainWindow(QMainWindow):
             self.txt_output_path.setText(str(last_output))
 
         # Inicializa o tema visual salvo (padrão é escuro)
-        is_dark = self.settings.value("dark_mode", True, type=bool)
-        self._apply_theme(is_dark)
+        self._initialize_theme()
         from .frontend import install_frontend
         install_frontend(self)
 
@@ -306,81 +305,9 @@ class MainWindow(QMainWindow):
         with open(example_dir / "template_v3.json", "w", encoding="utf-8") as f:
             json.dump(example_data, f, indent=4, ensure_ascii=False)
 
-    def _apply_theme(self, is_dark: bool):
-        app = QApplication.instance()
-        if not app: return
-        
-        app.setStyle("Fusion")
-        
-        if is_dark:
-            palette = QPalette()
-            # Cores exatas extraídas do Mint-Y-Dark
-            bg_color = QColor("#2e2e33")
-            text_color = QColor("#DADADA")
-            alt_base_color = QColor("#222226")
-            button_color = QColor("#333338")
-            highlight_color = QColor("#35A854")
-            
-            palette.setColor(QPalette.ColorRole.Window, bg_color)
-            palette.setColor(QPalette.ColorRole.WindowText, text_color)
-            palette.setColor(QPalette.ColorRole.Base, bg_color)
-            palette.setColor(QPalette.ColorRole.AlternateBase, alt_base_color)
-            palette.setColor(QPalette.ColorRole.ToolTipBase, bg_color)
-            palette.setColor(QPalette.ColorRole.ToolTipText, text_color)
-            palette.setColor(QPalette.ColorRole.Text, text_color)
-            palette.setColor(QPalette.ColorRole.Button, button_color)
-            palette.setColor(QPalette.ColorRole.ButtonText, text_color)
-            palette.setColor(QPalette.ColorRole.BrightText, QColor("#FFFFFF"))
-            palette.setColor(QPalette.ColorRole.Link, QColor("#5294E2"))
-            palette.setColor(QPalette.ColorRole.Highlight, highlight_color)
-            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
-            
-            # Textos e botões desabilitados
-            disabled_color = QColor(255, 255, 255, 107)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled_color)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_color)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, disabled_color)
-
-            app.setPalette(palette)
-            # Reforço global para bordas finas (Fusion costuma ignorar na paleta)
-            app.setStyleSheet("QTableWidget, QLineEdit, QTextEdit { border: 1px solid #202023; }")
-        else:
-            palette = QPalette()
-            # Paleta Clara Fixa (Independente de SO)
-            window_color = QColor("#F5F5F5")
-            text_color = QColor("#1A1A1A")
-            base_color = QColor("#FFFFFF")
-            btn_color = QColor("#E0E0E0")
-            highlight_green = QColor("#35A854")
-
-            palette.setColor(QPalette.ColorRole.Window, window_color)
-            palette.setColor(QPalette.ColorRole.WindowText, text_color)
-            palette.setColor(QPalette.ColorRole.Base, base_color)
-            palette.setColor(QPalette.ColorRole.AlternateBase, QColor("#EBEBEB"))
-            palette.setColor(QPalette.ColorRole.ToolTipBase, base_color)
-            palette.setColor(QPalette.ColorRole.ToolTipText, text_color)
-            palette.setColor(QPalette.ColorRole.Text, text_color)
-            palette.setColor(QPalette.ColorRole.Button, btn_color)
-            palette.setColor(QPalette.ColorRole.ButtonText, text_color)
-            palette.setColor(QPalette.ColorRole.BrightText, QColor("#FFFFFF"))
-            palette.setColor(QPalette.ColorRole.Link, QColor("#0000EE"))
-            palette.setColor(QPalette.ColorRole.Highlight, highlight_green)
-            palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#FFFFFF"))
-
-            # Estados desabilitados para o modo claro
-            disabled_text = QColor(0, 0, 0, 110)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.Text, disabled_text)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, disabled_text)
-            palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.WindowText, disabled_text)
-
-            app.setPalette(palette)
-            # Bordas sutis para manter profundidade visual no modo claro
-            app.setStyleSheet("QTableWidget, QLineEdit, QTextEdit { border: 1px solid #C0C0C0; }")
-            
-        if hasattr(self, 'settings'):
-            self.settings.setValue("dark_mode", is_dark)
-        if hasattr(self, '_workspace_apply_visual_theme'):
-            self._workspace_apply_visual_theme(is_dark)
+    def _initialize_theme(self):
+        from core.themes import theme_manager
+        theme_manager().initialize(self.settings)
 
     def closeEvent(self, event):
         """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
@@ -1007,10 +934,8 @@ class MainWindow(QMainWindow):
             self._refresh_imposition_presets()
 
     def _open_theme_dialog(self):
-        is_dark_now = self.settings.value("dark_mode", True, type=bool)
-        dlg = ThemeDialog(self, is_dark=is_dark_now)
-        if dlg.exec():
-            self._apply_theme(dlg.is_dark_theme())
+        dlg = ThemeDialog(self)
+        dlg.exec()
 
     def _select_output_folder(self):
         start_dir = self.txt_output_path.text() or ""

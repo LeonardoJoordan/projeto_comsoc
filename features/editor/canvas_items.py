@@ -232,7 +232,8 @@ class ResizeHandle(QGraphicsRectItem):
         self.name = name
         self.x_dir = x_dir
         self.y_dir = y_dir
-        self.setBrush(QBrush(QColor("#27ae60")))
+        from core.themes import theme_color
+        self.setBrush(QBrush(QColor(theme_color('handle'))))
         self.setPen(QPen(Qt.GlobalColor.white, 2))
         self.setAcceptHoverEvents(True)
         self.setCursor(cursor)
@@ -695,7 +696,8 @@ class Guideline(QGraphicsLineItem):
             self.setLine(-20000, 0, 40000, 0)
             self.setPos(0, position_px)
 
-        pen = QPen(QColor("#00bcd4"), 1, Qt.PenStyle.DashLine)
+        from core.themes import theme_color
+        pen = QPen(QColor(theme_color('guide')), 1, Qt.PenStyle.DashLine)
         pen.setCosmetic(True)
         self.setPen(pen)
 
@@ -752,7 +754,8 @@ class Guideline(QGraphicsLineItem):
         # --- Feedback visual: Muda apenas a cor quando selecionada ---
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
             is_selected = bool(value)
-            color = "#ff9800" if is_selected else "#00bcd4"
+            from core.themes import theme_color
+            color = theme_color('warning' if is_selected else 'guide')
             
             pen = QPen(QColor(color), 1, Qt.PenStyle.DashLine)
             pen.setCosmetic(True)
@@ -1262,10 +1265,12 @@ class DesignerBox(QGraphicsRectItem):
     
     def paint(self, painter, option, widget=None):
         if self.isSelected():
-            self.setPen(QPen(Qt.GlobalColor.blue, 2, Qt.PenStyle.DashLine))
+            from core.themes import theme_color
+            self.setPen(QPen(QColor(theme_color('canvas_selection')), 2, Qt.PenStyle.DashLine))
             self.setBrush(QBrush(QColor(0, 100, 255, 30)))
         else:
-            self.setPen(QPen(Qt.GlobalColor.gray, 1, Qt.PenStyle.DotLine))
+            from core.themes import theme_color
+            self.setPen(QPen(QColor(theme_color('canvas_outline')), 1, Qt.PenStyle.DotLine))
             self.setBrush(QBrush(QColor(255, 255, 255, 10)))
         super().paint(painter, option, widget)
 

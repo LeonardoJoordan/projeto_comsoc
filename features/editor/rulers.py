@@ -4,6 +4,7 @@ from PySide6.QtCore import Qt, QEvent, QPoint, QRect
 from PySide6.QtGui import QColor, QPainter, QFont
 from PySide6.QtWidgets import QWidget, QGridLayout, QLabel, QRubberBand
 from .canvas_items import mm_to_px
+from core.themes import theme_color, themed_style, theme_manager
 
 
 class Ruler(QWidget):
@@ -11,6 +12,7 @@ class Ruler(QWidget):
         super().__init__(parent)
         self.window = window
         self.horizontal = horizontal
+        theme_manager().changed.connect(self.update)
         self.dragging = False
         self.preview = QRubberBand(QRubberBand.Shape.Line, window.view.viewport())
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -23,7 +25,7 @@ class Ruler(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
-        painter.fillRect(self.rect(), QColor('#15161b'))
+        painter.fillRect(self.rect(), QColor(theme_color('panel')))
         painter.setFont(QFont('sans-serif', 8))
         view = self.window.view
         doc = self.window._get_document_rect()
@@ -47,7 +49,7 @@ class Ruler(QWidget):
         for index in range(start, end + 1):
             position = round(zero + index * step)
             large = index % 5 == 0
-            painter.setPen(QColor('#a8abb5' if large else '#454854'))
+            painter.setPen(QColor(theme_color('muted' if large else 'border_strong')))
             tick = 9 if large else 4
             if self.horizontal:
                 painter.drawLine(position, 26 - tick, position, 25)
@@ -111,7 +113,7 @@ class RulerWorkspace(QWidget):
         corner = QLabel('mm')
         corner.setFixedSize(26, 26)
         corner.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        corner.setStyleSheet('background: #15161b; color: #777b87; font-size: 9px;')
+        themed_style(corner, 'background: @panel@; color: @disabled@; font-size: 9px;')
         layout.addWidget(corner, 0, 0)
         layout.addWidget(self.top, 0, 1)
         layout.addWidget(self.left, 1, 0)

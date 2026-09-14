@@ -1,3 +1,4 @@
+from core.themes import themed_style, theme_color, theme_manager
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QFrame, QComboBox
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QPixmap, QResizeEvent, QImageReader
@@ -64,7 +65,7 @@ class PreviewPanel(QWidget):
 
         title = QLabel("Selecione o modelo")
         title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        title.setStyleSheet("font-size: 16px; font-weight: 600;")
+        themed_style(title, "font-size: 16px; font-weight: 600;")
         layout.addWidget(title)
 
         self.cbo_models = QComboBox()
@@ -74,7 +75,7 @@ class PreviewPanel(QWidget):
         self.preview = ResizingLabel()
         self.preview.setText("Nenhum modelo selecionado")
         self.preview.setFrameShape(QFrame.Shape.StyledPanel)
-        self.preview.setStyleSheet("background-color: #2a2a2a; border-radius: 10px;")
+        themed_style(self.preview, "background-color: @canvas@; border-radius: 10px;")
         layout.addWidget(self.preview, 1)
 
     def set_preview_text(self, text: str):

@@ -1,3 +1,4 @@
+from core.themes import themed_style, theme_color, theme_manager
 import time
 from PySide6.QtWidgets import QLabel, QApplication, QWidget
 from PySide6.QtCore import Qt, QTimer, QObject, QEvent, QPoint
@@ -29,11 +30,11 @@ class CustomTooltipManager(QObject):
 
         
         # AJUSTE VISUAL: Fundo sólido (sem rgba) para garantir a renderização
-        self.tooltip_label.setStyleSheet("""
+        themed_style(self.tooltip_label, """
             QLabel {
-                background-color: #262626; /* Fundo cinza escuro sólido */
-                color: #F0F0F0;            /* Texto claro e legível */
-                border: 1px solid #555555; /* Borda visível */
+                background-color: @panel@; /* Fundo cinza escuro sólido */
+                color: @text@;            /* Texto claro e legível */
+                border: 1px solid @border_strong@; /* Borda visível */
                 border-radius: 4px;        /* Arredondamento menor para evitar cantos pretos no Linux */
                 padding: 8px 12px;
                 font-family: 'Segoe UI', 'Ubuntu', sans-serif;

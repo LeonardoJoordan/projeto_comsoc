@@ -48,6 +48,9 @@ def main():
     app.setDesktopFileName(APP_ID)
     app.setWindowIcon(QIcon(str(app_icon_path())))
     app.setStyle('Fusion')
+    from core.themes import theme_manager
+    from core.settings import get_app_settings
+    theme_manager().initialize(get_app_settings())
     sys.excepthook = global_exception_handler
     CustomTooltipManager.install(delay_ms=1500)
     window = MainWindow()

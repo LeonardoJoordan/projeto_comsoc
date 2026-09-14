@@ -1,3 +1,4 @@
+from core.themes import themed_style, theme_color, theme_manager
 """Apresentação da planilha; preserva os controles e as operações da tabela."""
 from PySide6.QtCore import Qt, QSize, QSignalBlocker, Signal
 from PySide6.QtWidgets import (
@@ -24,12 +25,7 @@ class CellContentEditor(QPlainTextEdit):
 
 
 def sheet_icon(path):
-    source = icon(path).pixmap(20, 20)
-    painter = QPainter(source)
-    painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
-    painter.fillRect(source.rect(), '#c5c3df')
-    painter.end()
-    return QIcon(source)
+    return icon(path)
 
 
 def install_frontend(panel):
@@ -97,7 +93,7 @@ def install_frontend(panel):
     actions.addWidget(panel.btn_add_rows)
     separator = QFrame()
     separator.setFixedSize(1, 20)
-    separator.setStyleSheet('background: #30323b; border: none;')
+    themed_style(separator, 'background: @border@; border: none;')
     actions.addWidget(separator)
     actions.addWidget(panel.btn_duplicate_row)
     actions.addWidget(panel.btn_delete_rows)
@@ -168,7 +164,7 @@ def install_frontend(panel):
     table.setWordWrap(False)
     panel.btn_toggle_wrap.setChecked(False)
     table.setTextElideMode(Qt.TextElideMode.ElideRight)
-    table.setStyleSheet('')
+    themed_style(table, '')
     layout.addWidget(table, 1)
     table.show()
 
@@ -219,51 +215,51 @@ def install_frontend(panel):
     table.itemChanged.connect(refresh_formula_from_item)
     cell_editor.textChanged.connect(update_from_formula)
     update_state()
-    panel.setStyleSheet('''
-        QFrame#sheetHeading, QFrame#sheetToolbar { background: #15161b; border: none; border-bottom: 1px solid #30323b; }
-        QLabel#sheetTitle { color: #f3f5f8; font-size: 12px; font-weight: 600; }
-        QLabel#sheetCount { color: #a8abb5; font-size: 11px; }
-        QLabel#sheetSectionTitle { color: #8f939f; font-size: 10px; font-weight: 600; }
-        QLabel#sheetHint { background: #1a1b21; color: #8f939f; padding: 10px 14px; font-size: 11px; }
+    themed_style(panel, '''
+        QFrame#sheetHeading, QFrame#sheetToolbar { background: @panel@; border: none; border-bottom: 1px solid @border@; }
+        QLabel#sheetTitle { color: @text@; font-size: 12px; font-weight: 600; }
+        QLabel#sheetCount { color: @muted@; font-size: 11px; }
+        QLabel#sheetSectionTitle { color: @muted@; font-size: 10px; font-weight: 600; }
+        QLabel#sheetHint { background: @surface@; color: @muted@; padding: 10px 14px; font-size: 11px; }
         QPushButton#sheetSquare { padding: 0; min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; }
         QPushButton#sheetAction { padding: 0 10px; min-height: 28px; max-height: 28px; }
         QPushButton#sheetLineAction { padding: 0 3px; min-height: 28px; max-height: 28px; }
         QSpinBox { padding: 0 5px; min-height: 28px; max-height: 28px; }
-        QSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 18px; background: #30323b; border-left: 1px solid #454854; }
-        QSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 18px; background: #30323b; border-left: 1px solid #454854; }
-        QSpinBox::up-arrow { image: url(__ICONS__/spin-up.svg); width: 10px; height: 6px; }
-        QSpinBox::down-arrow { image: url(__ICONS__/spin-down.svg); width: 10px; height: 6px; }
-        QTableWidget#dataGrid { background: #121318; alternate-background-color: #18191f; border: none; border-radius: 0; gridline-color: #292b33; selection-background-color: #343159; selection-color: #f3f5f8; }
+        QSpinBox::up-button { subcontrol-origin: border; subcontrol-position: top right; width: 18px; background: @border@; border-left: 1px solid @border_strong@; }
+        QSpinBox::down-button { subcontrol-origin: border; subcontrol-position: bottom right; width: 18px; background: @border@; border-left: 1px solid @border_strong@; }
+        QSpinBox::up-arrow { image: url(@spin_up@); width: 10px; height: 6px; }
+        QSpinBox::down-arrow { image: url(@spin_down@); width: 10px; height: 6px; }
+        QTableWidget#dataGrid { background: @field@; alternate-background-color: @alternate@; border: none; border-radius: 0; gridline-color: @grid@; selection-background-color: @selection@; selection-color: @text@; }
         QTableWidget#dataGrid::item { padding: 6px 10px; }
-        QHeaderView::section { background: #1e2027; color: #bfc2cf; font-weight: 600; border: none; border-right: 1px solid #30323b; border-bottom: 1px solid #30323b; padding: 6px 10px; }
-        QTableCornerButton::section { background: #1e2027; border: none; }
+        QHeaderView::section { background: @header@; color: @icon@; font-weight: 600; border: none; border-right: 1px solid @border@; border-bottom: 1px solid @border@; padding: 6px 10px; }
+        QTableCornerButton::section { background: @header@; border: none; }
     '''.replace('__ICONS__', (Path(__file__).resolve().parents[1] / 'editor' / 'icons').as_posix()) + '''
-        QWidget#dataPanel { background: #121318; border: 1px solid #30323b; border-radius: 8px; padding: 0; }
-        QFrame#sheetHeading { background: #15161b; border: none; }
-        QLabel#sheetTitle { color: #f3f5f8; font-size: 18px; font-weight: 600; }
-        QLabel#sheetCount { color: #a8abb5; font-size: 12px; }
-        QLabel#sheetSectionTitle { color: #8f939f; font-size: 10px; font-weight: 600; }
-        QFrame#sheetToolbar { background: #1a1b21; border: none; border-bottom: 1px solid #30323b; }
-        QFrame#formulaBar { background: #15161b; border: none; border-bottom: 1px solid #30323b; }
-        QLabel#formulaLabel { color: #9087ff; font-size: 13px; font-style: italic; }
-        QPlainTextEdit#cellEditor { background: #121318; color: #f3f5f8; border: 1px solid #30323b; border-radius: 5px; padding: 5px 8px; selection-background-color: #343159; }
-        QPlainTextEdit#cellEditor:focus { border-color: #7c73f2; }
-        QPlainTextEdit#cellEditor:disabled { color: #777b87; background: #15161b; }
-        QLabel#sheetHint { background: #15161b; color: #8f939f; padding: 9px 14px; font-size: 11px; border-bottom: 1px solid #30323b; }
-        QPushButton#sheetSquare, QPushButton#sheetAction, QPushButton#sheetLineAction { background: transparent; color: #c9cbd3; border: 1px solid transparent; border-radius: 5px; }
-        QPushButton#sheetSquare:hover, QPushButton#sheetAction:hover, QPushButton#sheetLineAction:hover { background: #2a2c35; }
-        QPushButton#sheetSquare:pressed, QPushButton#sheetAction:checked, QPushButton#sheetLineAction:checked { background: #343159; color: #f3f5f8; }
-        QPushButton#sheetSquare:disabled { color: #777b87; }
-        QSpinBox { background: #121318; color: #f3f5f8; border: 1px solid #30323b; border-radius: 5px; }
-        QSpinBox::up-button, QSpinBox::down-button { background: #30323b; border: none; }
-        QTableWidget#dataGrid { background: #121318; color: #f3f5f8; alternate-background-color: #121318; gridline-color: #292b33; selection-background-color: #343159; selection-color: #f3f5f8; font-size: 13px; }
-        QHeaderView { background: #1a1b21; }
-        QHeaderView::section { background: #1a1b21; color: #a8abb5; font-size: 11px; font-weight: 500; border: none; border-right: 1px solid #292b33; border-bottom: 1px solid #30323b; padding: 6px 8px; }
-        QHeaderView::section:checked { background: #343159; color: #c5bdff; }
-        QTableCornerButton::section { background: #1a1b21; border: none; }
-        QTextEdit { background: #121318; color: #f3f5f8; border: 2px solid #8774df; border-radius: 0; padding: 2px 6px; selection-background-color: #343159; selection-color: #f3f5f8; }
-        QScrollBar:vertical, QScrollBar:horizontal { background: #24262e; }
-        QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: #5b5f6d; border-radius: 2px; }
-        QScrollBar::handle:hover { background: #747989; }
-        QAbstractScrollArea::corner { background: #24262e; }
+        QWidget#dataPanel { background: @field@; border: 1px solid @border@; border-radius: 8px; padding: 0; }
+        QFrame#sheetHeading { background: @panel@; border: none; }
+        QLabel#sheetTitle { color: @text@; font-size: 18px; font-weight: 600; }
+        QLabel#sheetCount { color: @muted@; font-size: 12px; }
+        QLabel#sheetSectionTitle { color: @muted@; font-size: 10px; font-weight: 600; }
+        QFrame#sheetToolbar { background: @surface@; border: none; border-bottom: 1px solid @border@; }
+        QFrame#formulaBar { background: @panel@; border: none; border-bottom: 1px solid @border@; }
+        QLabel#formulaLabel { color: @accent@; font-size: 13px; font-style: italic; }
+        QPlainTextEdit#cellEditor { background: @field@; color: @text@; border: 1px solid @border@; border-radius: 5px; padding: 5px 8px; selection-background-color: @selection@; }
+        QPlainTextEdit#cellEditor:focus { border-color: @accent@; }
+        QPlainTextEdit#cellEditor:disabled { color: @disabled@; background: @panel@; }
+        QLabel#sheetHint { background: @panel@; color: @muted@; padding: 9px 14px; font-size: 11px; border-bottom: 1px solid @border@; }
+        QPushButton#sheetSquare, QPushButton#sheetAction, QPushButton#sheetLineAction { background: transparent; color: @text@; border: 1px solid transparent; border-radius: 5px; }
+        QPushButton#sheetSquare:hover, QPushButton#sheetAction:hover, QPushButton#sheetLineAction:hover { background: @hover@; }
+        QPushButton#sheetSquare:pressed, QPushButton#sheetAction:checked, QPushButton#sheetLineAction:checked { background: @selection@; color: @text@; }
+        QPushButton#sheetSquare:disabled { color: @disabled@; }
+        QSpinBox { background: @field@; color: @text@; border: 1px solid @border@; border-radius: 5px; }
+        QSpinBox::up-button, QSpinBox::down-button { background: @border@; border: none; }
+        QTableWidget#dataGrid { background: @field@; color: @text@; alternate-background-color: @field@; gridline-color: @grid@; selection-background-color: @selection@; selection-color: @text@; font-size: 13px; }
+        QHeaderView { background: @surface@; }
+        QHeaderView::section { background: @surface@; color: @muted@; font-size: 11px; font-weight: 500; border: none; border-right: 1px solid @grid@; border-bottom: 1px solid @border@; padding: 6px 8px; }
+        QHeaderView::section:checked { background: @selection@; color: @accent@; }
+        QTableCornerButton::section { background: @surface@; border: none; }
+        QTextEdit { background: @field@; color: @text@; border: 2px solid @accent@; border-radius: 0; padding: 2px 6px; selection-background-color: @selection@; selection-color: @text@; }
+        QScrollBar:vertical, QScrollBar:horizontal { background: @scroll_track@; }
+        QScrollBar::handle:vertical, QScrollBar::handle:horizontal { background: @scroll_handle@; border-radius: 2px; }
+        QScrollBar::handle:hover { background: @scroll_hover@; }
+        QAbstractScrollArea::corner { background: @scroll_track@; }
     ''')

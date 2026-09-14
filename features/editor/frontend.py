@@ -1,3 +1,4 @@
+from core.themes import themed_style, theme_color, theme_manager
 """Apresentação Widgets independente; reutiliza controles e sinais do legado."""
 from pathlib import Path
 from PySide6.QtCore import Qt, QSize, QObject, QEvent, QPoint, QTimer
@@ -14,80 +15,75 @@ from PySide6.QtWidgets import (
 
 
 STYLE = """
-QWidget { background: #1a1b21; color: #f3f5f8; font-size: 12px; }
-QMainWindow, QWidget#root { background: #0f1014; }
-QFrame#footer { background: #0f1014; border: none; }
+QWidget { background: @surface@; color: @text@; font-size: 12px; }
+QMainWindow, QWidget#root { background: @window@; }
+QFrame#footer { background: @window@; border: none; }
 QLabel { background: transparent; }
-QLabel#muted { color: #a8abb5; }
-QFrame#bar { background: #15161b; border-bottom: 1px solid #30323b; }
-QFrame#compact { background: #121318; border: 1px solid #30323b; border-radius: 6px; }
+QLabel#muted { color: @muted@; }
+QFrame#bar { background: @panel@; border-bottom: 1px solid @border@; }
+QFrame#compact { background: @field@; border: 1px solid @border@; border-radius: 6px; }
 QFrame#compact QAbstractSpinBox { border: none; background: transparent; padding: 0; min-height: 0; font-size: 11px; }
-QFrame#compact QLabel { color: #777b87; font-size: 10px; }
-QPushButton { background: #22232b; border: 1px solid #30323b;
+QFrame#compact QLabel { color: @disabled@; font-size: 10px; }
+QPushButton { background: @button@; border: 1px solid @border@;
  border-radius: 6px; padding: 6px 10px; min-height: 20px; }
-QPushButton:hover { background: #2a2c35; border-color: #454854; }
-QPushButton:checked { background: #343159; border-color: #7c73f2; }
-QPushButton:disabled { color: #777b87; background: #1a1b21; }
-QPushButton#primary { background: #7c73f2; color: white; border: none; }
+QPushButton:hover { background: @hover@; border-color: @border_strong@; }
+QPushButton:checked { background: @selection@; border-color: @accent@; }
+QPushButton:disabled { color: @disabled@; background: @surface@; }
+QPushButton#primary { background: @accent@; color: @on_accent@; border: none; }
 QPushButton[squareControl="true"] {
  padding: 0; min-width: 28px; max-width: 28px;
- min-height: 28px; max-height: 28px; border: 1px solid #30323b;
+ min-height: 28px; max-height: 28px; border: 1px solid @border@;
 }
-QPushButton#section { text-align: left; background: #15161b;
- border: none; border-bottom: 1px solid #30323b; border-radius: 0;
+QPushButton#section { text-align: left; background: @panel@;
+ border: none; border-bottom: 1px solid @border@; border-radius: 0;
  padding: 12px; font-weight: 600; }
-QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit { background: #121318;
- border: 1px solid #30323b; border-radius: 5px; padding: 5px; min-height: 20px;
- selection-background-color: #343159; }
-QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus, QTextEdit:focus { border-color: #7c73f2; }
+QLineEdit, QAbstractSpinBox, QComboBox, QTextEdit { background: @field@;
+ border: 1px solid @border@; border-radius: 5px; padding: 5px; min-height: 20px;
+ selection-background-color: @selection@; }
+QLineEdit:focus, QAbstractSpinBox:focus, QComboBox:focus, QTextEdit:focus { border-color: @accent@; }
 QSpinBox::up-button, QDoubleSpinBox::up-button {
  subcontrol-origin: border; subcontrol-position: top right; width: 20px;
- background: #30323b; border-left: 1px solid #454854; border-bottom: 1px solid #454854;
+ background: @border@; border-left: 1px solid @border_strong@; border-bottom: 1px solid @border_strong@;
 }
 QSpinBox::down-button, QDoubleSpinBox::down-button {
  subcontrol-origin: border; subcontrol-position: bottom right; width: 20px;
- background: #30323b; border-left: 1px solid #454854;
+ background: @border@; border-left: 1px solid @border_strong@;
 }
 QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover,
-QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover { background: #343159; }
-QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url(__ICONS__/spin-up.svg); width: 10px; height: 6px; }
-QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url(__ICONS__/spin-down.svg); width: 10px; height: 6px; }
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover { background: @selection@; }
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow { image: url(@spin_up@); width: 10px; height: 6px; }
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow { image: url(@spin_down@); width: 10px; height: 6px; }
 QSpinBox::up-button:disabled, QDoubleSpinBox::up-button:disabled,
-QSpinBox::down-button:disabled, QDoubleSpinBox::down-button:disabled { background: #1a1b21; }
-QWidget:disabled { color: #777b87; }
-QListWidget { background: #1a1b21; border: none; outline: none; }
-QListWidget::item { padding: 7px; border-bottom: 1px solid #292a31; }
-QListWidget::item:selected { background: #343159; color: #f3f5f8; }
+QSpinBox::down-button:disabled, QDoubleSpinBox::down-button:disabled { background: @surface@; }
+QWidget:disabled { color: @disabled@; }
+QListWidget { background: @surface@; border: none; outline: none; }
+QListWidget::item { padding: 7px; border-bottom: 1px solid @border@; }
+QListWidget::item:selected { background: @selection@; color: @text@; }
 QListWidget#layers::item { padding: 0; border: none; }
 QListWidget#layers QWidget { background: transparent; }
 QScrollArea { border: none; }
-QScrollBar:vertical { background: #24262e; width: 8px; margin: 0; }
-QScrollBar:horizontal { background: #24262e; height: 8px; margin: 0; }
+QScrollBar:vertical { background: @scroll_track@; width: 8px; margin: 0; }
+QScrollBar:horizontal { background: @scroll_track@; height: 8px; margin: 0; }
 QScrollBar::handle:vertical {
- background: #5b5f6d; min-height: 24px; border-radius: 2px;
+ background: @scroll_handle@; min-height: 24px; border-radius: 2px;
 }
 QScrollBar::handle:horizontal {
- background: #5b5f6d; min-width: 24px; border-radius: 2px;
+ background: @scroll_handle@; min-width: 24px; border-radius: 2px;
 }
-QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: #747989; }
+QScrollBar::handle:vertical:hover, QScrollBar::handle:horizontal:hover { background: @scroll_hover@; }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical,
 QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
-QAbstractScrollArea::corner { background: #24262e; border: none; }
-QSplitter::handle { background: #30323b; width: 1px; }
-QToolTip { background: #22232b; color: #f3f5f8; border: 1px solid #454854; padding: 6px; }
+QAbstractScrollArea::corner { background: @scroll_track@; border: none; }
+QSplitter::handle { background: @border@; width: 1px; }
+QToolTip { background: @button@; color: @text@; border: 1px solid @border_strong@; padding: 6px; }
 """
 
 
 def icon(path):
-    svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="#c5c3df" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{path}</g></svg>'
-    pix = QPixmap(24, 24)
-    pix.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pix)
-    QSvgRenderer(svg.encode()).render(painter)
-    painter.end()
-    return QIcon(pix)
+    from core.theme_icons import tool_icon
+    return tool_icon(path)
 
 
 def column():
@@ -210,8 +206,8 @@ def install_frontend(w):
     old.hide()
     w._original_ui = old
     for child in old.findChildren(QWidget):
-        child.setStyleSheet('')
-    w.setStyleSheet(STYLE.replace('__ICONS__', (Path(__file__).parent / 'icons').as_posix()))
+        themed_style(child, '')
+    themed_style(w, STYLE.replace('__ICONS__', (Path(__file__).parent / 'icons').as_posix()))
     w.resize(1500, 930)
     root, outer = column()
     root.setObjectName('root')
@@ -226,7 +222,7 @@ def install_frontend(w):
     h.addStretch()
     model_title = QLabel(w._current_model_name or 'Novo modelo')
     model_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    model_title.setStyleSheet('font-size: 16px; font-weight: 600;')
+    themed_style(model_title, 'font-size: 16px; font-weight: 600;')
     w.windowTitleChanged.connect(
         lambda _, label=model_title: label.setText(w._current_model_name or 'Novo modelo')
     )
@@ -243,18 +239,18 @@ def install_frontend(w):
     tools.setSpacing(8)
     selection = QLabel('SELEÇÃO\nNenhum objeto')
     selection.setFixedWidth(138)
-    selection.setStyleSheet('color: #a8abb5; font-size: 10px;')
+    themed_style(selection, 'color: @muted@; font-size: 10px;')
     tools.addWidget(selection)
     def toolbar_separator():
         # O layout já fornece 8 px externamente; os 12 px internos completam
         # os 20 px de respiro desejados em cada lado da linha de 1 px.
         spacing = QWidget()
         spacing.setFixedSize(25, 24)
-        spacing.setStyleSheet('background: transparent;')
+        themed_style(spacing, 'background: transparent;')
         separator = QFrame(spacing)
         separator.setObjectName('toolbarSeparator')
         separator.setGeometry(12, 0, 1, 24)
-        separator.setStyleSheet('QFrame#toolbarSeparator { background: #30323b; border: none; }')
+        themed_style(separator, 'QFrame#toolbarSeparator { background: @border@; border: none; }')
         tools.addWidget(spacing)
     moved = [p.spin_w, p.spin_h, p.chk_proporcao, p.spin_rot, p.spin_opacity]
     for name, control in [('X', w.spin_pos_x), ('Y', w.spin_pos_y), ('L', p.spin_w), ('A', p.spin_h)]:
@@ -277,7 +273,7 @@ def install_frontend(w):
         button = QPushButton()
         button.setIcon(icon(path))
         button.setFixedSize(30, 30)
-        button.setStyleSheet('padding: 0;')
+        themed_style(button, 'padding: 0;')
         button.setToolTip(label)
         button.clicked.connect(lambda checked=False, v=vertical: w.add_guide(v))
         tools.addWidget(button)
@@ -287,7 +283,7 @@ def install_frontend(w):
     ):
         button.setText(symbol)
         button.setToolTip(tip)
-        button.setStyleSheet('QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
+        themed_style(button, 'QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
                             'min-height: 28px; max-height: 28px; font-size: 14px; }')
         button.setFixedSize(30, 30)
         tools.addWidget(button)
@@ -300,7 +296,7 @@ def install_frontend(w):
         button.setToolTip(tip)
         button.setMinimumSize(0, 0)
         button.setMaximumSize(16777215, 16777215)
-        button.setStyleSheet('padding: 0; font-size: 16px;')
+        themed_style(button, 'padding: 0; font-size: 16px;')
         button.setFixedSize(30, 30)
         tools.addWidget(button)
     tools.addStretch()
@@ -325,23 +321,23 @@ def install_frontend(w):
     forms.setToolTip('Escolha uma forma e arraste no canvas. Shift restringe proporções ou ângulo; Esc cancela.')
     shape_menu = QMenu(forms)
     shape_menu.setObjectName('shapeMenu')
-    shape_menu.setStyleSheet('''
+    themed_style(shape_menu, '''
         QMenu#shapeMenu {
-            background-color: #22232b;
-            border: 1px solid #454854;
+            background-color: @button@;
+            border: 1px solid @border_strong@;
             border-radius: 8px;
             padding: 6px;
         }
         QMenu#shapeMenu::item {
-            color: #f3f5f8;
+            color: @text@;
             background-color: transparent;
             padding: 10px 28px 10px 36px;
             border: 1px solid transparent;
             border-radius: 5px;
         }
         QMenu#shapeMenu::item:selected {
-            background-color: #343159;
-            border-color: #7c73f2;
+            background-color: @selection@;
+            border-color: @accent@;
         }
         QMenu#shapeMenu::icon { left: 10px; }
     ''')
@@ -361,7 +357,7 @@ def install_frontend(w):
         button.setText('')
         contents = QHBoxLayout(button)
         contents.setContentsMargins(42, 3, 8, 3)
-        caption = QLabel(f'<b>{label}</b><br><span style="font-size:9px;color:#777b87">{detail}</span>')
+        caption = QLabel(f'<b>{label}</b><br><span style="font-size:9px">{detail}</span>')
         caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         contents.addWidget(caption)
         button.setIcon(icon(path))
@@ -369,7 +365,7 @@ def install_frontend(w):
         button.setObjectName('add' + label)
         # QSS mede a área de conteúdo: 36 + 12 de padding + 2 de borda = 50.
         # Fixar também no estilo evita que o polish restaure o mínimo global.
-        button.setStyleSheet('QPushButton#' + button.objectName() + ' { '
+        themed_style(button, 'QPushButton#' + button.objectName() + ' { '
                             'text-align: left; padding: 6px 10px 6px 12px; '
                             'min-height: 36px; max-height: 36px; }')
         button.setFixedHeight(50)
@@ -381,7 +377,7 @@ def install_frontend(w):
         b.setToolTip(label)
         b.setMinimumSize(0, 0)
         b.setMaximumSize(16777215, 16777215)
-        b.setStyleSheet('')
+        themed_style(b, '')
         square_control(b)
         paths = {'Renomear': '<path d="m4 17 3-1L19 4l2 2L9 18l-5 1z"/>', 'Duplicar': '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>', 'Excluir': '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>'}
         b.setIcon(icon(paths[label]))
@@ -391,7 +387,25 @@ def install_frontend(w):
     w.layer_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
     ll.addWidget(w.layer_list, 1)
     split.addWidget(left)
-    w.view.setBackgroundBrush(QColor('#26272c'))
+    def update_canvas_theme():
+        w.view.setBackgroundBrush(QColor(theme_color('canvas')))
+        from .canvas_items import Guideline, ResizeHandle
+        for item in w.scene.items():
+            if isinstance(item, Guideline):
+                pen = item.pen()
+                pen.setColor(QColor(theme_color('warning' if item.isSelected() else 'guide')))
+                item.setPen(pen)
+            elif isinstance(item, ResizeHandle):
+                item.setBrush(QColor(theme_color('handle')))
+        w.view.viewport().update()
+    theme_manager().changed.connect(update_canvas_theme)
+    manager = theme_manager()
+    def disconnect_theme():
+        from shiboken6 import isValid
+        if isValid(manager):
+            manager.changed.disconnect(update_canvas_theme)
+    w.destroyed.connect(disconnect_theme)
+    update_canvas_theme()
     w.view.setFrameShape(QFrame.Shape.NoFrame)
     from .rulers import RulerWorkspace
     w.ruler_workspace = RulerWorkspace(w)
@@ -417,7 +431,7 @@ def install_frontend(w):
     fill_layout.setContentsMargins(0, 0, 0, 0)
     fill_heading = QLabel('PREENCHIMENTO')
     fill_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    fill_heading.setStyleSheet('color: #c5c3df; font-size: 11px; font-weight: 600;')
+    themed_style(fill_heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
     fill_layout.addWidget(fill_heading)
     fill_row = row(fill_layout, shape_swatch, shape_color, compact('α', fill_alpha, '%', 85))
     fill_row.setStretch(1, 1)
@@ -432,7 +446,7 @@ def install_frontend(w):
             selected[0].fill_opacity = fill_alpha.value() / 100
             selected[0].update()
             shape_color.setText(color.name())
-            shape_swatch.setStyleSheet(f'background: {color.name()};')
+            themed_style(shape_swatch, f'background: {color.name()};')
             w.save_snapshot()
     def choose_shape_color():
         color = QColorDialog.getColor(QColor(shape_color.text()), w, 'Cor do preenchimento')
@@ -481,7 +495,7 @@ def install_frontend(w):
     rectangle_radius_layout.setContentsMargins(0, 0, 0, 0)
     radius_heading = QLabel('ARREDONDAMENTO DE BORDAS')
     radius_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    radius_heading.setStyleSheet('color: #c5c3df; font-size: 11px; font-weight: 600;')
+    themed_style(radius_heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
     rectangle_radius_layout.addWidget(radius_heading)
     sync_radii = QPushButton()
     sync_radii.setObjectName('syncCornerRadii')
@@ -632,7 +646,7 @@ def install_frontend(w):
             item.outline_width = mm_to_px(outline_width.value())
         item.outline_position = 'center' if is_line else ('inside' if getattr(item, 'is_document_background', False) else outline_position.currentData())
         item.update()
-        outline_swatch.setStyleSheet(f'background: {color.name()};')
+        themed_style(outline_swatch, f'background: {color.name()};')
         for control in (outline_color, outline_swatch, outline_width, outline_position, outline_alpha, outline_join):
             control.setEnabled(item.outline_enabled)
         w.save_snapshot()
@@ -669,7 +683,7 @@ def install_frontend(w):
     styles = row(tl, t.btn_bold, t.btn_italic, t.btn_underline)
     styles.setSpacing(6)
     for button in (t.btn_bold, t.btn_italic, t.btn_underline):
-        button.setStyleSheet('QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
+        themed_style(button, 'QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
                             'min-height: 28px; max-height: 28px; }')
         button.setFixedSize(30, 30)
     styles.addStretch()
@@ -691,7 +705,7 @@ def install_frontend(w):
         value = t.color_hex.text().strip()
         color = QColor(value)
         if len(value) == 7 and value.startswith('#') and color.isValid():
-            t.btn_color.setStyleSheet(f'background: {color.name()}; border: 1px solid #454854;')
+            themed_style(t.btn_color, f'background: {color.name()}; border: 1px solid @border_strong@;')
             color.setAlphaF(text_alpha.value()/100)
             t.fontColorChanged.emit(color.name(QColor.NameFormat.HexArgb))
             t.snapshotRequested.emit()
@@ -706,20 +720,20 @@ def install_frontend(w):
         text_alpha.setValue(round(color.alphaF()*100))
     t.fontColorChanged.connect(color_changed)
     alignment_heading = QLabel('ALINHAMENTO')
-    alignment_heading.setStyleSheet('color: #a8abb5; font-size: 10px; font-weight: 600; margin-top: 6px;')
+    themed_style(alignment_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
     tl.addWidget(alignment_heading)
     for control in (t.cbo_align, t.cbo_valign, t.spin_lh, t.spin_indent, t.spin_size):
         selector = 'QComboBox' if isinstance(control, QComboBox) else 'QAbstractSpinBox'
-        control.setStyleSheet(selector + ' { min-height: 18px; max-height: 18px; padding-top: 5px; padding-bottom: 5px; }')
+        themed_style(control, selector + ' { min-height: 18px; max-height: 18px; padding-top: 5px; padding-bottom: 5px; }')
         control.setFixedHeight(30)
         control.setMinimumWidth(0)
     for control in (t.cbo_align, t.cbo_valign):
         popup = QListView(control)
         popup.setObjectName('alignmentOptions')
-        popup.setStyleSheet('''
+        themed_style(popup, '''
             QListView#alignmentOptions {
-                background: #22232b; color: #f3f5f8;
-                border: 1px solid #454854; border-radius: 8px;
+                background: @button@; color: @text@;
+                border: 1px solid @border_strong@; border-radius: 8px;
                 padding: 6px; outline: none;
             }
             QListView#alignmentOptions::item {
@@ -728,7 +742,7 @@ def install_frontend(w):
             }
             QListView#alignmentOptions::item:selected,
             QListView#alignmentOptions::item:hover {
-                background: #343159; border-color: #7c73f2; color: #f3f5f8;
+                background: @selection@; border-color: @accent@; color: @text@;
             }
         ''')
         popup.setMouseTracking(True)
@@ -745,7 +759,7 @@ def install_frontend(w):
     doc, dl = column()
     def document_heading(title):
         label = QLabel(title)
-        label.setStyleSheet('color: #a8abb5; font-size: 10px; font-weight: 600; margin-top: 6px;')
+        themed_style(label, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
         dl.addWidget(label)
     document_heading('DIMENSÕES')
     w.chk_doc_proporcao.setText('')
@@ -758,14 +772,14 @@ def install_frontend(w):
     document_heading('CAMPOS DA TABELA')
     order_hint = QLabel('Segure e arraste para ajustar a ordem')
     order_hint.setWordWrap(True)
-    order_hint.setStyleSheet('color: #777b87; font-size: 10px;')
+    themed_style(order_hint, 'color: @disabled@; font-size: 10px;')
     dl.addWidget(order_hint)
     w.lst_placeholders.setObjectName('tableFields')
-    w.lst_placeholders.setStyleSheet('''
-        QListWidget#tableFields { background: #1a1b21; border: none; outline: none; }
+    themed_style(w.lst_placeholders, '''
+        QListWidget#tableFields { background: @surface@; border: none; outline: none; }
         QListWidget#tableFields::item { padding: 4px 5px; border: none; }
-        QListWidget#tableFields::item:selected { background: #343159; color: #f3f5f8; }
-        QListWidget#tableFields::item:hover { background: #2a2c35; }
+        QListWidget#tableFields::item:selected { background: @selection@; color: @text@; }
+        QListWidget#tableFields::item:hover { background: @hover@; }
     ''')
     w.lst_placeholders.setFixedHeight(180)
     w.lst_placeholders.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
@@ -826,9 +840,7 @@ def install_frontend(w):
             t.spin_indent.lineEdit().clear()
             t.color_hex.clear()
             text_alpha.lineEdit().clear()
-            t.btn_color.setStyleSheet(
-                'background: #121318; border: 1px solid #30323b; border-radius: 5px;'
-            )
+            themed_style(t.btn_color, 'background: @field@; border: 1px solid @border@; border-radius: 5px;')
         finally:
             for control, was_blocked in previous:
                 control.blockSignals(was_blocked)
@@ -920,7 +932,7 @@ def install_frontend(w):
             outline_alpha.setValue(item.outline_opacity * 100)
             join_straight.setChecked(item.outline_join == 'miter')
             join_round.setChecked(item.outline_join != 'miter')
-            outline_swatch.setStyleSheet(f'background: {item.outline_color};')
+            themed_style(outline_swatch, f'background: {item.outline_color};')
             outline_width.setValue(px_to_mm(item.outline_width))
             for index in range(outline_position.count()):
                 outline_position.model().item(index).setEnabled(
@@ -930,7 +942,7 @@ def install_frontend(w):
                 control.setEnabled(item.outline_enabled)
             background_outline_hint.setVisible(background_selected)
             shape_color.setText(selected[0].fill_color)
-            shape_swatch.setStyleSheet(f'background: {selected[0].fill_color};')
+            themed_style(shape_swatch, f'background: {selected[0].fill_color};')
             p.btn_restore.setEnabled(False)
             p.set_link_available(not background_selected)
         selection.setText('SELEÇÃO\n' + (getattr(selected[0], 'layer_name', '') or 'Objeto selecionado' if selected else 'Nenhum objeto'))

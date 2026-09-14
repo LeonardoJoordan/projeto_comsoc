@@ -1,3 +1,4 @@
+from core.themes import themed_style, theme_color, theme_manager
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
                                QFormLayout, QGridLayout, QTextEdit, QFontComboBox,
                                QPushButton, QComboBox, QDoubleSpinBox, QColorDialog,
@@ -72,7 +73,7 @@ class CaixaDeTextoPanel(QWidget):
             "• <b>Opacidade:</b> Controla o nível de transparência do elemento (0% a 100%).<br>"
             "• <b>Restaurar original:</b> Reseta a escala e rotação para os valores nativos do arquivo.<br>"
             "• <b>Habilitar link:</b> Cria uma área de interação para redirecionamento em arquivos PDF.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Utilize a função 'Restaurar original' para recuperar instantaneamente a proporção e nitidez nativa de imagens que foram deformadas.</small>"
+            "<small >Dica: Utilize a função 'Restaurar original' para recuperar instantaneamente a proporção e nitidez nativa de imagens que foram deformadas.</small>"
         )
         self.lbl_title.setToolTip(tooltip_propriedades)
         layout.addWidget(self.lbl_title)
@@ -108,7 +109,7 @@ class CaixaDeTextoPanel(QWidget):
         self.lbl_w.setToolTip(
             "<b>LARGURA</b><br><br>"
             "Define a dimensão física horizontal exata do objeto.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Valores inseridos aqui refletem o tamanho real (em milímetros) na impressão final.</small>"
+            "<small >Dica: Valores inseridos aqui refletem o tamanho real (em milímetros) na impressão final.</small>"
         )
 
         self.spin_h = MathDoubleSpinBox()
@@ -121,7 +122,7 @@ class CaixaDeTextoPanel(QWidget):
         self.lbl_h.setToolTip(
             "<b>ALTURA</b><br><br>"
             "Define a dimensão física vertical exata do objeto.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Se a opção 'Manter proporção' estiver ativa, a largura será ajustada automaticamente.</small>"
+            "<small >Dica: Se a opção 'Manter proporção' estiver ativa, a largura será ajustada automaticamente.</small>"
         )
 
         size_grid.addWidget(self.lbl_w, 0, 0)
@@ -140,7 +141,7 @@ class CaixaDeTextoPanel(QWidget):
             "Preserva a relação entre largura e altura durante o redimensionamento:<br>"
             "• <b>Vínculo:</b> Ao alterar um valor, o outro é ajustado automaticamente.<br>"
             "• <b>Integridade:</b> Evita que imagens e textos fiquem esticados ou deformados.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Desative apenas se precisar forçar uma dimensão específica ignorando o aspeto original.</small>",
+            "<small >Dica: Desative apenas se precisar forçar uma dimensão específica ignorando o aspeto original.</small>",
             checkable=True
         )
         self.chk_proporcao.setChecked(True)
@@ -157,7 +158,7 @@ class CaixaDeTextoPanel(QWidget):
             "<b>RESTAURAR ORIGINAL</b><br><br>"
             "Reverte o objeto ao seu estado inicial de importação:<br><br>"
             "• <b>Reset:</b> Redefine o tamanho nativo e remove qualquer rotação aplicada.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>"
+            "<small >Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>"
         )
         # --- Efeito visual de Opacidade ---
         self.op_restore = QGraphicsOpacityEffect(self.btn_restore)
@@ -206,7 +207,7 @@ class CaixaDeTextoPanel(QWidget):
         self.lbl_rot.setToolTip(
             "<b>ROTAÇÃO</b><br><br>"
             "Gira o objeto selecionado em graus (°) ao redor do seu ponto central.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Use valores positivos para girar no sentido horário ou negativos para o sentido anti-horário.</small>"
+            "<small >Dica: Use valores positivos para girar no sentido horário ou negativos para o sentido anti-horário.</small>"
         )
 
         rot_line.addWidget(self.lbl_rot)
@@ -264,7 +265,7 @@ class CaixaDeTextoPanel(QWidget):
         self.lbl_opacity.setToolTip(
             "<b>OPACIDADE</b><br><br>"
             "Controla o nível de transparência do elemento (0% a 100%).<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Valores baixos são excelentes para criar marcas d'água sutis que não interferem na leitura de outros dados.</small>"
+            "<small >Dica: Valores baixos são excelentes para criar marcas d'água sutis que não interferem na leitura de outros dados.</small>"
         )
 
         opac_line.addWidget(self.lbl_opacity)
@@ -277,7 +278,7 @@ class CaixaDeTextoPanel(QWidget):
             "Cria uma área de interação (clicável) no PDF exportado:<br><br>"
             "• <b>Cartões interativos:</b> O PDF gerado terá um link clicável para redirecionar ao endereço configurado na tabela.<br>"
             "• <b>Somente em PDF:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>"
+            "<small >Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>"
         )
         self.chk_link.toggled.connect(self.linkToggled.emit)
         self.op_link = QGraphicsOpacityEffect(self.chk_link)
@@ -334,7 +335,7 @@ class CaixaDeTextoPanel(QWidget):
         btn = QPushButton(text)
         btn.setFixedSize(26, 26) # Tamanho padrão dos seus ícones de guia
         btn.setCheckable(checkable)
-        btn.setStyleSheet(self._tool_button_style())
+        themed_style(btn, self._tool_button_style())
         btn.setToolTip(tooltip)
         return btn
 
@@ -376,9 +377,7 @@ class CaixaDeTextoPanel(QWidget):
     def _refresh_proportion_button(self, available: bool):
         checked = self.chk_proporcao.isChecked()
         self.chk_proporcao.setEnabled(available)
-        self.chk_proporcao.setStyleSheet(
-            self._proportion_button_style(available and checked)
-        )
+        themed_style(self.chk_proporcao, self._proportion_button_style(available and checked))
         if not available:
             opacity = self.DISABLED_OPACITY
         elif not checked:
@@ -538,7 +537,7 @@ class EditorDeTextoPanel(QWidget):
         layout.setSpacing(10)
         
         lbl = QLabel("EDITOR DE TEXTO")
-        lbl.setStyleSheet("font-weight: bold; font-size: 12px; border-bottom: 1px solid #ccc;")
+        themed_style(lbl, "font-weight: bold; font-size: 12px; border-bottom: 1px solid #ccc;")
         lbl.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
         
         tooltip_editor = (
@@ -552,7 +551,7 @@ class EditorDeTextoPanel(QWidget):
             "• <b>Alinhamento vertical:</b> Fixa o conteúdo no Topo, no Meio ou na Base da moldura.<br>"
             "• <b>Recuo:</b> Define o recuo horizontal da primeira linha para organizar visualmente o início dos parágrafos.<br>"
             "• <b>Entrelinha:</b> Controla a distância vertical entre as linhas, melhorando a legibilidade ou compactando o bloco.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Para caixas que receberão nomes curtos ou longos, ajuste o alinhamento vertical para 'Meio' para mantê-los sempre perfeitamente centralizados na altura.</small>"
+            "<small >Dica: Para caixas que receberão nomes curtos ou longos, ajuste o alinhamento vertical para 'Meio' para mantê-los sempre perfeitamente centralizados na altura.</small>"
         )
         lbl.setToolTip(tooltip_editor)
         layout.addWidget(lbl)
@@ -567,14 +566,14 @@ class EditorDeTextoPanel(QWidget):
             "• <b>Composição:</b> Você pode misturar texto estático e variáveis na mesma caixa (ex: <i>Certificamos que {Aluno} concluiu...</i>).<br>"
             "• <b>Ocultação Automática:</b> Se uma variável solta estiver vazia na tabela, <b>toda a caixa de texto ficará invisível</b> naquele cartão, evitando lixo visual na impressão final, exceto se contiver <b>Trechos Opcionais</b>.<br>"
             "• <b>Trechos Opcionais (Condicionais):</b> Use barras retas (<b>|</b>) para isolar partes do texto. Ex: <i>| CPF n° {CPF} |</i>. Se o dado estiver vazio, apenas o trecho entre as barras desaparece, salvando o restante da caixa.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica Smart: Agrupe rótulos e variáveis na mesma caixa (ex: \"WhatsApp: {Telefone}\"). Assim, se a pessoa não tiver telefone cadastrado, a palavra \"WhatsApp:\" some junto com a variável, mantendo o layout impecável.</small>"
+            "<small >Dica Smart: Agrupe rótulos e variáveis na mesma caixa (ex: \"WhatsApp: {Telefone}\"). Assim, se a pessoa não tiver telefone cadastrado, a palavra \"WhatsApp:\" some junto com a variável, mantendo o layout impecável.</small>"
         )
         lbl_texto.setToolTip(tooltip_texto)
         layout.addWidget(lbl_texto)
         
         self.txt_content = CleanTextEdit()
         self.txt_content.setMinimumHeight(160)
-        self.txt_content.setStyleSheet("background-color: #FFFFFF; color: #000000; border: 1px solid #aaa; font-family: sans-serif; font-size: 11pt;")
+        themed_style(self.txt_content, "background-color: @field@; color: @text@; border: 1px solid @border@; font-family: sans-serif; font-size: 11pt;")
         self.txt_content.textChanged.connect(self._emit_clean_html)
         
         # INSERE A CAIXA NO LAYOUT PARA ELA APARECER
@@ -586,7 +585,7 @@ class EditorDeTextoPanel(QWidget):
         self.cbo_font.setToolTip(
             "<b>FAMÍLIA TIPOGRÁFICA</b><br><br>"
             "Define a fonte (tipo de letra) do texto ou da seleção atual.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Dê preferência a fontes limpas (como Arial, Roboto ou Montserrat) para garantir máxima legibilidade em impressões menores.</small>"
+            "<small >Dica: Dê preferência a fontes limpas (como Arial, Roboto ou Montserrat) para garantir máxima legibilidade em impressões menores.</small>"
         )
         self.cbo_font.currentFontChanged.connect(self.set_font_family)
         
@@ -595,7 +594,7 @@ class EditorDeTextoPanel(QWidget):
         self.spin_size.setToolTip(
             "<b>TAMANHO DA FONTE</b><br><br>"
             "Ajusta a escala do texto em pontos tipográficos (pt).<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Nomes e títulos principais costumam ter grande destaque, enquanto cargos e prefixos usam tamanhos reduzidos.</small>"
+            "<small >Dica: Nomes e títulos principais costumam ter grande destaque, enquanto cargos e prefixos usam tamanhos reduzidos.</small>"
         )
         self.spin_size.valueChanged.connect(self.set_font_size)
         
@@ -607,40 +606,40 @@ class EditorDeTextoPanel(QWidget):
         
         self.btn_bold = QPushButton("B")
         self.btn_bold.setFixedWidth(30)
-        self.btn_bold.setStyleSheet("font-weight: bold")
+        themed_style(self.btn_bold, "font-weight: bold")
         self.btn_bold.setCheckable(True)
         self.btn_bold.setToolTip(
             "<b>NEGRITO</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Ctrl + B</small>"
+            "<small >Atalho: Ctrl + B</small>"
             "<br><br>"
             "Aumenta a espessura da fonte para dar destaque ao texto selecionado.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Ideal para chamar a atenção para nomes, cargos ou informações cruciais no documento.</small>"
+            "<small >Dica: Ideal para chamar a atenção para nomes, cargos ou informações cruciais no documento.</small>"
         )
         self.btn_bold.clicked.connect(lambda: self.set_format_attribute("bold"))
 
         self.btn_italic = QPushButton("I")
         self.btn_italic.setFixedWidth(30)
-        self.btn_italic.setStyleSheet("font-style: italic")
+        themed_style(self.btn_italic, "font-style: italic")
         self.btn_italic.setCheckable(True)
         self.btn_italic.setToolTip(
             "<b>ITÁLICO</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Ctrl + I</small>"
+            "<small >Atalho: Ctrl + I</small>"
             "<br><br>"
             "Inclina o texto selecionado, alterando seu estilo visual sem mudar o peso.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Utilize para destacar citações, nomes científicos ou palavras de origem estrangeira.</small>"
+            "<small >Dica: Utilize para destacar citações, nomes científicos ou palavras de origem estrangeira.</small>"
         )
         self.btn_italic.clicked.connect(lambda: self.set_format_attribute("italic"))
 
         self.btn_underline = QPushButton("U")
         self.btn_underline.setFixedWidth(30)
-        self.btn_underline.setStyleSheet("text-decoration: underline")
+        themed_style(self.btn_underline, "text-decoration: underline")
         self.btn_underline.setCheckable(True)
         self.btn_underline.setToolTip(
             "<b>SUBLINHADO</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Ctrl + U</small>"
+            "<small >Atalho: Ctrl + U</small>"
             "<br><br>"
             "Adiciona uma linha contínua sob o texto para ressaltar informações.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Evite usar em blocos de texto muito grandes para não sobrecarregar o design.</small>"
+            "<small >Dica: Evite usar em blocos de texto muito grandes para não sobrecarregar o design.</small>"
         )
         self.btn_underline.clicked.connect(lambda: self.set_format_attribute("underline"))
 
@@ -649,8 +648,8 @@ class EditorDeTextoPanel(QWidget):
         self.btn_color.setToolTip(
             "<b>COR DO TEXTO</b><br><br>"
             "Abre a paleta de cores para personalizar o texto ou a seleção atual.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Procure manter um alto contraste com o fundo para garantir a legibilidade após a impressão.</small>")
-        self.btn_color.setStyleSheet("background-color: #000000; border: 1px solid #aaa; border-radius: 3px;")
+            "<small >Dica: Procure manter um alto contraste com o fundo para garantir a legibilidade após a impressão.</small>")
+        themed_style(self.btn_color, "background-color: #000000; border: 1px solid #aaa; border-radius: 3px;")
         self.btn_color.clicked.connect(self._choose_color)
 
         row_style.addWidget(self.btn_bold)
@@ -664,7 +663,7 @@ class EditorDeTextoPanel(QWidget):
             "<b>ALINHAMENTO HORIZONTAL</b><br><br>"
             "Define a posição do texto em relação às laterais da caixa:<br>"
             "• <b>Justificado:</b> Distribui o texto para preencher toda a largura da moldura.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: O alinhamento justificado cria margens retas e profissionais em blocos de texto mais densos.</small>")
+            "<small >Dica: O alinhamento justificado cria margens retas e profissionais em blocos de texto mais densos.</small>")
         self._align_map = ["left", "center", "right", "justify"]
         self.cbo_align.currentIndexChanged.connect(lambda idx: self.alignChanged.emit(self._align_map[idx]))
 
@@ -674,7 +673,7 @@ class EditorDeTextoPanel(QWidget):
             "<b>ALINHAMENTO VERTICAL</b><br><br>"
             "Posiciona o conteúdo verticalmente dentro da moldura da caixa:<br>"
             "• <b>Ancoragem:</b> Fixa o texto no Topo, no Meio ou na Base da caixa.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Combine o alinhamento 'Meio' com uma caixa alta para garantir que nomes e cargos fiquem sempre centralizados.</small>")
+            "<small >Dica: Combine o alinhamento 'Meio' com uma caixa alta para garantir que nomes e cargos fiquem sempre centralizados.</small>")
         self._valign_map = ["top", "center", "bottom"]
         self.cbo_valign.currentIndexChanged.connect(lambda idx: self.verticalAlignChanged.emit(self._valign_map[idx]))
 
@@ -690,7 +689,7 @@ class EditorDeTextoPanel(QWidget):
             "<b>RECUO DA PRIMEIRA LINHA</b><br><br>"
             "Define o recuo horizontal inicial do bloco de texto.<br><br>"
             "• <b>Estética:</b> Cria o efeito visual de parágrafo organizado.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Um valor entre 20 e 40px é o ideal para documentos formais.</small>")
+            "<small >Dica: Um valor entre 20 e 40px é o ideal para documentos formais.</small>")
         
         self.spin_indent = MathDoubleSpinBox()
         self.spin_indent.setRange(0, 500)
@@ -703,7 +702,7 @@ class EditorDeTextoPanel(QWidget):
             "<b>ENTRELINHA</b><br><br>"
             "Controla a distância vertical entre as linhas do parágrafo.<br><br>"
             "• <b>Legibilidade:</b> Valores maiores tornam a leitura mais fluida.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: 1.15 é o padrão de conforto; use 1.0 para compactar informações.</small>")
+            "<small >Dica: 1.15 é o padrão de conforto; use 1.0 para compactar informações.</small>")
 
         self.spin_lh = MathDoubleSpinBox()
         self.spin_lh.setRange(0.5, 5.0)
@@ -758,7 +757,7 @@ class EditorDeTextoPanel(QWidget):
         self.spin_size.setValue(state.font_size)
         
         color_hex = getattr(state, 'font_color', '#000000')
-        self.btn_color.setStyleSheet(f"background-color: {color_hex}; border: 1px solid #aaa; border-radius: 3px;")
+        themed_style(self.btn_color, f"background-color: {color_hex}; border: 1px solid #aaa; border-radius: 3px;")
         
         self.update_buttons_state()
 
@@ -841,7 +840,7 @@ class EditorDeTextoPanel(QWidget):
             if alpha_control:
                 color.setAlphaF(alpha_control.value()/100)
                 hex_color = color.name(color.NameFormat.HexArgb)
-            self.btn_color.setStyleSheet(f"background-color: {hex_color}; border: 1px solid #aaa; border-radius: 3px;")
+            themed_style(self.btn_color, f"background-color: {hex_color}; border: 1px solid #aaa; border-radius: 3px;")
             self.fontColorChanged.emit(hex_color)
             self.snapshotRequested.emit()
             self.txt_content.setFocus()
@@ -920,7 +919,7 @@ class AssinaturaPanel(QWidget):
         layout = QVBoxLayout(self)
         
         lbl = QLabel("PROPRIEDADES DA IMAGEM / ASSINATURA")
-        lbl.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 5px;")
+        themed_style(lbl, "font-weight: bold; font-size: 12px; margin-bottom: 5px;")
         layout.addWidget(lbl)
         
         form = QFormLayout()
@@ -931,7 +930,7 @@ class AssinaturaPanel(QWidget):
             "<b>DIMENSIONAMENTO PROPORCIONAL</b><br><br>"
             "Ajusta o tamanho do objeto baseando-se no seu lado mais comprido:<br>"
             "• <b>Automático:</b> A largura e altura são calculadas para evitar distorções na imagem.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Utilize este campo para garantir que todas as assinaturas do projeto mantenham uma escala uniforme.</small>")
+            "<small >Dica: Utilize este campo para garantir que todas as assinaturas do projeto mantenham uma escala uniforme.</small>")
         self.spin_size.valueChanged.connect(self.sideChanged.emit)
         
         form.addRow("Lado Maior:", self.spin_size)

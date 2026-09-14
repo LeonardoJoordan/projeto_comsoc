@@ -1,3 +1,4 @@
+from core.themes import themed_style, theme_color, theme_manager
 """Identidade visual do workspace, compartilhando o padrão do editor."""
 import re
 from pathlib import Path
@@ -11,59 +12,59 @@ from core.paths import get_models_dir
 
 
 STYLE = """
-QMainWindow, QWidget { background: #1a1b21; color: #f3f5f8; font-size: 12px; }
-QMainWindow { background: #0f1014; }
-QWidget#workspaceRoot { background: #0f1014; }
+QMainWindow, QWidget { background: @surface@; color: @text@; font-size: 12px; }
+QMainWindow { background: @window@; }
+QWidget#workspaceRoot { background: @window@; }
 QWidget#workspaceLeft, QWidget#previewPanel, QWidget#dataPanel,
 QWidget#outputPanel, QWidget#modelActions {
-    background: #15161b; border: 1px solid #30323b; border-radius: 8px;
+    background: @panel@; border: 1px solid @border@; border-radius: 8px;
 }
 QWidget#previewWorkspace { background: transparent; }
 QFrame#dataRail {
-    background: #15161b; border: 1px solid #30323b; border-radius: 8px;
+    background: @panel@; border: 1px solid @border@; border-radius: 8px;
 }
 QToolButton#dataRailToggle {
-    background: #191a20; color: #a9acb7; border: none;
-    border-right: 1px solid #30323b; border-radius: 0; padding: 0; font-size: 15px;
+    background: @alternate@; color: @muted@; border: none;
+    border-right: 1px solid @border@; border-radius: 0; padding: 0; font-size: 15px;
 }
-QToolButton#dataRailToggle:hover { background: #29283a; color: #ffffff; border-right-color: #7c73f2; }
-QFrame#modelBar, QFrame#logHeader { background: #15161b; border-bottom: 1px solid #30323b; }
+QToolButton#dataRailToggle:hover { background: @selection@; color: @on_accent@; border-right-color: @accent@; }
+QFrame#modelBar, QFrame#logHeader { background: @panel@; border-bottom: 1px solid @border@; }
 QWidget#outputControls { background: transparent; }
-QLabel#contextLabel { color: #8f939f; font-size: 10px; font-weight: 600; }
-QToolButton#moreActions { background: #22232b; border: 1px solid #30323b; border-radius: 6px; padding: 7px 10px; }
+QLabel#contextLabel { color: @muted@; font-size: 10px; font-weight: 600; }
+QToolButton#moreActions { background: @button@; border: 1px solid @border@; border-radius: 6px; padding: 7px 10px; }
 QToolButton#moreActions::menu-indicator { image: none; }
-QMenuBar { background: #101116; color: #d8dae2; padding: 3px 8px; border-bottom: 1px solid #30323b; }
+QMenuBar { background: @window@; color: @text@; padding: 3px 8px; border-bottom: 1px solid @border@; }
 QMenuBar::item { padding: 6px 10px; border-radius: 4px; }
-QMenuBar::item:selected { background: #2a2c35; }
-QMenu { background: #22232b; color: #f3f5f8; border: 1px solid #454854; padding: 6px; }
+QMenuBar::item:selected { background: @hover@; }
+QMenu { background: @button@; color: @text@; border: 1px solid @border_strong@; padding: 6px; }
 QMenu::item { padding: 8px 28px; border-radius: 4px; }
-QMenu::item:selected { background: #343159; }
-QMenu::separator { height: 1px; background: #454854; margin: 8px 8px; }
+QMenu::item:selected { background: @selection@; }
+QMenu::separator { height: 1px; background: @border_strong@; margin: 8px 8px; }
 QWidget#previewPanel, QWidget#dataPanel { padding: 10px; }
 QLabel { background: transparent; }
 QPushButton {
-    background: #22232b; color: #f3f5f8; border: 1px solid #30323b;
+    background: @button@; color: @text@; border: 1px solid @border@;
     border-radius: 6px; padding: 7px 10px; min-height: 20px;
 }
-QPushButton:hover { background: #2a2c35; border-color: #454854; }
-QPushButton:pressed, QPushButton:checked { background: #343159; border-color: #7c73f2; }
-QPushButton:disabled { color: #777b87; background: #1a1b21; }
-QPushButton#primary { background: #7c73f2; border-color: #7c73f2; color: white; font-weight: 600; }
-QPushButton#primary:hover { background: #8c84f6; }
-QPushButton#danger { color: #ef8d8d; }
+QPushButton:hover { background: @hover@; border-color: @border_strong@; }
+QPushButton:pressed, QPushButton:checked { background: @selection@; border-color: @accent@; }
+QPushButton:disabled { color: @disabled@; background: @surface@; }
+QPushButton#primary { background: @accent@; border-color: @accent@; color: @on_accent@; font-weight: 600; }
+QPushButton#primary:hover { background: @accent_hover@; }
+QPushButton#danger { color: @danger@; }
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit {
-    background: #121318; color: #f3f5f8; border: 1px solid #30323b;
+    background: @field@; color: @text@; border: 1px solid @border@;
     border-radius: 5px; padding: 5px; min-height: 20px;
-    selection-background-color: #343159;
+    selection-background-color: @selection@;
 }
 QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QTextEdit:focus {
-    border-color: #7c73f2;
+    border-color: @accent@;
 }
-QComboBox:hover { border-color: #454854; }
+QComboBox:hover { border-color: @border_strong@; }
 QComboBox::drop-down { border: none; width: 24px; }
-QComboBox::down-arrow { image: url(__COMBO_ARROW__); width: 10px; height: 6px; }
+QComboBox::down-arrow { image: url(@combo_arrow@); width: 10px; height: 6px; }
 QListView#workspaceComboOptions {
-    background: #22232b; color: #f3f5f8; border: 1px solid #454854;
+    background: @button@; color: @text@; border: 1px solid @border_strong@;
     border-radius: 8px; padding: 6px; outline: none;
     selection-background-color: transparent;
 }
@@ -73,54 +74,30 @@ QListView#workspaceComboOptions::item {
 }
 QListView#workspaceComboOptions::item:selected,
 QListView#workspaceComboOptions::item:hover {
-    background: #343159; border-color: #7c73f2; color: #f3f5f8;
+    background: @selection@; border-color: @accent@; color: @text@;
 }
 QTableWidget {
-    background: #121318; alternate-background-color: #17181e; color: #f3f5f8;
-    border: 1px solid #30323b; border-radius: 6px; gridline-color: #292b33;
-    selection-background-color: #343159; selection-color: #ffffff;
+    background: @field@; alternate-background-color: @alternate@; color: @text@;
+    border: 1px solid @border@; border-radius: 6px; gridline-color: @grid@;
+    selection-background-color: @selection@; selection-color: @on_accent@;
 }
 QHeaderView::section {
-    background: #22232b; color: #c9cbd3; border: none;
-    border-right: 1px solid #30323b; border-bottom: 1px solid #30323b;
+    background: @button@; color: @text@; border: none;
+    border-right: 1px solid @border@; border-bottom: 1px solid @border@;
     padding: 7px; font-weight: 600;
 }
-QProgressBar { background: #22232b; border: none; border-radius: 4px; }
-QProgressBar::chunk { background: #7c73f2; border-radius: 4px; }
-QSplitter::handle { background: #30323b; width: 1px; }
-QScrollBar:vertical { background: #24262e; width: 8px; margin: 0; }
-QScrollBar:horizontal { background: #24262e; height: 8px; margin: 0; }
-QScrollBar::handle:vertical { background: #5b5f6d; min-height: 24px; border-radius: 2px; }
-QScrollBar::handle:horizontal { background: #5b5f6d; min-width: 24px; border-radius: 2px; }
-QScrollBar::handle:hover { background: #747989; }
+QProgressBar { background: @button@; border: none; border-radius: 4px; }
+QProgressBar::chunk { background: @accent@; border-radius: 4px; }
+QSplitter::handle { background: @border@; width: 1px; }
+QScrollBar:vertical { background: @scroll_track@; width: 8px; margin: 0; }
+QScrollBar:horizontal { background: @scroll_track@; height: 8px; margin: 0; }
+QScrollBar::handle:vertical { background: @scroll_handle@; min-height: 24px; border-radius: 2px; }
+QScrollBar::handle:horizontal { background: @scroll_handle@; min-width: 24px; border-radius: 2px; }
+QScrollBar::handle:hover { background: @scroll_hover@; }
 QScrollBar::add-line, QScrollBar::sub-line { width: 0; height: 0; }
 QScrollBar::add-page, QScrollBar::sub-page { background: transparent; }
-QToolTip { background: #22232b; color: #f3f5f8; border: 1px solid #454854; padding: 6px; }
+QToolTip { background: @button@; color: @text@; border: 1px solid @border_strong@; padding: 6px; }
 """
-
-_LIGHT_COLORS = {
-    '#0f1014': '#e9ebf0', '#121318': '#ffffff', '#15161b': '#ffffff',
-    '#18191f': '#f7f8fa', '#191a20': '#f7f8fa', '#1a1b21': '#f4f5f7',
-    '#1e2027': '#eef0f4', '#202023': '#c8cbd3', '#22232b': '#eef0f4',
-    '#24262e': '#eceef2', '#29283a': '#e9e7fb', '#292b33': '#e2e4e9',
-    '#2a2a2a': '#e5e7eb', '#2a2c35': '#e2e5ea', '#30323b': '#d4d7df',
-    '#343159': '#ddd9ff', '#454854': '#bcc1cb', '#5b5f6d': '#afb4bf',
-    '#747989': '#9298a5', '#777b87': '#999da7', '#7c73f2': '#675de6',
-    '#8774df': '#675de6', '#8c84f6': '#756bea', '#8f939f': '#676c78',
-    '#9087ff': '#675de6', '#a8abb5': '#666b75', '#a9acb7': '#666b77',
-    '#bfc2cf': '#4d515b', '#c5bdff': '#4f45c4', '#c9cbd3': '#4b4f59',
-    '#d8dae2': '#343741', '#f3f5f8': '#20222a',
-}
-_LIGHT_COLOR_PATTERN = re.compile(
-    '|'.join(re.escape(color) for color in _LIGHT_COLORS), re.IGNORECASE
-)
-
-
-def _light_stylesheet(stylesheet):
-    return _LIGHT_COLOR_PATTERN.sub(
-        lambda match: _LIGHT_COLORS[match.group(0).lower()], stylesheet
-    )
-
 
 def install_frontend(window):
     window.resize(1440, 860)
@@ -152,7 +129,7 @@ def install_frontend(window):
     buttons.btn_remove_model.setObjectName('danger')
     window.btn_generate_cards.setObjectName('primary')
     window.btn_generate_cards.setMinimumHeight(42)
-    window.progress_bar.setStyleSheet('')
+    themed_style(window.progress_bar, '')
 
     window.table_panel.table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
@@ -214,11 +191,9 @@ def install_frontend(window):
             delete_action = action
     def style_model_action_hover(action):
         if action is delete_action:
-            model_actions.setStyleSheet(
-                'QMenu::item:selected { background: #762f3a; color: #f3f5f8; }'
-            )
+            themed_style(model_actions, 'QMenu::item:selected { background: @danger_background@; color: @on_danger@; }')
         else:
-            model_actions.setStyleSheet('')
+            themed_style(model_actions, '')
     model_actions.hovered.connect(style_model_action_hover)
     more.setMenu(model_actions)
     model_row.addWidget(more)
@@ -407,16 +382,5 @@ def install_frontend(window):
         fixed_data.setChecked(True)
     elif window.settings.value('workspaceDataPanelCollapsed', False, type=bool):
         set_data_panel_collapsed(True)
-    # O tema precisa alcançar também componentes que possuem estilos locais.
-    child_dark_styles = {
-        window.table_panel: window.table_panel.styleSheet(),
-        window.preview_panel.preview: window.preview_panel.preview.styleSheet(),
-    }
     combo_arrow = (Path(__file__).resolve().parent / 'icons' / 'combo-down.svg').as_posix()
-    workspace_style = STYLE.replace('__COMBO_ARROW__', combo_arrow)
-    def apply_visual_theme(is_dark):
-        window.setStyleSheet(workspace_style if is_dark else _light_stylesheet(workspace_style))
-        for widget, dark_style in child_dark_styles.items():
-            widget.setStyleSheet(dark_style if is_dark else _light_stylesheet(dark_style))
-    window._workspace_apply_visual_theme = apply_visual_theme
-    apply_visual_theme(window.settings.value('dark_mode', True, type=bool))
+    themed_style(window, STYLE)

@@ -29,6 +29,9 @@ def main():
     app.setDesktopFileName(APP_ID)
     app.setWindowIcon(QIcon(str(app_icon_path())))
     app.setStyle('Fusion')
+    from core.themes import theme_manager
+    from core.settings import get_app_settings
+    theme_manager().initialize(get_app_settings())
     window = EditorWindow()
     if args.model:
         window.load_from_json(args.model)

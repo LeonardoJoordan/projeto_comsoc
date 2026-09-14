@@ -1,3 +1,4 @@
+from core.themes import themed_style, theme_color, theme_manager
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QHBoxLayout, QFrame, QGridLayout, 
                                QDialogButtonBox, QCheckBox, QGroupBox, QDoubleSpinBox,
@@ -66,7 +67,7 @@ class ConfigDialog(QDialog):
         lbl_patern_title.setToolTip(
             "<b>PADRÃO DE NOME</b><br><br>"
             "Define como cada ficheiro gerado será batizado automaticamente pelo sistema.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Utilize as tags (ex: {Nome}) para que cada ficheiro saia com o nome do destinatário, facilitando a identificação e entrega do material.</small>"
+            "<small >Dica: Utilize as tags (ex: {Nome}) para que cada ficheiro saia com o nome do destinatário, facilitando a identificação e entrega do material.</small>"
         )
         ly_naming.addWidget(lbl_patern_title)
         ly_preview = QHBoxLayout()
@@ -77,7 +78,7 @@ class ConfigDialog(QDialog):
         self.txt_pattern.setMinimumHeight(34)
         
         lbl_ext = QLabel(".png")
-        lbl_ext.setStyleSheet("font-size: 14px; opacity: 0.7;") 
+        themed_style(lbl_ext, "font-size: 14px; opacity: 0.7;")
 
         ly_preview.addWidget(self.txt_pattern)
         ly_preview.addWidget(lbl_ext)
@@ -91,7 +92,7 @@ class ConfigDialog(QDialog):
             "<b>Exemplo:</b> Se definir como <i>Cartão de {Nome}</i>, o sistema gerará:<br>"
             "• Cartão de Leonardo.pdf<br>"
             "• Cartão de Lilia.pdf<br><br>"
-            "<small style='color: #A0A0A0;'>O sistema utiliza o dado exato que estiver preenchido na tabela para cada linha.</small>"
+            "<small >O sistema utiliza o dado exato que estiver preenchido na tabela para cada linha.</small>"
         )
         ly_naming.addWidget(lbl_vars_title)
         grid_vars = QGridLayout()
@@ -120,7 +121,7 @@ class ConfigDialog(QDialog):
 
         # Banner de Aviso para Hiperlinks
         self.lbl_link_warning = QLabel("⚠️ Hiperlinks ativos detetados. Use PDF (Arquivo Individual) para os manter.")
-        self.lbl_link_warning.setStyleSheet("color: #e67e22; font-weight: bold; padding: 5px; border: 1px solid #e67e22; border-radius: 4px;")
+        themed_style(self.lbl_link_warning, "color: @warning@; font-weight: bold; padding: 5px; border: 1px solid @warning@; border-radius: 4px;")
         self.lbl_link_warning.setVisible(False)
         ly_naming.insertWidget(0, self.lbl_link_warning)
 
@@ -142,7 +143,7 @@ class ConfigDialog(QDialog):
             "• <b>Salvar Novo:</b> Cria uma predefinição com as configurações atuais da tela.<br>"
             "• <b>Atualizar:</b> Sobrescreve a predefinição selecionada com as configurações atuais.<br>"
             "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>")
+            "<small >Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>")
         ly_combo_row.addWidget(lbl_preset)
         self._preset_combo_base_tooltip = (
             "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
@@ -150,7 +151,7 @@ class ConfigDialog(QDialog):
             "• <b>Salvar Novo:</b> Cria uma predefinição com as configurações atuais da tela.<br>"
             "• <b>Atualizar:</b> Sobrescreve a predefinição selecionada com as configurações atuais.<br>"
             "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>"
+            "<small >Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>"
         )
         self.cmb_presets.setToolTip(self._preset_combo_base_tooltip)
         ly_combo_row.addWidget(self.cmb_presets, 1)
@@ -178,7 +179,7 @@ class ConfigDialog(QDialog):
         self.chk_imposition.setToolTip(
             "<b>MÚLTIPLOS ITENS POR PÁGINA (AGRUPAMENTO)</b><br><br>"
             "Organiza automaticamente vários exemplares do seu modelo dentro da mesma folha de saída.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Além de economizar papel, este recurso otimiza o corte manual. Os itens são alinhados para que você possa usar régua e estilete e destacar vários cartões com poucos cortes retos, sem rebarbas.</small>"
+            "<small >Dica: Além de economizar papel, este recurso otimiza o corte manual. Os itens são alinhados para que você possa usar régua e estilete e destacar vários cartões com poucos cortes retos, sem rebarbas.</small>"
         )
         self.chk_imposition.toggled.connect(self._toggle_imposition_ui)
         ly_print.addWidget(self.chk_imposition)
@@ -186,7 +187,7 @@ class ConfigDialog(QDialog):
         # Label de aviso dinâmico (abaixo do checkbox)
         self.lbl_imposition_hint = QLabel()
         self.lbl_imposition_hint.setWordWrap(True)
-        self.lbl_imposition_hint.setStyleSheet("color: gray; font-style: italic; padding-left: 4px;")
+        themed_style(self.lbl_imposition_hint, "color: gray; font-style: italic; padding-left: 4px;")
         ly_print.addWidget(self.lbl_imposition_hint)
 
         self.container_imposition = QWidget()
@@ -200,7 +201,7 @@ class ConfigDialog(QDialog):
         lbl_sheet_title.setToolTip(
             "<b>FOLHA DE SAÍDA (DOCUMENTO FINAL)</b><br><br>"
             "Define o tamanho real do papel que será colocado na impressora (ex: A4, A3 ou formatos personalizados).<br><br>"
-            "<small style='color: #A0A0A0;'>Importante: Esta configuração dita a área útil de trabalho. Uma folha maior (A3) permite agrupar muito mais exemplares no mesmo documento do que uma folha A4.</small>"
+            "<small >Importante: Esta configuração dita a área útil de trabalho. Uma folha maior (A3) permite agrupar muito mais exemplares no mesmo documento do que uma folha A4.</small>"
         )
         ly_imp.addWidget(lbl_sheet_title)
         ly_sheet = QHBoxLayout()
@@ -231,7 +232,7 @@ class ConfigDialog(QDialog):
         lbl_model_dims_title.setToolTip(
             "<b>DIMENSÕES REAIS DO MODELO</b><br><br>"
             "Define o tamanho exato (em milímetros) que o seu cartão/documento terá impresso na folha.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica Smart: Essencial para materiais que precisam encaixar em suportes físicos, como displays de acrílico, crachás ou etiquetas. Meça o suporte com uma régua e digite os valores exatos aqui para um ajuste milimétrico.</small>"
+            "<small >Dica Smart: Essencial para materiais que precisam encaixar em suportes físicos, como displays de acrílico, crachás ou etiquetas. Meça o suporte com uma régua e digite os valores exatos aqui para um ajuste milimétrico.</small>"
         )
         ly_imp.addWidget(lbl_model_dims_title)
         self.spin_w_mm = QDoubleSpinBox()
@@ -258,7 +259,7 @@ class ConfigDialog(QDialog):
         ly_imp.addLayout(ly_model_dims)
 
         self.lbl_capacity = QLabel("Calculando capacidade...")
-        self.lbl_capacity.setStyleSheet("font-weight: bold; color: #2ecc71;")
+        themed_style(self.lbl_capacity, "font-weight: bold; color: @success@;")
         ly_imp.addWidget(self.lbl_capacity)
 
         self.chk_crop_marks = QCheckBox("Habilitar marcas de corte")
@@ -266,7 +267,7 @@ class ConfigDialog(QDialog):
         self.chk_crop_marks.setToolTip(
             "<b>MARCAS DE CORTE</b><br><br>"
             "Adiciona pequenas guias visuais nos cantos de cada item na folha impressa.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Estas marcas indicam o caminho exato para a lâmina do estilete ou da guilhotina, garantindo um acabamento profissional e uniforme em todo o lote.</small>"
+            "<small >Dica: Estas marcas indicam o caminho exato para a lâmina do estilete ou da guilhotina, garantindo um acabamento profissional e uniforme em todo o lote.</small>"
         )
         ly_imp.addWidget(self.chk_crop_marks)
         self.chk_bleed = QCheckBox("Habilitar margem de sangria")
@@ -274,7 +275,7 @@ class ConfigDialog(QDialog):
         self.chk_bleed.setToolTip(
             "<b>MARGEM DE SANGRIA</b><br><br>"
             "Reserva um espaço extra (5mm) ao redor dos itens na folha.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Ative para garantir que artes com fundo contínuo não criem filetes brancos durante o corte manual.</small>"
+            "<small >Dica: Ative para garantir que artes com fundo contínuo não criem filetes brancos durante o corte manual.</small>"
         )
         ly_imp.addWidget(self.chk_bleed)
         
@@ -364,7 +365,7 @@ class ConfigDialog(QDialog):
         """Calcula dinamicamente quantos itens cabem e valida se o modelo cabe na folha."""
         if not self.chk_imposition.isChecked():
             self.lbl_capacity.setText("Imposição desativada (1 item por arquivo)")
-            self.lbl_capacity.setStyleSheet("color: gray;")
+            themed_style(self.lbl_capacity, "color: gray;")
             self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
             return
 
@@ -382,11 +383,11 @@ class ConfigDialog(QDialog):
 
         if assembler.capacity > 0:
             self.lbl_capacity.setText(f"✅ Capacidade: {assembler.capacity} itens por página ({assembler.cols}x{assembler.rows})")
-            self.lbl_capacity.setStyleSheet("font-weight: bold; color: #2ecc71;")
+            themed_style(self.lbl_capacity, "font-weight: bold; color: @success@;")
             ok_button.setEnabled(True)
         else:
             self.lbl_capacity.setText("❌ Modelo muito grande para a página!")
-            self.lbl_capacity.setStyleSheet("font-weight: bold; color: #e74c3c;")
+            themed_style(self.lbl_capacity, "font-weight: bold; color: @danger@;")
             ok_button.setEnabled(False)
 
     def _on_accept(self):
@@ -563,10 +564,10 @@ class ConfigDialog(QDialog):
             if self.active_preset_name == self.SYSTEM_PRESET_NAME:
                 self._set_model_print_size_controls()
             self.lbl_imposition_hint.setText("⚙️ Configure a folha e as dimensões do modelo para um resultado preciso.")
-            self.lbl_imposition_hint.setStyleSheet("color: #e67e22; font-style: italic; padding-left: 4px;")
+            themed_style(self.lbl_imposition_hint, "color: @warning@; font-style: italic; padding-left: 4px;")
         else:
             self.lbl_imposition_hint.setText("ℹ️ O arquivo gerado terá as dimensões exatas do modelo original (1 item por arquivo).")
-            self.lbl_imposition_hint.setStyleSheet("color: gray; font-style: italic; padding-left: 4px;")
+            themed_style(self.lbl_imposition_hint, "color: gray; font-style: italic; padding-left: 4px;")
 
     def _insert_variable(self, var_name):
         self.txt_pattern.insert(f"{{{var_name}}}")
