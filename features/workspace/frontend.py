@@ -1,9 +1,11 @@
 from core.themes import themed_style, theme_color, theme_manager
 """Identidade visual do workspace, compartilhando o padrão do editor."""
+import os
 import re
+import sys
 from pathlib import Path
-from PySide6.QtCore import Qt, QUrl, QSize
-from PySide6.QtGui import QAction, QDesktopServices
+from PySide6.QtCore import Qt, QUrl, QSize, QProcess
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QToolButton, QHBoxLayout, QVBoxLayout,
     QMessageBox, QMenu, QGridLayout, QSizePolicy, QListView,
@@ -11,6 +13,29 @@ from PySide6.QtWidgets import (
 from core.paths import get_models_dir
 from core.resources import action_icon_path, navigation_icon_path
 from core.theme_icons import themed_svg_icon
+from core.i18n import SUPPORTED_LANGUAGES, current_locale, set_preferred_locale, tr
+
+
+def _restart_application(window):
+    """Inicia uma nova instância e encerra a atual após confirmar o processo."""
+    if getattr(sys, "frozen", False):
+        program = sys.executable
+        arguments = sys.argv[1:]
+    else:
+        program = sys.executable
+        arguments = [str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
+
+    result = QProcess.startDetached(program, arguments, os.getcwd())
+    started = result[0] if isinstance(result, tuple) else bool(result)
+    if started:
+        window.close()
+        return
+
+    QMessageBox.critical(
+        window,
+        tr('Não foi possível reiniciar'),
+        tr('Feche e abra o FORNAX Forge para aplicar o novo idioma.'),
+    )
 
 
 STYLE = """
@@ -129,13 +154,13 @@ def install_frontend(window):
 
     buttons = window.controls_panel
     button_labels = (
-        (buttons.btn_add_model, 'Novo modelo'),
-        (buttons.btn_duplicate_model, 'Duplicar'),
-        (buttons.btn_remove_model, 'Remover'),
-        (buttons.btn_rename_model, 'Renomear'),
-        (buttons.btn_config_model, 'Editar modelo'),
-        (buttons.btn_import_models, 'Importar'),
-        (buttons.btn_export_models, 'Exportar'),
+        (buttons.btn_add_model, tr('Novo modelo')),
+        (buttons.btn_duplicate_model, tr('Duplicar')),
+        (buttons.btn_remove_model, tr('Remover')),
+        (buttons.btn_rename_model, tr('Renomear')),
+        (buttons.btn_config_model, tr('Editar modelo')),
+        (buttons.btn_import_models, tr('Importar')),
+        (buttons.btn_export_models, tr('Exportar')),
     )
     for button, label in button_labels:
         button.setText(label)
@@ -179,7 +204,7 @@ def install_frontend(window):
     model_row = QHBoxLayout(model_bar)
     model_row.setContentsMargins(14, 10, 14, 10)
     model_row.setSpacing(8)
-    context = QLabel('MODELO')
+    context = QLabel(tr('MODELO'))
     context.setObjectName('contextLabel')
     model_row.addWidget(context)
     window.preview_panel.cbo_models.setMinimumWidth(100)
@@ -192,20 +217,20 @@ def install_frontend(window):
     more.setIcon(themed_svg_icon(action_icon_path('more-vertical')))
     more.setIconSize(QSize(18, 18))
     more.setFixedWidth(38)
-    more.setToolTip('Mais ações do modelo')
+    more.setToolTip(tr('Mais ações do modelo'))
     more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     model_actions = QMenu(more)
     delete_action = None
-    for label, button in (
-        ('Duplicar modelo', buttons.btn_duplicate_model),
-        ('Renomear modelo', buttons.btn_rename_model),
-        ('Excluir modelo', buttons.btn_remove_model),
+    for action_id, label, button in (
+        ('duplicate', tr('Duplicar modelo'), buttons.btn_duplicate_model),
+        ('rename', tr('Renomear modelo'), buttons.btn_rename_model),
+        ('delete', tr('Excluir modelo'), buttons.btn_remove_model),
     ):
         action = model_actions.addAction(label)
         action.triggered.connect(button.click)
-        if label == 'Renomear modelo':
+        if action_id == 'rename':
             model_actions.addSeparator()
-        if label == 'Excluir modelo':
+        if action_id == 'delete':
             delete_action = action
     def style_model_action_hover(action):
         if action is delete_action:
@@ -228,9 +253,9 @@ def install_frontend(window):
     output_grid.setVerticalSpacing(8)
     destination = QHBoxLayout()
     destination.setSpacing(8)
-    destination.addWidget(QLabel('Salvar em'))
+    destination.addWidget(QLabel(tr('Salvar em')))
     destination.addWidget(window.txt_output_path, 1)
-    window.txt_output_path.setPlaceholderText('Escolha a pasta de destino dos arquivos')
+    window.txt_output_path.setPlaceholderText(tr('Escolha a pasta de destino dos arquivos'))
     window.btn_sel_out.setText('')
     window.btn_sel_out.setIcon(themed_svg_icon(action_icon_path('more')))
     window.btn_sel_out.setIconSize(QSize(18, 18))
@@ -295,7 +320,7 @@ def install_frontend(window):
     data_toggle.setObjectName('dataRailToggle')
     data_toggle.setFixedWidth(38)
     data_toggle.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
-    data_toggle.setToolTip('Recolher tabela de dados')
+    data_toggle.setToolTip(tr('Recolher tabela de dados'))
     data_rail_layout.addWidget(data_toggle)
     data_rail_layout.addWidget(window.table_panel, 1)
 
@@ -327,7 +352,7 @@ def install_frontend(window):
             if len(sizes) > 1 and sizes[1] > 60:
                 panel_state['expanded_width'] = sizes[1]
             window.table_panel.hide()
-            data_toggle.setToolTip('Expandir tabela de dados')
+            data_toggle.setToolTip(tr('Expandir tabela de dados'))
             data_rail.setMinimumWidth(38)
             data_rail.setMaximumWidth(38)
             window.splitter.setSizes([max(500, sum(sizes) - 38), 38])
@@ -335,7 +360,7 @@ def install_frontend(window):
             data_rail.setMinimumWidth(420)
             data_rail.setMaximumWidth(16777215)
             window.table_panel.show()
-            data_toggle.setToolTip('Recolher tabela de dados')
+            data_toggle.setToolTip(tr('Recolher tabela de dados'))
             total = max(1000, sum(window.splitter.sizes()))
             right = min(max(420, panel_state['expanded_width']), total - 500)
             window.splitter.setSizes([total - right, right])
@@ -361,23 +386,50 @@ def install_frontend(window):
     # Menus conhecidos de aplicativos de criação, reutilizando as ações existentes.
     menu = window.menuBar()
     menu.clear()
-    programa = menu.addMenu('Programa')
-    programa.addAction('Configuração de exportação…', window._open_config_dialog)
-    programa.addAction('Temas…', window._open_theme_dialog)
-    modelo = menu.addMenu('Modelo')
-    modelo.addAction('Novo modelo', buttons.btn_add_model.click)
-    modelo.addAction('Importar modelos…', buttons.btn_import_models.click)
-    modelo.addAction('Exportar modelos…', buttons.btn_export_models.click)
+    programa = menu.addMenu(tr('Programa'))
+    programa.addAction(tr('Configuração de exportação…'), window._open_config_dialog)
+    programa.addAction(tr('Temas…'), window._open_theme_dialog)
+    idioma = programa.addMenu(tr('Idioma'))
+    language_group = QActionGroup(idioma)
+    language_group.setExclusive(True)
+    for locale, native_name in SUPPORTED_LANGUAGES:
+        language_action = idioma.addAction(native_name)
+        language_action.setCheckable(True)
+        language_action.setChecked(locale == current_locale())
+        language_group.addAction(language_action)
+        def choose_language(_checked=False, selected=locale):
+            set_preferred_locale(window.settings, selected)
+            if selected == current_locale():
+                return
+            prompt = QMessageBox(window)
+            prompt.setIcon(QMessageBox.Icon.Question)
+            prompt.setWindowTitle(tr('Reiniciar o programa'))
+            prompt.setText(tr('Reinicie o programa para aplicar o novo idioma.'))
+            restart_now = prompt.addButton(
+                tr('Reiniciar agora'), QMessageBox.ButtonRole.AcceptRole
+            )
+            prompt.addButton(
+                tr('Reiniciar depois'), QMessageBox.ButtonRole.RejectRole
+            )
+            prompt.setDefaultButton(restart_now)
+            prompt.exec()
+            if prompt.clickedButton() is restart_now:
+                _restart_application(window)
+        language_action.triggered.connect(choose_language)
+    modelo = menu.addMenu(tr('Modelo'))
+    modelo.addAction(tr('Novo modelo'), buttons.btn_add_model.click)
+    modelo.addAction(tr('Importar modelos…'), buttons.btn_import_models.click)
+    modelo.addAction(tr('Exportar modelos…'), buttons.btn_export_models.click)
     modelo.addSeparator()
     modelo.addAction(
-        'Abrir pasta de modelos',
+        tr('Abrir pasta de modelos'),
         lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(get_models_dir())))
     )
-    exibir = menu.addMenu('Exibir')
-    show_log = exibir.addAction('Log de processamento')
+    exibir = menu.addMenu(tr('Exibir'))
+    show_log = exibir.addAction(tr('Log de processamento'))
     show_log.setCheckable(True)
     show_log.toggled.connect(toggle_log)
-    fixed_data = exibir.addAction('Tabela de dados fixa')
+    fixed_data = exibir.addAction(tr('Tabela de dados fixa'))
     fixed_data.setCheckable(True)
     def set_data_panel_fixed(fixed):
         panel_state['fixed'] = bool(fixed)
@@ -386,23 +438,25 @@ def install_frontend(window):
         data_toggle.setVisible(not fixed)
         if not fixed:
             data_toggle.setToolTip(
-                'Expandir tabela de dados' if panel_state['collapsed'] else 'Recolher tabela de dados'
+                tr('Expandir tabela de dados') if panel_state['collapsed'] else tr('Recolher tabela de dados')
             )
         window.settings.setValue('workspaceDataPanelFixed', bool(fixed))
     fixed_data.toggled.connect(set_data_panel_fixed)
-    ajuda = menu.addMenu('Sobre')
-    ajuda.addAction('Sobre o FORNAX Forge', lambda: QMessageBox.about(
-        window, 'Sobre o FORNAX Forge',
-        '<b>FORNAX Forge</b><br>Geração de material personalizado em lote.<br><br>'
-        'Interface desenvolvida com <a href="https://www.qt.io/qt-for-python">Qt for Python (PySide6)</a>.'
+    ajuda = menu.addMenu(tr('Sobre'))
+    ajuda.addAction(tr('Sobre o FORNAX Forge'), lambda: QMessageBox.about(
+        window, tr('Sobre o FORNAX Forge'),
+        tr('<b>FORNAX Forge</b><br>Geração de material personalizado em lote.<br><br>'
+           'Interface desenvolvida com <a href="https://www.qt.io/qt-for-python">Qt for Python (PySide6)</a>.')
     ))
-    ajuda.addAction('Licenças de terceiros', lambda: QMessageBox.information(
-        window, 'Licenças de terceiros',
-        'Este programa utiliza Qt for Python (PySide6), disponibilizado sob opções de licença LGPLv3/GPLv3 ou comercial. '
-        'Os textos completos das licenças serão incluídos no pacote de distribuição.'
+    ajuda.addAction(tr('Licenças de terceiros'), lambda: QMessageBox.information(
+        window, tr('Licenças de terceiros'),
+        tr('Este programa utiliza Qt for Python (PySide6), disponibilizado sob opções de licença LGPLv3/GPLv3 ou comercial. '
+           'Os textos completos das licenças serão incluídos no pacote de distribuição.')
     ))
     # Mantém wrappers Python vivos durante toda a janela (necessário no PySide).
-    window._workspace_menus = (programa, modelo, exibir, ajuda, model_actions)
+    window._workspace_menus = (
+        programa, idioma, language_group, modelo, exibir, ajuda, model_actions,
+    )
     window._workspace_log_toggle = show_log
     window._workspace_data_toggle = data_toggle
     window._workspace_data_fixed_action = fixed_data

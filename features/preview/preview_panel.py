@@ -6,6 +6,7 @@ from PySide6.QtGui import QPixmap, QResizeEvent, QImageReader
 from pathlib import Path
 from core.resources import navigation_icon_path
 from core.theme_icons import themed_svg_icon
+from core.i18n import tr
 
 class ResizingLabel(QLabel):
     """QLabel que redimensiona a imagem interna automaticamente mantendo proporção."""
@@ -19,7 +20,7 @@ class ResizingLabel(QLabel):
         image_path = Path(path) if path else None
         if not image_path or not image_path.exists():
             self._pixmap = None
-            self.setText("Sem imagem")
+            self.setText(tr("Sem imagem"))
             return
 
         reader = QImageReader(str(image_path))
@@ -27,7 +28,7 @@ class ResizingLabel(QLabel):
         image = reader.read()
         if image.isNull():
             self._pixmap = None
-            self.setText("Erro na prévia")
+            self.setText(tr("Erro na prévia"))
             return
 
         self._pixmap = QPixmap.fromImage(image)
@@ -36,7 +37,7 @@ class ResizingLabel(QLabel):
     def set_pixmap_direct(self, pixmap: QPixmap):
         if not pixmap or pixmap.isNull():
             self._pixmap = None
-            self.setText("Erro na prévia")
+            self.setText(tr("Erro na prévia"))
         else:
             self._pixmap = pixmap
             self._update_view()
@@ -56,7 +57,7 @@ class ResizingLabel(QLabel):
             scaled = self._pixmap.scaled(w, h, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
             super().setPixmap(scaled)
         elif not self.text():
-            self.setText("Sem prévia")
+            self.setText(tr("Sem prévia"))
 
     
 class PreviewPanel(QWidget):
@@ -69,7 +70,7 @@ class PreviewPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        title = QLabel("Selecione o modelo")
+        title = QLabel(tr("Selecione o modelo"))
         title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         themed_style(title, "font-size: 16px; font-weight: 600;")
         layout.addWidget(title)
@@ -79,7 +80,7 @@ class PreviewPanel(QWidget):
         layout.addWidget(self.cbo_models)
 
         self.preview = ResizingLabel()
-        self.preview.setText("Nenhum modelo selecionado")
+        self.preview.setText(tr("Nenhum modelo selecionado"))
         self.preview.setFrameShape(QFrame.Shape.StyledPanel)
         themed_style(self.preview, "background-color: @canvas@; border-radius: 10px;")
         layout.addWidget(self.preview, 1)
@@ -96,10 +97,10 @@ class PreviewPanel(QWidget):
         self.btn_previous = QPushButton()
         self.btn_previous.setObjectName("previewPrevious")
         self.btn_previous.setFixedSize(24, 22)
-        self.btn_previous.setToolTip("Registro anterior")
+        self.btn_previous.setToolTip(tr("Item anterior"))
         page_navigation.addWidget(self.btn_previous)
 
-        self.lbl_navigation_kind = QLabel("Registro")
+        self.lbl_navigation_kind = QLabel(tr("Item"))
         self.lbl_navigation_kind.setObjectName("previewNavigationLabel")
         self.lbl_navigation_kind.setFixedWidth(50)
         self.lbl_navigation_kind.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -114,7 +115,7 @@ class PreviewPanel(QWidget):
         self.spin_navigation.valueChanged.connect(lambda value: self.indexRequested.emit(value - 1))
         page_navigation.addWidget(self.spin_navigation)
 
-        self.lbl_navigation_total = QLabel("de 0")
+        self.lbl_navigation_total = QLabel(tr("de {total}").format(total=0))
         self.lbl_navigation_total.setObjectName("previewNavigationLabel")
         self.lbl_navigation_total.setFixedWidth(50)
         self.lbl_navigation_total.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -123,7 +124,7 @@ class PreviewPanel(QWidget):
         self.btn_next = QPushButton()
         self.btn_next.setObjectName("previewNext")
         self.btn_next.setFixedSize(24, 22)
-        self.btn_next.setToolTip("Próximo registro")
+        self.btn_next.setToolTip(tr("Próximo item"))
         page_navigation.addWidget(self.btn_next)
         page_navigation.addStretch(1)
         navigation_stack.addLayout(page_navigation)
@@ -133,7 +134,7 @@ class PreviewPanel(QWidget):
         mode_navigation.addStretch(1)
         self.cbo_preview_mode = QComboBox()
         self.cbo_preview_mode.setObjectName("previewMode")
-        self.cbo_preview_mode.addItem("Item", "item")
+        self.cbo_preview_mode.addItem(tr("Item"), "item")
         self.cbo_preview_mode.setFixedSize(166, 22)
         self.cbo_preview_mode.currentIndexChanged.connect(self._emit_mode)
         mode_navigation.addWidget(self.cbo_preview_mode)
@@ -159,9 +160,9 @@ class PreviewPanel(QWidget):
         current_mode = self.cbo_preview_mode.currentData()
         with QSignalBlocker(self.cbo_preview_mode):
             self.cbo_preview_mode.clear()
-            self.cbo_preview_mode.addItem("Item", "item")
+            self.cbo_preview_mode.addItem(tr("Item"), "item")
             if sheet_available:
-                self.cbo_preview_mode.addItem("Folha de impressão", "sheet")
+                self.cbo_preview_mode.addItem(tr("Folha de impressão"), "sheet")
             wanted = mode if mode == "item" or sheet_available else "item"
             selected = self.cbo_preview_mode.findData(wanted)
             self.cbo_preview_mode.setCurrentIndex(max(0, selected))
@@ -171,15 +172,15 @@ class PreviewPanel(QWidget):
         with QSignalBlocker(self.spin_navigation):
             self.spin_navigation.setRange(1, max(1, total))
             self.spin_navigation.setValue(index + 1)
-        self.lbl_navigation_kind.setText("Folha" if wanted == "sheet" else "Item")
-        self.lbl_navigation_total.setText(f"de {total}")
+        self.lbl_navigation_kind.setText(tr("Folha") if wanted == "sheet" else tr("Item"))
+        self.lbl_navigation_total.setText(tr("de {total}").format(total=total))
         enabled = total > 0
         self.spin_navigation.setEnabled(enabled)
         self.btn_previous.setEnabled(enabled and index > 0)
         self.btn_next.setEnabled(enabled and index + 1 < total)
         if current_mode != wanted:
             self.cbo_preview_mode.setToolTip(
-                "Visualize um item ou a folha final conforme a predefinição de impressão."
+                tr("Visualize um item ou a folha final conforme a predefinição de impressão.")
             )
 
     def set_preview_text(self, text: str):

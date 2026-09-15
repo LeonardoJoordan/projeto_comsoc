@@ -79,7 +79,7 @@ class RichTableWidget(QTableWidget):
             row_idx = self.rowCount()
             self.insertRow(row_idx)
             
-            # 1. Coluna Quantidade (Sempre Index 0)
+            # 1. Coluna Cópias (sempre no índice 0)
             if has_qty_col:
                 qty_item = QTableWidgetItem("1")
                 qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)

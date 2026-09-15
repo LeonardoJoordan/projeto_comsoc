@@ -33,6 +33,7 @@ from core.font_utils import format_font_list, missing_template_fonts
 from core.render_cache import ensure_background_proxy
 from core.resources import object_icon_path
 from core.output_folders import create_forge_output_dir
+from core.i18n import tr
 from features.spreadsheet.headers import QUANTITY_HEADER, SIGNATURE_HEADER
 
 
@@ -49,7 +50,7 @@ class MainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FORNAX Forge — Geração de material personalizado em lote")
+        self.setWindowTitle(tr("FORNAX Forge — Geração de material personalizado em lote"))
         self.setMinimumSize(1024, 680)
         self.resize(1280, 720)
 
@@ -155,7 +156,7 @@ class MainWindow(QMainWindow):
         col_left_footer.addLayout(row_out_path)
 
         # Botão Gerar
-        self.btn_generate_cards = QPushButton("Gerar Material")
+        self.btn_generate_cards = QPushButton(tr("Gerar material"))
         self.btn_generate_cards.setMinimumHeight(40)
         self.btn_generate_cards.setStyleSheet("font-weight: bold; font-size: 13px;")
         self._apply_tooltip(self.btn_generate_cards, 
@@ -177,8 +178,8 @@ class MainWindow(QMainWindow):
         row_format_cfg = QHBoxLayout()
         self.cbo_export_format = QComboBox()
         self.cbo_export_format.addItem("PNG", "png")
-        self.cbo_export_format.addItem("PDF por item", "pdf_item")
-        self.cbo_export_format.addItem("PDF agrupado", "pdf_grouped")
+        self.cbo_export_format.addItem(tr("PDF por item"), "pdf_item")
+        self.cbo_export_format.addItem(tr("PDF agrupado"), "pdf_grouped")
         self.cbo_export_format.setFixedWidth(150)
         self._export_mode_tooltips = {
             "png": "<b>PNG</b><br>Gera uma imagem PNG para cada item da tabela.",
@@ -726,7 +727,9 @@ class MainWindow(QMainWindow):
                             self.preview_panel.set_preview_image(str(thumb_path))
                         else:
                             # --- LEGO: Worker de Preview Assíncrono ---
-                            self.preview_panel.set_preview_text("Gerando prévia, aguarde um instante...")
+                            self.preview_panel.set_preview_text(
+                                tr("Gerando prévia, aguarde um instante…")
+                            )
                             
                             from features.generator.workers import PreviewRenderWorker
                             
@@ -774,12 +777,11 @@ class MainWindow(QMainWindow):
             
         self.table_panel.table.setColumnCount(len(headers))
         self.table_panel.table.setHorizontalHeaderLabels(headers)
-        self.table_panel.table.horizontalHeaderItem(0).setIcon(QIcon(str(object_icon_path("quantity"))))
         if has_sig:
             self.table_panel.table.horizontalHeaderItem(1).setIcon(QIcon(str(object_icon_path("signature"))))
         
         # Ajuste de larguras iniciais
-        self.table_panel.table.setColumnWidth(0, 50) # Qtd
+        self.table_panel.table.setColumnWidth(0, 70) # Cópias
         if has_sig:
             self.table_panel.table.setColumnWidth(1, 50) # Assinatura
 
@@ -1414,7 +1416,10 @@ class MainWindow(QMainWindow):
 
         custom_path = self.txt_output_path.text().strip()
         if not custom_path:
-            QMessageBox.warning(self, "Atenção", "Por favor, selecione uma pasta de saída antes de gerar o material.")
+            QMessageBox.warning(
+                self, tr("Atenção"),
+                tr("Por favor, selecione uma pasta de saída antes de gerar o material.")
+            )
             self.log_panel.append("🛑 Geração cancelada: Pasta de saída não definida.")
             return
 
@@ -1427,9 +1432,11 @@ class MainWindow(QMainWindow):
         self.log_panel.append(f"📂 Salvando em: {folder_name}")
 
         self.btn_generate_cards.setEnabled(False)
-        self.btn_generate_cards.setText("Gerando... (Aguarde)")
+        self.btn_generate_cards.setText(tr("Gerando… Aguarde"))
         self.progress_bar.setValue(0)
-        self.log_panel.append(f"--- Iniciando lote de {len(rows_plain)} itens ---")
+        self.log_panel.append(
+            tr("--- Iniciando lote de {count} itens ---").format(count=len(rows_plain))
+        )
 
         # O padrão agora é 100% o que o usuário definiu. 
         # Se estiver vazio, usamos {modelo} como fallback padrão.
@@ -1462,7 +1469,7 @@ class MainWindow(QMainWindow):
 
     def _on_generation_finished(self):
         self.btn_generate_cards.setEnabled(True)
-        self.btn_generate_cards.setText("Gerar Material")
+        self.btn_generate_cards.setText(tr("Gerar material"))
         end_time = time.time()
         duration = end_time - getattr(self, 'start_time', end_time)
         
@@ -1484,7 +1491,7 @@ class MainWindow(QMainWindow):
         self.cbo_presets_main.clear()
 
         # O preset de sistema sempre existe, mesmo sem modelo carregado
-        self.cbo_presets_main.addItem(SYSTEM_PRESET, SYSTEM_PRESET)
+        self.cbo_presets_main.addItem(tr("Definição do Modelo"), SYSTEM_PRESET)
         self.cbo_presets_main.setEnabled(True)
 
         if self.cached_model_data:

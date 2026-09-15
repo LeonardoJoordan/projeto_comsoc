@@ -18,6 +18,7 @@ from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
 from core.resources import app_icon_path
 from core.ui_font import install_ui_font
 from core.wheel_focus import install_wheel_focus_guard
+from core.i18n import initialize_i18n, tr
 from features.workspace.main_window import MainWindow
 
 
@@ -35,9 +36,9 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
         pass
     message = QMessageBox()
     message.setIcon(QMessageBox.Icon.Critical)
-    message.setWindowTitle('Erro fatal')
-    message.setText('Ocorreu um erro inesperado e o sistema precisa ser encerrado.')
-    message.setInformativeText(f'Os detalhes técnicos foram salvos em:\n{log_file}')
+    message.setWindowTitle(tr('Erro fatal'))
+    message.setText(tr('Ocorreu um erro inesperado e o sistema precisa ser encerrado.'))
+    message.setInformativeText(tr('Os detalhes técnicos foram salvos em:\n{arquivo}').format(arquivo=log_file))
     message.setDetailedText(''.join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
     message.exec()
 
@@ -54,7 +55,9 @@ def main():
     install_wheel_focus_guard(app)
     from core.themes import theme_manager
     from core.settings import get_app_settings
-    theme_manager().initialize(get_app_settings())
+    settings = get_app_settings()
+    initialize_i18n(app, settings)
+    theme_manager().initialize(settings)
     sys.excepthook = global_exception_handler
     CustomTooltipManager.install(delay_ms=1500)
     window = MainWindow()

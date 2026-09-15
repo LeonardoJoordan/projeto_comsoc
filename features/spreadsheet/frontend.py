@@ -10,6 +10,7 @@ from pathlib import Path
 from features.editor.frontend import icon
 from core.resources import action_icon_path, align_icon_path
 from core.theme_icons import themed_svg_icon
+from core.i18n import tr
 
 
 class CellContentEditor(QPlainTextEdit):
@@ -48,7 +49,7 @@ def install_frontend(panel):
     heading.setObjectName('sheetHeading')
     head = QHBoxLayout(heading)
     head.setContentsMargins(14, 14, 14, 14)
-    title = QLabel('Dados para o modelo')
+    title = QLabel(tr('Dados para o modelo'))
     title.setObjectName('sheetTitle')
     title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     head.addSpacing(70)
@@ -67,7 +68,7 @@ def install_frontend(panel):
     toolbar_layout = QVBoxLayout(toolbar)
     toolbar_layout.setContentsMargins(0, 0, 0, 0)
     toolbar_layout.setSpacing(0)
-    line_tools_title = QLabel('LINHAS')
+    line_tools_title = QLabel(tr('LINHAS'))
     line_tools_title.setObjectName('sheetSectionTitle')
     line_tools_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     line_tools_title.setContentsMargins(14, 9, 14, 0)
@@ -76,11 +77,11 @@ def install_frontend(panel):
     actions.setContentsMargins(4, 5, 4, 9)
     actions.setSpacing(4)
     panel.spin_add_rows.setFixedWidth(46)
-    panel.spin_add_rows.setAccessibleName('Quantidade de linhas a adicionar')
+    panel.spin_add_rows.setAccessibleName(tr('Quantidade de linhas a adicionar'))
     specs = (
-        (panel.btn_add_rows, 'Adicionar', 'Adicionar linhas', None),
-        (panel.btn_duplicate_row, 'Duplicar', 'Duplicar linhas selecionadas', None),
-        (panel.btn_delete_rows, 'Excluir', 'Excluir linhas selecionadas', None),
+        (panel.btn_add_rows, tr('Adicionar'), tr('Adicionar linhas'), None),
+        (panel.btn_duplicate_row, tr('Duplicar'), tr('Duplicar linhas selecionadas'), None),
+        (panel.btn_delete_rows, tr('Excluir'), tr('Excluir linhas selecionadas'), None),
     )
     for button, text, tip, path in specs:
         button.setText(text)
@@ -100,9 +101,9 @@ def install_frontend(panel):
     actions.addWidget(panel.btn_duplicate_row)
     actions.addWidget(panel.btn_delete_rows)
     actions.addStretch()
-    panel.btn_toggle_wrap.setText('Exibir conteúdo completo')
+    panel.btn_toggle_wrap.setText(tr('Exibir conteúdo completo'))
     panel.btn_toggle_wrap.setToolTip(
-        'Alterna entre linhas compactas e altura automática para mostrar todo o conteúdo'
+        tr('Alterna entre linhas compactas e altura automática para mostrar todo o conteúdo')
     )
     panel.btn_toggle_wrap.setIcon(themed_svg_icon(action_icon_path('expand-content')))
     panel.btn_toggle_wrap.setObjectName('sheetLineAction')
@@ -125,7 +126,7 @@ def install_frontend(panel):
     editor_row.addWidget(formula_label)
     cell_editor = CellContentEditor()
     cell_editor.setObjectName('cellEditor')
-    cell_editor.setPlaceholderText('Selecione uma célula para visualizar ou editar seu conteúdo')
+    cell_editor.setPlaceholderText(tr('Selecione uma célula para visualizar ou editar seu conteúdo'))
     cell_editor.setFixedHeight(58)
     cell_editor.setEnabled(False)
     editor_row.addWidget(cell_editor, 1)
@@ -134,9 +135,9 @@ def install_frontend(panel):
     format_row.setContentsMargins(44, 0, 12, 8)
     format_row.setSpacing(8)
     for asset_name, tag, tooltip in [
-        ('bold', 'b', 'Negrito · Ctrl+B'),
-        ('italic', 'i', 'Itálico · Ctrl+I'),
-        ('underline', 'u', 'Sublinhado · Ctrl+U'),
+        ('bold', 'b', tr('Negrito · Ctrl+B')),
+        ('italic', 'i', tr('Itálico · Ctrl+I')),
+        ('underline', 'u', tr('Sublinhado · Ctrl+U')),
     ]:
         button = QPushButton()
         button.setObjectName('sheetSquare')
@@ -150,7 +151,7 @@ def install_frontend(panel):
     formula_layout.addLayout(format_row)
     layout.addWidget(formula_bar)
 
-    hint = QLabel('Selecione uma célula para começar · Cole do Excel ou Google Sheets com Ctrl+V')
+    hint = QLabel(tr('Selecione uma célula para começar · Cole do Excel ou Google Sheets com Ctrl+V'))
     hint.setObjectName('sheetHint')
     layout.addWidget(hint)
     table = panel.table
@@ -175,7 +176,10 @@ def install_frontend(panel):
         if not isValid(table) or not isValid(count):
             return
         rows = table.rowCount()
-        count.setText(f'{rows} linha' if rows == 1 else f'{rows} linhas')
+        count.setText(
+            tr('{count} linha').format(count=rows)
+            if rows == 1 else tr('{count} linhas').format(count=rows)
+        )
         selected = bool(table.selectedIndexes())
         panel.btn_duplicate_row.setEnabled(selected)
         panel.btn_delete_rows.setEnabled(selected)
@@ -185,7 +189,11 @@ def install_frontend(panel):
     table.itemSelectionChanged.connect(update_state)
     def load_cell_editor(row, column, *_):
         header = table.horizontalHeaderItem(column) if column >= 0 else None
-        hint.setText(f'Linha {row + 1}  /  {header.text()}    ·    Duplo clique para editar' if row >= 0 and header else 'Cole do Excel ou Google Sheets com Ctrl+V')
+        hint.setText(
+            tr('Linha {row}  /  {column}    ·    Duplo clique para editar').format(
+                row=row + 1, column=header.text()
+            ) if row >= 0 and header else tr('Cole do Excel ou Google Sheets com Ctrl+V')
+        )
         item = table.item(row, column) if row >= 0 and column >= 0 else None
         with QSignalBlocker(cell_editor):
             cell_editor.setPlainText(item.text() if item else '')

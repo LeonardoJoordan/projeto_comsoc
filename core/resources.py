@@ -5,6 +5,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 ICONS_DIR = PROJECT_ROOT / "assets" / "icons"
+TRANSLATIONS_DIR = PROJECT_ROOT / "assets" / "translations"
 
 
 def app_icon_path(size: int = 256) -> Path:
@@ -36,3 +37,7 @@ def align_icon_path(name: str) -> Path:
 
 def navigation_icon_path(name: str) -> Path:
     return ICONS_DIR / "ui" / "navigation" / f"{name}.svg"
+
+
+def translation_path(locale: str) -> Path:
+    return TRANSLATIONS_DIR / f"fornax_{locale}.qm"

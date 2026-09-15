@@ -12,6 +12,7 @@ from core.paths import APP_ID
 from core.resources import app_icon_path
 from core.ui_font import install_ui_font
 from core.wheel_focus import install_wheel_focus_guard
+from core.i18n import initialize_i18n
 from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
 from features.editor.editor_window import EditorWindow
 
@@ -35,7 +36,9 @@ def main():
     install_wheel_focus_guard(app)
     from core.themes import theme_manager
     from core.settings import get_app_settings
-    theme_manager().initialize(get_app_settings())
+    settings = get_app_settings()
+    initialize_i18n(app, settings)
+    theme_manager().initialize(settings)
     window = EditorWindow()
     if args.model:
         window.load_from_json(args.model)

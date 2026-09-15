@@ -123,7 +123,7 @@ class HTMLDelegate(QStyledItemDelegate):
 
     def createEditor(self, parent, option, index):
         editor = RichTextEditor(parent)
-        # Se for a coluna 0 (🔢 Qtd), força o alinhamento central no editor
+        # Se for a coluna 0 (Cópias), força o alinhamento central no editor
         if index.column() == 0:
             editor.setAlignment(Qt.AlignmentFlag.AlignCenter)
         return editor
