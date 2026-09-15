@@ -34,3 +34,33 @@ class ToolIconEngine(QIconEngine):
 
 def tool_icon(path):
     return QIcon(ToolIconEngine(path))
+
+
+class ThemedSvgIconEngine(QIconEngine):
+    """Renderiza um SVG externo usando a cor de ícone do tema atual."""
+
+    def __init__(self, path):
+        super().__init__()
+        self.path = str(path)
+
+    def clone(self):
+        return ThemedSvgIconEngine(self.path)
+
+    def pixmap(self, size, mode, state):
+        source = QPixmap(size)
+        source.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(source)
+        QSvgRenderer(self.path).render(painter, source.rect())
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_SourceIn)
+        painter.fillRect(source.rect(), theme_color(
+            'disabled' if mode == QIcon.Mode.Disabled else 'icon'
+        ))
+        painter.end()
+        return source
+
+    def paint(self, painter, rect, mode, state):
+        painter.drawPixmap(rect, self.pixmap(rect.size(), mode, state))
+
+
+def themed_svg_icon(path):
+    return QIcon(ThemedSvgIconEngine(path))

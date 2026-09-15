@@ -1,8 +1,15 @@
 from core.themes import themed_style, theme_color, theme_manager
 """Apresentação Widgets independente; reutiliza controles e sinais do legado."""
 from pathlib import Path
-from core.resources import object_icon_path, state_icon_path
-from PySide6.QtCore import Qt, QSize, QObject, QEvent, QPoint, QTimer
+from core.resources import (
+    action_icon_path, align_icon_path, navigation_icon_path, object_icon_path,
+    state_icon_path,
+)
+from core.theme_icons import themed_svg_icon
+from PySide6.QtCore import (
+    Qt, QSize, QObject, QEvent, QPoint, QTimer, QPropertyAnimation, QEasingCurve,
+    QAbstractAnimation,
+)
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtGui import QPainter
@@ -11,7 +18,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QSplitter, QFrame, QLineEdit, QAbstractSpinBox, QColorDialog,
     QCheckBox, QDoubleSpinBox, QComboBox, QMenu, QRadioButton, QSizePolicy, QListView,
-    QGridLayout,
+    QGridLayout, QButtonGroup,
 )
 
 
@@ -60,6 +67,10 @@ QWidget:disabled { color: @disabled@; }
 QListWidget { background: @surface@; border: none; outline: none; }
 QListWidget::item { padding: 7px; border-bottom: 1px solid @border@; }
 QListWidget::item:selected { background: @selection@; color: @text@; }
+QListWidget#layers {
+ background: @surface@; border: 1px solid @border@; border-radius: 5px;
+ padding: 3px; outline: none;
+}
 QListWidget#layers::item { padding: 0; border: none; }
 QListWidget#layers QWidget { background: transparent; }
 QScrollArea { border: none; }
@@ -181,9 +192,57 @@ class FooterSaveAlignment(QObject):
         return False
 
 
+class SectionReveal(QWidget):
+    """Recorta o conteúdo sem comprimir seus controles durante a animação."""
+    def __init__(self, content):
+        super().__init__()
+        self.content = content
+        self._content_hint = content.sizeHint()
+        self._sync_pending = False
+        content.setParent(self)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        content.installEventFilter(self)
+
+    def sizeHint(self):
+        return self._content_hint
+
+    def minimumSizeHint(self):
+        return QSize(0, 0)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._position_content()
+
+    def _position_content(self):
+        target = self.content.geometry()
+        target.setRect(0, 0, self.width(), self._content_hint.height())
+        if self.content.geometry() != target:
+            self.content.setGeometry(target)
+
+    def _sync_content_hint(self):
+        self._sync_pending = False
+        hint = self.content.sizeHint()
+        if hint != self._content_hint:
+            self._content_hint = hint
+            self.updateGeometry()
+        self._position_content()
+
+    def eventFilter(self, watched, event):
+        if event.type() in (QEvent.Type.LayoutRequest, QEvent.Type.Show) and not self._sync_pending:
+            self._sync_pending = True
+            QTimer.singleShot(0, self._sync_content_hint)
+        return False
+
+
 class Section(QWidget):
     def __init__(self, title, content, expanded=False):
         super().__init__()
+        self._content = content
+        self._reveal = SectionReveal(content)
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self._animation = QPropertyAnimation(self._reveal, b'maximumHeight', self)
+        self._animation.setDuration(180)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
@@ -191,13 +250,46 @@ class Section(QWidget):
         self.header.setObjectName('section')
         self.header.setCheckable(True)
         self.header.setChecked(expanded)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.header)
-        layout.addWidget(content)
+        layout.addWidget(self._reveal)
+
+        def refresh_header(opened):
+            from core.theme_icons import themed_svg_icon
+            self.header.setText(title.upper())
+            self.header.setIcon(themed_svg_icon(navigation_icon_path(
+                'chevron-up' if opened else 'chevron-down'
+            )))
+            self.header.setIconSize(QSize(13, 13))
+
+        def finish_animation():
+            if self.header.isChecked():
+                self._reveal.setMaximumHeight(16777215)
+            else:
+                self._reveal.hide()
+
         def toggle(opened):
-            self.header.setText(('⌄  ' if opened else '›  ') + title.upper())
-            content.setVisible(opened)
+            refresh_header(opened)
+            if self._animation.state() == QAbstractAnimation.State.Running:
+                self._animation.stop()
+            current_height = self._reveal.height() if self._reveal.isVisible() else 0
+            if opened:
+                self._reveal.show()
+                target_height = max(1, content.sizeHint().height())
+                self._reveal.setMaximumHeight(current_height)
+            else:
+                target_height = 0
+                self._reveal.setMaximumHeight(current_height)
+            self._animation.setStartValue(current_height)
+            self._animation.setEndValue(target_height)
+            self._animation.start()
+
+        self._animation.finished.connect(finish_animation)
         self.header.toggled.connect(toggle)
-        toggle(expanded)
+        refresh_header(expanded)
+        content.show()
+        self._reveal.setVisible(expanded)
+        self._reveal.setMaximumHeight(16777215 if expanded else 0)
 
 
 def install_frontend(w):
@@ -259,7 +351,6 @@ def install_frontend(w):
             toolbar_separator()
         tools.addWidget(compact(name, control, 'mm'))
     p.chk_proporcao.setText('')
-    p.chk_proporcao.setIcon(icon('<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/>'))
     p.chk_proporcao.setFixedSize(30, 30)
     p._refresh_proportion_button(p.isEnabled())
     tools.addWidget(p.chk_proporcao)
@@ -295,11 +386,13 @@ def install_frontend(w):
         button.setFixedSize(30, 30)
         tools.addWidget(button)
     toolbar_separator()
-    for button, symbol, tip in (
-        (w.btn_undo, '↶', 'Desfazer'),
-        (w.btn_redo, '↷', 'Refazer'),
+    for button, asset_name, tip in (
+        (w.btn_undo, 'undo', 'Desfazer'),
+        (w.btn_redo, 'redo', 'Refazer'),
     ):
-        button.setText(symbol)
+        button.setText('')
+        button.setIcon(QIcon(str(action_icon_path(asset_name))))
+        button.setIconSize(QSize(18, 18))
         button.setToolTip(tip)
         button.setMinimumSize(0, 0)
         button.setMaximumSize(16777215, 16777215)
@@ -386,8 +479,13 @@ def install_frontend(w):
         b.setMaximumSize(16777215, 16777215)
         themed_style(b, '')
         square_control(b)
-        paths = {'Renomear': '<path d="m4 17 3-1L19 4l2 2L9 18l-5 1z"/>', 'Duplicar': '<rect x="8" y="8" width="12" height="12" rx="2"/><path d="M15 8V4H4v11h4"/>', 'Excluir': '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7m4-7v7"/>'}
-        b.setIcon(icon(paths[label]))
+        asset_name = {
+            'Renomear': 'edit',
+            'Duplicar': 'duplicate',
+            'Excluir': 'delete',
+        }[label]
+        b.setIcon(themed_svg_icon(action_icon_path(asset_name)))
+        b.setIconSize(QSize(18, 18))
         layer_heading.addWidget(b)
     ll.addLayout(layer_heading)
     w.layer_list.setObjectName('layers')
@@ -508,9 +606,13 @@ def install_frontend(w):
     sync_radii.setObjectName('syncCornerRadii')
     sync_radii.setCheckable(True)
     sync_radii.setChecked(True)
-    sync_radii.setIcon(icon('<path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-2 2M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l2-2"/>'))
     sync_radii.setToolTip('Sincronizar o arredondamento dos quatro cantos')
     square_control(sync_radii)
+    def refresh_radius_sync_icon(checked):
+        asset_name = 'lock ratio' if checked else 'unlock ratio'
+        sync_radii.setIcon(QIcon(str(action_icon_path(asset_name))))
+        sync_radii.setIconSize(QSize(20, 20))
+    refresh_radius_sync_icon(sync_radii.isChecked())
     corner_grid = QGridLayout()
     corner_grid.setContentsMargins(0, 0, 0, 0)
     corner_grid.setHorizontalSpacing(8)
@@ -576,6 +678,7 @@ def install_frontend(w):
     for key, spin in corner_spins.items():
         spin.editingFinished.connect(lambda key=key: apply_corner_radius(key))
     def toggle_radius_sync(checked):
+        refresh_radius_sync_icon(checked)
         if updating_radii['active']:
             return
         selected = w.scene.selectedItems()
@@ -684,6 +787,10 @@ def install_frontend(w):
     hint.setWordWrap(True)
     hint.setObjectName('muted')
     tl.addWidget(hint)
+    typography_heading = QLabel('TIPOGRAFIA')
+    typography_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    themed_style(typography_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
+    tl.addWidget(typography_heading)
     font_row = row(tl, field('Fonte', t.cbo_font), field('Tamanho', t.spin_size))
     font_row.setStretch(0, 3)
     font_row.setStretch(1, 1)
@@ -727,55 +834,134 @@ def install_frontend(w):
         text_alpha.setValue(round(color.alphaF()*100))
     t.fontColorChanged.connect(color_changed)
     alignment_heading = QLabel('ALINHAMENTO')
+    alignment_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(alignment_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
     tl.addWidget(alignment_heading)
-    for control in (t.cbo_align, t.cbo_valign, t.spin_lh, t.spin_indent, t.spin_size):
+    for control in (t.spin_lh, t.spin_indent, t.spin_size):
         selector = 'QComboBox' if isinstance(control, QComboBox) else 'QAbstractSpinBox'
         themed_style(control, selector + ' { min-height: 18px; max-height: 18px; padding-top: 5px; padding-bottom: 5px; }')
         control.setFixedHeight(30)
         control.setMinimumWidth(0)
-    for control in (t.cbo_align, t.cbo_valign):
-        popup = QListView(control)
-        popup.setObjectName('alignmentOptions')
-        themed_style(popup, '''
-            QListView#alignmentOptions {
-                background: @button@; color: @text@;
-                border: 1px solid @border_strong@; border-radius: 8px;
-                padding: 6px; outline: none;
-            }
-            QListView#alignmentOptions::item {
-                padding: 9px 12px; border: 1px solid transparent;
-                border-radius: 5px; background: transparent;
-            }
-            QListView#alignmentOptions::item:selected,
-            QListView#alignmentOptions::item:hover {
-                background: @selection@; border-color: @accent@; color: @text@;
-            }
-        ''')
-        popup.setMouseTracking(True)
-        control.setView(popup)
-    alignments = row(tl, field('Horizontal', t.cbo_align), field('Vertical', t.cbo_valign))
-    alignments.setStretch(0, 1)
-    alignments.setStretch(1, 1)
-    spacing = row(tl, field('Entrelinha', t.spin_lh), field('Recuo', t.spin_indent))
+    t.cbo_align.hide()
+    t.cbo_valign.hide()
+    alignment_widget = QWidget()
+    alignment_layout = QHBoxLayout(alignment_widget)
+    alignment_layout.setContentsMargins(0, 0, 0, 0)
+    alignment_layout.setSpacing(0)
+    horizontal_widget = QWidget()
+    horizontal_layout = QHBoxLayout(horizontal_widget)
+    horizontal_layout.setContentsMargins(0, 0, 0, 0)
+    horizontal_layout.setSpacing(0)
+    vertical_widget = QWidget()
+    vertical_layout = QHBoxLayout(vertical_widget)
+    vertical_layout.setContentsMargins(0, 0, 0, 0)
+    vertical_layout.setSpacing(0)
+    horizontal_group = QButtonGroup(t)
+    vertical_group = QButtonGroup(t)
+    horizontal_group.setExclusive(True)
+    vertical_group.setExclusive(True)
+    t.alignment_buttons = []
+    alignment_icon_specs = []
+    alignment_value_icons = []
+
+    def alignment_button(asset_name, tooltip, group, combo, index, target_layout):
+        button = QPushButton()
+        button.setObjectName('textAlign_' + asset_name)
+        button.setCheckable(True)
+        button.setIcon(themed_svg_icon(align_icon_path(asset_name)))
+        button.setIconSize(QSize(18, 18))
+        button.setToolTip(tooltip)
+        square_control(button)
+        group.addButton(button, index)
+        button.clicked.connect(lambda _checked=False, i=index: combo.setCurrentIndex(i))
+        button.clicked.connect(t.snapshotRequested.emit)
+        if target_layout.count():
+            target_layout.addStretch(1)
+        target_layout.addWidget(button)
+        t.alignment_buttons.append(button)
+        alignment_icon_specs.append((button, asset_name))
+        return button
+
+    horizontal_buttons = [
+        alignment_button('left-align', 'Alinhar texto à esquerda', horizontal_group, t.cbo_align, 0, horizontal_layout),
+        alignment_button('center-align', 'Centralizar texto', horizontal_group, t.cbo_align, 1, horizontal_layout),
+        alignment_button('right-align', 'Alinhar texto à direita', horizontal_group, t.cbo_align, 2, horizontal_layout),
+        alignment_button('justify', 'Justificar texto', horizontal_group, t.cbo_align, 3, horizontal_layout),
+    ]
+    alignment_layout.addWidget(horizontal_widget, 4)
+    align_separator = QFrame()
+    align_separator.setObjectName('textAlignmentSeparator')
+    align_separator.setFixedSize(1, 22)
+    themed_style(align_separator, 'QFrame#textAlignmentSeparator { background: @border_strong@; border: none; }')
+    alignment_layout.addSpacing(10)
+    alignment_layout.addWidget(align_separator)
+    alignment_layout.addSpacing(10)
+    vertical_buttons = [
+        alignment_button('top-alignment', 'Alinhar texto ao topo', vertical_group, t.cbo_valign, 0, vertical_layout),
+        alignment_button('mid-alignment', 'Alinhar texto ao meio', vertical_group, t.cbo_valign, 1, vertical_layout),
+        alignment_button('bot-alignment', 'Alinhar texto à base', vertical_group, t.cbo_valign, 2, vertical_layout),
+    ]
+    alignment_layout.addWidget(vertical_widget, 3)
+
+    def sync_alignment_buttons():
+        horizontal_index = t.cbo_align.currentIndex()
+        vertical_index = t.cbo_valign.currentIndex()
+        for index, button in enumerate(horizontal_buttons):
+            button.setChecked(index == horizontal_index)
+        for index, button in enumerate(vertical_buttons):
+            button.setChecked(index == vertical_index)
+
+    t.cbo_align.currentIndexChanged.connect(sync_alignment_buttons)
+    t.cbo_valign.currentIndexChanged.connect(sync_alignment_buttons)
+    sync_alignment_buttons()
+    tl.addWidget(alignment_widget)
+
+    def icon_value_field(asset_name, tooltip, control):
+        widget = QWidget()
+        layout = QHBoxLayout(widget)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(7)
+        icon_label = QLabel()
+        icon_label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(20, 20))
+        icon_label.setFixedSize(22, 30)
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setToolTip(tooltip)
+        control.setToolTip(tooltip)
+        alignment_value_icons.append((icon_label, asset_name))
+        layout.addWidget(icon_label)
+        layout.addWidget(control, 1)
+        return widget
+
+    spacing = row(
+        tl,
+        icon_value_field('line-space', 'Entrelinha', t.spin_lh),
+        icon_value_field('paragraph', 'Recuo da primeira linha', t.spin_indent),
+    )
     t.spin_indent.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
     spacing.setStretch(0, 1)
     spacing.setStretch(1, 1)
+    def refresh_alignment_icons():
+        for button, asset_name in alignment_icon_specs:
+            button.setIcon(themed_svg_icon(align_icon_path(asset_name)))
+        for label, asset_name in alignment_value_icons:
+            label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(20, 20))
+    theme_manager().changed.connect(refresh_alignment_icons)
     text_section = Section('Texto', text_body)
     il.addWidget(text_section)
     doc, dl = column()
     def document_heading(title):
         label = QLabel(title)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         themed_style(label, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
         dl.addWidget(label)
     document_heading('DIMENSÕES')
     w.chk_doc_proporcao.setText('')
-    w.chk_doc_proporcao.setIcon(p.chk_proporcao.icon())
     w.chk_doc_proporcao.setFixedSize(30, 30)
     w._refresh_doc_proportion_button()
-    dimensions = row(dl, compact('L', w.spin_phys_w, 'mm'),
-                     compact('A', w.spin_phys_h, 'mm'), w.chk_doc_proporcao)
-    dimensions.addStretch()
+    dimensions = row(dl, compact('L', w.spin_phys_w, 'mm', None),
+                     compact('A', w.spin_phys_h, 'mm', None), w.chk_doc_proporcao)
+    dimensions.setStretch(0, 1)
+    dimensions.setStretch(1, 1)
     document_heading('CAMPOS DA TABELA')
     order_hint = QLabel('Segure e arraste para ajustar a ordem')
     order_hint.setWordWrap(True)
@@ -783,7 +969,10 @@ def install_frontend(w):
     dl.addWidget(order_hint)
     w.lst_placeholders.setObjectName('tableFields')
     themed_style(w.lst_placeholders, '''
-        QListWidget#tableFields { background: @surface@; border: none; outline: none; }
+        QListWidget#tableFields {
+            background: @surface@; border: 1px solid @border@;
+            border-radius: 5px; padding: 3px; outline: none;
+        }
         QListWidget#tableFields::item { padding: 4px 5px; border: none; }
         QListWidget#tableFields::item:selected { background: @selection@; color: @text@; }
         QListWidget#tableFields::item:hover { background: @hover@; }
@@ -831,6 +1020,7 @@ def install_frontend(w):
         controls = (
             t.txt_content, t.cbo_font, t.spin_size, t.btn_bold,
             t.btn_italic, t.btn_underline, t.cbo_align, t.cbo_valign,
+            *t.alignment_buttons,
             t.spin_lh, t.spin_indent, t.btn_color, t.color_hex, text_alpha,
         )
         previous = [(control, control.blockSignals(True)) for control in controls]
@@ -843,6 +1033,7 @@ def install_frontend(w):
             t.btn_underline.setChecked(False)
             t.cbo_align.setCurrentIndex(-1)
             t.cbo_valign.setCurrentIndex(-1)
+            sync_alignment_buttons()
             t.spin_lh.lineEdit().clear()
             t.spin_indent.lineEdit().clear()
             t.color_hex.clear()
@@ -867,17 +1058,14 @@ def install_frontend(w):
         selected = w.scene.selectedItems()
         current_kind = 'text' if text_available else ('object' if selected else 'none')
         if current_kind != selection_state['kind']:
-            if current_kind != 'text':
-                clear_text_presentation()
-            if properties_available:
-                prop_section.header.setChecked(True)
-            else:
-                prop_section.header.setChecked(False)
-            if text_available:
-                text_section.header.setChecked(True)
-            else:
-                text_section.header.setChecked(False)
-            selection_state['kind'] = current_kind
+            # Undo/Redo reconstrói a cena e produz transições temporárias de
+            # seleção. Elas não representam uma escolha nova do operador.
+            if not getattr(w, '_restoring_history', False):
+                if current_kind != 'text':
+                    clear_text_presentation()
+                prop_section.header.setChecked(bool(properties_available))
+                text_section.header.setChecked(bool(text_available))
+                selection_state['kind'] = current_kind
         from .canvas_items import RectangleItem, ImageItem, BackgroundItem, SignatureItem
         is_shape = len(selected) == 1 and isinstance(selected[0], RectangleItem)
         background_selected = any(getattr(item, 'is_document_background', False) for item in selected)
@@ -917,6 +1105,7 @@ def install_frontend(w):
                 updating_radii['active'] = True
                 try:
                     sync_radii.setChecked(getattr(item, 'corner_radii_linked', True))
+                    refresh_radius_sync_icon(sync_radii.isChecked())
                     for key, spin in corner_spins.items():
                         spin.setValue(px_to_mm(stored_radii.get(key, fallback)))
                 finally:
@@ -965,3 +1154,27 @@ def install_frontend(w):
     # objeto só são habilitadas quando o usuário faz uma seleção explícita.
     w.scene.clearSelection()
     sync_enabled()
+    w._inspector_sections = {
+        'document': document_section,
+        'properties': prop_section,
+        'text': text_section,
+    }
+
+    def restore_inspector_state(saved_state):
+        """Restaura preferências visuais após uma reconstrução do histórico."""
+        selected = w.scene.selectedItems()
+        text_available = t.isEnabled()
+        properties_available = p.isEnabled()
+        current_kind = 'text' if text_available else ('object' if selected else 'none')
+        selection_state['kind'] = current_kind
+        if current_kind != 'text':
+            clear_text_presentation()
+        document_section.header.setChecked(saved_state.get('document', True))
+        prop_section.header.setChecked(
+            saved_state.get('properties', False) if properties_available else False
+        )
+        text_section.header.setChecked(
+            saved_state.get('text', False) if text_available else False
+        )
+
+    w._restore_inspector_state = restore_inspector_state

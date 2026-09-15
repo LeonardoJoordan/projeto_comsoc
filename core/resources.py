@@ -24,3 +24,15 @@ def object_icon_path(name: str) -> Path:
 
 def state_icon_path(name: str) -> Path:
     return ICONS_DIR / "ui" / "state" / f"{name}.svg"
+
+
+def action_icon_path(name: str) -> Path:
+    return ICONS_DIR / "ui" / "actions" / f"{name}.svg"
+
+
+def align_icon_path(name: str) -> Path:
+    return ICONS_DIR / "ui" / "align" / f"{name}.svg"
+
+
+def navigation_icon_path(name: str) -> Path:
+    return ICONS_DIR / "ui" / "navigation" / f"{name}.svg"

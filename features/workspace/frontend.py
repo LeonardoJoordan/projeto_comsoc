@@ -2,13 +2,15 @@ from core.themes import themed_style, theme_color, theme_manager
 """Identidade visual do workspace, compartilhando o padrão do editor."""
 import re
 from pathlib import Path
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtCore import Qt, QUrl, QSize
 from PySide6.QtGui import QAction, QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QToolButton, QHBoxLayout, QVBoxLayout,
     QMessageBox, QMenu, QGridLayout, QSizePolicy, QListView,
 )
 from core.paths import get_models_dir
+from core.resources import action_icon_path, navigation_icon_path
+from core.theme_icons import themed_svg_icon
 
 
 STYLE = """
@@ -16,24 +18,31 @@ QMainWindow, QWidget { background: @surface@; color: @text@; font-size: 12px; }
 QMainWindow { background: @window@; }
 QWidget#workspaceRoot { background: @window@; }
 QWidget#workspaceLeft, QWidget#previewPanel, QWidget#dataPanel,
-QWidget#outputPanel, QWidget#modelActions {
-    background: @panel@; border: 1px solid @border@; border-radius: 8px;
+QWidget#modelActions {
+    background: @panel@; border: none; border-radius: 0;
 }
-QWidget#previewWorkspace { background: transparent; }
+QWidget#previewWorkspace { background: @panel@; }
+QWidget#outputPanel {
+    background: @panel@; border: none; border-top: 1px solid @grid@;
+    border-radius: 0;
+}
+QWidget#logPanel {
+    background: @panel@; border: none; border-top: 1px solid @grid@;
+}
 QFrame#dataRail {
-    background: @panel@; border: 1px solid @border@; border-radius: 8px;
+    background: @panel@; border: none; border-radius: 0;
 }
 QToolButton#dataRailToggle {
     background: @alternate@; color: @muted@; border: none;
-    border-right: 1px solid @border@; border-radius: 0; padding: 0; font-size: 15px;
+    border-right: 1px solid @grid@; border-radius: 0; padding: 0; font-size: 15px;
 }
 QToolButton#dataRailToggle:hover { background: @selection@; color: @on_accent@; border-right-color: @accent@; }
-QFrame#modelBar, QFrame#logHeader { background: @panel@; border-bottom: 1px solid @border@; }
+QFrame#modelBar, QFrame#logHeader { background: @panel@; border-bottom: 1px solid @grid@; }
 QWidget#outputControls { background: transparent; }
 QLabel#contextLabel { color: @muted@; font-size: 10px; font-weight: 600; }
 QToolButton#moreActions { background: @button@; border: 1px solid @border@; border-radius: 6px; padding: 7px 10px; }
 QToolButton#moreActions::menu-indicator { image: none; }
-QMenuBar { background: @window@; color: @text@; padding: 3px 8px; border-bottom: 1px solid @border@; }
+QMenuBar { background: @window@; color: @text@; padding: 3px 8px; border-bottom: 1px solid @grid@; }
 QMenuBar::item { padding: 6px 10px; border-radius: 4px; }
 QMenuBar::item:selected { background: @hover@; }
 QMenu { background: @button@; color: @text@; border: 1px solid @border_strong@; padding: 6px; }
@@ -94,7 +103,7 @@ QHeaderView::section {
 }
 QProgressBar { background: @button@; border: none; border-radius: 4px; }
 QProgressBar::chunk { background: @accent@; border-radius: 4px; }
-QSplitter::handle { background: @border@; width: 1px; }
+QSplitter::handle { background: @grid@; width: 1px; }
 QScrollBar:vertical { background: @scroll_track@; width: 8px; margin: 0; }
 QScrollBar:horizontal { background: @scroll_track@; height: 8px; margin: 0; }
 QScrollBar::handle:vertical { background: @scroll_handle@; min-height: 24px; border-radius: 2px; }
@@ -116,7 +125,7 @@ def install_frontend(window):
     window.preview_panel.setObjectName('previewPanel')
     window.controls_panel.setObjectName('modelActions')
     window.table_panel.setObjectName('dataPanel')
-    window.splitter.setHandleWidth(4)
+    window.splitter.setHandleWidth(1)
 
     buttons = window.controls_panel
     button_labels = (
@@ -179,7 +188,9 @@ def install_frontend(window):
     model_row.addWidget(buttons.btn_config_model)
     more = QToolButton()
     more.setObjectName('moreActions')
-    more.setText('⋮')
+    more.setText('')
+    more.setIcon(themed_svg_icon(action_icon_path('more-vertical')))
+    more.setIconSize(QSize(18, 18))
     more.setFixedWidth(38)
     more.setToolTip('Mais ações do modelo')
     more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -220,7 +231,9 @@ def install_frontend(window):
     destination.addWidget(QLabel('Salvar em'))
     destination.addWidget(window.txt_output_path, 1)
     window.txt_output_path.setPlaceholderText('Escolha a pasta de destino dos arquivos')
-    window.btn_sel_out.setText('…')
+    window.btn_sel_out.setText('')
+    window.btn_sel_out.setIcon(themed_svg_icon(action_icon_path('more')))
+    window.btn_sel_out.setIconSize(QSize(18, 18))
     destination.addWidget(window.btn_sel_out)
     output_grid.addLayout(destination, 0, 0, 1, 5)
     output_grid.addWidget(window.cbo_export_format, 1, 0)
@@ -254,6 +267,7 @@ def install_frontend(window):
 
     # O log fica oculto durante o trabalho normal e é acessado pelo menu Exibir.
     window.log_panel.setMaximumHeight(180)
+    window.log_panel.setObjectName('logPanel')
     window.log_panel.hide()
     def toggle_log(opened):
         window.log_panel.setVisible(opened)
@@ -264,7 +278,7 @@ def install_frontend(window):
     preview_workspace.setMinimumWidth(500)
     preview_workspace_layout = QVBoxLayout(preview_workspace)
     preview_workspace_layout.setContentsMargins(0, 0, 0, 0)
-    preview_workspace_layout.setSpacing(8)
+    preview_workspace_layout.setSpacing(0)
     preview_workspace_layout.addWidget(model_bar)
     preview_workspace_layout.addWidget(window.preview_panel, 1)
     preview_workspace_layout.addWidget(window.log_panel)
@@ -293,6 +307,15 @@ def install_frontend(window):
 
     panel_state = {'expanded_width': 700, 'collapsed': False, 'fixed': False}
 
+    def refresh_data_toggle_icon():
+        asset_name = (
+            'double-chevron-left' if panel_state['collapsed']
+            else 'double-chevron-right'
+        )
+        data_toggle.setText('')
+        data_toggle.setIcon(themed_svg_icon(navigation_icon_path(asset_name)))
+        data_toggle.setIconSize(QSize(20, 20))
+
     def set_data_panel_collapsed(collapsed):
         collapsed = bool(collapsed)
         if collapsed and panel_state['fixed']:
@@ -304,7 +327,6 @@ def install_frontend(window):
             if len(sizes) > 1 and sizes[1] > 60:
                 panel_state['expanded_width'] = sizes[1]
             window.table_panel.hide()
-            data_toggle.setText('‹\n\nD\nA\nD\nO\nS')
             data_toggle.setToolTip('Expandir tabela de dados')
             data_rail.setMinimumWidth(38)
             data_rail.setMaximumWidth(38)
@@ -313,16 +335,17 @@ def install_frontend(window):
             data_rail.setMinimumWidth(420)
             data_rail.setMaximumWidth(16777215)
             window.table_panel.show()
-            data_toggle.setText('›')
             data_toggle.setToolTip('Recolher tabela de dados')
             total = max(1000, sum(window.splitter.sizes()))
             right = min(max(420, panel_state['expanded_width']), total - 500)
             window.splitter.setSizes([total - right, right])
         panel_state['collapsed'] = collapsed
+        refresh_data_toggle_icon()
         window.settings.setValue('workspaceDataPanelCollapsed', collapsed)
 
     data_toggle.clicked.connect(lambda: set_data_panel_collapsed(not panel_state['collapsed']))
-    data_toggle.setText('›')
+    refresh_data_toggle_icon()
+    theme_manager().changed.connect(refresh_data_toggle_icon)
 
     # Recompõe a tela sem substituir os objetos responsáveis pela lógica.
     while layout.count():
@@ -330,8 +353,8 @@ def install_frontend(window):
     shell = QWidget()
     shell.setObjectName('workspaceRoot')
     shell_layout = QVBoxLayout(shell)
-    shell_layout.setContentsMargins(14, 0, 14, 14)
-    shell_layout.setSpacing(8)
+    shell_layout.setContentsMargins(0, 0, 0, 0)
+    shell_layout.setSpacing(0)
     shell_layout.addWidget(window.splitter, 1)
     layout.addWidget(shell)
 

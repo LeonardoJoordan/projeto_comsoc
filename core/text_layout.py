@@ -6,6 +6,26 @@ from core.html_utils import normalize_text_decoration
 from core.object_style import outline_pen
 
 ALIGNMENTS = {"left": Qt.AlignLeft, "center": Qt.AlignHCenter, "right": Qt.AlignRight, "justify": Qt.AlignJustify}
+REFERENCE_GLYPHS = "AÇgjpqy|{}"
+
+
+def line_reference_ink_bounds(doc, block, line):
+    """Retorna topo/base estáveis usando as fontes realmente presentes na linha."""
+    fonts = {}
+    line_start = line.textStart()
+    line_end = line_start + line.textLength()
+    cursor = QTextCursor(doc)
+    for offset in range(line_start, line_end):
+        cursor.setPosition(block.position() + offset)
+        font = cursor.charFormat().font().resolve(doc.defaultFont())
+        fonts[font.toString()] = font
+
+    if not fonts:
+        default = doc.defaultFont()
+        fonts[default.toString()] = default
+
+    bounds = [QFontMetrics(font).tightBoundingRect(REFERENCE_GLYPHS) for font in fonts.values()]
+    return min(rect.top() for rect in bounds), max(rect.bottom() for rect in bounds)
 
 
 def variables_in_html(content):
@@ -86,10 +106,8 @@ def build_document(box, content):
 
 def text_geometry(doc, box_data):
     h = box_data.get("h", 100)
-    font = doc.defaultFont()
     layout = doc.documentLayout()
     logical_h = layout.documentSize().height()
-    fm = QFontMetrics(font)
     
     real_top = 0
     real_bottom = logical_h
@@ -101,8 +119,8 @@ def text_geometry(doc, box_data):
             first_line = text_layout.lineAt(0)
             text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
             if text_str.strip():
-                tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
-                real_top = first_line.y() + first_line.ascent() + tight_rect.top()
+                ink_top, _ = line_reference_ink_bounds(doc, first_block, first_line)
+                real_top = first_line.y() + first_line.ascent() + ink_top
 
     last_block = doc.begin()
     last_valid_block = last_block
@@ -116,9 +134,9 @@ def text_geometry(doc, box_data):
             last_line = text_layout.lineAt(text_layout.lineCount() - 1)
             text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
             if text_str.strip():
-                tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
+                _, ink_bottom = line_reference_ink_bounds(doc, last_valid_block, last_line)
                 block_y = layout.blockBoundingRect(last_valid_block).y()
-                real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
+                real_bottom = block_y + last_line.y() + last_line.ascent() + ink_bottom
                 
     content_h = real_bottom - real_top
     

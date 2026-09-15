@@ -8,6 +8,8 @@ from PySide6.QtGui import QIcon, QPixmap, QPainter
 from shiboken6 import isValid
 from pathlib import Path
 from features.editor.frontend import icon
+from core.resources import action_icon_path, align_icon_path
+from core.theme_icons import themed_svg_icon
 
 
 class CellContentEditor(QPlainTextEdit):
@@ -102,7 +104,7 @@ def install_frontend(panel):
     panel.btn_toggle_wrap.setToolTip(
         'Alterna entre linhas compactas e altura automática para mostrar todo o conteúdo'
     )
-    panel.btn_toggle_wrap.setIcon(sheet_icon('<path d="M4 6h16M4 11h12a4 4 0 0 1 0 8h-4m3-3-3 3 3 3M4 16h3"/>'))
+    panel.btn_toggle_wrap.setIcon(themed_svg_icon(action_icon_path('expand-content')))
     panel.btn_toggle_wrap.setObjectName('sheetLineAction')
     actions.addWidget(panel.btn_toggle_wrap)
     toolbar_layout.addLayout(actions)
@@ -131,16 +133,17 @@ def install_frontend(panel):
     format_row = QHBoxLayout()
     format_row.setContentsMargins(44, 0, 12, 8)
     format_row.setSpacing(8)
-    for caption, tag, tooltip in [('B', 'b', 'Negrito · Ctrl+B'), ('I', 'i', 'Itálico · Ctrl+I'), ('U', 'u', 'Sublinhado · Ctrl+U')]:
-        button = QPushButton(caption)
+    for asset_name, tag, tooltip in [
+        ('bold', 'b', 'Negrito · Ctrl+B'),
+        ('italic', 'i', 'Itálico · Ctrl+I'),
+        ('underline', 'u', 'Sublinhado · Ctrl+U'),
+    ]:
+        button = QPushButton()
         button.setObjectName('sheetSquare')
         button.setFixedSize(30, 30)
         button.setToolTip(tooltip)
-        font = button.font()
-        font.setBold(tag == 'b')
-        font.setItalic(tag == 'i')
-        font.setUnderline(tag == 'u')
-        button.setFont(font)
+        button.setIcon(themed_svg_icon(align_icon_path(asset_name)))
+        button.setIconSize(QSize(14, 14))
         button.clicked.connect(lambda checked=False, t=tag: panel.table._toggle_format(t))
         format_row.addWidget(button)
     format_row.addStretch(1)
@@ -234,7 +237,7 @@ def install_frontend(panel):
         QHeaderView::section { background: @header@; color: @icon@; font-weight: 600; border: none; border-right: 1px solid @border@; border-bottom: 1px solid @border@; padding: 6px 10px; }
         QTableCornerButton::section { background: @header@; border: none; }
     '''.replace('__ICONS__', (Path(__file__).resolve().parents[1] / 'editor' / 'icons').as_posix()) + '''
-        QWidget#dataPanel { background: @field@; border: 1px solid @border@; border-radius: 8px; padding: 0; }
+        QWidget#dataPanel { background: @field@; border: none; border-radius: 0; padding: 0; }
         QFrame#sheetHeading { background: @panel@; border: none; }
         QLabel#sheetTitle { color: @text@; font-size: 18px; font-weight: 600; }
         QLabel#sheetCount { color: @muted@; font-size: 12px; }

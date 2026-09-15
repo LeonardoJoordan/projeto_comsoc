@@ -7,9 +7,10 @@ from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTe
 from PySide6.QtCore import Qt, QPointF, QRectF, QSize
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
-                           QImageReader, QPainterPath, QFontMetrics, QPainter,
+                           QImageReader, QPainterPath, QPainter,
                            QImageIOHandler)
 from core.html_utils import normalize_text_decoration
+from core.text_layout import line_reference_ink_bounds
 from core.text_state import TextState
 
 DPI = 300
@@ -1367,8 +1368,6 @@ class DesignerBox(QGraphicsRectItem):
         box_h = self.rect().height()
         
         # --- CÁLCULO DA TINTA REAL (Ignorando Ascender/Descender invisível) ---
-        font = self.text_item.font()
-        fm = QFontMetrics(font)
         real_top = 0
         real_bottom = logical_h
         
@@ -1379,8 +1378,8 @@ class DesignerBox(QGraphicsRectItem):
                 first_line = text_layout.lineAt(0)
                 text_str = first_block.text()[first_line.textStart() : first_line.textStart() + first_line.textLength()]
                 if text_str.strip():
-                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
-                    real_top = first_line.y() + first_line.ascent() + tight_rect.top()
+                    ink_top, _ = line_reference_ink_bounds(doc, first_block, first_line)
+                    real_top = first_line.y() + first_line.ascent() + ink_top
 
         last_block = doc.begin()
         last_valid_block = last_block
@@ -1394,9 +1393,9 @@ class DesignerBox(QGraphicsRectItem):
                 last_line = text_layout.lineAt(text_layout.lineCount() - 1)
                 text_str = last_valid_block.text()[last_line.textStart() : last_line.textStart() + last_line.textLength()]
                 if text_str.strip():
-                    tight_rect = fm.tightBoundingRect("AÇgjpqy|{}")
+                    _, ink_bottom = line_reference_ink_bounds(doc, last_valid_block, last_line)
                     block_y = layout.blockBoundingRect(last_valid_block).y()
-                    real_bottom = block_y + last_line.y() + last_line.ascent() + tight_rect.bottom()
+                    real_bottom = block_y + last_line.y() + last_line.ascent() + ink_bottom
                     
         content_h = real_bottom - real_top
         

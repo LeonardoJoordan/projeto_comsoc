@@ -3,13 +3,15 @@ from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinB
                                QFormLayout, QGridLayout, QTextEdit, QFontComboBox,
                                QPushButton, QComboBox, QDoubleSpinBox, QColorDialog,
                                QCheckBox, QGraphicsOpacityEffect, QMessageBox)
-from PySide6.QtCore import Qt, Signal, QMimeData
-from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat
+from PySide6.QtCore import Qt, Signal, QMimeData, QSize
+from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat, QIcon
 import re
 
 from .canvas_items import DesignerBox, SignatureItem, ImageItem, BackgroundItem, px_to_mm
 from core.custom_widgets import MathDoubleSpinBox
 from core.html_utils import normalize_text_decoration
+from core.resources import action_icon_path, align_icon_path
+from core.theme_icons import themed_svg_icon
 
 
 class CleanTextEdit(QTextEdit):
@@ -136,7 +138,7 @@ class CaixaDeTextoPanel(QWidget):
         size_buttons.setSpacing(4) # Espaço entre os emojis
 
         self.chk_proporcao = self._make_tool_button(
-            "🔗",
+            "",
             "<b>MANTER PROPORÇÃO</b><br><br>"
             "Preserva a relação entre largura e altura durante o redimensionamento:<br>"
             "• <b>Vínculo:</b> Ao alterar um valor, o outro é ajustado automaticamente.<br>"
@@ -217,9 +219,16 @@ class CaixaDeTextoPanel(QWidget):
         rot_buttons.setContentsMargins(0, 0, 0, 0)
         rot_buttons.setSpacing(4)
 
-        self.btn_rot_minus_90 = self._make_tool_button("↪️", "Gira o objeto 90° anti-horário.")
+        self.btn_rot_minus_90 = self._make_tool_button("", "Gira o objeto 90° anti-horário.")
         self.btn_rot_zero = self._make_tool_button("⬆️", "Zera a rotação do objeto.")
-        self.btn_rot_plus_90 = self._make_tool_button("↩️", "Gira o objeto 90° horário.")
+        self.btn_rot_plus_90 = self._make_tool_button("", "Gira o objeto 90° horário.")
+        for button, asset_name in (
+            (self.btn_rot_minus_90, "rotate-left"),
+            (self.btn_rot_plus_90, "rotate-right"),
+        ):
+            button.setText("")
+            button.setIcon(QIcon(str(action_icon_path(asset_name))))
+            button.setIconSize(QSize(18, 18))
 
         # --- Efeitos visuais de Opacidade para Rotação ---
         self.op_rot_minus = QGraphicsOpacityEffect(self.btn_rot_minus_90)
@@ -272,6 +281,8 @@ class CaixaDeTextoPanel(QWidget):
         opac_line.addWidget(self.spin_opacity, 1)
 
         self.chk_link = QCheckBox("Habilitar Link")
+        self.chk_link.setIcon(QIcon(str(action_icon_path("link"))))
+        self.chk_link.setIconSize(QSize(18, 18))
         self.chk_link.setFixedHeight(30)
         self.chk_link.setToolTip(
             "<b>HABILITAR LINK (URL)</b><br><br>"
@@ -376,6 +387,9 @@ class CaixaDeTextoPanel(QWidget):
 
     def _refresh_proportion_button(self, available: bool):
         checked = self.chk_proporcao.isChecked()
+        asset_name = "lock ratio" if checked else "unlock ratio"
+        self.chk_proporcao.setIcon(QIcon(str(action_icon_path(asset_name))))
+        self.chk_proporcao.setIconSize(QSize(20, 20))
         self.chk_proporcao.setEnabled(available)
         themed_style(self.chk_proporcao, self._proportion_button_style(available and checked))
         if not available:
@@ -604,9 +618,10 @@ class EditorDeTextoPanel(QWidget):
 
         row_style = QHBoxLayout()
         
-        self.btn_bold = QPushButton("B")
+        self.btn_bold = QPushButton()
         self.btn_bold.setFixedWidth(30)
-        themed_style(self.btn_bold, "font-weight: bold")
+        self.btn_bold.setIcon(themed_svg_icon(align_icon_path("bold")))
+        self.btn_bold.setIconSize(QSize(14, 14))
         self.btn_bold.setCheckable(True)
         self.btn_bold.setToolTip(
             "<b>NEGRITO</b><br>"
@@ -617,9 +632,10 @@ class EditorDeTextoPanel(QWidget):
         )
         self.btn_bold.clicked.connect(lambda: self.set_format_attribute("bold"))
 
-        self.btn_italic = QPushButton("I")
+        self.btn_italic = QPushButton()
         self.btn_italic.setFixedWidth(30)
-        themed_style(self.btn_italic, "font-style: italic")
+        self.btn_italic.setIcon(themed_svg_icon(align_icon_path("italic")))
+        self.btn_italic.setIconSize(QSize(14, 14))
         self.btn_italic.setCheckable(True)
         self.btn_italic.setToolTip(
             "<b>ITÁLICO</b><br>"
@@ -630,9 +646,10 @@ class EditorDeTextoPanel(QWidget):
         )
         self.btn_italic.clicked.connect(lambda: self.set_format_attribute("italic"))
 
-        self.btn_underline = QPushButton("U")
+        self.btn_underline = QPushButton()
         self.btn_underline.setFixedWidth(30)
-        themed_style(self.btn_underline, "text-decoration: underline")
+        self.btn_underline.setIcon(themed_svg_icon(align_icon_path("underline")))
+        self.btn_underline.setIconSize(QSize(14, 14))
         self.btn_underline.setCheckable(True)
         self.btn_underline.setToolTip(
             "<b>SUBLINHADO</b><br>"

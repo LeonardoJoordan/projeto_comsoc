@@ -1,9 +1,11 @@
 from core.themes import themed_style, theme_color, theme_manager
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFrame,
                                QComboBox, QPushButton, QSpinBox)
-from PySide6.QtCore import Qt, Signal, QSignalBlocker
+from PySide6.QtCore import Qt, Signal, QSignalBlocker, QSize
 from PySide6.QtGui import QPixmap, QResizeEvent, QImageReader
 from pathlib import Path
+from core.resources import navigation_icon_path
+from core.theme_icons import themed_svg_icon
 
 class ResizingLabel(QLabel):
     """QLabel que redimensiona a imagem interna automaticamente mantendo proporção."""
@@ -91,7 +93,7 @@ class PreviewPanel(QWidget):
         page_navigation.setSpacing(5)
         page_navigation.addStretch(1)
 
-        self.btn_previous = QPushButton("‹")
+        self.btn_previous = QPushButton()
         self.btn_previous.setObjectName("previewPrevious")
         self.btn_previous.setFixedSize(24, 22)
         self.btn_previous.setToolTip("Registro anterior")
@@ -118,7 +120,7 @@ class PreviewPanel(QWidget):
         self.lbl_navigation_total.setAlignment(Qt.AlignmentFlag.AlignCenter)
         page_navigation.addWidget(self.lbl_navigation_total)
 
-        self.btn_next = QPushButton("›")
+        self.btn_next = QPushButton()
         self.btn_next.setObjectName("previewNext")
         self.btn_next.setFixedSize(24, 22)
         self.btn_next.setToolTip("Próximo registro")
@@ -141,6 +143,13 @@ class PreviewPanel(QWidget):
 
         self.btn_previous.clicked.connect(lambda: self.indexRequested.emit(self.spin_navigation.value() - 2))
         self.btn_next.clicked.connect(lambda: self.indexRequested.emit(self.spin_navigation.value()))
+        def refresh_navigation_icons():
+            self.btn_previous.setIcon(themed_svg_icon(navigation_icon_path("left-arrow")))
+            self.btn_previous.setIconSize(QSize(14, 14))
+            self.btn_next.setIcon(themed_svg_icon(navigation_icon_path("right-arrow")))
+            self.btn_next.setIconSize(QSize(14, 14))
+        refresh_navigation_icons()
+        theme_manager().changed.connect(refresh_navigation_icons)
         self.set_navigation("item", 0, 0, sheet_available=False)
 
     def _emit_mode(self):

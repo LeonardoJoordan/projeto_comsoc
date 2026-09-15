@@ -21,7 +21,6 @@ Coloque os SVGs usando exatamente os nomes abaixo. Um único conjunto visual dev
 | `chevron-right.svg` | `›` | Próximo item/folha e expansão lateral |
 | `chevron-down.svg` | `⌄` | Cabeçalhos recolhíveis e comboboxes |
 | `chevron-up.svg` | símbolo de recolhimento | Cabeçalhos quando necessário |
-| `more-vertical.svg` | `⋮` | Menu de ações do modelo |
 
 ## `actions/`
 
@@ -41,6 +40,16 @@ Coloque os SVGs usando exatamente os nomes abaixo. Um único conjunto visual dev
 | `link.svg` | `🔗` | Manter proporção ou habilitar link |
 | `restore.svg` | `🔄` | Restaurar estado original |
 | `expand-content.svg` | `↕️` | Exibir conteúdo completo das células |
+| `more.svg` | `…` | Selecionar a pasta de saída |
+| `more-vertical.svg` | `⋮` | Menu de ações do modelo |
+
+## `align/`
+
+| Arquivo | Substitui | Uso |
+|---|---|---|
+| `bold.svg` | `B` | Aplicar negrito ao texto selecionado |
+| `italic.svg` | `I` | Aplicar itálico ao texto selecionado |
+| `underline.svg` | `U` | Aplicar sublinhado ao texto selecionado |
 
 ## `objects/`
 

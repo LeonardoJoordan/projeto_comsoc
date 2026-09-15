@@ -22,7 +22,7 @@ from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
 from core.render_cache import ensure_background_proxy
-from core.resources import app_icon_path, state_icon_path
+from core.resources import action_icon_path, app_icon_path, state_icon_path
 
 
 _VISIBILITY_ICONS = {}
@@ -154,7 +154,9 @@ class EditorWindow(QMainWindow):
         self.btn_toggle_guides.setGraphicsEffect(self.op_eye)
         self.op_eye.setOpacity(1.0 if self.btn_toggle_guides.isChecked() else 0.2)
         
-        self.btn_clear_guides = QPushButton("🗑️")
+        self.btn_clear_guides = QPushButton()
+        self.btn_clear_guides.setIcon(QIcon(str(action_icon_path("delete"))))
+        self.btn_clear_guides.setIconSize(QSize(18, 18))
         self.btn_clear_guides.setFixedSize(26, 26)
         self.btn_clear_guides.setStyleSheet(btn_icon_style)
         self._apply_tooltip(self.btn_clear_guides, 
@@ -438,7 +440,7 @@ class EditorWindow(QMainWindow):
             QPushButton:disabled { color: #555555; }
         """
 
-        self.chk_doc_proporcao = QPushButton("🔗")
+        self.chk_doc_proporcao = QPushButton()
         self.chk_doc_proporcao.setFixedSize(26, 26)
         self.chk_doc_proporcao.setCheckable(True)
         self.chk_doc_proporcao.setChecked(True)
@@ -1586,6 +1588,10 @@ class EditorWindow(QMainWindow):
 
     def _refresh_doc_proportion_button(self):
         checked = self.chk_doc_proporcao.isChecked()
+        self.chk_doc_proporcao.setIcon(QIcon(str(action_icon_path(
+            "lock ratio" if checked else "unlock ratio"
+        ))))
+        self.chk_doc_proporcao.setIconSize(QSize(20, 20))
         self.chk_doc_proporcao.setStyleSheet(self._doc_proportion_button_style(checked))
         self.op_doc_proporcao.setOpacity(1.0 if checked else 0.2)
 
@@ -2437,11 +2443,19 @@ class EditorWindow(QMainWindow):
             self._restore_history_state(state)
 
     def _restore_history_state(self, state):
+        sections = getattr(self, '_inspector_sections', {})
+        inspector_state = {
+            name: section.header.isChecked()
+            for name, section in sections.items()
+        }
         self._restoring_history = True
         try:
             self.apply_scene_state(state, is_undo_redo=True)
         finally:
             self._restoring_history = False
+        restore_inspector = getattr(self, '_restore_inspector_state', None)
+        if restore_inspector:
+            restore_inspector(inspector_state)
 
     def _setup_layer_toolbar(self) -> QWidget:
         """Cria a barra de ferramentas compacta acima da lista de camadas."""
@@ -2463,7 +2477,9 @@ class EditorWindow(QMainWindow):
             QPushButton:disabled { background-color: #222222; color: #555555; border-color: #333333; }
         """
 
-        self.btn_undo = QPushButton("⬅️")
+        self.btn_undo = QPushButton()
+        self.btn_undo.setIcon(QIcon(str(action_icon_path("undo"))))
+        self.btn_undo.setIconSize(QSize(18, 18))
         self._apply_tooltip(self.btn_undo, 
             "<b>DESFAZER</b><br>"
             "<small style='color: #A0A0A0;'>Atalho: Ctrl + Z</small>"
@@ -2475,7 +2491,9 @@ class EditorWindow(QMainWindow):
         self.btn_undo.setEnabled(False)
         self.btn_undo.clicked.connect(self.undo)
 
-        self.btn_redo = QPushButton("➡️")
+        self.btn_redo = QPushButton()
+        self.btn_redo.setIcon(QIcon(str(action_icon_path("redo"))))
+        self.btn_redo.setIconSize(QSize(18, 18))
         self._apply_tooltip(self.btn_redo, 
             "<b>REFAZER</b><br>"
             "<small style='color: #A0A0A0;'>Atalho: Ctrl + Y</small>"
@@ -2510,7 +2528,9 @@ class EditorWindow(QMainWindow):
         self.btn_dup_layer.setStyleSheet(btn_style)
         self.btn_dup_layer.clicked.connect(self.duplicate_selected)
 
-        self.btn_del_layer = QPushButton("🗑️")
+        self.btn_del_layer = QPushButton()
+        self.btn_del_layer.setIcon(QIcon(str(action_icon_path("delete"))))
+        self.btn_del_layer.setIconSize(QSize(18, 18))
         self._apply_tooltip(self.btn_del_layer, 
             "<b>EXCLUIR CAMADA</b><br>"
             "<small style='color: #A0A0A0;'>Atalho: Delete</small>"
