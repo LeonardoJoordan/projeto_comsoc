@@ -56,6 +56,9 @@ Coloque os SVGs usando exatamente os nomes abaixo. Um único conjunto visual dev
 | Arquivo | Substitui | Uso |
 |---|---|---|
 | `text.svg` | `📝` | Adicionar ou representar texto |
+| `square.svg` | forma desenhada no código | Quadrado/retângulo no menu de formas |
+| `circle.svg` | forma desenhada no código | Círculo/elipse no menu de formas |
+| `line.svg` | forma desenhada no código | Linha no menu de formas |
 | `image.svg` | `📸` / `🖼️` | Adicionar ou representar imagem |
 | `signature.svg` | `✍️` | Assinatura e cabeçalho da coluna |
 | `quantity.svg` | `🔢` | Cabeçalho da coluna de quantidade |
@@ -73,6 +76,7 @@ Coloque os SVGs usando exatamente os nomes abaixo. Um único conjunto visual dev
 | `success.svg` | `✅` | Validação bem-sucedida |
 | `error.svg` | `❌` | Erro de validação |
 | `settings.svg` | `⚙️` | Configuração |
+| `opacity.svg` | `Op.` / `α` | Identificação dos campos de opacidade |
 
 ## Símbolos usados somente no log
 

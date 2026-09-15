@@ -1,35 +1,50 @@
 """Impede alterações acidentais em seletores durante a rolagem de painéis."""
 
 from PySide6.QtCore import QObject, QEvent, Qt
-from PySide6.QtWidgets import QAbstractScrollArea, QAbstractSpinBox, QComboBox, QLineEdit
+from PySide6.QtWidgets import QAbstractScrollArea, QAbstractSpinBox, QComboBox, QWidget
 
 
 class WheelFocusGuard(QObject):
-    """Só permite que seletores processem a roda quando possuem foco."""
+    """Só permite que o último seletor clicado processe a roda."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._armed = None
+
+    @staticmethod
+    def _selector_for(widget):
+        while isinstance(widget, QWidget):
+            if isinstance(widget, (QComboBox, QAbstractSpinBox)):
+                return widget
+            widget = widget.parentWidget()
+        return None
+
+    def _belongs_to_combo_popup(self, widget):
+        if not isinstance(self._armed, QComboBox):
+            return False
+        popup = self._armed.view()
+        while isinstance(widget, QWidget):
+            if widget is popup or widget is popup.viewport():
+                return True
+            widget = widget.parentWidget()
+        return False
 
     def eventFilter(self, watched, event):
-        # Spinboxes e comboboxes editáveis também recebem eventos pelo editor
-        # interno. O foco, sozinho, não prova que o usuário clicou no campo:
-        # o Qt pode atribuí-lo automaticamente ao abrir a janela ou pela roda.
-        if isinstance(watched, QLineEdit):
-            watched = watched.parentWidget()
-        if not isinstance(watched, (QComboBox, QAbstractSpinBox)):
-            return False
         kind = event.type()
-        if kind == QEvent.Type.Polish:
-            watched.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        elif kind == QEvent.Type.MouseButtonPress:
-            if event.button() == Qt.MouseButton.LeftButton:
-                watched.setProperty('_wheel_clicked', True)
-        elif kind == QEvent.Type.FocusOut:
-            popup_open = isinstance(watched, QComboBox) and watched.view().isVisible()
-            if not popup_open and event.reason() not in (
-                Qt.FocusReason.PopupFocusReason, Qt.FocusReason.ActiveWindowFocusReason,
-            ):
-                watched.setProperty('_wheel_clicked', False)
+        selector = self._selector_for(watched)
+        if kind == QEvent.Type.Polish and selector is not None:
+            selector.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        elif kind == QEvent.Type.MouseButtonPress and event.button() == Qt.MouseButton.LeftButton:
+            if selector is not None:
+                self._armed = selector
+            elif not self._belongs_to_combo_popup(watched):
+                self._armed = None
         if kind != QEvent.Type.Wheel:
             return False
-        if watched.hasFocus() and watched.property('_wheel_clicked'):
+        if selector is None:
+            return False
+        watched = selector
+        if self._armed is watched:
             return False
 
         # O controle está apenas sob o cursor. Aplicar a rolagem ao painel

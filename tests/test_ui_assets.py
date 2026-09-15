@@ -28,7 +28,10 @@ def test_bundled_inter_font_is_registered_and_applied():
 def test_object_icons_are_valid_svg_icons():
     app = QApplication.instance() or QApplication([])
 
-    for name in ("text", "shapes", "image", "signature", "quantity"):
+    for name in (
+        "text", "shapes", "image", "signature", "quantity",
+        "square", "circle", "line",
+    ):
         path = object_icon_path(name)
         assert path.is_file()
         assert not QIcon(str(path)).pixmap(24, 24).isNull()
@@ -37,7 +40,10 @@ def test_object_icons_are_valid_svg_icons():
 def test_guide_icons_are_valid_svg_icons():
     app = QApplication.instance() or QApplication([])
 
-    for name in ("guide", "h.guide", "v.guide", "l.guide", "lock", "unlock", "eye"):
+    for name in (
+        "guide", "h.guide", "v.guide", "l.guide", "lock", "unlock", "eye",
+        "opacity",
+    ):
         path = state_icon_path(name)
         assert path.is_file()
         assert not QIcon(str(path)).pixmap(24, 24).isNull()

@@ -132,7 +132,7 @@ def field(name, control):
     return widget
 
 
-def compact(name, control, suffix='', width=100):
+def compact(name, control, suffix='', width=100, accessible_name=None):
     widget = QFrame()
     widget.setObjectName('compact')
     widget.setFixedHeight(30)
@@ -141,12 +141,22 @@ def compact(name, control, suffix='', width=100):
     layout = QHBoxLayout(widget)
     layout.setContentsMargins(8, 0, 7, 0)
     layout.setSpacing(5)
-    layout.addWidget(QLabel(name))
+    if isinstance(name, Path):
+        label = QLabel()
+        label.setFixedSize(16, 20)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        def refresh_icon():
+            label.setPixmap(themed_svg_icon(name).pixmap(14, 14))
+        refresh_icon()
+        theme_manager().changed.connect(refresh_icon)
+    else:
+        label = QLabel(name)
+    layout.addWidget(label)
     control.setMinimumWidth(0)
     control.setMaximumWidth(16777215)
     control.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
     control.setAlignment(Qt.AlignmentFlag.AlignRight)
-    control.setAccessibleName(name)
+    control.setAccessibleName(accessible_name or (name if isinstance(name, str) else 'Valor'))
     layout.addWidget(control, 1)
     if suffix:
         layout.addWidget(QLabel(suffix))
@@ -345,7 +355,10 @@ def install_frontend(w):
         separator.setGeometry(12, 0, 1, 24)
         themed_style(separator, 'QFrame#toolbarSeparator { background: @border@; border: none; }')
         tools.addWidget(spacing)
-    moved = [p.spin_w, p.spin_h, p.chk_proporcao, p.spin_rot, p.spin_opacity]
+    moved = [
+        p.spin_w, p.spin_h, p.chk_proporcao, p.spin_rot, p.spin_opacity,
+        p.btn_rot_minus_90, p.btn_rot_plus_90,
+    ]
     for name, control in [('X', w.spin_pos_x), ('Y', w.spin_pos_y), ('L', p.spin_w), ('A', p.spin_h)]:
         if name == 'L':
             toolbar_separator()
@@ -355,8 +368,22 @@ def install_frontend(w):
     p._refresh_proportion_button(p.isEnabled())
     tools.addWidget(p.chk_proporcao)
     toolbar_separator()
+    for button, asset_name, tip in (
+        (p.btn_rot_minus_90, 'rotate-left', 'Girar 90° no sentido anti-horário'),
+        (p.btn_rot_plus_90, 'rotate-right', 'Girar 90° no sentido horário'),
+    ):
+        button.setText('')
+        button.setIcon(themed_svg_icon(action_icon_path(asset_name)))
+        button.setIconSize(QSize(18, 18))
+        button.setToolTip(tip)
+        button.setGraphicsEffect(None)
+        themed_style(button, 'padding: 0;')
+        button.setFixedSize(30, 30)
+        tools.addWidget(button)
     tools.addWidget(compact('↻', p.spin_rot, '°', 78))
-    tools.addWidget(compact('Op.', p.spin_opacity, '%', 88))
+    tools.addWidget(compact(
+        state_icon_path('opacity'), p.spin_opacity, '%', 88, 'Opacidade'
+    ))
     toolbar_separator()
     guide_label = QLabel('GUIAS')
     guide_label.setObjectName('muted')
@@ -442,10 +469,12 @@ def install_frontend(w):
         QMenu#shapeMenu::icon { left: 10px; }
     ''')
     shape_menu.aboutToShow.connect(lambda: shape_menu.setMinimumWidth(forms.width()))
-    for name, kind, path in [('Quadrado', 'rectangle', '<rect x="4" y="4" width="16" height="16"/>'),
-                              ('Círculo', 'ellipse', '<circle cx="12" cy="12" r="8"/>'),
-                              ('Linha', 'line', '<path d="M4 20 20 4"/>')]:
-        action = shape_menu.addAction(icon(path), name)
+    for name, kind, asset_name in (
+        ('Quadrado', 'rectangle', 'square'),
+        ('Círculo', 'ellipse', 'circle'),
+        ('Linha', 'line', 'line'),
+    ):
+        action = shape_menu.addAction(themed_svg_icon(object_icon_path(asset_name)), name)
         action.triggered.connect(lambda checked=False, k=kind: w.shape_drawing.activate(k))
     forms.setMenu(shape_menu)
     for button, label, path, asset_name in [
@@ -456,18 +485,38 @@ def install_frontend(w):
         detail = {'Texto': 'Campo dinâmico', 'Formas': 'Preenchimento e borda', 'Imagens': 'Foto, logo ou QR', 'Assinatura': 'Imagem opcional'}[label]
         button.setText('')
         contents = QHBoxLayout(button)
-        contents.setContentsMargins(42, 3, 8, 3)
+        contents.setContentsMargins(12, 3, 8, 3)
+        contents.setSpacing(10)
+        leading_icon = QLabel()
+        leading_icon.setFixedSize(20, 20)
+        leading_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        leading_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        leading_icon.setPixmap(QIcon(str(object_icon_path(asset_name))).pixmap(20, 20))
+        contents.addWidget(leading_icon)
         caption = QLabel(f'<b>{label}</b><br><span style="font-size:9px">{detail}</span>')
         caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
         contents.addWidget(caption)
-        button.setIcon(QIcon(str(object_icon_path(asset_name))) if asset_name else icon(path))
-        button.setIconSize(QSize(20, 20))
+        contents.addStretch(1)
+        trailing_icon = QLabel()
+        trailing_icon.setFixedSize(20, 20)
+        trailing_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        trailing_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        if button is forms:
+            def refresh_shape_arrow(target=trailing_icon):
+                target.setPixmap(
+                    themed_svg_icon(navigation_icon_path('chevron-down')).pixmap(16, 16)
+                )
+            refresh_shape_arrow()
+            theme_manager().changed.connect(refresh_shape_arrow)
+        contents.addWidget(trailing_icon)
+        button.setIcon(QIcon())
         button.setObjectName('add' + label)
         # QSS mede a área de conteúdo: 36 + 12 de padding + 2 de borda = 50.
         # Fixar também no estilo evita que o polish restaure o mínimo global.
         themed_style(button, 'QPushButton#' + button.objectName() + ' { '
                             'text-align: left; padding: 6px 10px 6px 12px; '
-                            'min-height: 36px; max-height: 36px; }')
+                            'min-height: 36px; max-height: 36px; } '
+                            'QPushButton#' + button.objectName() + '::menu-indicator { image: none; }')
         button.setFixedHeight(50)
         ll.addWidget(button)
     layer_heading = QHBoxLayout()
@@ -538,7 +587,9 @@ def install_frontend(w):
     fill_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(fill_heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
     fill_layout.addWidget(fill_heading)
-    fill_row = row(fill_layout, shape_swatch, shape_color, compact('α', fill_alpha, '%', 85))
+    fill_row = row(fill_layout, shape_swatch, shape_color, compact(
+        state_icon_path('opacity'), fill_alpha, '%', 85, 'Opacidade do preenchimento'
+    ))
     fill_row.setStretch(1, 1)
     shape_layout.addWidget(fill_controls)
     pl.addWidget(shape_controls)
@@ -586,7 +637,9 @@ def install_frontend(w):
     shape_layout.addWidget(outline_enabled)
     outline_details, outline_details_layout = column()
     outline_details_layout.setContentsMargins(0, 0, 0, 0)
-    outline_color_row = row(outline_details_layout, outline_swatch, outline_color, compact('α', outline_alpha, '%', 85))
+    outline_color_row = row(outline_details_layout, outline_swatch, outline_color, compact(
+        state_icon_path('opacity'), outline_alpha, '%', 85, 'Opacidade do contorno'
+    ))
     outline_color_row.setStretch(1, 1)
     outline_join, join_layout = column()
     join_layout.setContentsMargins(0, 0, 0, 0)
@@ -812,7 +865,9 @@ def install_frontend(w):
     text_alpha.setKeyboardTracking(False)
     color_row, color_layout = column()
     color_layout.setContentsMargins(0, 0, 0, 0)
-    text_color_row = row(color_layout, t.btn_color, t.color_hex, compact('α', text_alpha, '%', 85))
+    text_color_row = row(color_layout, t.btn_color, t.color_hex, compact(
+        state_icon_path('opacity'), text_alpha, '%', 85, 'Opacidade do texto'
+    ))
     text_color_row.setStretch(1, 1)
     tl.addWidget(field('Cor', color_row))
     def apply_hex():

@@ -6,7 +6,6 @@ import tempfile
 import copy
 import time
 from pathlib import Path
-from datetime import datetime
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
@@ -33,6 +32,7 @@ from core.settings import get_app_settings
 from core.font_utils import format_font_list, missing_template_fonts
 from core.render_cache import ensure_background_proxy
 from core.resources import object_icon_path
+from core.output_folders import create_forge_output_dir
 from features.spreadsheet.headers import QUANTITY_HEADER, SIGNATURE_HEADER
 
 
@@ -1421,11 +1421,8 @@ class MainWindow(QMainWindow):
         base_dir = Path(custom_path)
         self.settings.setValue("last_output_dir", custom_path)
 
-        timestamp = datetime.now().strftime("%y.%m.%d-%H.%M.%S")
-        folder_name = f"FORNAX_Forge_{timestamp}"
-        
-        output_dir = base_dir / folder_name
-        output_dir.mkdir(parents=True, exist_ok=True)
+        output_dir, _forge_number = create_forge_output_dir(base_dir, self.settings)
+        folder_name = output_dir.name
         
         self.log_panel.append(f"📂 Salvando em: {folder_name}")
 
