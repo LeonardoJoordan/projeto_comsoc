@@ -154,16 +154,17 @@ def install_frontend(window):
 
     buttons = window.controls_panel
     button_labels = (
-        (buttons.btn_add_model, tr('Novo modelo')),
-        (buttons.btn_duplicate_model, tr('Duplicar')),
-        (buttons.btn_remove_model, tr('Remover')),
-        (buttons.btn_rename_model, tr('Renomear')),
-        (buttons.btn_config_model, tr('Editar modelo')),
-        (buttons.btn_import_models, tr('Importar')),
-        (buttons.btn_export_models, tr('Exportar')),
+        (buttons.btn_add_model, tr('Novo modelo'), tr('Criar um modelo em branco')),
+        (buttons.btn_duplicate_model, tr('Duplicar'), tr('Duplicar o modelo selecionado')),
+        (buttons.btn_remove_model, tr('Remover'), tr('Excluir o modelo selecionado')),
+        (buttons.btn_rename_model, tr('Renomear'), tr('Renomear o modelo selecionado')),
+        (buttons.btn_config_model, tr('Editar modelo'), tr('Abrir o modelo selecionado no editor')),
+        (buttons.btn_import_models, tr('Importar'), tr('Importar modelos de um pacote ZIP')),
+        (buttons.btn_export_models, tr('Exportar'), tr('Exportar modelos para um pacote ZIP')),
     )
-    for button, label in button_labels:
+    for button, label, tooltip in button_labels:
         button.setText(label)
+        button.setToolTip(tooltip)
         button.setMinimumHeight(38)
     buttons.btn_add_model.setObjectName('primary')
     buttons.btn_remove_model.setObjectName('danger')
@@ -259,15 +260,27 @@ def install_frontend(window):
     window.btn_sel_out.setText('')
     window.btn_sel_out.setIcon(themed_svg_icon(action_icon_path('more')))
     window.btn_sel_out.setIconSize(QSize(18, 18))
+    window.btn_sel_out.setToolTip(tr('Escolher a pasta de destino'))
     destination.addWidget(window.btn_sel_out)
     output_grid.addLayout(destination, 0, 0, 1, 5)
     output_grid.addWidget(window.cbo_export_format, 1, 0)
+    export_tooltips = {
+        'png': tr('Uma imagem PNG para cada item.'),
+        'pdf_item': tr('Um arquivo PDF separado para cada item.'),
+        'pdf_grouped': tr('Todos os itens reunidos em um único arquivo PDF.'),
+    }
+    for index in range(window.cbo_export_format.count()):
+        mode = window.cbo_export_format.itemData(index)
+        window.cbo_export_format.setItemData(index, export_tooltips[mode], Qt.ItemDataRole.ToolTipRole)
+    window.cbo_export_format.setToolTip(tr('Selecionar o formato dos arquivos gerados'))
     window.cbo_presets_main.setMinimumWidth(100)
     window.cbo_presets_main.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+    window.cbo_presets_main.setToolTip(tr('Selecionar uma predefinição de impressão'))
     output_grid.addWidget(window.cbo_presets_main, 1, 1, 1, 3)
     output_grid.setColumnStretch(1, 1)
     window.btn_generate_cards.setFixedWidth(140)
     window.btn_generate_cards.setFixedHeight(42)
+    window.btn_generate_cards.setToolTip(tr('Gerar os arquivos usando os dados da tabela'))
     output_grid.addWidget(window.btn_generate_cards, 1, 4, 1, 1, Qt.AlignmentFlag.AlignVCenter)
     for control in (window.txt_output_path, window.btn_sel_out, window.cbo_export_format,
                     window.cbo_presets_main):

@@ -150,7 +150,14 @@ class PreviewPanel(QWidget):
             self.btn_next.setIcon(themed_svg_icon(navigation_icon_path("right-arrow")))
             self.btn_next.setIconSize(QSize(14, 14))
         refresh_navigation_icons()
-        theme_manager().changed.connect(refresh_navigation_icons)
+        manager = theme_manager()
+        manager.changed.connect(refresh_navigation_icons)
+        def disconnect_navigation_icons():
+            try:
+                manager.changed.disconnect(refresh_navigation_icons)
+            except (RuntimeError, TypeError):
+                pass
+        self.destroyed.connect(disconnect_navigation_icons)
         self.set_navigation("item", 0, 0, sheet_available=False)
 
     def _emit_mode(self):

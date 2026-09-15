@@ -23,6 +23,7 @@ from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
 from core.render_cache import ensure_background_proxy
 from core.resources import action_icon_path, app_icon_path, state_icon_path
+from core.i18n import tr
 
 
 _VISIBILITY_ICONS = {}
@@ -100,7 +101,7 @@ class EditorWindow(QMainWindow):
         self._workspace_session_active = False
         self._current_model_name = None
         self._current_model_dir = None
-        self.setWindowTitle("Editor de modelos — FORNAX Forge")
+        self.setWindowTitle(tr("Editor de modelos — FORNAX Forge"))
         self.setWindowIcon(QIcon(str(app_icon_path())))
         self.resize(1200, 800)
 
@@ -701,13 +702,13 @@ class EditorWindow(QMainWindow):
         if hasattr(self, '_last_saved_state') and self._last_saved_state is not None:
             if not self._states_equal_for_close(current_state, self._last_saved_state):
                 msg_box = QMessageBox(self)
-                msg_box.setWindowTitle("Alterações não salvas")
+                msg_box.setWindowTitle(tr("Alterações não salvas"))
                 msg_box.setIcon(QMessageBox.Icon.Warning)
-                msg_box.setText("<b>Você tem alterações não salvas neste modelo.</b><br><br>Gostaria de salvá-las antes de sair?")
+                msg_box.setText(tr("<b>Você tem alterações não salvas neste modelo.</b><br><br>Gostaria de salvá-las antes de sair?"))
                 
-                btn_save = msg_box.addButton("Salvar e Sair", QMessageBox.ButtonRole.AcceptRole)
-                btn_discard = msg_box.addButton("Sair sem salvar", QMessageBox.ButtonRole.DestructiveRole)
-                btn_cancel = msg_box.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
+                btn_save = msg_box.addButton(tr("Salvar e Sair"), QMessageBox.ButtonRole.AcceptRole)
+                btn_discard = msg_box.addButton(tr("Sair sem salvar"), QMessageBox.ButtonRole.DestructiveRole)
+                btn_cancel = msg_box.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
                 msg_box.setDefaultButton(btn_save)
                 
                 msg_box.exec()
@@ -1007,7 +1008,7 @@ class EditorWindow(QMainWindow):
         data = self._migrate_model_data(data)
         self._current_model_name = data.get("name", "")
         self._current_model_dir = path.parent
-        self.setWindowTitle(f"Editor Visual de Modelo - {self._current_model_name}")
+        self.setWindowTitle(tr("Editor de modelos — {modelo}").format(modelo=self._current_model_name))
         
         # O apply_scene_state faz todo o trabalho duro de desenhar
         self.apply_scene_state(data, is_undo_redo=False)
@@ -1023,10 +1024,10 @@ class EditorWindow(QMainWindow):
         data = self.get_current_scene_state()
         
         if not self._current_model_name:
-            novo_nome, ok = QInputDialog.getText(self, "Salvar Modelo", "Nome do Modelo:")
+            novo_nome, ok = QInputDialog.getText(self, tr("Salvar modelo"), tr("Nome do modelo:"))
             if not ok or not novo_nome.strip(): return
             self._current_model_name = novo_nome.strip()
-            self.setWindowTitle(f"Editor Visual de Modelo - {self._current_model_name}")
+            self.setWindowTitle(tr("Editor de modelos — {modelo}").format(modelo=self._current_model_name))
             
         data["name"] = self._current_model_name
         model_name = self._current_model_name
@@ -1107,12 +1108,12 @@ class EditorWindow(QMainWindow):
         
         # Criação do Diálogo de Decisão Customizado
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Sucesso")
+        msg_box.setWindowTitle(tr("Sucesso"))
         msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setText("<b>Seu modelo foi salvo com sucesso!</b><br><br>Deseja sair do editor?")
+        msg_box.setText(tr("<b>Seu modelo foi salvo com sucesso!</b><br><br>Deseja sair do editor?"))
         
-        btn_exit = msg_box.addButton("Encerrar edição", QMessageBox.ButtonRole.AcceptRole)
-        btn_stay = msg_box.addButton("Continuar editando", QMessageBox.ButtonRole.RejectRole)
+        btn_exit = msg_box.addButton(tr("Encerrar edição"), QMessageBox.ButtonRole.AcceptRole)
+        btn_stay = msg_box.addButton(tr("Continuar editando"), QMessageBox.ButtonRole.RejectRole)
         msg_box.setDefaultButton(btn_stay)
 
         msg_box.exec()
@@ -1129,7 +1130,7 @@ class EditorWindow(QMainWindow):
             original_size = _reader_logical_size(reader, raw_size) if not raw_size.isEmpty() else raw_size
             
             if not reader.canRead() and QPixmap(path).isNull():
-                QMessageBox.warning(self, "Erro de Leitura", "A imagem está corrompida ou em um formato não suportado (ex: CMYK sem plugin).")
+                QMessageBox.warning(self, tr("Erro de leitura"), tr("A imagem está corrompida ou em um formato não suportado (ex.: CMYK sem plugin)."))
                 return
                 
             if original_size.isEmpty():
@@ -1619,7 +1620,7 @@ class EditorWindow(QMainWindow):
 
     def _fit_background_to_doc(self):
         if not getattr(self, 'background_path', None) or not self.bg_item:
-            QMessageBox.information(self, "Sem fundo", "Nenhum arquivo de imagem de fundo carregado para ajustar.")
+            QMessageBox.information(self, tr("Sem fundo"), tr("Nenhum arquivo de imagem de fundo carregado para ajustar."))
             return
 
         doc_w_px = mm_to_px(self.spin_phys_w.value())
@@ -1670,13 +1671,13 @@ class EditorWindow(QMainWindow):
                 item.bind_document(rect)
 
     def _on_click_load_bg(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Fundo", "", "Imagens (*.png *.jpg *.jpeg)")
+        path, _ = QFileDialog.getOpenFileName(self, tr("Selecionar fundo"), "", tr("Imagens (*.png *.jpg *.jpeg)"))
         if path:
             self.load_background_image(path, force_document_resize=True)
 
 
     def _on_click_add_signature(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Assinatura", "", "Imagens (*.png)")
+        path, _ = QFileDialog.getOpenFileName(self, tr("Selecionar assinatura"), "", tr("Imagens (*.png)"))
         if path:
             sig = SignatureItem(path)
             sig.custom_name = self._unique_layer_name(Path(path).stem or "Assinatura")
@@ -1695,7 +1696,7 @@ class EditorWindow(QMainWindow):
             self.save_snapshot()
 
     def _on_click_add_image(self):
-        path, _ = QFileDialog.getOpenFileName(self, "Selecionar Imagem", "", "Imagens (*.png *.jpg *.jpeg)")
+        path, _ = QFileDialog.getOpenFileName(self, tr("Selecionar imagem"), "", tr("Imagens (*.png *.jpg *.jpeg)"))
         if path:
             img = ImageItem(path)
             img.custom_name = self._unique_layer_name(Path(path).stem or "Imagem")
@@ -1794,8 +1795,8 @@ class EditorWindow(QMainWindow):
 
         current_name = self._generate_layer_name(selected_id, item)
         new_name, ok = QInputDialog.getText(
-            self, "Renomear Camada", 
-            "Novo nome para a camada:", 
+            self, tr("Renomear camada"),
+            tr("Novo nome para a camada:"),
             text=current_name
         )
         
@@ -1940,6 +1941,7 @@ class EditorWindow(QMainWindow):
         def add_items(item_list):
             for item in item_list:
                 name = self._generate_layer_name(item.layer_id, item)
+                display_name = tr("Plano de fundo") if getattr(item, 'is_document_background', False) else name
                 list_item = QListWidgetItem()
                 list_item.setData(Qt.ItemDataRole.UserRole, item)
                 
@@ -1961,10 +1963,7 @@ class EditorWindow(QMainWindow):
                 btn_vis.setFixedSize(24, 24)
                 btn_vis.setStyleSheet("border: none; background: transparent; padding: 0; min-height: 0; font-size: 14px;")
                 btn_vis.setToolTip(
-                    "<b>VISIBILIDADE DA CAMADA</b><br><br>"
-                    "Alterna a exibição do objeto atual no editor e na impressão:<br><br>"
-                    "• <b>Oculto:</b> O elemento fica transparente e NÃO sai no arquivo final.<br><br>"
-                    "<small style='color: #A0A0A0;'>Dica: Útil para esconder temporariamente elementos muito grandes enquanto você ajusta pequenos detalhes embaixo deles.</small>")
+                    tr("Exibir ou ocultar esta camada no editor e no arquivo final"))
                 
                 effect_vis = QGraphicsOpacityEffect()
                 is_visible = item.isVisible()
@@ -1975,7 +1974,7 @@ class EditorWindow(QMainWindow):
                 ly.addWidget(btn_vis)
                 
                 # --- Nome da Camada (CENTRO) ---
-                lbl = ElidedLayerLabel(name)
+                lbl = ElidedLayerLabel(display_name)
                 is_locked = not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                 if is_locked:
                     lbl.setStyleSheet("color: #888888; font-style: italic;")
@@ -1990,10 +1989,7 @@ class EditorWindow(QMainWindow):
                     btn_lock.setEnabled(False)
                 btn_lock.setStyleSheet("border: none; background: transparent; padding: 0; min-height: 0; font-size: 14px;")
                 btn_lock.setToolTip(
-                    "<b>BLOQUEIO DE CAMADA</b><br><br>"
-                    "Protege o elemento selecionado contra edições acidentais:<br><br>"
-                    "• <b>Travado:</b> O item não pode ser clicado, movido ou apagado na tela.<br><br>"
-                    "<small style='color: #A0A0A0;'>Dica: Tranque o Fundo e as Imagens decorativas assim que posicioná-los. Isso facilita muito a seleção dos textos.</small>")
+                    tr("Bloquear ou desbloquear a edição desta camada"))
                 
                 effect_lock = QGraphicsOpacityEffect()
                 effect_lock.setOpacity(1.0 if is_locked else 0.15) # Sincroniza com sua personalização

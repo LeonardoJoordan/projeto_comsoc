@@ -5,6 +5,7 @@ from PySide6.QtGui import QImage, QPainter, QPdfWriter, QPageLayout, QPageSize
 
 from .imposition import SheetAssembler
 from .pdf_links import inject_pdf_links
+from core.i18n import tr
 
 
 def physical_page(width_mm, height_mm):
@@ -16,7 +17,7 @@ def physical_page(width_mm, height_mm):
 def pdf_painter(writer):
     painter = QPainter(writer)
     if not painter.isActive():
-        raise OSError("Não foi possível abrir o PDF para gravação.")
+        raise OSError(tr("Não foi possível abrir o PDF para gravação."))
     return painter
 
 
@@ -95,7 +96,7 @@ class DirectRenderWorker(QThread):
                                 )
                                 
                             except Exception as e:
-                                self.error_occurred.emit(f"Falha ao injetar links no PDF {out_path.name}: {e}")
+                                self.error_occurred.emit(tr("Falha ao adicionar links ao PDF {arquivo}: {erro}").format(arquivo=out_path.name, erro=e))
                                 
                         self.card_finished.emit(out_path.name, original_idx, local_links)
                 else:
@@ -211,7 +212,7 @@ class PageRenderWorker(QThread):
                 painter.end()
 
         except Exception as e:
-            self.error_occurred.emit(f"Erro no Worker: {str(e)}\n{traceback.format_exc()}")
+            self.error_occurred.emit(tr("Erro no processamento: {erro}\n{detalhes}").format(erro=e, detalhes=traceback.format_exc()))
             
             
 class HybridAssemblerWorker(QThread):
@@ -339,4 +340,4 @@ class PreviewRenderWorker(QThread):
             self.preview_ready.emit(self.model_name, str(thumb_path))
             
         except Exception as e:
-            self.error_occurred.emit(f"Erro no background preview: {str(e)}")
+            self.error_occurred.emit(tr("Erro na prévia em segundo plano: {erro}").format(erro=e))

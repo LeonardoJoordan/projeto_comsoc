@@ -12,6 +12,7 @@ from core.custom_widgets import MathDoubleSpinBox
 from core.html_utils import normalize_text_decoration
 from core.resources import action_icon_path, align_icon_path
 from core.theme_icons import themed_svg_icon
+from core.i18n import tr
 
 
 class CleanTextEdit(QTextEdit):
@@ -280,7 +281,7 @@ class CaixaDeTextoPanel(QWidget):
         opac_line.addWidget(self.lbl_opacity)
         opac_line.addWidget(self.spin_opacity, 1)
 
-        self.chk_link = QCheckBox("Habilitar Link")
+        self.chk_link = QCheckBox(tr("Habilitar link"))
         self.chk_link.setIcon(QIcon(str(action_icon_path("link"))))
         self.chk_link.setIconSize(QSize(18, 18))
         self.chk_link.setFixedHeight(30)
@@ -675,7 +676,7 @@ class EditorDeTextoPanel(QWidget):
         row_style.addWidget(self.btn_color)
         
         self.cbo_align = QComboBox()
-        self.cbo_align.addItems(["Esquerda", "Centro", "Direita", "Justificado"])
+        self.cbo_align.addItems([tr("Esquerda"), tr("Centro"), tr("Direita"), tr("Justificado")])
         self.cbo_align.setToolTip(
             "<b>ALINHAMENTO HORIZONTAL</b><br><br>"
             "Define a posição do texto em relação às laterais da caixa:<br>"
@@ -685,7 +686,7 @@ class EditorDeTextoPanel(QWidget):
         self.cbo_align.currentIndexChanged.connect(lambda idx: self.alignChanged.emit(self._align_map[idx]))
 
         self.cbo_valign = QComboBox()
-        self.cbo_valign.addItems(["Topo", "Meio", "Base"])
+        self.cbo_valign.addItems([tr("Topo"), tr("Meio"), tr("Base")])
         self.cbo_valign.setToolTip(
             "<b>ALINHAMENTO VERTICAL</b><br><br>"
             "Posiciona o conteúdo verticalmente dentro da moldura da caixa:<br>"
@@ -898,12 +899,12 @@ class EditorDeTextoPanel(QWidget):
             
         cursor = self.txt_content.textCursor()
         if not cursor.hasSelection():
-            QMessageBox.warning(self, "Atenção", "Selecione uma palavra primeiro para transformá-la em variável.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione uma palavra primeiro para transformá-la em variável."))
             return
             
         selected_text = cursor.selectedText()
         if not re.match(r"^[a-zA-Z0-9_]+$", selected_text):
-            QMessageBox.warning(self, "Caracteres Inválidos", "A variável só pode conter letras (sem acentos), números e subtraços (_). Remova espaços ou símbolos.")
+            QMessageBox.warning(self, tr("Caracteres inválidos"), tr("A variável só pode conter letras (sem acentos), números e subtraços (_). Remova espaços ou símbolos."))
             return
             
         cursor.insertText(f"{{{selected_text}}}")
@@ -916,12 +917,12 @@ class EditorDeTextoPanel(QWidget):
             
         cursor = self.txt_content.textCursor()
         if not cursor.hasSelection():
-            QMessageBox.warning(self, "Atenção", "Selecione um trecho de texto para transformá-lo em opcional.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione um trecho de texto para transformá-lo em opcional."))
             return
             
         selected_text = cursor.selectedText()
         if not re.search(r"\{[a-zA-Z0-9_]+\}", selected_text):
-            QMessageBox.warning(self, "Ausência de Variável", "Um trecho opcional precisa conter pelo menos uma variável válida (ex: {Nome}) para funcionar.")
+            QMessageBox.warning(self, tr("Ausência de variável"), tr("Um trecho opcional precisa conter pelo menos uma variável válida (ex.: {Nome}) para funcionar."))
             return
             
         cursor.insertText(f"|{selected_text}|")

@@ -1,16 +1,17 @@
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox, QListWidget,
                                QListWidgetItem, QDialogButtonBox)
 from PySide6.QtCore import Qt
+from core.i18n import tr
 
 class ExportModelsDialog(QDialog):
     def __init__(self, parent=None, models=None):
         super().__init__(parent)
-        self.setWindowTitle("Exportar Modelos")
+        self.setWindowTitle(tr("Exportar modelos"))
         self.resize(350, 400)
         
         layout = QVBoxLayout(self)
         
-        self.chk_master = QCheckBox("Selecionar / Desmarcar Todos")
+        self.chk_master = QCheckBox(tr("Selecionar/desmarcar todos"))
         self.chk_master.setChecked(False)
         self.chk_master.stateChanged.connect(self._on_master_toggled)
         layout.addWidget(self.chk_master)
@@ -59,4 +60,4 @@ class ExportModelsDialog(QDialog):
                 break
         
         self.chk_master.setCheckState(Qt.CheckState.Checked if all_checked else Qt.CheckState.Unchecked)
-        self._updating = False   
+        self._updating = False

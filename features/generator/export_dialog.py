@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit,
 from PySide6.QtCore import Qt
 from .imposition import SheetAssembler
 from .preset_warnings import warning_display_name, warning_tooltip, with_model_ratio_snapshot
+from core.i18n import tr
 
 class ConfigDialog(QDialog):
     def __init__(self, parent, model_slug: str, available_vars: list[str], 
@@ -14,7 +15,7 @@ class ConfigDialog(QDialog):
                  model_print_size_mm: tuple[float, float] = None,
                  current_imposition: dict = None):
         super().__init__(parent)
-        self.setWindowTitle("Configurações de exportação")
+        self.setWindowTitle(tr("Configurações de exportação"))
         self.resize(640, 760)
         
         self.model_slug = model_slug
@@ -62,18 +63,14 @@ class ConfigDialog(QDialog):
         ly_naming.setSpacing(15)
         ly_naming.setContentsMargins(15, 15, 15, 15)
         
-        lbl_patern_title = QLabel("<b>Padrão de Nomenclatura:</b>")
+        lbl_patern_title = QLabel(tr("<b>Padrão de nomenclatura:</b>"))
         lbl_patern_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        lbl_patern_title.setToolTip(
-            "<b>PADRÃO DE NOME</b><br><br>"
-            "Define como cada ficheiro gerado será batizado automaticamente pelo sistema.<br><br>"
-            "<small >Dica: Utilize as tags (ex: {Nome}) para que cada ficheiro saia com o nome do destinatário, facilitando a identificação e entrega do material.</small>"
-        )
+        lbl_patern_title.setToolTip(tr("Define o nome dos arquivos usando campos como {Nome}."))
         ly_naming.addWidget(lbl_patern_title)
         ly_preview = QHBoxLayout()
         
         self.txt_pattern = QLineEdit()
-        self.txt_pattern.setPlaceholderText("Ex: {modelo}_{nome}")
+        self.txt_pattern.setPlaceholderText(tr("Ex.: {modelo}_{nome}"))
         self.txt_pattern.setText(current_pattern)
         self.txt_pattern.setMinimumHeight(34)
         
@@ -84,43 +81,33 @@ class ConfigDialog(QDialog):
         ly_preview.addWidget(lbl_ext)
         ly_naming.addLayout(ly_preview)
 
-        lbl_vars_title = QLabel("Variáveis disponíveis:")
+        lbl_vars_title = QLabel(tr("Variáveis disponíveis:"))
         lbl_vars_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        lbl_vars_title.setToolTip(
-            "<b>VARIÁVEIS DINÂMICAS</b><br><br>"
-            "Estes são os campos detetados no seu modelo. Ao clicar neles, a 'tag' é inserida no nome do ficheiro.<br><br>"
-            "<b>Exemplo:</b> Se definir como <i>Cartão de {Nome}</i>, o sistema gerará:<br>"
-            "• Cartão de Leonardo.pdf<br>"
-            "• Cartão de Lilia.pdf<br><br>"
-            "<small >O sistema utiliza o dado exato que estiver preenchido na tabela para cada linha.</small>"
-        )
+        lbl_vars_title.setToolTip(tr("Clique em um campo para inseri-lo no padrão de nomenclatura."))
         ly_naming.addWidget(lbl_vars_title)
         grid_vars = QGridLayout()
         col, row = 0, 0
         if not available_vars:
-            ly_naming.addWidget(QLabel("<i>(Nenhuma coluna encontrada)</i>"))
+            ly_naming.addWidget(QLabel(tr("<i>(Nenhuma coluna encontrada)</i>")))
         else:
             for var in available_vars:
                 btn = QPushButton(f"{{{var}}}")
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn.setMinimumHeight(30)
-                btn.setToolTip(
-                    "<b>INSERIR VARIÁVEL</b><br><br>"
-                    "Clique para adicionar esta tag ao padrão de nome. Durante a geração, o sistema substituirá o texto entre chaves pelo dado real da tabela."
-                )
+                btn.setToolTip(tr("Inserir este campo no padrão de nomenclatura"))
                 btn.clicked.connect(lambda checked, v=var: self._insert_variable(v))
                 grid_vars.addWidget(btn, row, col)
                 col += 1
                 if col > 3: col, row = 0, row + 1
             ly_naming.addLayout(grid_vars)
-        naming_group = QGroupBox("Nomenclatura")
+        naming_group = QGroupBox(tr("Nomenclatura"))
         naming_layout = QVBoxLayout(naming_group)
         naming_layout.setContentsMargins(8, 10, 8, 8)
         naming_layout.addWidget(tab_naming)
         content_layout.addWidget(naming_group)
 
         # Banner de Aviso para Hiperlinks
-        self.lbl_link_warning = QLabel("⚠️ Hiperlinks ativos detetados. Use PDF (Arquivo Individual) para os manter.")
+        self.lbl_link_warning = QLabel(tr("⚠️ Links ativos detectados. Use PDF por item para preservá-los."))
         themed_style(self.lbl_link_warning, "color: @warning@; font-weight: bold; padding: 5px; border: 1px solid @warning@; border-radius: 4px;")
         self.lbl_link_warning.setVisible(False)
         ly_naming.insertWidget(0, self.lbl_link_warning)
@@ -135,33 +122,20 @@ class ConfigDialog(QDialog):
         ly_combo_row = QHBoxLayout()
         self.cmb_presets = QComboBox()
         self.cmb_presets.currentIndexChanged.connect(self._on_preset_selected)
-        lbl_preset = QLabel("<b>Predefinição:</b>")
+        lbl_preset = QLabel(tr("<b>Predefinição:</b>"))
         lbl_preset.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        lbl_preset.setToolTip(
-            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
-            "Atalho para carregar e salvar conjuntos completos de configurações de impressão:<br>"
-            "• <b>Salvar Novo:</b> Cria uma predefinição com as configurações atuais da tela.<br>"
-            "• <b>Atualizar:</b> Sobrescreve a predefinição selecionada com as configurações atuais.<br>"
-            "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
-            "<small >Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>")
+        lbl_preset.setToolTip(tr("Selecionar ou gerenciar configurações de impressão salvas"))
         ly_combo_row.addWidget(lbl_preset)
-        self._preset_combo_base_tooltip = (
-            "<b>PREDEFINIÇÃO DE LAYOUT</b><br><br>"
-            "Atalho para carregar e salvar conjuntos completos de configurações de impressão:<br>"
-            "• <b>Salvar Novo:</b> Cria uma predefinição com as configurações atuais da tela.<br>"
-            "• <b>Atualizar:</b> Sobrescreve a predefinição selecionada com as configurações atuais.<br>"
-            "• <b>Apagar:</b> Remove permanentemente a predefinição selecionada.<br><br>"
-            "<small >Dica: Configure folha, imposição e marcas de corte como desejar e clique em <b>Salvar Novo</b> para guardar o conjunto. Ele ficará disponível como atalho na tela principal do programa.</small>"
-        )
+        self._preset_combo_base_tooltip = tr("Selecionar uma predefinição de impressão")
         self.cmb_presets.setToolTip(self._preset_combo_base_tooltip)
         ly_combo_row.addWidget(self.cmb_presets, 1)
         
         ly_buttons_row = QHBoxLayout()
-        self.btn_new_preset = QPushButton("Criar Nova Predefinição")
+        self.btn_new_preset = QPushButton(tr("Criar nova predefinição"))
         self.btn_new_preset.clicked.connect(self._save_new_preset)
-        self.btn_rename_preset = QPushButton("Renomear")
+        self.btn_rename_preset = QPushButton(tr("Renomear"))
         self.btn_rename_preset.clicked.connect(self._rename_preset)
-        self.btn_del_preset = QPushButton("Excluir")
+        self.btn_del_preset = QPushButton(tr("Excluir"))
         self.btn_del_preset.clicked.connect(self._delete_preset)
         
         ly_buttons_row.addWidget(self.btn_new_preset)
@@ -174,13 +148,9 @@ class ConfigDialog(QDialog):
         ly_print.addLayout(ly_presets_v)
         ly_print.addSpacing(10) # Respiro visual
         
-        self.chk_imposition = QCheckBox("Habilitar múltiplos itens por página")
+        self.chk_imposition = QCheckBox(tr("Habilitar múltiplos itens por página"))
         self.chk_imposition.setChecked(initial_print["enabled"])
-        self.chk_imposition.setToolTip(
-            "<b>MÚLTIPLOS ITENS POR PÁGINA (AGRUPAMENTO)</b><br><br>"
-            "Organiza automaticamente vários exemplares do seu modelo dentro da mesma folha de saída.<br><br>"
-            "<small >Dica: Além de economizar papel, este recurso otimiza o corte manual. Os itens são alinhados para que você possa usar régua e estilete e destacar vários cartões com poucos cortes retos, sem rebarbas.</small>"
-        )
+        self.chk_imposition.setToolTip(tr("Organizar vários itens em cada folha de saída"))
         self.chk_imposition.toggled.connect(self._toggle_imposition_ui)
         ly_print.addWidget(self.chk_imposition)
 
@@ -196,13 +166,9 @@ class ConfigDialog(QDialog):
         ly_imp.setContentsMargins(10, 0, 0, 0)
 
         # Folha de Saída agora está dentro do container de imposição
-        lbl_sheet_title = QLabel("Folha de saída (Largura x Altura):")
+        lbl_sheet_title = QLabel(tr("Folha de saída (largura × altura):"))
         lbl_sheet_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        lbl_sheet_title.setToolTip(
-            "<b>FOLHA DE SAÍDA (DOCUMENTO FINAL)</b><br><br>"
-            "Define o tamanho real do papel que será colocado na impressora (ex: A4, A3 ou formatos personalizados).<br><br>"
-            "<small >Importante: Esta configuração dita a área útil de trabalho. Uma folha maior (A3) permite agrupar muito mais exemplares no mesmo documento do que uma folha A4.</small>"
-        )
+        lbl_sheet_title.setToolTip(tr("Definir o tamanho físico da folha de saída"))
         ly_imp.addWidget(lbl_sheet_title)
         ly_sheet = QHBoxLayout()
         self.spin_sheet_w_mm = QDoubleSpinBox()
@@ -227,13 +193,9 @@ class ConfigDialog(QDialog):
         sep.setFrameShadow(QFrame.Shadow.Sunken)
         ly_imp.addWidget(sep)
         
-        lbl_model_dims_title = QLabel("Dimensões do modelo na folha (Largura x Altura):")
+        lbl_model_dims_title = QLabel(tr("Dimensões do modelo na folha (largura × altura):"))
         lbl_model_dims_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        lbl_model_dims_title.setToolTip(
-            "<b>DIMENSÕES REAIS DO MODELO</b><br><br>"
-            "Define o tamanho exato (em milímetros) que o seu cartão/documento terá impresso na folha.<br><br>"
-            "<small >Dica Smart: Essencial para materiais que precisam encaixar em suportes físicos, como displays de acrílico, crachás ou etiquetas. Meça o suporte com uma régua e digite os valores exatos aqui para um ajuste milimétrico.</small>"
-        )
+        lbl_model_dims_title.setToolTip(tr("Definir o tamanho físico de cada item impresso"))
         ly_imp.addWidget(lbl_model_dims_title)
         self.spin_w_mm = QDoubleSpinBox()
         self.spin_w_mm.setRange(10, 2000)
@@ -258,32 +220,24 @@ class ConfigDialog(QDialog):
         ly_model_dims.addStretch()
         ly_imp.addLayout(ly_model_dims)
 
-        self.lbl_capacity = QLabel("Calculando capacidade...")
+        self.lbl_capacity = QLabel(tr("Calculando capacidade…"))
         themed_style(self.lbl_capacity, "font-weight: bold; color: @success@;")
         ly_imp.addWidget(self.lbl_capacity)
 
-        self.chk_crop_marks = QCheckBox("Habilitar marcas de corte")
+        self.chk_crop_marks = QCheckBox(tr("Habilitar marcas de corte"))
         self.chk_crop_marks.setChecked(initial_print["crop"])
-        self.chk_crop_marks.setToolTip(
-            "<b>MARCAS DE CORTE</b><br><br>"
-            "Adiciona pequenas guias visuais nos cantos de cada item na folha impressa.<br><br>"
-            "<small >Dica: Estas marcas indicam o caminho exato para a lâmina do estilete ou da guilhotina, garantindo um acabamento profissional e uniforme em todo o lote.</small>"
-        )
+        self.chk_crop_marks.setToolTip(tr("Adicionar marcas para orientar o corte dos itens"))
         ly_imp.addWidget(self.chk_crop_marks)
-        self.chk_bleed = QCheckBox("Habilitar margem de sangria")
+        self.chk_bleed = QCheckBox(tr("Habilitar margem de sangria"))
         self.chk_bleed.setChecked(initial_print["bleed"])
-        self.chk_bleed.setToolTip(
-            "<b>MARGEM DE SANGRIA</b><br><br>"
-            "Reserva um espaço extra (5mm) ao redor dos itens na folha.<br><br>"
-            "<small >Dica: Ative para garantir que artes com fundo contínuo não criem filetes brancos durante o corte manual.</small>"
-        )
+        self.chk_bleed.setToolTip(tr("Reservar uma margem adicional ao redor dos itens"))
         ly_imp.addWidget(self.chk_bleed)
         
         # Carrega a UI com os dados em memória
         self._load_presets_ui()
         
         ly_print.addWidget(self.container_imposition)
-        print_group = QGroupBox("Impressão")
+        print_group = QGroupBox(tr("Impressão"))
         print_layout = QVBoxLayout(print_group)
         print_layout.setContentsMargins(8, 10, 8, 8)
         print_layout.addWidget(tab_print)
@@ -364,7 +318,7 @@ class ConfigDialog(QDialog):
     def _update_capacity_preview(self):
         """Calcula dinamicamente quantos itens cabem e valida se o modelo cabe na folha."""
         if not self.chk_imposition.isChecked():
-            self.lbl_capacity.setText("Imposição desativada (1 item por arquivo)")
+            self.lbl_capacity.setText(tr("Imposição desativada (1 item por arquivo)"))
             themed_style(self.lbl_capacity, "color: gray;")
             self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
             return
@@ -382,11 +336,13 @@ class ConfigDialog(QDialog):
         ok_button = self.buttonBox.button(QDialogButtonBox.StandardButton.Ok)
 
         if assembler.capacity > 0:
-            self.lbl_capacity.setText(f"✅ Capacidade: {assembler.capacity} itens por página ({assembler.cols}x{assembler.rows})")
+            self.lbl_capacity.setText(tr("✅ Capacidade: {capacidade} itens por página ({colunas}×{linhas})").format(
+                capacidade=assembler.capacity, colunas=assembler.cols, linhas=assembler.rows
+            ))
             themed_style(self.lbl_capacity, "font-weight: bold; color: @success@;")
             ok_button.setEnabled(True)
         else:
-            self.lbl_capacity.setText("❌ Modelo muito grande para a página!")
+            self.lbl_capacity.setText(tr("❌ Modelo muito grande para a página!"))
             themed_style(self.lbl_capacity, "font-weight: bold; color: @danger@;")
             ok_button.setEnabled(False)
 
@@ -395,7 +351,11 @@ class ConfigDialog(QDialog):
         if self.active_preset_name == self.SYSTEM_PRESET_NAME:
             # Se ativou imposição no preset de sistema, assumimos que algo foi customizado
             if self.chk_imposition.isChecked():
-                name, ok = QInputDialog.getText(self, "Configurações Personalizadas", "Você alterou as configurações padrão.\nDê um nome para salvar esta predefinição:", QLineEdit.EchoMode.Normal, "Personalizada")
+                name, ok = QInputDialog.getText(
+                    self, tr("Configurações personalizadas"),
+                    tr("Você alterou as configurações padrão.\nDê um nome para salvar esta predefinição:"),
+                    QLineEdit.EchoMode.Normal, tr("Personalizada")
+                )
                 
                 # Se o usuário cancelar ou deixar em branco, aplica o nome padrão de fallback
                 new_name = name.strip() if (ok and name.strip()) else "Personalizada"
@@ -424,7 +384,7 @@ class ConfigDialog(QDialog):
         self.cmb_presets.blockSignals(True)
         self.cmb_presets.clear()
         
-        self.cmb_presets.addItem(self.SYSTEM_PRESET_NAME, self.SYSTEM_PRESET_NAME)
+        self.cmb_presets.addItem(tr(self.SYSTEM_PRESET_NAME), self.SYSTEM_PRESET_NAME)
 
         user_presets = sorted(k for k in self.presets.keys() if k != self.SYSTEM_PRESET_NAME)
         for name in user_presets:
@@ -513,15 +473,15 @@ class ConfigDialog(QDialog):
         if isinstance(default_name, bool):
             default_name = ""
             
-        name, ok = QInputDialog.getText(self, "Nova Predefinição", "Nome da predefinição:", QLineEdit.EchoMode.Normal, default_name)
+        name, ok = QInputDialog.getText(self, tr("Nova predefinição"), tr("Nome da predefinição:"), QLineEdit.EchoMode.Normal, default_name)
         if ok and name.strip():
             name = name.strip()
             if name == self.SYSTEM_PRESET_NAME:
-                QMessageBox.warning(self, "Nome reservado", f"O nome '{self.SYSTEM_PRESET_NAME}' é reservado pelo sistema.")
+                QMessageBox.warning(self, tr("Nome reservado"), tr("O nome '{nome}' é reservado pelo sistema.").format(nome=self.SYSTEM_PRESET_NAME))
                 return False
             
             if name in self.presets:
-                reply = QMessageBox.question(self, "Sobrescrever", f"A predefinição '{name}' já existe. Deseja sobrescrevê-la?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+                reply = QMessageBox.question(self, tr("Sobrescrever"), tr("A predefinição '{nome}' já existe. Deseja sobrescrevê-la?").format(nome=name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
                 if reply == QMessageBox.StandardButton.No:
                     return self._save_new_preset(name) # Repete o prompt para o usuário tentar outro nome
                     
@@ -534,7 +494,7 @@ class ConfigDialog(QDialog):
     def _delete_preset(self):
         if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
         
-        reply = QMessageBox.question(self, "Excluir Predefinição", f"Tem certeza que deseja excluir '{self.active_preset_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        reply = QMessageBox.question(self, tr("Excluir predefinição"), tr("Tem certeza de que deseja excluir '{nome}'?").format(nome=self.active_preset_name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
             del self.presets[self.active_preset_name]
             self.active_preset_name = self.SYSTEM_PRESET_NAME
@@ -543,15 +503,15 @@ class ConfigDialog(QDialog):
     def _rename_preset(self):
         if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
 
-        new_name, ok = QInputDialog.getText(self, "Renomear Predefinição", "Novo nome:", QLineEdit.EchoMode.Normal, self.active_preset_name)
+        new_name, ok = QInputDialog.getText(self, tr("Renomear predefinição"), tr("Novo nome:"), QLineEdit.EchoMode.Normal, self.active_preset_name)
         if ok and new_name.strip():
             new_name = new_name.strip()
             if new_name == self.active_preset_name: return
             if new_name == self.SYSTEM_PRESET_NAME:
-                QMessageBox.warning(self, "Nome reservado", f"O nome '{self.SYSTEM_PRESET_NAME}' é reservado pelo sistema.")
+                QMessageBox.warning(self, tr("Nome reservado"), tr("O nome '{nome}' é reservado pelo sistema.").format(nome=self.SYSTEM_PRESET_NAME))
                 return
             if new_name in self.presets:
-                QMessageBox.warning(self, "Nome já existe", f"Já existe uma predefinição com o nome '{new_name}'.")
+                QMessageBox.warning(self, tr("Nome já existe"), tr("Já existe uma predefinição com o nome '{nome}'.").format(nome=new_name))
                 return
 
             self.presets[new_name] = self.presets.pop(self.active_preset_name)
@@ -563,10 +523,10 @@ class ConfigDialog(QDialog):
         if enabled:
             if self.active_preset_name == self.SYSTEM_PRESET_NAME:
                 self._set_model_print_size_controls()
-            self.lbl_imposition_hint.setText("⚙️ Configure a folha e as dimensões do modelo para um resultado preciso.")
+            self.lbl_imposition_hint.setText(tr("⚙️ Configure a folha e as dimensões do modelo para um resultado preciso."))
             themed_style(self.lbl_imposition_hint, "color: @warning@; font-style: italic; padding-left: 4px;")
         else:
-            self.lbl_imposition_hint.setText("ℹ️ O arquivo gerado terá as dimensões exatas do modelo original (1 item por arquivo).")
+            self.lbl_imposition_hint.setText(tr("ℹ️ O arquivo gerado terá as dimensões exatas do modelo original (1 item por arquivo)."))
             themed_style(self.lbl_imposition_hint, "color: gray; font-style: italic; padding-left: 4px;")
 
     def _insert_variable(self, var_name):

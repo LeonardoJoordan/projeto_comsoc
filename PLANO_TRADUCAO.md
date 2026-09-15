@@ -4,6 +4,8 @@ Idioma original: português do Brasil (`pt_BR`).
 
 Primeiro idioma adicional: inglês dos Estados Unidos (`en_US`).
 
+Segundo idioma adicional: espanhol (`es_ES`).
+
 ## Regras
 
 - Usar o sistema de tradução do Qt com catálogos `.ts` e `.qm`.
@@ -20,12 +22,14 @@ Primeiro idioma adicional: inglês dos Estados Unidos (`en_US`).
 - [x] Traduzir a estrutura principal do workspace.
 - [x] Traduzir navegação do preview e controles da tabela.
 - [x] Compilar e validar o primeiro catálogo `en_US`.
-- [ ] Traduzir todos os textos visíveis do editor.
-- [ ] Traduzir configurações de exportação, temas e importação/exportação de modelos.
-- [ ] Traduzir confirmações, erros e mensagens de processamento do workspace.
-- [ ] Revisar pluralização, textos longos e larguras no inglês.
-- [ ] Fazer uma varredura final para localizar textos visíveis sem `tr()`.
-- [ ] Validar os fluxos completos em `pt_BR` e `en_US` antes da distribuição.
+- [x] Traduzir todos os textos visíveis do editor.
+- [x] Traduzir configurações de exportação, temas e importação/exportação de modelos.
+- [x] Traduzir confirmações, erros e mensagens de processamento do workspace.
+- [x] Revisar pluralização, textos longos e larguras no inglês.
+- [x] Fazer uma varredura final para localizar textos visíveis sem `tr()`.
+- [x] Validar os fluxos completos em `pt_BR` e `en_US` antes da distribuição.
+- [x] Criar, revisar, compilar e integrar o catálogo `es_ES`.
+- [x] Validar os fluxos completos em `es_ES` antes da distribuição.
 
 ## Atualização do catálogo
 

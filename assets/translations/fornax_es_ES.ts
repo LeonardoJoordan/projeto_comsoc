@@ -1,256 +1,256 @@
 <?xml version='1.0' encoding='utf-8'?>
-<TS version="2.1" language="en_US" sourcelanguage="pt_BR">
+<TS version="2.1" language="es_ES" sourcelanguage="pt_BR">
   <context>
     <name />
     <message>
       <location filename="../../features/workspace/main_window.py" line="1198" />
       <source> [Imposição ativada]</source>
-      <translation> [Imposition enabled]</translation>
+      <translation> [Imposición activada]</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1453" />
       <source>--- Iniciando lote de {count} itens ---</source>
-      <translation>--- Starting batch of {count} items ---</translation>
+      <translation>--- Iniciando lote de {count} elementos ---</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="609" />
       <source>1 modelo adicionado à sua biblioteca!</source>
-      <translation>1 template added to your library!</translation>
+      <translation>¡1 plantilla añadida a su biblioteca!</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="661" />
       <source>1 modelo exportado com sucesso!</source>
-      <translation>1 template exported successfully!</translation>
+      <translation>¡1 plantilla exportada con éxito!</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="735" />
       <source>&lt;b&gt;AVISO:&lt;/b&gt; {mensagem}</source>
-      <translation>&lt;b&gt;WARNING:&lt;/b&gt; {mensagem}</translation>
+      <translation>&lt;b&gt;AVISO:&lt;/b&gt; {mensagem}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="30" />
       <source>&lt;b&gt;Ação para todos os conflitos:&lt;/b&gt;</source>
-      <translation>&lt;b&gt;Action for all conflicts:&lt;/b&gt;</translation>
+      <translation>&lt;b&gt;Acción para todos los conflictos:&lt;/b&gt;</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="461" />
       <source>&lt;b&gt;FORNAX Forge&lt;/b&gt;&lt;br&gt;Geração de material personalizado em lote.&lt;br&gt;&lt;br&gt;Interface desenvolvida com &lt;a href="https://www.qt.io/qt-for-python"&gt;Qt for Python (PySide6)&lt;/a&gt;.</source>
-      <translation>&lt;b&gt;FORNAX Forge&lt;/b&gt;&lt;br&gt;Personalized batch material generation.&lt;br&gt;&lt;br&gt;Interface built with &lt;a href="https://www.qt.io/qt-for-python"&gt;Qt for Python (PySide6)&lt;/a&gt;.</translation>
+      <translation>&lt;b&gt;FORNAX Forge&lt;/b&gt;&lt;br&gt;Generación de material personalizado por lotes.&lt;br&gt;&lt;br&gt;Interfaz desarrollada con &lt;a href="https://www.qt.io/qt-for-python"&gt;Qt for Python (PySide6)&lt;/a&gt;.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1127" />
       <source>&lt;b&gt;Modelo '{nome}' salvo com sucesso em:&lt;/b&gt; {arquivo}</source>
-      <translation>&lt;b&gt;Template '{nome}' saved successfully to:&lt;/b&gt; {arquivo}</translation>
+      <translation>&lt;b&gt;Plantilla '{nome}' guardada con éxito en:&lt;/b&gt; {arquivo}</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="66" />
       <source>&lt;b&gt;Padrão de nomenclatura:&lt;/b&gt;</source>
-      <translation>&lt;b&gt;Naming pattern:&lt;/b&gt;</translation>
+      <translation>&lt;b&gt;Patrón de nomenclatura:&lt;/b&gt;</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="125" />
       <source>&lt;b&gt;Predefinição:&lt;/b&gt;</source>
-      <translation>&lt;b&gt;Preset:&lt;/b&gt;</translation>
+      <translation>&lt;b&gt;Preajuste:&lt;/b&gt;</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1113" />
       <source>&lt;b&gt;Seu modelo foi salvo com sucesso!&lt;/b&gt;&lt;br&gt;&lt;br&gt;Deseja sair do editor?</source>
-      <translation>&lt;b&gt;Your template was saved successfully!&lt;/b&gt;&lt;br&gt;&lt;br&gt;Do you want to close the editor?</translation>
+      <translation>&lt;b&gt;¡Su plantilla se ha guardado con éxito!&lt;/b&gt;&lt;br&gt;&lt;br&gt;¿Desea salir del editor?</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="707" />
       <source>&lt;b&gt;Você tem alterações não salvas neste modelo.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Gostaria de salvá-las antes de sair?</source>
-      <translation>&lt;b&gt;This template has unsaved changes.&lt;/b&gt;&lt;br&gt;&lt;br&gt;Would you like to save them before closing?</translation>
+      <translation>&lt;b&gt;Tiene cambios no guardados en esta plantilla.&lt;/b&gt;&lt;br&gt;&lt;br&gt;¿Desea guardarlos antes de salir?</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1105" />
       <source>&lt;b&gt;{aviso}&lt;/b&gt;&lt;br&gt;&lt;br&gt;Se você prosseguir para a edição, a fonte será substituída pela fonte padrão do sistema e o modelo sofrerá uma mudança visual.</source>
-      <translation>&lt;b&gt;{aviso}&lt;/b&gt;&lt;br&gt;&lt;br&gt;If you continue editing, the font will be replaced with the system default and the template appearance will change.</translation>
+      <translation>&lt;b&gt;{aviso}&lt;/b&gt;&lt;br&gt;&lt;br&gt;Si continúa hacia la edición, la fuente será reemplazada por la fuente predeterminada del sistema y la plantilla sufrirá un cambio visual.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="91" />
       <source>&lt;i&gt;(Nenhuma coluna encontrada)&lt;/i&gt;</source>
-      <translation>&lt;i&gt;(No columns found)&lt;/i&gt;</translation>
+      <translation>&lt;i&gt;(No se encontraron columnas)&lt;/i&gt;</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1498" />
       <source>=== Processo finalizado ===</source>
-      <translation>=== Process finished ===</translation>
+      <translation>=== Proceso finalizado ===</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1133" />
       <source>A imagem está corrompida ou em um formato não suportado (ex.: CMYK sem plugin).</source>
-      <translation>The image is corrupted or uses an unsupported format (for example, CMYK without a plugin).</translation>
+      <translation>La imagen está corrupta o en un formato no compatible (ej.: CMYK sin plugin).</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="484" />
       <source>A predefinição '{nome}' já existe. Deseja sobrescrevê-la?</source>
-      <translation>The preset '{nome}' already exists. Do you want to overwrite it?</translation>
+      <translation>El preajuste '{nome}' ya existe. ¿Desea sobrescribirlo?</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="907" />
       <source>A variável só pode conter letras (sem acentos), números e subtraços (_). Remova espaços ou símbolos.</source>
-      <translation>A variable can contain only unaccented letters, numbers, and underscores (_). Remove spaces or symbols.</translation>
+      <translation>La variable solo puede contener letras (sin tildes), números y guiones bajos (_). Elimine espacios o símbolos.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="446" />
       <source>ADICIONAR AO MODELO</source>
-      <translation>ADD TO TEMPLATE</translation>
+      <translation>AGREGAR A LA PLANTILLA</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="900" />
       <source>ALINHAMENTO</source>
-      <translation>ALIGNMENT</translation>
+      <translation>ALINEACIÓN</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="655" />
       <source>ARREDONDAMENTO DE BORDAS</source>
-      <translation>CORNER ROUNDING</translation>
+      <translation>REDONDEO DE BORDES</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1387" />
       <source>AVISO: a tabela está vazia. Nada a gerar.</source>
-      <translation>WARNING: the table is empty. Nothing to generate.</translation>
+      <translation>AVISO: la tabla está vacía. Nada por generar.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1109" />
       <source>Abrir mesmo assim</source>
-      <translation>Open anyway</translation>
+      <translation>Abrir de todos modos</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="438" />
       <source>Abrir pasta de modelos</source>
-      <translation>Open templates folder</translation>
+      <translation>Abrir carpeta de plantillas</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="835" />
       <source>Adiciona ao objeto um link clicável nos arquivos PDF.</source>
-      <translation>Adds a clickable link to the object in PDF files.</translation>
+      <translation>Añade al objeto un enlace clicable en los archivos PDF.</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="82" />
       <source>Adicionar</source>
-      <translation>Add</translation>
+      <translation>Añadir</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="394" />
       <source>Adicionar guia horizontal</source>
-      <translation>Add horizontal guide</translation>
+      <translation>Añadir guía horizontal</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="395" />
       <source>Adicionar guia vertical</source>
-      <translation>Add vertical guide</translation>
+      <translation>Añadir guía vertical</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="82" />
       <source>Adicionar linhas</source>
-      <translation>Add rows</translation>
+      <translation>Añadir líneas</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="486" />
       <source>Adicionar uma assinatura opcional ao modelo</source>
-      <translation>Add an optional signature to the template</translation>
+      <translation>Añadir una firma opcional a la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="483" />
       <source>Adicionar uma caixa de texto ao modelo</source>
-      <translation>Add a text box to the template</translation>
+      <translation>Añadir un cuadro de texto a la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="485" />
       <source>Adicionar uma imagem ao modelo</source>
-      <translation>Add an image to the template</translation>
+      <translation>Añadir una imagen a la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="432" />
       <source>Ajustar à janela</source>
-      <translation>Fit to window</translation>
+      <translation>Ajustar al tamaño de la ventana</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="965" />
       <source>Alinhar texto ao meio</source>
-      <translation>Align text to middle</translation>
+      <translation>Centrar texto</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="964" />
       <source>Alinhar texto ao topo</source>
-      <translation>Align text to top</translation>
+      <translation>Alinear texto arriba</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="966" />
       <source>Alinhar texto à base</source>
-      <translation>Align text to bottom</translation>
+      <translation>Alinear texto abajo</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="952" />
       <source>Alinhar texto à direita</source>
-      <translation>Align text right</translation>
+      <translation>Alinear texto derecha</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="950" />
       <source>Alinhar texto à esquerda</source>
-      <translation>Align text left</translation>
+      <translation>Alinear texto izquierda</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="841" />
       <source>Alterar o tamanho da fonte</source>
-      <translation>Change font size</translation>
+      <translation>Cambiar tamaño de fuente</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="705" />
       <source>Alterações não salvas</source>
-      <translation>Unsaved changes</translation>
+      <translation>Cambios no guardados</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="106" />
       <source>Alterna entre linhas compactas e altura automática para mostrar todo o conteúdo</source>
-      <translation>Switches between compact rows and automatic height to show all content</translation>
+      <translation>Alternar entre líneas compactas y altura automática para mostrar todo el contenido</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="148" />
       <source>Aplicar</source>
-      <translation>Apply</translation>
+      <translation>Aplicar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="535" />
       <source>Arquivo inválido</source>
-      <translation>Invalid file</translation>
+      <translation>Archivo inválido</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="635" />
       <source>Arquivos ZIP (*.zip)</source>
-      <translation>ZIP files (*.zip)</translation>
+      <translation>Archivos ZIP (*.zip)</translation>
     </message>
     <message>
       <location filename="../../features/editor/rulers.py" line="21" />
       <source>Arraste para criar uma guia horizontal</source>
-      <translation>Drag to create a horizontal guide</translation>
+      <translation>Arrastra para crear una guía horizontal</translation>
     </message>
     <message>
       <location filename="../../features/editor/rulers.py" line="21" />
       <source>Arraste para criar uma guia vertical</source>
-      <translation>Drag to create a vertical guide</translation>
+      <translation>Arrastra para crear una guía vertical</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="701" />
       <source>Arredonda as extremidades da linha, limitado à metade da espessura.</source>
-      <translation>Rounds the line ends, limited to half its thickness.</translation>
+      <translation>Redondear los extremos de la línea, limitado a la mitad del grosor.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="649" />
       <source>Arredondados</source>
-      <translation>Rounded</translation>
+      <translation>Redondeados</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="700" />
       <source>Arredondamento</source>
-      <translation>Rounding</translation>
+      <translation>Redondeo</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="486" />
       <source>Assinatura</source>
-      <translation>Signature</translation>
+      <translation>Firma</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="902" />
@@ -263,72 +263,72 @@
       <location filename="../../features/workspace/main_window.py" line="1147" />
       <location filename="../../features/workspace/main_window.py" line="1435" />
       <source>Atenção</source>
-      <translation>Attention</translation>
+      <translation>Atención</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1128" />
       <source>Atualizando lista…</source>
-      <translation>Updating list…</translation>
+      <translation>Actualizando lista…</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="925" />
       <source>Ausência de variável</source>
-      <translation>Missing variable</translation>
+      <translation>Variable ausente</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1403" />
       <source>Aviso: links desativados em PNG</source>
-      <translation>Warning: links disabled in PNG</translation>
+      <translation>Aviso: enlaces desactivados en PNG</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="772" />
       <source>Aviso: template_v3.json não encontrado.</source>
-      <translation>Warning: template_v3.json was not found.</translation>
+      <translation>Aviso: template_v3.json no encontrado.</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="689" />
       <source>Base</source>
-      <translation>Bottom</translation>
+      <translation>Inferior</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1992" />
       <source>Bloquear ou desbloquear a edição desta camada</source>
-      <translation>Lock or unlock editing for this layer</translation>
+      <translation>Bloquear o desbloquear la edición de esta capa</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="407" />
       <source>Bloquear ou desbloquear a movimentação das guias</source>
-      <translation>Lock or unlock guide movement</translation>
+      <translation>Bloquear o desbloquear el movimiento de las guías</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="57" />
       <source>Bordas</source>
-      <translation>Borders</translation>
+      <translation>Bordes</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="525" />
       <source>CAMADAS</source>
-      <translation>LAYERS</translation>
+      <translation>CAPAS</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1030" />
       <source>CAMPOS DA TABELA</source>
-      <translation>TABLE FIELDS</translation>
+      <translation>CAMPOS DE LA TABLA</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="223" />
       <source>Calculando capacidade…</source>
-      <translation>Calculating capacity…</translation>
+      <translation>Calculando capacidad…</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="483" />
       <source>Campo dinâmico</source>
-      <translation>Dynamic field</translation>
+      <translation>Campo dinámico</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="55" />
       <source>Campos</source>
-      <translation>Fields</translation>
+      <translation>Campos</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="711" />
@@ -336,87 +336,87 @@
       <location filename="../../features/workspace/settings_dialogs.py" line="73" />
       <location filename="../../features/workspace/settings_dialogs.py" line="149" />
       <source>Cancelar</source>
-      <translation>Cancel</translation>
+      <translation>Cancelar</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="651" />
       <source>Cantos do contorno</source>
-      <translation>Outline corners</translation>
+      <translation>Esquinas del contorno</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="907" />
       <source>Caracteres inválidos</source>
-      <translation>Invalid characters</translation>
+      <translation>Caracteres inválidos</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1062" />
       <source>Carregando prévia</source>
-      <translation>Loading preview</translation>
+      <translation>Cargando vista previa</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="635" />
       <source>Centralizado</source>
-      <translation>Centered</translation>
+      <translation>Centrado</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="951" />
       <source>Centralizar texto</source>
-      <translation>Center text</translation>
+      <translation>Centrar texto</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="679" />
       <source>Centro</source>
-      <translation>Center</translation>
+      <translation>Centro</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="195" />
       <source>Cole do Excel ou Google Sheets com Ctrl+V</source>
-      <translation>Paste from Excel or Google Sheets with Ctrl+V</translation>
+      <translation>Pegar de Excel o Google Sheets con Ctrl+V</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="769" />
       <source>Comprimento</source>
-      <translation>Length</translation>
+      <translation>Longitud</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="403" />
       <source>Configuração de exportação…</source>
-      <translation>Export settings…</translation>
+      <translation>Configuración de exportación…</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1202" />
       <source>Configuração salva: sequência automática{estado}</source>
-      <translation>Settings saved: automatic sequence{estado}</translation>
+      <translation>Configuración guardada: secuencia automática{estado}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1200" />
       <source>Configuração salva: {nome}{estado}</source>
-      <translation>Settings saved: {nome}{estado}</translation>
+      <translation>Configuración guardada: {nome}{estado}</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="18" />
       <source>Configurações de exportação</source>
-      <translation>Export settings</translation>
+      <translation>Configuraciones de exportación</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="355" />
       <source>Configurações personalizadas</source>
-      <translation>Custom settings</translation>
+      <translation>Configuraciones personalizadas</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="494" />
       <source>Confirmar exclusão</source>
-      <translation>Confirm deletion</translation>
+      <translation>Confirmar eliminación</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1116" />
       <source>Continuar editando</source>
-      <translation>Continue editing</translation>
+      <translation>Continuar editando</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="615" />
       <source>Contorno</source>
-      <translation>Outline</translation>
+      <translation>Contorno</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="881" />
@@ -426,140 +426,140 @@
     <message>
       <location filename="../../features/editor/frontend.py" line="818" />
       <source>Cor do contorno</source>
-      <translation>Outline color</translation>
+      <translation>Color del contorno</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="609" />
       <source>Cor do preenchimento</source>
-      <translation>Fill color</translation>
+      <translation>Color del relleno</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="134" />
       <source>Criar nova predefinição</source>
-      <translation>Create preset</translation>
+      <translation>Crear nuevo preajuste</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="139" />
       <source>Criar tema</source>
-      <translation>Create theme</translation>
+      <translation>Crear tema</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="33" />
       <source>Criar tema personalizado</source>
-      <translation>Create custom theme</translation>
+      <translation>Crear tema personalizado</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="476" />
       <source>Círculo</source>
-      <translation>Circle</translation>
+      <translation>Círculo</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/headers.py" line="10" />
       <source>Cópias</source>
-      <translation>Copies</translation>
+      <translation>Copias</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1021" />
       <source>DIMENSÕES</source>
-      <translation>DIMENSIONS</translation>
+      <translation>DIMENSIONES</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="52" />
       <source>Dados para o modelo</source>
-      <translation>Template data</translation>
+      <translation>Datos para la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1509" />
       <source>Definição do Modelo</source>
-      <translation>Template defaults</translation>
+      <translation>Configuración de la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="419" />
       <source>Desfazer</source>
-      <translation>Undo</translation>
+      <translation>Deshacer</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="54" />
       <source>Destaque</source>
-      <translation>Accent</translation>
+      <translation>Resalte</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="196" />
       <source>Dimensões do modelo na folha (largura × altura):</source>
-      <translation>Template dimensions on sheet (width × height):</translation>
+      <translation>Dimensiones de la plantilla en la hoja (ancho × alto):</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="679" />
       <source>Direita</source>
-      <translation>Right</translation>
+      <translation>Derecha</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1050" />
       <source>Documento</source>
-      <translation>Document</translation>
+      <translation>Documento</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="528" />
       <location filename="../../features/spreadsheet/frontend.py" line="83" />
       <location filename="../../features/workspace/frontend.py" line="158" />
       <source>Duplicar</source>
-      <translation>Duplicate</translation>
+      <translation>Duplicar</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="83" />
       <source>Duplicar linhas selecionadas</source>
-      <translation>Duplicate selected rows</translation>
+      <translation>Duplicar líneas seleccionadas</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="226" />
       <source>Duplicar modelo</source>
-      <translation>Duplicate template</translation>
+      <translation>Duplicar plantilla</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="848" />
       <source>Duplo clique no texto para editar no canvas.</source>
-      <translation>Double-click the text to edit it on the canvas.</translation>
+      <translation>Doble clic en el texto para editarlo en el lienzo.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="402" />
       <source>ERRO: Pasta do modelo original não encontrada.</source>
-      <translation>ERROR: original template folder was not found.</translation>
+      <translation>ERROR: No se encontró la carpeta de la plantilla original.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1416" />
       <source>ERRO: modelo '{nome}' não encontrado.</source>
-      <translation>ERROR: template '{nome}' was not found.</translation>
+      <translation>ERROR: no se encontró la plantilla '{nome}'.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1392" />
       <source>ERRO: nenhum modelo selecionado.</source>
-      <translation>ERROR: no template selected.</translation>
+      <translation>ERROR: no hay ninguna plantilla seleccionada.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="161" />
       <source>Editar modelo</source>
-      <translation>Edit template</translation>
+      <translation>Editar plantilla</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="104" />
       <source>Editor de modelos — FORNAX Forge</source>
-      <translation>Template Editor — FORNAX Forge</translation>
+      <translation>Editor de plantillas — FORNAX Forge</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1011" />
       <location filename="../../features/editor/editor_window.py" line="1030" />
       <source>Editor de modelos — {modelo}</source>
-      <translation>Template Editor — {modelo}</translation>
+      <translation>Editor de plantillas — {modelo}</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1115" />
       <source>Encerrar edição</source>
-      <translation>Close editor</translation>
+      <translation>Finalizar edición</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1001" />
       <source>Entrelinha</source>
-      <translation>Line spacing</translation>
+      <translation>Interlineado</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="431" />
@@ -572,480 +572,480 @@
     <message>
       <location filename="../../features/workspace/main_window.py" line="767" />
       <source>Erro ao gerar a prévia do modelo</source>
-      <translation>Unable to generate template preview</translation>
+      <translation>Error al generar la vista previa de la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="759" />
       <source>Erro ao gerar a prévia em segundo plano: {erro}</source>
-      <translation>Background preview error: {erro}</translation>
+      <translation>Error al generar la vista previa en segundo plano: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="766" />
       <source>Erro ao gerar a prévia: {erro}</source>
-      <translation>Preview error: {erro}</translation>
+      <translation>Error al generar la vista previa: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="770" />
       <source>Erro ao ler as colunas do modelo: {erro}</source>
-      <translation>Error reading template columns: {erro}</translation>
+      <translation>Error al leer las columnas del modelo: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1133" />
       <source>Erro de leitura</source>
-      <translation>Read error</translation>
+      <translation>Error de lectura</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main.py" line="39" />
       <source>Erro fatal</source>
-      <translation>Fatal error</translation>
+      <translation>Error fatal</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="666" />
       <source>Erro na exportação</source>
-      <translation>Export error</translation>
+      <translation>Error en la exportación</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="196" />
       <source>Erro na montagem do PDF: {erro}</source>
-      <translation>PDF assembly error: {erro}</translation>
+      <translation>Error en el montaje del PDF: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="31" />
       <location filename="../../features/preview/preview_panel.py" line="40" />
       <source>Erro na prévia</source>
-      <translation>Preview error</translation>
+      <translation>Error en la vista previa</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1029" />
       <source>Erro na prévia da folha: {erro}</source>
-      <translation>Sheet preview error: {erro}</translation>
+      <translation>Error en la vista previa de la hoja: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/generator/workers.py" line="343" />
       <source>Erro na prévia em segundo plano: {erro}</source>
-      <translation>Background preview error: {erro}</translation>
+      <translation>Error en la vista previa en segundo plano: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/generator/workers.py" line="215" />
       <source>Erro no processamento: {erro}
 {detalhes}</source>
-      <translation>Processing error: {erro}
+      <translation>Error en el procesamiento: {erro}
 {detalhes}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="259" />
       <source>Escolha a pasta de destino dos arquivos</source>
-      <translation>Choose the destination folder</translation>
+      <translation>Elija la carpeta de destino para los archivos</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="132" />
       <source>Escolha um perfil para a aparência do programa.</source>
-      <translation>Choose a profile for the application appearance.</translation>
+      <translation>Elija un perfil para la apariencia del programa.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="450" />
       <source>Escolha uma forma e arraste no canvas. Shift restringe proporções ou ângulo; Esc cancela.</source>
-      <translation>Choose a shape and drag on the canvas. Shift constrains proportions or angle; Esc cancels.</translation>
+      <translation>Elija una forma y arrástrela en el lienzo. Shift restringe proporciones o ángulo; Esc cancela.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="84" />
       <source>Escolher cor</source>
-      <translation>Choose color</translation>
+      <translation>Elegir color</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="747" />
       <source>Espessura</source>
-      <translation>Thickness</translation>
+      <translation>Grosor</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="679" />
       <source>Esquerda</source>
-      <translation>Left</translation>
+      <translation>Izquierda</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="535" />
       <source>Este arquivo ZIP não contém modelos compatíveis com o FORNAX Forge.</source>
-      <translation>This ZIP file does not contain templates compatible with FORNAX Forge.</translation>
+      <translation>Este archivo ZIP no contiene plantillas compatibles con FORNAX Forge.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1404" />
       <source>Este modelo possui links ativos, mas o formato de saída atual é PNG.
 
 Os links funcionam somente em PDF. Deseja continuar e gerar as imagens sem links?</source>
-      <translation>This template has active links, but the current output format is PNG.
+      <translation>Esta plantilla posee enlaces activos, pero el formato de salida actual es PNG.
 
-Links work only in PDF. Do you want to continue and generate images without links?</translation>
+Los enlaces funcionan únicamente en PDF. ¿Desea continuar y generar las imágenes sin enlaces?</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="734" />
       <source>Este modelo usa fontes não encontradas no sistema: {fontes}</source>
-      <translation>This template uses fonts that are not installed: {fontes}</translation>
+      <translation>Esta plantilla utiliza fuentes no encontradas en el sistema: {fontes}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="732" />
       <source>Este modelo usa uma fonte não encontrada no sistema: {fontes}</source>
-      <translation>This template uses a font that is not installed: {fontes}</translation>
+      <translation>Esta plantilla utiliza una fuente no encontrada en el sistema: {fontes}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="466" />
       <source>Este programa utiliza Qt for Python (PySide6), disponibilizado sob opções de licença LGPLv3/GPLv3 ou comercial. Os textos completos das licenças serão incluídos no pacote de distribuição.</source>
-      <translation>This application uses Qt for Python (PySide6), available under LGPLv3/GPLv3 or commercial license options. The complete license texts will be included in the distribution package.</translation>
+      <translation>Este programa utiliza Qt for Python (PySide6), disponible bajo opciones de licencia LGPLv3/GPLv3 o comercial. Los textos completos de las licencias se incluirán en el paquete de distribución.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1097" />
       <source>Está faltando a fonte {fontes}.</source>
-      <translation>The font {fontes} is missing.</translation>
+      <translation>Falta la fuente {fontes}.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1099" />
       <source>Estão faltando as fontes {fontes}.</source>
-      <translation>The fonts {fontes} are missing.</translation>
+      <translation>Faltan las fuentes {fontes}.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="73" />
       <source>Ex.: {modelo}_{nome}</source>
-      <translation>E.g.: {modelo}_{nome}</translation>
+      <translation>Ej.: {modelo}_{nome}</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="529" />
       <location filename="../../features/generator/export_dialog.py" line="138" />
       <location filename="../../features/spreadsheet/frontend.py" line="84" />
       <source>Excluir</source>
-      <translation>Delete</translation>
+      <translation>Eliminar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="494" />
       <source>Excluir '{nome}'?</source>
-      <translation>Delete '{nome}'?</translation>
+      <translation>¿Eliminar '{nome}'?</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="84" />
       <source>Excluir linhas selecionadas</source>
-      <translation>Delete selected rows</translation>
+      <translation>Eliminar líneas seleccionadas</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="228" />
       <source>Excluir modelo</source>
-      <translation>Delete template</translation>
+      <translation>Eliminar plantilla</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="497" />
       <source>Excluir predefinição</source>
-      <translation>Delete preset</translation>
+      <translation>Eliminar preajuste</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="441" />
       <source>Exibir</source>
-      <translation>View</translation>
+      <translation>Mostrar</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="104" />
       <source>Exibir conteúdo completo</source>
-      <translation>Show full content</translation>
+      <translation>Mostrar contenido completo</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1966" />
       <source>Exibir ou ocultar esta camada no editor e no arquivo final</source>
-      <translation>Show or hide this layer in the editor and final output</translation>
+      <translation>Mostrar u ocultar esta capa en el editor y en el archivo final</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="406" />
       <source>Exibir ou ocultar guias</source>
-      <translation>Show or hide guides</translation>
+      <translation>Mostrar u ocultar guías</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="368" />
       <location filename="../../features/workspace/frontend.py" line="454" />
       <source>Expandir tabela de dados</source>
-      <translation>Expand data table</translation>
+      <translation>Expandir tabla de datos</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="163" />
       <source>Exportar</source>
-      <translation>Export</translation>
+      <translation>Exportar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/export_models_dialog.py" line="9" />
       <location filename="../../features/workspace/main_window.py" line="635" />
       <source>Exportar modelos</source>
-      <translation>Export templates</translation>
+      <translation>Exportar plantillas</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="435" />
       <source>Exportar modelos…</source>
-      <translation>Export templates…</translation>
+      <translation>Exportar plantillas…</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="635" />
       <source>Externo</source>
-      <translation>Outside</translation>
+      <translation>Externo</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="158" />
       <source>FORNAX Carbono</source>
-      <translation>FORNAX Carbon</translation>
+      <translation>FORNAX Carbono</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="53" />
       <source>FORNAX Forge — Geração de material personalizado em lote</source>
-      <translation>FORNAX Forge — Personalized Batch Material Generation</translation>
+      <translation>FORNAX Forge — Generación de material personalizado por lotes</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="159" />
       <source>FORNAX Grafite</source>
-      <translation>FORNAX Graphite</translation>
+      <translation>FORNAX Grafito</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="158" />
       <source>FORNAX Marinho</source>
-      <translation>FORNAX Navy</translation>
+      <translation>FORNAX Marino</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="159" />
       <source>FORNAX Pérola</source>
-      <translation>FORNAX Pearl</translation>
+      <translation>FORNAX Perla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="160" />
       <source>FORNAX Rosê</source>
-      <translation>FORNAX Rose</translation>
+      <translation>FORNAX Rosé</translation>
     </message>
     <message>
       <location filename="../../features/generator/workers.py" line="99" />
       <source>Falha ao adicionar links ao PDF {arquivo}: {erro}</source>
-      <translation>Unable to add links to PDF {arquivo}: {erro}</translation>
+      <translation>Error al añadir enlaces al PDF {arquivo}: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="431" />
       <source>Falha ao duplicar modelo:
 {erro}</source>
-      <translation>Unable to duplicate template:
+      <translation>Error al duplicar el modelo:
 {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="500" />
       <source>Falha ao excluir: {erro}</source>
-      <translation>Unable to delete: {erro}</translation>
+      <translation>Error al eliminar: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="666" />
       <source>Falha ao gerar o arquivo ZIP:
 {erro}</source>
-      <translation>Unable to create the ZIP file:
+      <translation>Error al generar el archivo ZIP:
 {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="617" />
       <source>Falha ao processar o arquivo ZIP:
 {erro}</source>
-      <translation>Unable to process the ZIP file:
+      <translation>Error al procesar el archivo ZIP:
 {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="483" />
       <source>Falha ao renomear: {erro}</source>
-      <translation>Unable to rename: {erro}</translation>
+      <translation>Error al renombrar: {erro}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="617" />
       <source>Falha crítica</source>
-      <translation>Critical failure</translation>
+      <translation>Error crítico</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="37" />
       <source>Feche e abra o FORNAX Forge para aplicar o novo idioma.</source>
-      <translation>Close and reopen FORNAX Forge to apply the new language.</translation>
+      <translation>Cierre y abra FORNAX Forge para aplicar el nuevo idioma.</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="182" />
       <source>Folha</source>
-      <translation>Sheet</translation>
+      <translation>Hoja</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="172" />
       <source>Folha de impressão</source>
-      <translation>Print sheet</translation>
+      <translation>Hoja de impresión</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="169" />
       <source>Folha de saída (largura × altura):</source>
-      <translation>Output sheet (width × height):</translation>
+      <translation>Hoja de salida (ancho × alto):</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="856" />
       <source>Fonte</source>
-      <translation>Font</translation>
+      <translation>Fuente</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="101" />
       <location filename="../../features/workspace/main_window.py" line="1102" />
       <source>Fonte ausente</source>
-      <translation>Missing font</translation>
+      <translation>Fuente ausente</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="101" />
       <source>Fontes ausentes</source>
-      <translation>Missing fonts</translation>
+      <translation>Fuentes ausentes</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="447" />
       <location filename="../../features/editor/frontend.py" line="484" />
       <source>Formas</source>
-      <translation>Shapes</translation>
+      <translation>Formas</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="485" />
       <source>Foto, logo ou QR</source>
-      <translation>Photo, logo, or QR code</translation>
+      <translation>Foto, logo o QR</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="54" />
       <source>Fundo principal</source>
-      <translation>Main background</translation>
+      <translation>Fondo principal</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="390" />
       <source>GUIAS</source>
-      <translation>GUIDES</translation>
+      <translation>GUÍAS</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="749" />
       <source>Gerando prévia, aguarde um instante…</source>
-      <translation>Generating preview, please wait…</translation>
+      <translation>Generando vista previa, espere un instante…</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1450" />
       <source>Gerando… Aguarde</source>
-      <translation>Generating… Please wait</translation>
+      <translation>Generando… Espere</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="159" />
       <location filename="../../features/workspace/main_window.py" line="1487" />
       <source>Gerar material</source>
-      <translation>Generate material</translation>
+      <translation>Generar material</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="374" />
       <source>Girar 90° no sentido anti-horário</source>
-      <translation>Rotate 90° counterclockwise</translation>
+      <translation>Girar 90° en sentido antihorario</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="375" />
       <source>Girar 90° no sentido horário</source>
-      <translation>Rotate 90° clockwise</translation>
+      <translation>Girar 90° en sentido horario</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="57" />
       <source>Guias</source>
-      <translation>Guides</translation>
+      <translation>Guías</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="834" />
       <location filename="../../features/editor/properties.py" line="284" />
       <source>Habilitar link</source>
-      <translation>Enable link</translation>
+      <translation>Habilitar enlace</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="227" />
       <source>Habilitar marcas de corte</source>
-      <translation>Enable crop marks</translation>
+      <translation>Habilitar marcas de corte</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="231" />
       <source>Habilitar margem de sangria</source>
-      <translation>Enable bleed margin</translation>
+      <translation>Habilitar margen de sangrado</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="151" />
       <source>Habilitar múltiplos itens por página</source>
-      <translation>Enable multiple items per page</translation>
+      <translation>Habilitar múltiples elementos por página</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="405" />
       <source>Idioma</source>
-      <translation>Language</translation>
+      <translation>Idioma</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="486" />
       <source>Imagem opcional</source>
-      <translation>Optional image</translation>
+      <translation>Imagen opcional</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="485" />
       <source>Imagens</source>
-      <translation>Images</translation>
+      <translation>Imágenes</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1674" />
       <location filename="../../features/editor/editor_window.py" line="1699" />
       <source>Imagens (*.png *.jpg *.jpeg)</source>
-      <translation>Images (*.png *.jpg *.jpeg)</translation>
+      <translation>Imágenes (*.png *.jpg *.jpeg)</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1680" />
       <source>Imagens (*.png)</source>
-      <translation>Images (*.png)</translation>
+      <translation>Imágenes (*.png)</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="162" />
       <location filename="../../features/workspace/import_models_dialog.py" line="45" />
       <source>Importar</source>
-      <translation>Import</translation>
+      <translation>Importar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="507" />
       <source>Importar modelos</source>
-      <translation>Import templates</translation>
+      <translation>Importar plantillas</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="434" />
       <source>Importar modelos…</source>
-      <translation>Import templates…</translation>
+      <translation>Importar plantillas…</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="612" />
       <source>Importação concluída</source>
-      <translation>Import complete</translation>
+      <translation>Importación finalizada</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="11" />
       <source>Importação de modelos</source>
-      <translation>Import templates</translation>
+      <translation>Importación de plantillas</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="321" />
       <source>Imposição desativada (1 item por arquivo)</source>
-      <translation>Imposition disabled (1 item per file)</translation>
+      <translation>Imposición desactivada (1 elemento por archivo)</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="240" />
       <source>Impressão</source>
-      <translation>Printing</translation>
+      <translation>Impresión</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="677" />
       <source>Inf. direito</source>
-      <translation>Bottom right</translation>
+      <translation>Inf. derecha</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="677" />
       <source>Inf. esquerdo</source>
-      <translation>Bottom left</translation>
+      <translation>Inf. izquierda</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="98" />
       <source>Informe um nome para o perfil.</source>
-      <translation>Enter a profile name.</translation>
+      <translation>Indique un nombre para el perfil.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="635" />
       <source>Interno</source>
-      <translation>Inside</translation>
+      <translation>Interno</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="637" />
       <source>Interno: para dentro. Externo: para fora. Centralizado: metade para cada lado.</source>
-      <translation>Inside: grows inward. Outside: grows outward. Centered: half on each side.</translation>
+      <translation>Interior: hacia adentro. Exterior: hacia afuera. Centralizado: mitad para cada lado.</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="103" />
@@ -1053,205 +1053,205 @@ Links work only in PDF. Do you want to continue and generate images without link
       <location filename="../../features/preview/preview_panel.py" line="170" />
       <location filename="../../features/preview/preview_panel.py" line="182" />
       <source>Item</source>
-      <translation>Item</translation>
+      <translation>Elemento</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="100" />
       <source>Item anterior</source>
-      <translation>Previous item</translation>
+      <translation>Elemento anterior</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="843" />
       <source>Itálico (Ctrl+I)</source>
-      <translation>Italic (Ctrl+I)</translation>
+      <translation>Cursiva (Ctrl+I)</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="139" />
       <source>Itálico · Ctrl+I</source>
-      <translation>Italic · Ctrl+I</translation>
+      <translation>Cursiva · Ctrl+I</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="679" />
       <source>Justificado</source>
-      <translation>Justified</translation>
+      <translation>Justificado</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="953" />
       <source>Justificar texto</source>
-      <translation>Justify text</translation>
+      <translation>Justificar texto</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="458" />
       <source>Já existe um modelo com o identificador '{slug}'.</source>
-      <translation>A template with identifier '{slug}' already exists.</translation>
+      <translation>Ya existe una plantilla con el identificador '{slug}'.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="514" />
       <source>Já existe uma predefinição com o nome '{nome}'.</source>
-      <translation>A preset named '{nome}' already exists.</translation>
+      <translation>Ya existe un preajuste con el nombre '{nome}'.</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="71" />
       <source>LINHAS</source>
-      <translation>ROWS</translation>
+      <translation>FILAS</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="464" />
       <location filename="../../features/workspace/frontend.py" line="465" />
       <source>Licenças de terceiros</source>
-      <translation>Third-party licenses</translation>
+      <translation>Licencias de terceros</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="477" />
       <source>Linha</source>
-      <translation>Line</translation>
+      <translation>Línea</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="193" />
       <source>Linha {row}  /  {column}    ·    Duplo clique para editar</source>
-      <translation>Row {row}  /  {column}    ·    Double-click to edit</translation>
+      <translation>Fila {row}  /  {column}    ·    Doble clic para editar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="442" />
       <source>Log de processamento</source>
-      <translation>Processing log</translation>
+      <translation>Registro de procesamiento</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="208" />
       <source>MODELO</source>
-      <translation>TEMPLATE</translation>
+      <translation>PLANTILLA</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="221" />
       <source>Mais ações do modelo</source>
-      <translation>More template actions</translation>
+      <translation>Más acciones de la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1023" />
       <source>Manter a proporção do documento</source>
-      <translation>Keep document proportions</translation>
+      <translation>Mantener la proporción del documento</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="368" />
       <source>Manter proporção ao redimensionar</source>
-      <translation>Keep proportions while resizing</translation>
+      <translation>Mantener proporción al redimensionar</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="689" />
       <source>Meio</source>
-      <translation>Middle</translation>
+      <translation>Centro</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="432" />
       <source>Modelo</source>
-      <translation>Template</translation>
+      <translation>Plantilla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="677" />
       <source>Modelo ativo: {nome}</source>
-      <translation>Active template: {nome}</translation>
+      <translation>Plantilla activa: {nome}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="427" />
       <source>Modelo duplicado: '{nome}'</source>
-      <translation>Template duplicated: '{nome}'</translation>
+      <translation>Plantilla duplicada: '{nome}'</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="503" />
       <source>Modelo excluído: {nome}</source>
-      <translation>Template deleted: {nome}</translation>
+      <translation>Plantilla eliminada: {nome}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="45" />
       <source>Modelo no ZIP</source>
-      <translation>Template in ZIP</translation>
+      <translation>Plantilla en ZIP</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="479" />
       <source>Modelo renomeado: '{anterior}' → '{novo}'</source>
-      <translation>Template renamed: '{anterior}' → '{novo}'</translation>
+      <translation>Plantilla renombrada: '{anterior}' → '{novo}'</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="842" />
       <source>Negrito (Ctrl+B)</source>
-      <translation>Bold (Ctrl+B)</translation>
+      <translation>Negrita (Ctrl+B)</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="138" />
       <source>Negrito · Ctrl+B</source>
-      <translation>Bold · Ctrl+B</translation>
+      <translation>Negrita · Ctrl+B</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1623" />
       <source>Nenhum arquivo de imagem de fundo carregado para ajustar.</source>
-      <translation>No background image is loaded to fit.</translation>
+      <translation>No hay archivo de imagen de fondo cargado para ajustar.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="623" />
       <source>Nenhum modelo disponível para exportar.</source>
-      <translation>No templates are available to export.</translation>
+      <translation>No hay plantilla disponible para exportar.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="632" />
       <source>Nenhum modelo foi selecionado para exportação.</source>
-      <translation>No templates were selected for export.</translation>
+      <translation>No se ha seleccionado ninguna plantilla para exportación.</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="83" />
       <source>Nenhum modelo selecionado</source>
-      <translation>No template selected</translation>
+      <translation>Ninguna plantilla seleccionada</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="344" />
       <location filename="../../features/editor/frontend.py" line="1209" />
       <source>Nenhum objeto</source>
-      <translation>No object</translation>
+      <translation>Ningún objeto</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="788" />
       <source>No plano de fundo, o contorno cresce sempre para dentro da página.</source>
-      <translation>For the background, the outline always grows inward from the page edge.</translation>
+      <translation>En el fondo, el contorno crece siempre hacia dentro de la página.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="476" />
       <source>Nome da predefinição:</source>
-      <translation>Preset name:</translation>
+      <translation>Nombre del preajuste:</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1027" />
       <source>Nome do modelo:</source>
-      <translation>Template name:</translation>
+      <translation>Nombre de la plantilla:</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="49" />
       <source>Nome do perfil</source>
-      <translation>Profile name</translation>
+      <translation>Nombre del perfil</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="514" />
       <source>Nome já existe</source>
-      <translation>Name already exists</translation>
+      <translation>El nombre ya existe</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="98" />
       <source>Nome necessário</source>
-      <translation>Name required</translation>
+      <translation>Se requiere un nombre</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="480" />
       <location filename="../../features/generator/export_dialog.py" line="511" />
       <source>Nome reservado</source>
-      <translation>Reserved name</translation>
+      <translation>Nombre reservado</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="103" />
       <source>Nomenclatura</source>
-      <translation>Naming</translation>
+      <translation>Nomenclatura</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="476" />
       <source>Nova predefinição</source>
-      <translation>New preset</translation>
+      <translation>Nuevo preajuste</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="327" />
@@ -1259,558 +1259,558 @@ Links work only in PDF. Do you want to continue and generate images without link
       <location filename="../../features/workspace/frontend.py" line="157" />
       <location filename="../../features/workspace/frontend.py" line="433" />
       <source>Novo modelo</source>
-      <translation>New template</translation>
+      <translation>Nueva plantilla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="122" />
       <source>Novo nome</source>
-      <translation>New name</translation>
+      <translation>Nuevo nombre</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1799" />
       <source>Novo nome para a camada:</source>
-      <translation>New layer name:</translation>
+      <translation>Nuevo nombre para la capa:</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="506" />
       <location filename="../../features/workspace/main_window.py" line="442" />
       <source>Novo nome:</source>
-      <translation>New name:</translation>
+      <translation>Nuevo nombre:</translation>
     </message>
     <message>
       <location filename="../../features/generator/workers.py" line="20" />
       <source>Não foi possível abrir o PDF para gravação.</source>
-      <translation>Unable to open the PDF for writing.</translation>
+      <translation>No fue posible abrir el PDF para grabación.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="36" />
       <source>Não foi possível reiniciar</source>
-      <translation>Unable to restart</translation>
+      <translation>No fue posible reiniciar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="104" />
       <source>Não foi possível salvar</source>
-      <translation>Unable to save</translation>
+      <translation>No fue posible guardar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1050" />
       <source>Não há itens para montar a folha</source>
-      <translation>There are no items to place on the sheet</translation>
+      <translation>No hay elementos para montar la hoja</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="48" />
       <source>Não há registros válidos para gerar.</source>
-      <translation>There are no valid records to generate.</translation>
+      <translation>No hay registros válidos para generar.</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="100" />
       <source>O modelo é grande demais para as margens da folha.</source>
-      <translation>The template is too large for the sheet margins.</translation>
+      <translation>La plantilla es demasiado grande para los márgenes de la hoja.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="480" />
       <location filename="../../features/generator/export_dialog.py" line="511" />
       <source>O nome '{nome}' é reservado pelo sistema.</source>
-      <translation>The name '{nome}' is reserved by the system.</translation>
+      <translation>El nombre '{nome}' está reservado por el sistema.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1209" />
       <source>Objeto selecionado</source>
-      <translation>Selected object</translation>
+      <translation>Objeto seleccionado</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="45" />
       <source>Observação</source>
-      <translation>Notes</translation>
+      <translation>Nota</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main.py" line="40" />
       <source>Ocorreu um erro inesperado e o sistema precisa ser encerrado.</source>
-      <translation>An unexpected error occurred and the application must close.</translation>
+      <translation>Ocurrió un error inesperado y el sistema necesita ser cerrado.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="387" />
       <source>Opacidade</source>
-      <translation>Opacity</translation>
+      <translation>Opacidad</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="642" />
       <source>Opacidade do contorno</source>
-      <translation>Outline opacity</translation>
+      <translation>Opacidad del contorno</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="592" />
       <source>Opacidade do preenchimento</source>
-      <translation>Fill opacity</translation>
+      <translation>Opacidad del relleno</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="878" />
       <source>Opacidade do texto</source>
-      <translation>Text opacity</translation>
+      <translation>Opacidad del texto</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main.py" line="41" />
       <source>Os detalhes técnicos foram salvos em:
 {arquivo}</source>
-      <translation>Technical details were saved to:
+      <translation>Los detalles técnicos se guardaron en:
 {arquivo}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="182" />
       <source>PDF agrupado</source>
-      <translation>Combined PDF</translation>
+      <translation>PDF agrupado</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="181" />
       <source>PDF por item</source>
-      <translation>PDF per item</translation>
+      <translation>PDF por elemento</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="587" />
       <source>PREENCHIMENTO</source>
-      <translation>FILL</translation>
+      <translation>RELLENO</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="507" />
       <source>Pacotes de modelos ZIP (*.zip)</source>
-      <translation>Template ZIP packages (*.zip)</translation>
+      <translation>Paquetes de plantillas ZIP (*.zip)</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="55" />
       <source>Painéis</source>
-      <translation>Panels</translation>
+      <translation>Paneles</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="357" />
       <source>Personalizada</source>
-      <translation>Custom</translation>
+      <translation>Personalizada</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1944" />
       <source>Plano de fundo</source>
-      <translation>Background</translation>
+      <translation>Fondo</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1436" />
       <source>Por favor, selecione uma pasta de saída antes de gerar o material.</source>
-      <translation>Please select an output folder before generating the material.</translation>
+      <translation>Por favor, seleccione una carpeta de salida antes de generar el material.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="746" />
       <source>Posição</source>
-      <translation>Position</translation>
+      <translation>Posición</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="484" />
       <source>Preenchimento e borda</source>
-      <translation>Fill and outline</translation>
+      <translation>Relleno y contorno</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="402" />
       <source>Programa</source>
-      <translation>Application</translation>
+      <translation>Programa</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="837" />
       <source>Propriedades</source>
-      <translation>Properties</translation>
+      <translation>Propiedades</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="676" />
       <source>Prévia do modelo selecionado:
 {nome}</source>
-      <translation>Selected template preview:
+      <translation>Vista previa de la plantilla seleccionada:
 {nome}</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="127" />
       <source>Próximo item</source>
-      <translation>Next item</translation>
+      <translation>Siguiente elemento</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1067" />
       <source>Página 1 de 1</source>
-      <translation>Page 1 of 1</translation>
+      <translation>Página 1 de 1</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="475" />
       <source>Quadrado</source>
-      <translation>Rectangle</translation>
+      <translation>Rectángulo</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="80" />
       <source>Quantidade de linhas a adicionar</source>
-      <translation>Number of rows to add</translation>
+      <translation>Cantidad de líneas a añadir</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="336" />
       <location filename="../../features/workspace/frontend.py" line="376" />
       <location filename="../../features/workspace/frontend.py" line="454" />
       <source>Recolher tabela de dados</source>
-      <translation>Collapse data table</translation>
+      <translation>Contraer tabla de datos</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1002" />
       <source>Recuo da primeira linha</source>
-      <translation>First-line indent</translation>
+      <translation>Sangría de primera línea</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="420" />
       <source>Refazer</source>
-      <translation>Redo</translation>
+      <translation>Rehacer</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="422" />
       <source>Reiniciar agora</source>
-      <translation>Restart now</translation>
+      <translation>Reiniciar ahora</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="425" />
       <source>Reiniciar depois</source>
-      <translation>Restart later</translation>
+      <translation>Reiniciar después</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="419" />
       <source>Reiniciar o programa</source>
-      <translation>Restart application</translation>
+      <translation>Reiniciar el programa</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="420" />
       <source>Reinicie o programa para aplicar o novo idioma.</source>
-      <translation>Restart the application to apply the new language.</translation>
+      <translation>Reinicie el programa para aplicar el nuevo idioma.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="159" />
       <source>Remover</source>
-      <translation>Remove</translation>
+      <translation>Eliminar</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="527" />
       <location filename="../../features/generator/export_dialog.py" line="136" />
       <location filename="../../features/workspace/frontend.py" line="160" />
       <source>Renomear</source>
-      <translation>Rename</translation>
+      <translation>Renombrar</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1798" />
       <source>Renomear camada</source>
-      <translation>Rename layer</translation>
+      <translation>Renombrar capa</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="227" />
       <location filename="../../features/workspace/main_window.py" line="442" />
       <source>Renomear modelo</source>
-      <translation>Rename template</translation>
+      <translation>Renombrar plantilla</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="506" />
       <source>Renomear predefinição</source>
-      <translation>Rename preset</translation>
+      <translation>Renombrar preajuste</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="32" />
       <source>Renomear todos</source>
-      <translation>Rename all</translation>
+      <translation>Renombrar todos</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="45" />
       <source>Resolução de conflito</source>
-      <translation>Conflict resolution</translation>
+      <translation>Resolución de conflictos</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="831" />
       <source>Restaurar original</source>
-      <translation>Restore original</translation>
+      <translation>Restaurar original</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="648" />
       <source>Retos</source>
-      <translation>Straight</translation>
+      <translation>Rectos</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="344" />
       <location filename="../../features/editor/frontend.py" line="1209" />
       <source>SELEÇÃO</source>
-      <translation>SELECTION</translation>
+      <translation>SELECCIÓN</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="710" />
       <source>Sair sem salvar</source>
-      <translation>Close without saving</translation>
+      <translation>Salir sin guardar</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="709" />
       <source>Salvar e Sair</source>
-      <translation>Save and close</translation>
+      <translation>Guardar y salir</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="257" />
       <source>Salvar em</source>
-      <translation>Save to</translation>
+      <translation>Guardar en</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1027" />
       <location filename="../../features/editor/frontend.py" line="1069" />
       <source>Salvar modelo</source>
-      <translation>Save template</translation>
+      <translation>Guardar plantilla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="72" />
       <source>Salvar perfil</source>
-      <translation>Save profile</translation>
+      <translation>Guardar perfil</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="1031" />
       <source>Segure e arraste para ajustar a ordem</source>
-      <translation>Drag and drop to change the order</translation>
+      <translation>Mantenga pulsado y arrastre para ajustar el orden</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="845" />
       <source>Selecionar a cor do texto</source>
-      <translation>Select text color</translation>
+      <translation>Seleccionar el color del texto</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="840" />
       <source>Selecionar a família da fonte</source>
-      <translation>Select font family</translation>
+      <translation>Seleccionar la familia de fuente</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1680" />
       <source>Selecionar assinatura</source>
-      <translation>Select signature</translation>
+      <translation>Seleccionar firma</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1674" />
       <source>Selecionar fundo</source>
-      <translation>Select background</translation>
+      <translation>Seleccionar fondo</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1699" />
       <source>Selecionar imagem</source>
-      <translation>Select image</translation>
+      <translation>Seleccionar imagen</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1218" />
       <source>Selecionar pasta de saída</source>
-      <translation>Select output folder</translation>
+      <translation>Seleccionar carpeta de salida</translation>
     </message>
     <message>
       <location filename="../../features/workspace/export_models_dialog.py" line="14" />
       <location filename="../../features/workspace/import_models_dialog.py" line="23" />
       <source>Selecionar/desmarcar todos</source>
-      <translation>Select/deselect all</translation>
+      <translation>Seleccionar/deseleccionar todo</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="73" />
       <source>Selecione o modelo</source>
-      <translation>Select a template</translation>
+      <translation>Seleccionar la plantilla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1068" />
       <source>Selecione um modelo na lista antes de configurar.</source>
-      <translation>Select a template from the list before opening settings.</translation>
+      <translation>Seleccione una plantilla en la lista antes de configurar.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="395" />
       <source>Selecione um modelo para duplicar.</source>
-      <translation>Select a template to duplicate.</translation>
+      <translation>Seleccione una plantilla para duplicar.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="439" />
       <source>Selecione um modelo para renomear.</source>
-      <translation>Select a template to rename.</translation>
+      <translation>Seleccione una plantilla para renombrar.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1147" />
       <source>Selecione um modelo primeiro.</source>
-      <translation>Select a template first.</translation>
+      <translation>Seleccione una plantilla primero.</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="920" />
       <source>Selecione um trecho de texto para transformá-lo em opcional.</source>
-      <translation>Select a text segment first to make it optional.</translation>
+      <translation>Seleccione un fragmento de texto para convertirlo en opcional.</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="154" />
       <source>Selecione uma célula para começar · Cole do Excel ou Google Sheets com Ctrl+V</source>
-      <translation>Select a cell to begin · Paste from Excel or Google Sheets with Ctrl+V</translation>
+      <translation>Seleccione una celda para comenzar · Pegue desde Excel o Google Sheets con Ctrl+V</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="129" />
       <source>Selecione uma célula para visualizar ou editar seu conteúdo</source>
-      <translation>Select a cell to view or edit its content</translation>
+      <translation>Seleccione una celda para visualizar o editar su contenido</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="902" />
       <source>Selecione uma palavra primeiro para transformá-la em variável.</source>
-      <translation>Select a word first to turn it into a variable.</translation>
+      <translation>Seleccione una palabra primero para convertirla en variable.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="56" />
       <source>Seleção</source>
-      <translation>Selection</translation>
+      <translation>Selección</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1623" />
       <source>Sem fundo</source>
-      <translation>No background</translation>
+      <translation>Sin fondo</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="23" />
       <source>Sem imagem</source>
-      <translation>No image</translation>
+      <translation>Sin imagen</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="60" />
       <source>Sem prévia</source>
-      <translation>No preview</translation>
+      <translation>Sin vista previa</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="663" />
       <source>Sincronizar o arredondamento dos quatro cantos</source>
-      <translation>Synchronize all four corner radii</translation>
+      <translation>Sincronizar el redondeo de las cuatro esquinas</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="458" />
       <source>Sobre</source>
-      <translation>About</translation>
+      <translation>Acerca de</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="459" />
       <location filename="../../features/workspace/frontend.py" line="460" />
       <source>Sobre o FORNAX Forge</source>
-      <translation>About FORNAX Forge</translation>
+      <translation>Acerca de FORNAX Forge</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="484" />
       <source>Sobrescrever</source>
-      <translation>Overwrite</translation>
+      <translation>Sobrescribir</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="45" />
       <source>Status</source>
-      <translation>Status</translation>
+      <translation>Estado</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="844" />
       <source>Sublinhado (Ctrl+U)</source>
-      <translation>Underline (Ctrl+U)</translation>
+      <translation>Subrayado (Ctrl+U)</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="140" />
       <source>Sublinhado · Ctrl+U</source>
-      <translation>Underline · Ctrl+U</translation>
+      <translation>Subrayado · Ctrl+U</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="121" />
       <source>Substituir</source>
-      <translation>Replace</translation>
+      <translation>Reemplazar</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="31" />
       <source>Substituir todos</source>
-      <translation>Replace all</translation>
+      <translation>Reemplazar todo</translation>
     </message>
     <message>
       <location filename="../../features/editor/editor_window.py" line="1111" />
       <location filename="../../features/workspace/main_window.py" line="664" />
       <source>Sucesso</source>
-      <translation>Success</translation>
+      <translation>Éxito</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="676" />
       <source>Sup. direito</source>
-      <translation>Top right</translation>
+      <translation>Sup. derecha</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="676" />
       <source>Sup. esquerdo</source>
-      <translation>Top left</translation>
+      <translation>Sup. izquierda</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="852" />
       <source>TIPOGRAFIA</source>
-      <translation>TYPOGRAPHY</translation>
+      <translation>TIPOGRAFÍA</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="445" />
       <source>Tabela de dados fixa</source>
-      <translation>Pin data table</translation>
+      <translation>Tabla de datos fija</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="856" />
       <source>Tamanho</source>
-      <translation>Size</translation>
+      <translation>Tamaño</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="497" />
       <source>Tem certeza de que deseja excluir '{nome}'?</source>
-      <translation>Are you sure you want to delete '{nome}'?</translation>
+      <translation>¿Está seguro de que desea eliminar '{nome}'?</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="118" />
       <location filename="../../features/workspace/settings_dialogs.py" line="129" />
       <source>Tema da interface</source>
-      <translation>Interface theme</translation>
+      <translation>Tema de interfaz</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="180" />
       <source>Tema indisponível</source>
-      <translation>Theme unavailable</translation>
+      <translation>Tema no disponible</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="44" />
       <source>Tema personalizado</source>
-      <translation>Custom theme</translation>
+      <translation>Tema personalizado</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="404" />
       <source>Temas…</source>
-      <translation>Themes…</translation>
+      <translation>Temas…</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="483" />
       <location filename="../../features/editor/frontend.py" line="1013" />
       <location filename="../../features/workspace/settings_dialogs.py" line="55" />
       <source>Texto</source>
-      <translation>Text</translation>
+      <translation>Texto</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="56" />
       <source>Texto secundário</source>
-      <translation>Secondary text</translation>
+      <translation>Texto secundario</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="689" />
       <source>Topo</source>
-      <translation>Top</translation>
+      <translation>Superior</translation>
     </message>
     <message>
       <location filename="../../features/editor/properties.py" line="925" />
       <source>Um trecho opcional precisa conter pelo menos uma variável válida (ex.: {Nome}) para funcionar.</source>
-      <translation>An optional segment must contain at least one valid variable (for example, {Nome}).</translation>
+      <translation>Un fragmento opcional debe contener al menos una variable válida (ej.: {Nome}) para funcionar.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/settings_dialogs.py" line="47" />
       <source>Use o tema atual como base e salve um novo perfil.</source>
-      <translation>Use the current theme as a base and save a new profile.</translation>
+      <translation>Utilice el tema actual como base y guarde un nuevo perfil.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="84" />
       <source>Variáveis disponíveis:</source>
-      <translation>Available variables:</translation>
+      <translation>Variables disponibles:</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="190" />
       <source>Visualize um item ou a folha final conforme a predefinição de impressão.</source>
-      <translation>Preview an item or the final sheet using the selected print preset.</translation>
+      <translation>Visualice un elemento o la hoja final según el preajuste de impresión.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="356" />
       <source>Você alterou as configurações padrão.
 Dê um nome para salvar esta predefinição:</source>
-      <translation>You changed the default settings.
-Enter a name to save this preset:</translation>
+      <translation>Ha modificado las configuraciones predeterminadas.
+Asigne un nombre para guardar este preajuste:</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1479" />
@@ -1820,23 +1820,23 @@ Enter a name to save this preset:</translation>
     <message>
       <location filename="../../features/generator/manager.py" line="185" />
       <source>[{concluidos}/{total}] Salvo: {arquivo}</source>
-      <translation>[{concluidos}/{total}] Saved: {arquivo}</translation>
+      <translation>[{concluidos}/{total}] Guardado: {arquivo}</translation>
     </message>
     <message>
       <location filename="../../features/preview/preview_panel.py" line="118" />
       <location filename="../../features/preview/preview_panel.py" line="183" />
       <source>de {total}</source>
-      <translation>of {total}</translation>
+      <translation>de {total}</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="180" />
       <source>{count} linha</source>
-      <translation>{count} row</translation>
+      <translation>{count} fila</translation>
     </message>
     <message>
       <location filename="../../features/spreadsheet/frontend.py" line="181" />
       <source>{count} linhas</source>
-      <translation>{count} rows</translation>
+      <translation>{count} filas</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1496" />
@@ -1846,275 +1846,275 @@ Enter a name to save this preset:</translation>
     <message>
       <location filename="../../features/workspace/main_window.py" line="610" />
       <source>{quantidade} modelos adicionados à sua biblioteca!</source>
-      <translation>{quantidade} templates added to your library!</translation>
+      <translation>¡{quantidade} plantillas añadidas a su biblioteca!</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="662" />
       <source>{quantidade} modelos exportados com sucesso!</source>
-      <translation>{quantidade} templates exported successfully!</translation>
+      <translation>¡{quantidade} plantillas exportadas con éxito!</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1492" />
       <source>{tempo:.1f} segundos</source>
-      <translation>{tempo:.1f} seconds</translation>
+      <translation>{tempo:.1f} segundos</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" line="770" />
       <source>Ângulo</source>
-      <translation>Angle</translation>
+      <translation>Ángulo</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="529" />
       <source>ℹ️ O arquivo gerado terá as dimensões exatas do modelo original (1 item por arquivo).</source>
-      <translation>ℹ️ The generated file will use the exact dimensions of the original template (1 item per file).</translation>
+      <translation>ℹ️ El archivo generado tendrá las dimensiones exactas de la plantilla original (1 elemento por archivo).</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1499" />
       <source>⏱️ Tempo total: {tempo}</source>
-      <translation>⏱️ Total time: {tempo}</translation>
+      <translation>⏱️ Tiempo total: {tempo}</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="526" />
       <source>⚙️ Configure a folha e as dimensões do modelo para um resultado preciso.</source>
-      <translation>⚙️ Set the sheet and template dimensions for an accurate result.</translation>
+      <translation>⚙️ Configure la hoja y las dimensiones del modelo para un resultado preciso.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="112" />
       <source>⚠️ Já existe</source>
-      <translation>⚠️ Already exists</translation>
+      <translation>⚠️ Ya existe</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="110" />
       <source>⚠️ Links ativos detectados. Use PDF por item para preservá-los.</source>
-      <translation>⚠️ Active links detected. Use PDF per item to preserve them.</translation>
+      <translation>⚠️ Enlaces activos detectados. Use PDF por ítem para preservarlos.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="614" />
       <source>⚠️ Processo finalizado: nenhum modelo novo foi adicionado.</source>
-      <translation>⚠️ Process finished: no new templates were added.</translation>
+      <translation>⚠️ Proceso finalizado: no se añadió ninguna plantilla nueva.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1561" />
       <location filename="../../features/workspace/main_window.py" line="1573" />
       <source>⚡ Layout aplicado: &lt;b&gt;{nome}&lt;/b&gt;</source>
-      <translation>⚡ Layout applied: &lt;b&gt;{nome}&lt;/b&gt;</translation>
+      <translation>⚡ Diseño aplicado: &lt;b&gt;{nome}&lt;/b&gt;</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="63" />
       <source>⚡ Modo híbrido: gerando em cache ({threads} threads)…</source>
-      <translation>⚡ Hybrid mode: generating cache with {threads} threads…</translation>
+      <translation>⚡ Modo híbrido: generando en caché ({threads} hilos)…</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="339" />
       <source>✅ Capacidade: {capacidade} itens por página ({colunas}×{linhas})</source>
-      <translation>✅ Capacity: {capacidade} items per page ({colunas}×{linhas})</translation>
+      <translation>✅ Capacidad: {capacidade} ítems por página ({colunas}×{linhas})</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="193" />
       <location filename="../../features/generator/manager.py" line="217" />
       <source>✅ Processo finalizado com sucesso!</source>
-      <translation>✅ Process completed successfully!</translation>
+      <translation>✅ ¡Proceso finalizado con éxito!</translation>
     </message>
     <message>
       <location filename="../../features/workspace/import_models_dialog.py" line="138" />
       <source>✨ Novo</source>
-      <translation>✨ New</translation>
+      <translation>✨ Nuevo</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="345" />
       <source>❌ Modelo muito grande para a página!</source>
-      <translation>❌ Template is too large for the page!</translation>
+      <translation>❌ ¡La plantilla es demasiado grande para la página!</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="300" />
       <source>🌱 Primeiro uso detectado. Preparando modelo de exemplo…</source>
-      <translation>🌱 First launch detected. Preparing sample template…</translation>
+      <translation>🌱 Primer uso detectado. Preparando modelo de ejemplo…</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1447" />
       <source>📂 Salvando em: {pasta}</source>
-      <translation>📂 Saving to: {pasta}</translation>
+      <translation>📂 Guardando en: {pasta}</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="51" />
       <source>📋 Planejando produção…</source>
-      <translation>📋 Planning production…</translation>
+      <translation>📋 Planificando producción…</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="104" />
       <source>📚 Imposição: {itens} itens em {folhas} folhas (capacidade: {capacidade} por folha).</source>
-      <translation>📚 Imposition: {itens} items on {folhas} sheets (capacity: {capacidade} per sheet).</translation>
+      <translation>📚 Imposición: {itens} ítems en {folhas} hojas (capacidad: {capacidade} por hoja).</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="656" />
       <source>📤 1 modelo exportado para: {arquivo}</source>
-      <translation>📤 1 template exported to: {arquivo}</translation>
+      <translation>📤 1 plantilla exportada a: {arquivo}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="657" />
       <source>📤 {quantidade} modelos exportados para: {arquivo}</source>
-      <translation>📤 {quantidade} templates exported to: {arquivo}</translation>
+      <translation>📤 {quantidade} plantillas exportadas a: {arquivo}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="602" />
       <source>📥 1 modelo processado e importado de: {arquivo}</source>
-      <translation>📥 1 template processed and imported from: {arquivo}</translation>
+      <translation>📥 1 plantilla procesada e importada de: {arquivo}</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="604" />
       <source>📥 {quantidade} modelos processados e importados de: {arquivo}</source>
-      <translation>📥 {quantidade} templates processed and imported from: {arquivo}</translation>
+      <translation>📥 {quantidade} plantillas procesadas e importadas de: {arquivo}</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="156" />
       <source>📦 Montando o PDF agrupado em segundo plano…</source>
-      <translation>📦 Assembling the combined PDF in the background…</translation>
+      <translation>📦 Montando el PDF agrupado en segundo plano…</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="105" />
       <source>🚀 Distribuindo o trabalho entre {threads} threads…</source>
-      <translation>🚀 Distributing work across {threads} threads…</translation>
+      <translation>🚀 Distribuyendo el trabajo entre {threads} hilos…</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="137" />
       <source>🚀 Processando {arquivos} arquivos em {threads} threads…</source>
-      <translation>🚀 Processing {arquivos} files with {threads} threads…</translation>
+      <translation>🚀 Procesando {arquivos} archivos en {threads} hilos…</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1409" />
       <source>🛑 Geração cancelada para alteração de formato.</source>
-      <translation>🛑 Generation canceled to change the format.</translation>
+      <translation>🛑 Generación cancelada para cambiar el formato.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1438" />
       <source>🛑 Geração cancelada: pasta de saída não definida.</source>
-      <translation>🛑 Generation canceled: output folder is not set.</translation>
+      <translation>🛑 Generación cancelada: carpeta de salida no definida.</translation>
     </message>
     <message>
       <location filename="../../features/generator/manager.py" line="89" />
       <source>🛑 Interrompendo processamento…</source>
-      <translation>🛑 Stopping processing…</translation>
+      <translation>🛑 Interrumpiendo el procesamiento…</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="161" />
       <source>Abrir o modelo selecionado no editor</source>
-      <translation>Open the selected template in the editor</translation>
+      <translation>Abrir la plantilla seleccionada en el editor</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="229" />
       <source>Adicionar marcas para orientar o corte dos itens</source>
-      <translation>Add marks to guide item cutting</translation>
+      <translation>Añadir marcas para orientar el corte de los elementos</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="86" />
       <source>Clique em um campo para inseri-lo no padrão de nomenclatura.</source>
-      <translation>Click a field to insert it into the naming pattern.</translation>
+      <translation>Haga clic en un campo para insertarlo en el patrón de nomenclatura.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="157" />
       <source>Criar um modelo em branco</source>
-      <translation>Create a blank template</translation>
+      <translation>Crear una plantilla en blanco</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="68" />
       <source>Define o nome dos arquivos usando campos como {Nome}.</source>
-      <translation>Defines file names using fields such as {Nome}.</translation>
+      <translation>Define el nombre de los archivos usando campos como {Nome}.</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="171" />
       <source>Definir o tamanho físico da folha de saída</source>
-      <translation>Set the physical size of the output sheet</translation>
+      <translation>Definir el tamaño físico de la hoja de salida</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="198" />
       <source>Definir o tamanho físico de cada item impresso</source>
-      <translation>Set the physical size of each printed item</translation>
+      <translation>Definir el tamaño físico de cada elemento impreso</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="158" />
       <source>Duplicar o modelo selecionado</source>
-      <translation>Duplicate the selected template</translation>
+      <translation>Duplicar la plantilla seleccionada</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="263" />
       <source>Escolher a pasta de destino</source>
-      <translation>Choose the destination folder</translation>
+      <translation>Elegir la carpeta de destino</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="159" />
       <source>Excluir o modelo selecionado</source>
-      <translation>Delete the selected template</translation>
+      <translation>Eliminar la plantilla seleccionada</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="163" />
       <source>Exportar modelos para um pacote ZIP</source>
-      <translation>Export templates to a ZIP package</translation>
+      <translation>Exportar plantillas a un paquete ZIP</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="283" />
       <source>Gerar os arquivos usando os dados da tabela</source>
-      <translation>Generate files using the table data</translation>
+      <translation>Generar los archivos usando los datos de la tabla</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="162" />
       <source>Importar modelos de um pacote ZIP</source>
-      <translation>Import templates from a ZIP package</translation>
+      <translation>Importar plantillas de un paquete ZIP</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="97" />
       <source>Inserir este campo no padrão de nomenclatura</source>
-      <translation>Insert this field into the naming pattern</translation>
+      <translation>Insertar este campo en el patrón de nomenclatura</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="153" />
       <source>Organizar vários itens em cada folha de saída</source>
-      <translation>Arrange multiple items on each output sheet</translation>
+      <translation>Organizar varios elementos en cada hoja de salida</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="160" />
       <source>Renomear o modelo selecionado</source>
-      <translation>Rename the selected template</translation>
+      <translation>Renombrar la plantilla seleccionada</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="233" />
       <source>Reservar uma margem adicional ao redor dos itens</source>
-      <translation>Reserve an additional margin around items</translation>
+      <translation>Dejar un margen adicional alrededor de los elementos</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="275" />
       <source>Selecionar o formato dos arquivos gerados</source>
-      <translation>Select the generated file format</translation>
+      <translation>Seleccionar el formato de los archivos generados</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="127" />
       <source>Selecionar ou gerenciar configurações de impressão salvas</source>
-      <translation>Select or manage saved print settings</translation>
+      <translation>Seleccionar o gestionar configuraciones de impresión guardadas</translation>
     </message>
     <message>
       <location filename="../../features/generator/export_dialog.py" line="129" />
       <location filename="../../features/workspace/frontend.py" line="278" />
       <source>Selecionar uma predefinição de impressão</source>
-      <translation>Select a print preset</translation>
+      <translation>Seleccionar un preajuste de impresión</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="270" />
       <source>Todos os itens reunidos em um único arquivo PDF.</source>
-      <translation>All items combined into a single PDF file.</translation>
+      <translation>Todos los elementos reunidos en un único archivo PDF.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="269" />
       <source>Um arquivo PDF separado para cada item.</source>
-      <translation>A separate PDF file for each item.</translation>
+      <translation>Un archivo PDF separado para cada elemento.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="268" />
       <source>Uma imagem PNG para cada item.</source>
-      <translation>One PNG image for each item.</translation>
+      <translation>Una imagen PNG para cada elemento.</translation>
     </message>
     <message>
       <location filename="../../core/output_folders.py" line="44" />
       <source>FORNAX - Forja nº {numero}</source>
-      <translation>FORNAX - Forge No. {numero}</translation>
+      <translation>FORNAX - Forja n.º {numero}</translation>
     </message>
   </context>
 </TS>

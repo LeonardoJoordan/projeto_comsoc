@@ -6,6 +6,7 @@ import math
 from core.naming_engine import build_output_filename
 from .production_plan import build_imposition_plan
 from .workers import PageRenderWorker, DirectRenderWorker, HybridAssemblerWorker
+from core.i18n import tr
 
 class RenderManager(QObject):
     progress_updated = Signal(int)
@@ -44,10 +45,10 @@ class RenderManager(QObject):
         self.all_cards_links = {}
 
         if not self.total_cards or len(self.rows_rich) != self.total_cards:
-            self._on_worker_error("Não há registros válidos para gerar.")
+            self._on_worker_error(tr("Não há registros válidos para gerar."))
             return
         
-        self.log_updated.emit("📋 Planejando produção...")
+        self.log_updated.emit(tr("📋 Planejando produção…"))
         
         cpu_count = os.cpu_count() or 4
         num_threads = max(1, cpu_count - 2)
@@ -59,7 +60,7 @@ class RenderManager(QObject):
 
         if self.is_hybrid:
             self.work_dir.mkdir(parents=True, exist_ok=True)
-            self.log_updated.emit(f"⚡ Modo Híbrido: Gerando em cache ({num_threads} threads)...")
+            self.log_updated.emit(tr("⚡ Modo híbrido: gerando em cache ({threads} threads)…").format(threads=num_threads))
 
         all_tasks_data = []
         used_names = set()
@@ -85,7 +86,7 @@ class RenderManager(QObject):
 
     def stop(self):
         self._is_running = False
-        self.log_updated.emit("🛑 Parando threads...")
+        self.log_updated.emit(tr("🛑 Interrompendo processamento…"))
         for w in self.workers:
             w.stop()
             w.quit()
@@ -96,12 +97,12 @@ class RenderManager(QObject):
         capacity = plan.capacity
         
         if capacity <= 0:
-            self._on_worker_error("Erro: O modelo é grande demais para as margens da folha.")
+            self._on_worker_error(tr("O modelo é grande demais para as margens da folha."))
             return
             
         total_pages = len(plan.pages)
-        self.log_updated.emit(f"📚 Modo Imposição: {len(all_data)} cartões cabem em {total_pages} folhas (Capacidade: {capacity}/fl).")
-        self.log_updated.emit(f"🚀 Distribuindo trabalho para {num_threads} threads...")
+        self.log_updated.emit(tr("📚 Imposição: {itens} itens em {folhas} folhas (capacidade: {capacidade} por folha).").format(itens=len(all_data), folhas=total_pages, capacidade=capacity))
+        self.log_updated.emit(tr("🚀 Distribuindo o trabalho entre {threads} threads…").format(threads=num_threads))
 
         pages_jobs = []
         safe_pattern = self.pattern.replace("{", "").replace("}", "")
@@ -133,7 +134,7 @@ class RenderManager(QObject):
             w.start()
 
     def _start_direct_mode(self, all_data, num_threads):
-        self.log_updated.emit(f"🚀 Modo Direto: Processando {len(all_data)} arquivos em {num_threads} threads...")
+        self.log_updated.emit(tr("🚀 Processando {arquivos} arquivos em {threads} threads…").format(arquivos=len(all_data), threads=num_threads))
         
         chunk_size = math.ceil(len(all_data) / num_threads)
         
@@ -152,7 +153,7 @@ class RenderManager(QObject):
             w.start()
 
     def _start_hybrid_assembly(self):
-        self.log_updated.emit("📦 Montando arquivo PDF Único final em segundo plano...")
+        self.log_updated.emit(tr("📦 Montando o PDF agrupado em segundo plano…"))
         canvas_w = self.renderer.tpl.get("canvas_size", {}).get("w", 1000)
         canvas_h = self.renderer.tpl.get("canvas_size", {}).get("h", 1000)
         self.assembler_worker = HybridAssemblerWorker(
@@ -181,7 +182,7 @@ class RenderManager(QObject):
             self.all_cards_links[original_idx] = local_links
             
         self.cards_done += 1
-        self.log_updated.emit(f"[{self.cards_done}/{self.total_cards}] Salvo: {filename}")
+        self.log_updated.emit(tr("[{concluidos}/{total}] Salvo: {arquivo}").format(concluidos=self.cards_done, total=self.total_cards, arquivo=filename))
         self.generated_files.append(filename)
         self._update_progress()
 
@@ -189,10 +190,10 @@ class RenderManager(QObject):
         out_name = f"{self.output_dir.name}_Imposicao.pdf" if self.is_imposition else f"{self.output_dir.name}_Completo.pdf"
         self.generated_files = [out_name]
         self.finished_process.emit()
-        self.log_updated.emit("✅ Processo finalizado com sucesso!")
+        self.log_updated.emit(tr("✅ Processo finalizado com sucesso!"))
 
     def _on_hybrid_assembly_error(self, error_msg):
-        self._on_worker_error(f"Erro na montagem do PDF: {error_msg}")
+        self._on_worker_error(tr("Erro na montagem do PDF: {erro}").format(erro=error_msg))
 
     def _on_worker_error(self, error_msg):
         if not self._is_running:
@@ -213,7 +214,7 @@ class RenderManager(QObject):
                     self._start_hybrid_assembly()
                 else:
                     self.finished_process.emit()
-                    self.log_updated.emit("✅ Processo finalizado com sucesso!")
+                    self.log_updated.emit(tr("✅ Processo finalizado com sucesso!"))
     
     def _update_progress(self):
         done = min(self.cards_done, self.total_cards)

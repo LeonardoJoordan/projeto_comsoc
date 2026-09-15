@@ -34,7 +34,7 @@ from core.render_cache import ensure_background_proxy
 from core.resources import object_icon_path
 from core.output_folders import create_forge_output_dir
 from core.i18n import tr
-from features.spreadsheet.headers import QUANTITY_HEADER, SIGNATURE_HEADER
+from features.spreadsheet.headers import SIGNATURE_HEADER, quantity_header_label, is_quantity_header
 
 
 
@@ -297,7 +297,7 @@ class MainWindow(QMainWindow):
         if any(models_dir.iterdir()):
             return
             
-        self.log_panel.append("🌱 Primeiro uso detectado. Preparando Modelo de Exemplo...")
+        self.log_panel.append(tr("🌱 Primeiro uso detectado. Preparando modelo de exemplo…"))
         slug = "modelo_exemplo"
         example_dir = models_dir / slug
         example_dir.mkdir(parents=True, exist_ok=True)
@@ -392,14 +392,14 @@ class MainWindow(QMainWindow):
         original_name = self.preview_panel.cbo_models.currentText()
         
         if not original_name:
-            QMessageBox.warning(self, "Atenção", "Selecione um modelo para duplicar.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo para duplicar."))
             return
 
         original_slug = slugify_model_name(original_name)
         original_dir = get_models_dir() / original_slug
 
         if not original_dir.exists():
-            self.log_panel.append("ERRO: Pasta do modelo original não encontrada.")
+            self.log_panel.append(tr("ERRO: Pasta do modelo original não encontrada."))
             return
 
         counter = 1
@@ -424,11 +424,11 @@ class MainWindow(QMainWindow):
                 with open(json_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=4, ensure_ascii=False)
 
-            self.log_panel.append(f"Modelo duplicado: '{new_name}'")
+            self.log_panel.append(tr("Modelo duplicado: '{nome}'").format(nome=new_name))
             self._reload_models_from_disk(select_name=new_name)
 
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao duplicar modelo:\n{e}")
+            QMessageBox.critical(self, tr("Erro"), tr("Falha ao duplicar modelo:\n{erro}").format(erro=e))
             if new_dir.exists():
                 shutil.rmtree(new_dir, ignore_errors=True)
 
@@ -436,10 +436,10 @@ class MainWindow(QMainWindow):
         old_name = self.preview_panel.cbo_models.currentText()
         
         if not old_name:
-            QMessageBox.warning(self, "Atenção", "Selecione um modelo para renomear.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo para renomear."))
             return
 
-        new_name, ok = QInputDialog.getText(self, "Renomear Modelo", "Novo nome:", text=old_name)
+        new_name, ok = QInputDialog.getText(self, tr("Renomear modelo"), tr("Novo nome:"), text=old_name)
         if not ok or not new_name.strip():
             return
         
@@ -455,7 +455,7 @@ class MainWindow(QMainWindow):
 
         # Se os slugs forem diferentes e o destino já existe, há um conflito real.
         if new_slug != old_slug and new_dir.exists():
-            QMessageBox.warning(self, "Erro", f"Já existe um modelo com o slug '{new_slug}'.")
+            QMessageBox.warning(self, tr("Erro"), tr("Já existe um modelo com o identificador '{slug}'.").format(slug=new_slug))
             return
 
         try:
@@ -476,11 +476,11 @@ class MainWindow(QMainWindow):
                 with open(json_path, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=4, ensure_ascii=False)
             
-            self.log_panel.append(f"Modelo renomeado: '{old_name}' -> '{new_name}'")
+            self.log_panel.append(tr("Modelo renomeado: '{anterior}' → '{novo}'").format(anterior=old_name, novo=new_name))
             self._reload_models_from_disk(select_name=new_name)
 
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao renomear: {e}")
+            QMessageBox.critical(self, tr("Erro"), tr("Falha ao renomear: {erro}").format(erro=e))
 
     def _on_remove_model(self):
         model_name = (self.preview_panel.cbo_models.currentText() or "").strip()
@@ -491,20 +491,20 @@ class MainWindow(QMainWindow):
 
         if not model_dir.exists(): return
 
-        resp = QMessageBox.question(self, "Confirmar exclusão", f"Excluir '{model_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        resp = QMessageBox.question(self, tr("Confirmar exclusão"), tr("Excluir '{nome}'?").format(nome=model_name), QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if resp != QMessageBox.StandardButton.Yes: return
 
         try:
             shutil.rmtree(model_dir)
         except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Falha ao excluir: {e}")
+            QMessageBox.critical(self, tr("Erro"), tr("Falha ao excluir: {erro}").format(erro=e))
             return
 
-        self.log_panel.append(f"Modelo excluído: {model_name}")
+        self.log_panel.append(tr("Modelo excluído: {nome}").format(nome=model_name))
         self._reload_models_from_disk()
 
     def _on_import_models(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, "Importar Lote", "", "Pacotes de Modelo ZIP (*.zip)")
+        file_path, _ = QFileDialog.getOpenFileName(self, tr("Importar modelos"), "", tr("Pacotes de modelos ZIP (*.zip)"))
         if not file_path: return
 
         try:
@@ -532,7 +532,7 @@ class MainWindow(QMainWindow):
                         missing_fonts_by_model[zip_slug] = []
                         
                 if not models_in_zip:
-                    QMessageBox.warning(self, "Arquivo Inválido", "Este arquivo ZIP não contém modelos compatíveis com o FORNAX Forge.")
+                    QMessageBox.warning(self, tr("Arquivo inválido"), tr("Este arquivo ZIP não contém modelos compatíveis com o FORNAX Forge."))
                     return
                 
                 # Etapa 2: Checagem de Conflitos e Abertura da Janela de Decisão
@@ -598,20 +598,29 @@ class MainWindow(QMainWindow):
             
             # Etapa 4: Finalização e Limpeza Automática do TempDir
             if imported_count > 0:
-                self.log_panel.append(f"📥 {imported_count} modelo(s) processado(s) e importado(s) de: {Path(file_path).name}")
+                imported_log = (
+                    tr("📥 1 modelo processado e importado de: {arquivo}")
+                    if imported_count == 1 else
+                    tr("📥 {quantidade} modelos processados e importados de: {arquivo}").format(quantidade=imported_count)
+                )
+                self.log_panel.append(imported_log.format(arquivo=Path(file_path).name))
                 self._reload_models_from_disk()
-                QMessageBox.information(self, "Importação Concluída", f"{imported_count} modelo(s) adicionado(s) à sua biblioteca!")
+                imported_message = (
+                    tr("1 modelo adicionado à sua biblioteca!") if imported_count == 1 else
+                    tr("{quantidade} modelos adicionados à sua biblioteca!").format(quantidade=imported_count)
+                )
+                QMessageBox.information(self, tr("Importação concluída"), imported_message)
             else:
-                self.log_panel.append("⚠️ Processo finalizado: Nenhum modelo novo foi adicionado.")
+                self.log_panel.append(tr("⚠️ Processo finalizado: nenhum modelo novo foi adicionado."))
                 
         except Exception as e:
-            QMessageBox.critical(self, "Falha Crítica", f"O sistema interceptou um erro na montagem do arquivo ZIP:\n{str(e)}")
+            QMessageBox.critical(self, tr("Falha crítica"), tr("Falha ao processar o arquivo ZIP:\n{erro}").format(erro=e))
 
     def _on_export_models(self):
         all_models = [self.preview_panel.cbo_models.itemText(i) for i in range(self.preview_panel.cbo_models.count())]
         
         if not all_models:
-            QMessageBox.warning(self, "Atenção", "Nenhum modelo disponível para exportar.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Nenhum modelo disponível para exportar."))
             return
             
         dlg = ExportModelsDialog(self, all_models)
@@ -620,10 +629,10 @@ class MainWindow(QMainWindow):
             
         selected_models = dlg.get_selected_models()
         if not selected_models:
-            QMessageBox.warning(self, "Atenção", "Nenhum modelo foi selecionado para exportação.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Nenhum modelo foi selecionado para exportação."))
             return
             
-        save_path, _ = QFileDialog.getSaveFileName(self, "Exportar Modelos", "Modelos_FORNAX_Forge.zip", "Arquivos ZIP (*.zip)")
+        save_path, _ = QFileDialog.getSaveFileName(self, tr("Exportar modelos"), "Modelos_FORNAX_Forge.zip", tr("Arquivos ZIP (*.zip)"))
         if not save_path: return
         
         try:
@@ -642,10 +651,19 @@ class MainWindow(QMainWindow):
                             arcname = Path(slug) / file_path.relative_to(model_dir)
                             zipf.write(file_path, arcname)
             
-            self.log_panel.append(f"📤 {len(selected_models)} modelo(s) exportado(s) para: {Path(save_path).name}")
-            QMessageBox.information(self, "Sucesso", f"{len(selected_models)} modelo(s) exportado(s) com sucesso!")
+            exported_count = len(selected_models)
+            exported_log = (
+                tr("📤 1 modelo exportado para: {arquivo}") if exported_count == 1 else
+                tr("📤 {quantidade} modelos exportados para: {arquivo}").format(quantidade=exported_count)
+            )
+            self.log_panel.append(exported_log.format(arquivo=Path(save_path).name))
+            exported_message = (
+                tr("1 modelo exportado com sucesso!") if exported_count == 1 else
+                tr("{quantidade} modelos exportados com sucesso!").format(quantidade=exported_count)
+            )
+            QMessageBox.information(self, tr("Sucesso"), exported_message)
         except Exception as e:
-            QMessageBox.critical(self, "Erro na Exportação", f"Falha ao gerar o arquivo ZIP:\n{e}")
+            QMessageBox.critical(self, tr("Erro na exportação"), tr("Falha ao gerar o arquivo ZIP:\n{erro}").format(erro=e))
 
     def _on_model_changed(self, name: str):
         self._preview_generation = getattr(self, "_preview_generation", 0) + 1
@@ -655,8 +673,8 @@ class MainWindow(QMainWindow):
         self._preview_mode = "item"
         self._preview_sheet_index = 0
         self._invalidate_sheet_previews()
-        self.preview_panel.set_preview_text(f"Prévia do modelo selecionado:\n{name}")
-        self.log_panel.append(f"Modelo ativo: {name}")
+        self.preview_panel.set_preview_text(tr("Prévia do modelo selecionado:\n{nome}").format(nome=name))
+        self.log_panel.append(tr("Modelo ativo: {nome}").format(nome=name))
         self.active_model_name = name
         self.current_filename_suffix = ""
 
@@ -711,10 +729,10 @@ class MainWindow(QMainWindow):
                     missing_fonts = missing_template_fonts(data)
                     if missing_fonts:
                         if len(missing_fonts) == 1:
-                            msg = f"Este modelo usa uma fonte não encontrada no sistema: {format_font_list(missing_fonts)}"
+                            msg = tr("Este modelo usa uma fonte não encontrada no sistema: {fontes}").format(fontes=format_font_list(missing_fonts))
                         else:
-                            msg = f"Este modelo usa fontes não encontradas no sistema: {format_font_list(missing_fonts)}"
-                        self.log_panel.append(f"<b>AVISO:</b> {msg}")
+                            msg = tr("Este modelo usa fontes não encontradas no sistema: {fontes}").format(fontes=format_font_list(missing_fonts))
+                        self.log_panel.append(tr("<b>AVISO:</b> {mensagem}").format(mensagem=msg))
                     
                     try:
                         # Cria o "Chef" na memória (operação ultraleve, sem desenho)
@@ -738,20 +756,20 @@ class MainWindow(QMainWindow):
                             worker.setParent(self) 
                             
                             worker.preview_ready.connect(lambda model, path, revision=generation: self._on_preview_ready(model, path) if revision == self._preview_generation else None)
-                            worker.error_occurred.connect(lambda msg: self.log_panel.append(f"Erro preview background: {msg}"))
+                            worker.error_occurred.connect(lambda msg: self.log_panel.append(tr("Erro ao gerar a prévia em segundo plano: {erro}").format(erro=msg)))
                             worker.finished.connect(worker.deleteLater) # Autolimpeza imediata ao terminar
                         
                             worker.start()
                             # --- FIM DO LEGO ---
 
                     except Exception as e:
-                        self.log_panel.append(f"Erro ao gerar preview: {e}")
-                        self.preview_panel.set_preview_text("Erro ao gerar preview do modelo")
+                        self.log_panel.append(tr("Erro ao gerar a prévia: {erro}").format(erro=e))
+                        self.preview_panel.set_preview_text(tr("Erro ao gerar a prévia do modelo"))
                     self._start_sheet_preview_preload()
             except Exception as e:
-                self.log_panel.append(f"Erro ao ler colunas do modelo: {e}")
+                self.log_panel.append(tr("Erro ao ler as colunas do modelo: {erro}").format(erro=e))
         else:
-            self.log_panel.append("Aviso: template_v3.json não encontrado.")
+            self.log_panel.append(tr("Aviso: template_v3.json não encontrado."))
 
     # --- LEGO: Recebimento do Preview e Descarte Inteligente ---
     def _on_preview_ready(self, worker_model_name: str, thumb_path: str):
@@ -767,7 +785,7 @@ class MainWindow(QMainWindow):
         self.table_panel.table.setRowCount(0)
         self.table_panel.table.setColumnCount(0)
         
-        headers = [QUANTITY_HEADER] # Coluna 0
+        headers = [quantity_header_label()] # Coluna 0
         has_sig = bool(signatures)
         
         if has_sig:
@@ -1008,7 +1026,7 @@ class MainWindow(QMainWindow):
 
     def _on_sheet_preview_failed(self, _page_index, message, generation):
         if generation == self._sheet_preview_revision:
-            self.log_panel.append(f"Erro na prévia da folha: {message}")
+            self.log_panel.append(tr("Erro na prévia da folha: {erro}").format(erro=message))
 
     def _on_sheet_preview_finished(self, worker, directory):
         self._sheet_preview_workers.discard(worker)
@@ -1029,7 +1047,7 @@ class MainWindow(QMainWindow):
             plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
         total = len(plan.pages)
         if not total:
-            self.preview_panel.set_preview_text("Não há itens para montar a folha")
+            self.preview_panel.set_preview_text(tr("Não há itens para montar a folha"))
             self.preview_panel.set_navigation("sheet", 0, 0, sheet_available=True)
             return
 
@@ -1041,13 +1059,13 @@ class MainWindow(QMainWindow):
         if path and Path(path).exists():
             self.preview_panel.set_preview_image(path)
             return
-        self.preview_panel.set_preview_text("Carregando preview")
+        self.preview_panel.set_preview_text(tr("Carregando prévia"))
         self._start_sheet_preview_preload(plan, first_page=self._preview_sheet_index)
 
     def _open_model_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
         if not current_model_name:
-            QMessageBox.warning(self, "Atenção", "Selecione um modelo na lista antes de configurar.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo na lista antes de configurar."))
             return
             
         self.active_model_name = current_model_name
@@ -1076,21 +1094,19 @@ class MainWindow(QMainWindow):
     def _confirm_open_model_with_missing_fonts(self, missing_fonts: list[str]) -> bool:
         font_names = format_font_list(missing_fonts)
         if len(missing_fonts) == 1:
-            headline = f"Está faltando a fonte {font_names}."
+            headline = tr("Está faltando a fonte {fontes}.").format(fontes=font_names)
         else:
-            headline = f"Estão faltando as fontes {font_names}."
+            headline = tr("Estão faltando as fontes {fontes}.").format(fontes=font_names)
 
         msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Fonte ausente")
+        msg_box.setWindowTitle(tr("Fonte ausente"))
         msg_box.setIcon(QMessageBox.Icon.Warning)
         msg_box.setText(
-            f"<b>{headline}</b><br><br>"
-            "Se você prosseguir para a edição, a fonte será substituída pela fonte padrão do sistema "
-            "e o modelo sofrerá uma mudança visual."
+            tr("<b>{aviso}</b><br><br>Se você prosseguir para a edição, a fonte será substituída pela fonte padrão do sistema e o modelo sofrerá uma mudança visual.").format(aviso=headline)
         )
 
-        btn_cancel = msg_box.addButton("Cancelar", QMessageBox.ButtonRole.RejectRole)
-        btn_open = msg_box.addButton("Abrir mesmo assim", QMessageBox.ButtonRole.AcceptRole)
+        btn_cancel = msg_box.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+        btn_open = msg_box.addButton(tr("Abrir mesmo assim"), QMessageBox.ButtonRole.AcceptRole)
         msg_box.setDefaultButton(btn_cancel)
         msg_box.exec()
 
@@ -1108,8 +1124,8 @@ class MainWindow(QMainWindow):
                                    for col in range(table.columnCount()) if table.item(row, col)})
         blocker = QSignalBlocker(table)
         # Formata o log conforme o seu novo padrão
-        self.log_panel.append(f"<b>Modelo '{model_name}' salvo com sucesso em:</b> {file_path}")
-        self.log_panel.append("Atualizando lista...")
+        self.log_panel.append(tr("<b>Modelo '{nome}' salvo com sucesso em:</b> {arquivo}").format(nome=model_name, arquivo=file_path))
+        self.log_panel.append(tr("Atualizando lista…"))
         self._reload_models_from_disk(select_name=target_name)
         if saved_rows and self.preview_panel.cbo_models.currentText() == target_name:
             defaults = [table.item(0, col).clone() if table.item(0, col) else None for col in range(table.columnCount())]
@@ -1128,7 +1144,7 @@ class MainWindow(QMainWindow):
     def _open_config_dialog(self):
         current_model_name = self.preview_panel.cbo_models.currentText()
         if not current_model_name:
-            QMessageBox.warning(self, "Atenção", "Selecione um modelo primeiro.")
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo primeiro."))
             return
             
         self.active_model_name = current_model_name
@@ -1179,11 +1195,11 @@ class MainWindow(QMainWindow):
                 except Exception as e:
                     print(f"Erro ao salvar config: {e}")
 
-            msg_imp = " [Imposição A4 ATIVADA]" if new_imposition["enabled"] else ""
+            msg_imp = tr(" [Imposição ativada]") if new_imposition["enabled"] else ""
             if self.current_filename_suffix:
-                self.log_panel.append(f"Configuração salva: {slug}_{self.current_filename_suffix}.png{msg_imp}")
+                self.log_panel.append(tr("Configuração salva: {nome}{estado}").format(nome=f"{slug}_{self.current_filename_suffix}.png", estado=msg_imp))
             else:
-                self.log_panel.append(f"Configuração salva: Sequencial automático{msg_imp}")
+                self.log_panel.append(tr("Configuração salva: sequência automática{estado}").format(estado=msg_imp))
 
             self._refresh_imposition_presets()
             self._invalidate_sheet_previews()
@@ -1199,7 +1215,7 @@ class MainWindow(QMainWindow):
 
     def _select_output_folder(self):
         start_dir = self.txt_output_path.text() or ""
-        folder = QFileDialog.getExistingDirectory(self, "Selecionar Pasta de Saída", start_dir)
+        folder = QFileDialog.getExistingDirectory(self, tr("Selecionar pasta de saída"), start_dir)
         if folder:
             self.txt_output_path.setText(folder)
             self.settings.setValue("last_output_dir", folder)
@@ -1261,7 +1277,7 @@ class MainWindow(QMainWindow):
                 item = table.item(r, c)
                 
                 # 1. Trata a nova coluna de Quantidade
-                if key == QUANTITY_HEADER:
+                if is_quantity_header(key):
                     try:
                         val = int(item.text().strip()) if item else 1
                         multiplier = max(0, val) # Impede números negativos
@@ -1310,7 +1326,7 @@ class MainWindow(QMainWindow):
             item = table.item(row_idx, c)
             
             # Ignora a coluna de quantidade no preview técnico do cartão
-            if key == QUANTITY_HEADER:
+            if is_quantity_header(key):
                 continue
                 
             if key == SIGNATURE_HEADER:
@@ -1368,12 +1384,12 @@ class MainWindow(QMainWindow):
     def _generate_cards_async(self):
         rows_plain, rows_rich = self._scrape_table_data()
         if not rows_plain:
-            self.log_panel.append("AVISO: A tabela está vazia. Nada a gerar.")
+            self.log_panel.append(tr("AVISO: a tabela está vazia. Nada a gerar."))
             return
 
         current_name = self.preview_panel.cbo_models.currentText()
         if not current_name:
-            self.log_panel.append("ERRO: Nenhum modelo selecionado.")
+            self.log_panel.append(tr("ERRO: nenhum modelo selecionado."))
             return
         
         _, export_format, _ = self._current_export_mode()
@@ -1384,21 +1400,20 @@ class MainWindow(QMainWindow):
         if export_format == "PNG" and has_any_link:
             resp = QMessageBox.question(
                 self, 
-                "Aviso: Hiperlinks desativados em PNG",
-                "Este modelo possui hiperlinks ativos, mas o formato de saída atual é PNG.\n\n"
-                "Os hiperlinks SÓ funcionam em formato PDF. Deseja continuar mesmo assim e gerar as imagens sem links?",
+                tr("Aviso: links desativados em PNG"),
+                tr("Este modelo possui links ativos, mas o formato de saída atual é PNG.\n\nOs links funcionam somente em PDF. Deseja continuar e gerar as imagens sem links?"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No
             )
             if resp == QMessageBox.StandardButton.No:
-                self.log_panel.append("🛑 Geração cancelada para alteração de formato.")
+                self.log_panel.append(tr("🛑 Geração cancelada para alteração de formato."))
                 return
             
         slug = slugify_model_name(current_name)
         template_path = get_models_dir() / slug / "template_v3.json"
 
         if not template_path.exists():
-            self.log_panel.append(f"ERRO: Modelo '{self.active_model_name}' não encontrado.")
+            self.log_panel.append(tr("ERRO: modelo '{nome}' não encontrado.").format(nome=self.active_model_name))
             return
 
         with open(template_path, "r", encoding="utf-8") as f:
@@ -1420,7 +1435,7 @@ class MainWindow(QMainWindow):
                 self, tr("Atenção"),
                 tr("Por favor, selecione uma pasta de saída antes de gerar o material.")
             )
-            self.log_panel.append("🛑 Geração cancelada: Pasta de saída não definida.")
+            self.log_panel.append(tr("🛑 Geração cancelada: pasta de saída não definida."))
             return
 
         base_dir = Path(custom_path)
@@ -1429,7 +1444,7 @@ class MainWindow(QMainWindow):
         output_dir, _forge_number = create_forge_output_dir(base_dir, self.settings)
         folder_name = output_dir.name
         
-        self.log_panel.append(f"📂 Salvando em: {folder_name}")
+        self.log_panel.append(tr("📂 Salvando em: {pasta}").format(pasta=folder_name))
 
         self.btn_generate_cards.setEnabled(False)
         self.btn_generate_cards.setText(tr("Gerando… Aguarde"))
@@ -1461,7 +1476,7 @@ class MainWindow(QMainWindow):
         
         self.manager.progress_updated.connect(self.progress_bar.setValue)
         self.manager.log_updated.connect(self.log_panel.append)
-        self.manager.error_occurred.connect(lambda msg: self.log_panel.append(f"[ERRO] {msg}"))
+        self.manager.error_occurred.connect(lambda msg: self.log_panel.append(tr("[ERRO] {erro}").format(erro=msg)))
         self.manager.finished_process.connect(self._on_generation_finished)
         
         self.start_time = time.time()
@@ -1474,14 +1489,14 @@ class MainWindow(QMainWindow):
         duration = end_time - getattr(self, 'start_time', end_time)
         
         if duration < 60:
-            time_str = f"{duration:.1f} segundos"
+            time_str = tr("{tempo:.1f} segundos").format(tempo=duration)
         else:
             minutes = int(duration // 60)
             seconds = int(duration % 60)
-            time_str = f"{minutes} min {seconds}s"
+            time_str = tr("{minutos} min {segundos}s").format(minutos=minutes, segundos=seconds)
 
-        self.log_panel.append("=== Processo Finalizado ===")    
-        self.log_panel.append(f"⏱️ Tempo total: {time_str}")
+        self.log_panel.append(tr("=== Processo finalizado ==="))
+        self.log_panel.append(tr("⏱️ Tempo total: {tempo}").format(tempo=time_str))
         
     def _refresh_imposition_presets(self):
         """Atualiza a lista de presets rápidos na tela principal baseada no modelo atual."""
@@ -1543,7 +1558,7 @@ class MainWindow(QMainWindow):
             imp["enabled"] = False
             imp["active_preset_name"] = SYSTEM_PRESET
             self._update_template_json({"imposition_settings": imp})
-            self.log_panel.append(f"⚡ Layout aplicado: <b>{SYSTEM_PRESET}</b>")
+            self.log_panel.append(tr("⚡ Layout aplicado: <b>{nome}</b>").format(nome=tr(SYSTEM_PRESET)))
             self._refresh_main_preset_tooltip()
             self._invalidate_sheet_previews()
             self._refresh_preview_navigation()
@@ -1555,7 +1570,7 @@ class MainWindow(QMainWindow):
         if name in presets:
             imp["active_preset_name"] = name
             self._update_template_json({"imposition_settings": imp})
-            self.log_panel.append(f"⚡ Layout aplicado: <b>{name}</b>")
+            self.log_panel.append(tr("⚡ Layout aplicado: <b>{nome}</b>").format(nome=name))
         self._refresh_main_preset_tooltip()
         self._invalidate_sheet_previews()
         self._refresh_preview_navigation()

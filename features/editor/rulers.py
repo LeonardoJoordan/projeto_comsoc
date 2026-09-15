@@ -5,6 +5,7 @@ from PySide6.QtGui import QColor, QPainter, QFont
 from PySide6.QtWidgets import QWidget, QGridLayout, QLabel, QRubberBand
 from .canvas_items import mm_to_px
 from core.themes import theme_color, themed_style, theme_manager
+from core.i18n import tr
 
 
 class Ruler(QWidget):
@@ -17,7 +18,7 @@ class Ruler(QWidget):
         self.preview = QRubberBand(QRubberBand.Shape.Line, window.view.viewport())
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setCursor(Qt.CursorShape.SplitVCursor if horizontal else Qt.CursorShape.SplitHCursor)
-        self.setToolTip('Arraste para criar uma guia ' + ('horizontal' if horizontal else 'vertical'))
+        self.setToolTip(tr('Arraste para criar uma guia horizontal') if horizontal else tr('Arraste para criar uma guia vertical'))
         if horizontal:
             self.setFixedHeight(26)
         else:

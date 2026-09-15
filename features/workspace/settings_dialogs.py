@@ -14,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from features.generator.export_dialog import ConfigDialog as ExportConfigDialog
+from core.i18n import tr
 
 
 EDITABLE_COLORS = (
@@ -29,7 +30,7 @@ class CustomThemeDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Criar tema personalizado")
+        self.setWindowTitle(tr("Criar tema personalizado"))
         self.setModal(True)
         self.setMinimumWidth(420)
         self.manager = theme_manager()
@@ -40,20 +41,26 @@ class CustomThemeDialog(QDialog):
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(12)
 
-        title = QLabel("Tema personalizado")
+        title = QLabel(tr("Tema personalizado"))
         title.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(title)
-        layout.addWidget(QLabel("Use o tema atual como base e salve um novo perfil."))
+        layout.addWidget(QLabel(tr("Use o tema atual como base e salve um novo perfil.")))
         self.name = QLineEdit()
-        self.name.setPlaceholderText("Nome do perfil")
+        self.name.setPlaceholderText(tr("Nome do perfil"))
         layout.addWidget(self.name)
         form = QFormLayout()
         self.swatches = {}
+        color_labels = {
+            'accent': tr('Destaque'), 'surface': tr('Fundo principal'),
+            'panel': tr('Painéis'), 'field': tr('Campos'), 'text': tr('Texto'),
+            'muted': tr('Texto secundário'), 'selection': tr('Seleção'),
+            'border': tr('Bordas'), 'guide': tr('Guias'),
+        }
         for role, label in EDITABLE_COLORS:
             button = QPushButton()
             button.clicked.connect(lambda checked=False, role=role: self.choose_color(role))
             self.swatches[role] = button
-            form.addRow(label, button)
+            form.addRow(color_labels[role], button)
         layout.addLayout(form)
         self.refresh_swatches()
 
@@ -62,8 +69,8 @@ class CustomThemeDialog(QDialog):
         )
         buttons.accepted.connect(self.save)
         buttons.rejected.connect(self.reject)
-        buttons.button(QDialogButtonBox.StandardButton.Save).setText('Salvar perfil')
-        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText('Cancelar')
+        buttons.button(QDialogButtonBox.StandardButton.Save).setText(tr('Salvar perfil'))
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(tr('Cancelar'))
         layout.addWidget(buttons)
 
     def refresh_swatches(self):
@@ -74,7 +81,7 @@ class CustomThemeDialog(QDialog):
             button.setStyleSheet(f'background: {color}; color: {foreground}; padding: 5px;')
 
     def choose_color(self, role):
-        color = QColorDialog.getColor(QColor(self.manager.color(role)), self, 'Escolher cor')
+        color = QColorDialog.getColor(QColor(self.manager.color(role)), self, tr('Escolher cor'))
         if not color.isValid():
             return
         data = copy.deepcopy(self.manager.current)
@@ -88,13 +95,13 @@ class CustomThemeDialog(QDialog):
     def save(self):
         name = self.name.text().strip()
         if not name:
-            QMessageBox.warning(self, 'Nome necessário', 'Informe um nome para o perfil.')
+            QMessageBox.warning(self, tr('Nome necessário'), tr('Informe um nome para o perfil.'))
             self.name.setFocus()
             return
         try:
             self.saved_id = self.manager.save_custom(name, self.manager.current['colors'])
         except (OSError, ValueError) as error:
-            QMessageBox.warning(self, 'Não foi possível salvar', str(error))
+            QMessageBox.warning(self, tr('Não foi possível salvar'), str(error))
             return
         self.accept()
 
@@ -108,7 +115,7 @@ class ThemeDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Tema da interface")
+        self.setWindowTitle(tr("Tema da interface"))
         self.setModal(True)
         self.setMinimumWidth(420)
         self.manager = theme_manager()
@@ -119,17 +126,17 @@ class ThemeDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 18, 20, 16)
         layout.setSpacing(12)
-        title = QLabel("Tema da interface")
+        title = QLabel(tr("Tema da interface"))
         title.setStyleSheet("font-size: 16px; font-weight: 600;")
         layout.addWidget(title)
-        layout.addWidget(QLabel("Escolha um perfil para a aparência do programa."))
+        layout.addWidget(QLabel(tr("Escolha um perfil para a aparência do programa.")))
         self.choice = QComboBox()
         layout.addWidget(self.choice)
         self._load_choices(self.original_id)
         self.choice.currentIndexChanged.connect(self.select_theme)
 
         footer = QHBoxLayout()
-        self.btn_create_theme = QPushButton('Criar tema')
+        self.btn_create_theme = QPushButton(tr('Criar tema'))
         self.btn_create_theme.clicked.connect(self.create_theme)
         footer.addWidget(self.btn_create_theme)
         footer.addStretch(1)
@@ -138,8 +145,8 @@ class ThemeDialog(QDialog):
         )
         buttons.accepted.connect(self.save)
         buttons.rejected.connect(self.reject)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText('Aplicar')
-        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText('Cancelar')
+        buttons.button(QDialogButtonBox.StandardButton.Ok).setText(tr('Aplicar'))
+        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(tr('Cancelar'))
         footer.addWidget(buttons)
         layout.addLayout(footer)
         self.buttons = buttons
@@ -147,8 +154,13 @@ class ThemeDialog(QDialog):
     def _load_choices(self, selected):
         self.choice.blockSignals(True)
         self.choice.clear()
+        builtin_names = {
+            'carbon': tr('FORNAX Carbono'), 'dark': tr('FORNAX Marinho'),
+            'graphite': tr('FORNAX Grafite'), 'light': tr('FORNAX Pérola'),
+            'rose': tr('FORNAX Rosê'),
+        }
         for theme_id, data in self.manager.builtins.items():
-            self.choice.addItem(data['name'], theme_id)
+            self.choice.addItem(builtin_names.get(theme_id, data['name']), theme_id)
         for path in sorted((get_app_data_dir() / 'themes').glob('custom-*.json')):
             try:
                 data = load_theme(path, self.manager.dark['colors'])
@@ -165,7 +177,7 @@ class ThemeDialog(QDialog):
             self.manager.select(selected)
             self._last_theme_id = selected
         except (OSError, ValueError) as error:
-            QMessageBox.warning(self, 'Tema indisponível', str(error))
+            QMessageBox.warning(self, tr('Tema indisponível'), str(error))
             self._load_choices(self._last_theme_id)
 
     def create_theme(self):

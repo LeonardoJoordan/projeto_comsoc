@@ -3,11 +3,12 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QCheckBox,
                                QRadioButton, QWidget, QHeaderView, QLabel, QButtonGroup, QPushButton)
 from PySide6.QtCore import Qt
 from core.template_manager import slugify_model_name
+from core.i18n import tr
 
 class ImportModelsDialog(QDialog):
     def __init__(self, parent, zip_models, existing_slugs, missing_fonts_by_model=None):
         super().__init__(parent)
-        self.setWindowTitle("Importação de Lote")
+        self.setWindowTitle(tr("Importação de modelos"))
         self.resize(900, 500)
         
         self.zip_models = zip_models
@@ -19,16 +20,16 @@ class ImportModelsDialog(QDialog):
         
         # --- Topo: Controles em Lote ---
         top_layout = QHBoxLayout()
-        self.chk_master = QCheckBox("Selecionar / Desmarcar Todos")
+        self.chk_master = QCheckBox(tr("Selecionar/desmarcar todos"))
         self.chk_master.setChecked(True)
         self.chk_master.stateChanged.connect(self._on_master_toggled)
         top_layout.addWidget(self.chk_master)
         
         top_layout.addStretch()
         
-        lbl_global = QLabel("<b>Ação Global para Conflitos:</b>")
-        btn_all_replace = QPushButton("Substituir Todos")
-        btn_all_rename = QPushButton("Novo Nome Todos")
+        lbl_global = QLabel(tr("<b>Ação para todos os conflitos:</b>"))
+        btn_all_replace = QPushButton(tr("Substituir todos"))
+        btn_all_rename = QPushButton(tr("Renomear todos"))
         
         btn_all_replace.clicked.connect(lambda: self._apply_global_conflict("replace"))
         btn_all_rename.clicked.connect(lambda: self._apply_global_conflict("rename"))
@@ -41,7 +42,7 @@ class ImportModelsDialog(QDialog):
         
         # --- Tabela Central ---
         self.table = QTableWidget(len(zip_models), 5)
-        self.table.setHorizontalHeaderLabels(["Importar", "Modelo no ZIP", "Observação", "Status", "Resolução de Conflito"])
+        self.table.setHorizontalHeaderLabels([tr("Importar"), tr("Modelo no ZIP"), tr("Observação"), tr("Status"), tr("Resolução de conflito")])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.setAlternatingRowColors(True)
         layout.addWidget(self.table)
@@ -97,7 +98,7 @@ class ImportModelsDialog(QDialog):
             # 3. Coluna Observação
             missing_fonts = self.missing_fonts_by_model.get(model_name, [])
             if missing_fonts:
-                label = "Fonte ausente" if len(missing_fonts) == 1 else "Fontes ausentes"
+                label = tr("Fonte ausente") if len(missing_fonts) == 1 else tr("Fontes ausentes")
                 item_note = QTableWidgetItem(f"{label}: {', '.join(missing_fonts)}")
                 item_note.setForeground(Qt.GlobalColor.darkYellow)
             else:
@@ -108,7 +109,7 @@ class ImportModelsDialog(QDialog):
             # 4. Colunas Status e Resolução
             
             if is_conflict:
-                item_status = QTableWidgetItem("⚠️ Já Existe")
+                item_status = QTableWidgetItem(tr("⚠️ Já existe"))
                 item_status.setForeground(Qt.GlobalColor.red)
                 self.table.setItem(row, 3, item_status)
                 
@@ -117,8 +118,8 @@ class ImportModelsDialog(QDialog):
                 action_layout.setContentsMargins(5, 0, 5, 0) 
                 action_layout.setSpacing(15) 
                 
-                rb_replace = QRadioButton("Substituir")
-                rb_rename = QRadioButton("Novo Nome")
+                rb_replace = QRadioButton(tr("Substituir"))
+                rb_rename = QRadioButton(tr("Novo nome"))
                 rb_rename.setChecked(True) 
                 
                 bg = QButtonGroup(action_widget)
@@ -134,7 +135,7 @@ class ImportModelsDialog(QDialog):
                 # BÔNUS UX: Desativa a coluna de conflito se desmarcar a importação
                 chk.stateChanged.connect(lambda state, aw=action_widget: aw.setEnabled(state == Qt.CheckState.Checked.value))
             else:
-                item_status = QTableWidgetItem("✨ Novo")
+                item_status = QTableWidgetItem(tr("✨ Novo"))
                 item_status.setForeground(Qt.GlobalColor.darkGreen)
                 self.table.setItem(row, 3, item_status)
                 

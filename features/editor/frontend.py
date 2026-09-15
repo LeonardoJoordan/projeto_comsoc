@@ -6,6 +6,7 @@ from core.resources import (
     state_icon_path,
 )
 from core.theme_icons import themed_svg_icon
+from core.i18n import tr
 from PySide6.QtCore import (
     Qt, QSize, QObject, QEvent, QPoint, QTimer, QPropertyAnimation, QEasingCurve,
     QAbstractAnimation,
@@ -323,11 +324,11 @@ def install_frontend(w):
     header.setFixedHeight(64)
     h = QHBoxLayout(header)
     h.addStretch()
-    model_title = QLabel(w._current_model_name or 'Novo modelo')
+    model_title = QLabel(w._current_model_name or tr('Novo modelo'))
     model_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(model_title, 'font-size: 16px; font-weight: 600;')
     w.windowTitleChanged.connect(
-        lambda _, label=model_title: label.setText(w._current_model_name or 'Novo modelo')
+        lambda _, label=model_title: label.setText(w._current_model_name or tr('Novo modelo'))
     )
     h.addWidget(model_title)
     h.addStretch()
@@ -340,7 +341,7 @@ def install_frontend(w):
     tools = QHBoxLayout(toolbar)
     tools.setContentsMargins(14, 8, 14, 8)
     tools.setSpacing(8)
-    selection = QLabel('SELEÇÃO\nNenhum objeto')
+    selection = QLabel(tr('SELEÇÃO') + '\n' + tr('Nenhum objeto'))
     selection.setFixedWidth(138)
     themed_style(selection, 'color: @muted@; font-size: 10px;')
     tools.addWidget(selection)
@@ -364,13 +365,14 @@ def install_frontend(w):
             toolbar_separator()
         tools.addWidget(compact(name, control, 'mm'))
     p.chk_proporcao.setText('')
+    p.chk_proporcao.setToolTip(tr('Manter proporção ao redimensionar'))
     p.chk_proporcao.setFixedSize(30, 30)
     p._refresh_proportion_button(p.isEnabled())
     tools.addWidget(p.chk_proporcao)
     toolbar_separator()
     for button, asset_name, tip in (
-        (p.btn_rot_minus_90, 'rotate-left', 'Girar 90° no sentido anti-horário'),
-        (p.btn_rot_plus_90, 'rotate-right', 'Girar 90° no sentido horário'),
+        (p.btn_rot_minus_90, 'rotate-left', tr('Girar 90° no sentido anti-horário')),
+        (p.btn_rot_plus_90, 'rotate-right', tr('Girar 90° no sentido horário')),
     ):
         button.setText('')
         button.setIcon(themed_svg_icon(action_icon_path(asset_name)))
@@ -382,15 +384,15 @@ def install_frontend(w):
         tools.addWidget(button)
     tools.addWidget(compact('↻', p.spin_rot, '°', 78))
     tools.addWidget(compact(
-        state_icon_path('opacity'), p.spin_opacity, '%', 88, 'Opacidade'
+        state_icon_path('opacity'), p.spin_opacity, '%', 88, tr('Opacidade')
     ))
     toolbar_separator()
-    guide_label = QLabel('GUIAS')
+    guide_label = QLabel(tr('GUIAS'))
     guide_label.setObjectName('muted')
     tools.addWidget(guide_label)
     for vertical, label, asset_name in [
-        (False, 'Adicionar guia horizontal', 'h.guide'),
-        (True, 'Adicionar guia vertical', 'v.guide'),
+        (False, tr('Adicionar guia horizontal'), 'h.guide'),
+        (True, tr('Adicionar guia vertical'), 'v.guide'),
     ]:
         button = QPushButton()
         button.setIcon(QIcon(str(state_icon_path(asset_name))))
@@ -401,8 +403,8 @@ def install_frontend(w):
         button.clicked.connect(lambda checked=False, v=vertical: w.add_guide(v))
         tools.addWidget(button)
     for button, asset_name, tip in (
-        (w.btn_toggle_guides, 'guide', 'Exibir ou ocultar guias'),
-        (w.btn_lock_guides, 'l.guide', 'Bloquear ou desbloquear a movimentação das guias'),
+        (w.btn_toggle_guides, 'guide', tr('Exibir ou ocultar guias')),
+        (w.btn_lock_guides, 'l.guide', tr('Bloquear ou desbloquear a movimentação das guias')),
     ):
         button.setText('')
         button.setIcon(QIcon(str(state_icon_path(asset_name))))
@@ -414,8 +416,8 @@ def install_frontend(w):
         tools.addWidget(button)
     toolbar_separator()
     for button, asset_name, tip in (
-        (w.btn_undo, 'undo', 'Desfazer'),
-        (w.btn_redo, 'redo', 'Refazer'),
+        (w.btn_undo, 'undo', tr('Desfazer')),
+        (w.btn_redo, 'redo', tr('Refazer')),
     ):
         button.setText('')
         button.setIcon(QIcon(str(action_icon_path(asset_name))))
@@ -427,7 +429,7 @@ def install_frontend(w):
         button.setFixedSize(30, 30)
         tools.addWidget(button)
     tools.addStretch()
-    fit = QPushButton('Ajustar à janela')
+    fit = QPushButton(tr('Ajustar à janela'))
     fit.setFixedSize(116, 34)
     fit.clicked.connect(w._zoom_to_fit)
     tools.addWidget(fit)
@@ -441,11 +443,11 @@ def install_frontend(w):
     outer.addWidget(split, 1)
     left, ll = column()
     left.setMinimumWidth(220)
-    ll.addWidget(QLabel('ADICIONAR AO MODELO'))
-    forms = QPushButton('Formas')
+    ll.addWidget(QLabel(tr('ADICIONAR AO MODELO')))
+    forms = QPushButton(tr('Formas'))
     from .draw_shapes import ShapeDrawing
     w.shape_drawing = ShapeDrawing(w)
-    forms.setToolTip('Escolha uma forma e arraste no canvas. Shift restringe proporções ou ângulo; Esc cancela.')
+    forms.setToolTip(tr('Escolha uma forma e arraste no canvas. Shift restringe proporções ou ângulo; Esc cancela.'))
     shape_menu = QMenu(forms)
     shape_menu.setObjectName('shapeMenu')
     themed_style(shape_menu, '''
@@ -470,20 +472,20 @@ def install_frontend(w):
     ''')
     shape_menu.aboutToShow.connect(lambda: shape_menu.setMinimumWidth(forms.width()))
     for name, kind, asset_name in (
-        ('Quadrado', 'rectangle', 'square'),
-        ('Círculo', 'ellipse', 'circle'),
-        ('Linha', 'line', 'line'),
+        (tr('Quadrado'), 'rectangle', 'square'),
+        (tr('Círculo'), 'ellipse', 'circle'),
+        (tr('Linha'), 'line', 'line'),
     ):
         action = shape_menu.addAction(themed_svg_icon(object_icon_path(asset_name)), name)
         action.triggered.connect(lambda checked=False, k=kind: w.shape_drawing.activate(k))
     forms.setMenu(shape_menu)
-    for button, label, path, asset_name in [
-        (w.btn_add, 'Texto', '<path d="M4 5h16M12 5v15M8 20h8"/>', 'text'),
-        (forms, 'Formas', '<rect x="4" y="4" width="16" height="16" rx="3"/>', 'shapes'),
-        (w.btn_add_img, 'Imagens', '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 5 5 3-3 5 5"/>', 'image'),
-        (w.btn_add_sig, 'Assinatura', '<path d="m4 17 3-1L19 4l2 2L9 18l-5 1zM4 22h16"/>', 'signature')]:
-        detail = {'Texto': 'Campo dinâmico', 'Formas': 'Preenchimento e borda', 'Imagens': 'Foto, logo ou QR', 'Assinatura': 'Imagem opcional'}[label]
+    for button, label, detail, tooltip, path, asset_name, object_name in [
+        (w.btn_add, tr('Texto'), tr('Campo dinâmico'), tr('Adicionar uma caixa de texto ao modelo'), '<path d="M4 5h16M12 5v15M8 20h8"/>', 'text', 'Texto'),
+        (forms, tr('Formas'), tr('Preenchimento e borda'), forms.toolTip(), '<rect x="4" y="4" width="16" height="16" rx="3"/>', 'shapes', 'Formas'),
+        (w.btn_add_img, tr('Imagens'), tr('Foto, logo ou QR'), tr('Adicionar uma imagem ao modelo'), '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m3 16 5-5 5 5 3-3 5 5"/>', 'image', 'Imagens'),
+        (w.btn_add_sig, tr('Assinatura'), tr('Imagem opcional'), tr('Adicionar uma assinatura opcional ao modelo'), '<path d="m4 17 3-1L19 4l2 2L9 18l-5 1zM4 22h16"/>', 'signature', 'Assinatura')]:
         button.setText('')
+        button.setToolTip(tooltip)
         contents = QHBoxLayout(button)
         contents.setContentsMargins(12, 3, 8, 3)
         contents.setSpacing(10)
@@ -510,7 +512,7 @@ def install_frontend(w):
             theme_manager().changed.connect(refresh_shape_arrow)
         contents.addWidget(trailing_icon)
         button.setIcon(QIcon())
-        button.setObjectName('add' + label)
+        button.setObjectName('add' + object_name)
         # QSS mede a área de conteúdo: 36 + 12 de padding + 2 de borda = 50.
         # Fixar também no estilo evita que o polish restaure o mínimo global.
         themed_style(button, 'QPushButton#' + button.objectName() + ' { '
@@ -520,19 +522,18 @@ def install_frontend(w):
         button.setFixedHeight(50)
         ll.addWidget(button)
     layer_heading = QHBoxLayout()
-    layer_heading.addWidget(QLabel('CAMADAS'), 1)
-    for b, label in [(w.btn_ren_layer, 'Renomear'), (w.btn_dup_layer, 'Duplicar'), (w.btn_del_layer, 'Excluir')]:
+    layer_heading.addWidget(QLabel(tr('CAMADAS')), 1)
+    for b, label, asset_name in [
+        (w.btn_ren_layer, tr('Renomear'), 'edit'),
+        (w.btn_dup_layer, tr('Duplicar'), 'duplicate'),
+        (w.btn_del_layer, tr('Excluir'), 'delete'),
+    ]:
         b.setText('')
         b.setToolTip(label)
         b.setMinimumSize(0, 0)
         b.setMaximumSize(16777215, 16777215)
         themed_style(b, '')
         square_control(b)
-        asset_name = {
-            'Renomear': 'edit',
-            'Duplicar': 'duplicate',
-            'Excluir': 'delete',
-        }[label]
         b.setIcon(themed_svg_icon(action_icon_path(asset_name)))
         b.setIconSize(QSize(18, 18))
         layer_heading.addWidget(b)
@@ -583,12 +584,12 @@ def install_frontend(w):
     shape_layout.setContentsMargins(0, 0, 0, 0)
     fill_controls, fill_layout = column()
     fill_layout.setContentsMargins(0, 0, 0, 0)
-    fill_heading = QLabel('PREENCHIMENTO')
+    fill_heading = QLabel(tr('PREENCHIMENTO'))
     fill_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(fill_heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
     fill_layout.addWidget(fill_heading)
     fill_row = row(fill_layout, shape_swatch, shape_color, compact(
-        state_icon_path('opacity'), fill_alpha, '%', 85, 'Opacidade do preenchimento'
+        state_icon_path('opacity'), fill_alpha, '%', 85, tr('Opacidade do preenchimento')
     ))
     fill_row.setStretch(1, 1)
     shape_layout.addWidget(fill_controls)
@@ -605,13 +606,13 @@ def install_frontend(w):
             themed_style(shape_swatch, f'background: {color.name()};')
             w.save_snapshot()
     def choose_shape_color():
-        color = QColorDialog.getColor(QColor(shape_color.text()), w, 'Cor do preenchimento')
+        color = QColorDialog.getColor(QColor(shape_color.text()), w, tr('Cor do preenchimento'))
         if color.isValid():
             set_shape_color(color.name())
     shape_swatch.clicked.connect(choose_shape_color)
     shape_color.editingFinished.connect(lambda: set_shape_color(shape_color.text()))
     fill_alpha.editingFinished.connect(lambda: set_shape_color(shape_color.text()))
-    outline_enabled = QCheckBox('Contorno')
+    outline_enabled = QCheckBox(tr('Contorno'))
     outline_enabled.setObjectName('shapeOutlineEnabled')
     outline_color = QLineEdit('#000000')
     outline_color.setMaxLength(7)
@@ -631,27 +632,27 @@ def install_frontend(w):
     outline_width.setKeyboardTracking(False)
     outline_position = QComboBox()
     outline_position.setObjectName('shapeOutlinePosition')
-    for title, value in [('Interno', 'inside'), ('Centralizado', 'center'), ('Externo', 'outside')]:
+    for title, value in [(tr('Interno'), 'inside'), (tr('Centralizado'), 'center'), (tr('Externo'), 'outside')]:
         outline_position.addItem(title, value)
-    outline_position.setToolTip('Interno: para dentro. Externo: para fora. Centralizado: metade para cada lado.')
+    outline_position.setToolTip(tr('Interno: para dentro. Externo: para fora. Centralizado: metade para cada lado.'))
     shape_layout.addWidget(outline_enabled)
     outline_details, outline_details_layout = column()
     outline_details_layout.setContentsMargins(0, 0, 0, 0)
     outline_color_row = row(outline_details_layout, outline_swatch, outline_color, compact(
-        state_icon_path('opacity'), outline_alpha, '%', 85, 'Opacidade do contorno'
+        state_icon_path('opacity'), outline_alpha, '%', 85, tr('Opacidade do contorno')
     ))
     outline_color_row.setStretch(1, 1)
     outline_join, join_layout = column()
     join_layout.setContentsMargins(0, 0, 0, 0)
     outline_join.setObjectName('shapeOutlineJoin')
-    join_straight = QRadioButton('Retos')
-    join_round = QRadioButton('Arredondados')
+    join_straight = QRadioButton(tr('Retos'))
+    join_round = QRadioButton(tr('Arredondados'))
     row(join_layout, join_straight, join_round)
-    join_field = field('Cantos do contorno', outline_join)
+    join_field = field(tr('Cantos do contorno'), outline_join)
     outline_details_layout.addWidget(join_field)
     rectangle_radius, rectangle_radius_layout = column()
     rectangle_radius_layout.setContentsMargins(0, 0, 0, 0)
-    radius_heading = QLabel('ARREDONDAMENTO DE BORDAS')
+    radius_heading = QLabel(tr('ARREDONDAMENTO DE BORDAS'))
     radius_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(radius_heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
     rectangle_radius_layout.addWidget(radius_heading)
@@ -659,7 +660,7 @@ def install_frontend(w):
     sync_radii.setObjectName('syncCornerRadii')
     sync_radii.setCheckable(True)
     sync_radii.setChecked(True)
-    sync_radii.setToolTip('Sincronizar o arredondamento dos quatro cantos')
+    sync_radii.setToolTip(tr('Sincronizar o arredondamento dos quatro cantos'))
     square_control(sync_radii)
     def refresh_radius_sync_icon(checked):
         asset_name = 'lock ratio' if checked else 'unlock ratio'
@@ -672,8 +673,8 @@ def install_frontend(w):
     corner_grid.setVerticalSpacing(8)
     corner_spins = {}
     for index, (key, title) in enumerate((
-        ('top_left', 'Sup. esquerdo'), ('top_right', 'Sup. direito'),
-        ('bottom_left', 'Inf. esquerdo'), ('bottom_right', 'Inf. direito'),
+        ('top_left', tr('Sup. esquerdo')), ('top_right', tr('Sup. direito')),
+        ('bottom_left', tr('Inf. esquerdo')), ('bottom_right', tr('Inf. direito')),
     )):
         spin = QDoubleSpinBox()
         spin.setObjectName('shapeCornerRadius_' + key)
@@ -696,8 +697,8 @@ def install_frontend(w):
     radius.setRange(0, 1000)
     radius.setSingleStep(0.1)
     radius.setKeyboardTracking(False)
-    radius_field = field('Arredondamento', compact('', radius, 'mm', None))
-    radius_field.setToolTip('Arredonda as extremidades da linha, limitado à metade da espessura.')
+    radius_field = field(tr('Arredondamento'), compact('', radius, 'mm', None))
+    radius_field.setToolTip(tr('Arredonda as extremidades da linha, limitado à metade da espessura.'))
     def apply_line_radius():
         selected = w.scene.selectedItems()
         if len(selected) == 1 and getattr(selected[0], 'shape_type', '') == 'line':
@@ -742,8 +743,8 @@ def install_frontend(w):
             else:
                 w.save_snapshot()
     sync_radii.toggled.connect(toggle_radius_sync)
-    position_field = field('Posição', outline_position)
-    thickness_row = row(outline_details_layout, field('Espessura', compact('', outline_width, 'mm')), position_field)
+    position_field = field(tr('Posição'), outline_position)
+    thickness_row = row(outline_details_layout, field(tr('Espessura'), compact('', outline_width, 'mm')), position_field)
     thickness_row.setStretch(0, 1)
     thickness_row.setStretch(1, 1)
     for layout_index in range(outline_details_layout.count()):
@@ -765,8 +766,8 @@ def install_frontend(w):
     line_angle.setDecimals(2)
     line_angle.setWrapping(True)
     line_angle.setKeyboardTracking(False)
-    line_dimensions = row(line_layout, field('Comprimento', compact('', line_length, 'mm')),
-                          field('Ângulo', compact('', line_angle, '°')))
+    line_dimensions = row(line_layout, field(tr('Comprimento'), compact('', line_length, 'mm')),
+                          field(tr('Ângulo'), compact('', line_angle, '°')))
     line_dimensions.setStretch(0, 1)
     line_dimensions.setStretch(1, 1)
     shape_layout.addWidget(line_geometry)
@@ -784,7 +785,7 @@ def install_frontend(w):
             w.save_snapshot()
     line_length.editingFinished.connect(apply_line_geometry)
     line_angle.editingFinished.connect(apply_line_geometry)
-    background_outline_hint = QLabel('No plano de fundo, o contorno cresce sempre para dentro da página.')
+    background_outline_hint = QLabel(tr('No plano de fundo, o contorno cresce sempre para dentro da página.'))
     background_outline_hint.setWordWrap(True)
     background_outline_hint.setObjectName('muted')
     shape_layout.addWidget(background_outline_hint)
@@ -814,7 +815,7 @@ def install_frontend(w):
             control.setEnabled(item.outline_enabled)
         w.save_snapshot()
     def choose_outline_color():
-        color = QColorDialog.getColor(QColor(outline_color.text()), w, 'Cor do contorno')
+        color = QColorDialog.getColor(QColor(outline_color.text()), w, tr('Cor do contorno'))
         if color.isValid():
             outline_color.setText(color.name())
             apply_outline()
@@ -827,24 +828,32 @@ def install_frontend(w):
     join_straight.clicked.connect(apply_outline)
     join_round.clicked.connect(apply_outline)
     outline_alpha.editingFinished.connect(apply_outline)
-    p.btn_restore.setText('Restaurar original')
+    p.btn_restore.setText(tr('Restaurar original'))
     p.btn_restore.setMinimumSize(0, 0)
     p.btn_restore.setMaximumSize(16777215, 16777215)
+    p.chk_link.setText(tr('Habilitar link'))
+    p.chk_link.setToolTip(tr('Adiciona ao objeto um link clicável nos arquivos PDF.'))
     row(pl, p.btn_restore, p.chk_link)
-    prop_section = Section('Propriedades', props)
+    prop_section = Section(tr('Propriedades'), props)
     il.addWidget(prop_section)
     t = w.editor_texto_panel
+    t.cbo_font.setToolTip(tr('Selecionar a família da fonte'))
+    t.spin_size.setToolTip(tr('Alterar o tamanho da fonte'))
+    t.btn_bold.setToolTip(tr('Negrito (Ctrl+B)'))
+    t.btn_italic.setToolTip(tr('Itálico (Ctrl+I)'))
+    t.btn_underline.setToolTip(tr('Sublinhado (Ctrl+U)'))
+    t.btn_color.setToolTip(tr('Selecionar a cor do texto'))
     square_control(t.btn_color)
     text_body, tl = column()
-    hint = QLabel('Duplo clique no texto para editar no canvas.')
+    hint = QLabel(tr('Duplo clique no texto para editar no canvas.'))
     hint.setWordWrap(True)
     hint.setObjectName('muted')
     tl.addWidget(hint)
-    typography_heading = QLabel('TIPOGRAFIA')
+    typography_heading = QLabel(tr('TIPOGRAFIA'))
     typography_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(typography_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
     tl.addWidget(typography_heading)
-    font_row = row(tl, field('Fonte', t.cbo_font), field('Tamanho', t.spin_size))
+    font_row = row(tl, field(tr('Fonte'), t.cbo_font), field(tr('Tamanho'), t.spin_size))
     font_row.setStretch(0, 3)
     font_row.setStretch(1, 1)
     styles = row(tl, t.btn_bold, t.btn_italic, t.btn_underline)
@@ -866,10 +875,10 @@ def install_frontend(w):
     color_row, color_layout = column()
     color_layout.setContentsMargins(0, 0, 0, 0)
     text_color_row = row(color_layout, t.btn_color, t.color_hex, compact(
-        state_icon_path('opacity'), text_alpha, '%', 85, 'Opacidade do texto'
+        state_icon_path('opacity'), text_alpha, '%', 85, tr('Opacidade do texto')
     ))
     text_color_row.setStretch(1, 1)
-    tl.addWidget(field('Cor', color_row))
+    tl.addWidget(field(tr('Cor'), color_row))
     def apply_hex():
         value = t.color_hex.text().strip()
         color = QColor(value)
@@ -888,7 +897,7 @@ def install_frontend(w):
         t.color_hex.setProperty('lastColor', color.name())
         text_alpha.setValue(round(color.alphaF()*100))
     t.fontColorChanged.connect(color_changed)
-    alignment_heading = QLabel('ALINHAMENTO')
+    alignment_heading = QLabel(tr('ALINHAMENTO'))
     alignment_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(alignment_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
     tl.addWidget(alignment_heading)
@@ -938,10 +947,10 @@ def install_frontend(w):
         return button
 
     horizontal_buttons = [
-        alignment_button('left-align', 'Alinhar texto à esquerda', horizontal_group, t.cbo_align, 0, horizontal_layout),
-        alignment_button('center-align', 'Centralizar texto', horizontal_group, t.cbo_align, 1, horizontal_layout),
-        alignment_button('right-align', 'Alinhar texto à direita', horizontal_group, t.cbo_align, 2, horizontal_layout),
-        alignment_button('justify', 'Justificar texto', horizontal_group, t.cbo_align, 3, horizontal_layout),
+        alignment_button('left-align', tr('Alinhar texto à esquerda'), horizontal_group, t.cbo_align, 0, horizontal_layout),
+        alignment_button('center-align', tr('Centralizar texto'), horizontal_group, t.cbo_align, 1, horizontal_layout),
+        alignment_button('right-align', tr('Alinhar texto à direita'), horizontal_group, t.cbo_align, 2, horizontal_layout),
+        alignment_button('justify', tr('Justificar texto'), horizontal_group, t.cbo_align, 3, horizontal_layout),
     ]
     alignment_layout.addWidget(horizontal_widget, 4)
     align_separator = QFrame()
@@ -952,9 +961,9 @@ def install_frontend(w):
     alignment_layout.addWidget(align_separator)
     alignment_layout.addSpacing(10)
     vertical_buttons = [
-        alignment_button('top-alignment', 'Alinhar texto ao topo', vertical_group, t.cbo_valign, 0, vertical_layout),
-        alignment_button('mid-alignment', 'Alinhar texto ao meio', vertical_group, t.cbo_valign, 1, vertical_layout),
-        alignment_button('bot-alignment', 'Alinhar texto à base', vertical_group, t.cbo_valign, 2, vertical_layout),
+        alignment_button('top-alignment', tr('Alinhar texto ao topo'), vertical_group, t.cbo_valign, 0, vertical_layout),
+        alignment_button('mid-alignment', tr('Alinhar texto ao meio'), vertical_group, t.cbo_valign, 1, vertical_layout),
+        alignment_button('bot-alignment', tr('Alinhar texto à base'), vertical_group, t.cbo_valign, 2, vertical_layout),
     ]
     alignment_layout.addWidget(vertical_widget, 3)
 
@@ -989,8 +998,8 @@ def install_frontend(w):
 
     spacing = row(
         tl,
-        icon_value_field('line-space', 'Entrelinha', t.spin_lh),
-        icon_value_field('paragraph', 'Recuo da primeira linha', t.spin_indent),
+        icon_value_field('line-space', tr('Entrelinha'), t.spin_lh),
+        icon_value_field('paragraph', tr('Recuo da primeira linha'), t.spin_indent),
     )
     t.spin_indent.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.UpDownArrows)
     spacing.setStretch(0, 1)
@@ -1001,7 +1010,7 @@ def install_frontend(w):
         for label, asset_name in alignment_value_icons:
             label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(20, 20))
     theme_manager().changed.connect(refresh_alignment_icons)
-    text_section = Section('Texto', text_body)
+    text_section = Section(tr('Texto'), text_body)
     il.addWidget(text_section)
     doc, dl = column()
     def document_heading(title):
@@ -1009,16 +1018,17 @@ def install_frontend(w):
         label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         themed_style(label, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
         dl.addWidget(label)
-    document_heading('DIMENSÕES')
+    document_heading(tr('DIMENSÕES'))
     w.chk_doc_proporcao.setText('')
+    w.chk_doc_proporcao.setToolTip(tr('Manter a proporção do documento'))
     w.chk_doc_proporcao.setFixedSize(30, 30)
     w._refresh_doc_proportion_button()
     dimensions = row(dl, compact('L', w.spin_phys_w, 'mm', None),
                      compact('A', w.spin_phys_h, 'mm', None), w.chk_doc_proporcao)
     dimensions.setStretch(0, 1)
     dimensions.setStretch(1, 1)
-    document_heading('CAMPOS DA TABELA')
-    order_hint = QLabel('Segure e arraste para ajustar a ordem')
+    document_heading(tr('CAMPOS DA TABELA'))
+    order_hint = QLabel(tr('Segure e arraste para ajustar a ordem'))
     order_hint.setWordWrap(True)
     themed_style(order_hint, 'color: @disabled@; font-size: 10px;')
     dl.addWidget(order_hint)
@@ -1037,7 +1047,7 @@ def install_frontend(w):
     dl.addWidget(w.lst_placeholders)
     w.btn_fit_bg.hide()
     w.btn_add_bg.hide()
-    document_section = Section('Documento', doc, True)
+    document_section = Section(tr('Documento'), doc, True)
     il.insertWidget(0, document_section)
     il.addStretch()
     right = QScrollArea()
@@ -1054,9 +1064,9 @@ def install_frontend(w):
     footer_bar.setFixedHeight(44)
     footer = QHBoxLayout(footer_bar)
     footer.setContentsMargins(14, 5, 14, 5)
-    footer.addWidget(QLabel('Página 1 de 1'))
+    footer.addWidget(QLabel(tr('Página 1 de 1')))
     footer.addStretch()
-    w.btn_save.setText('Salvar modelo')
+    w.btn_save.setText(tr('Salvar modelo'))
     w.btn_save.setMinimumSize(0, 0)
     w.btn_save.setMaximumSize(16777215, 16777215)
     w.btn_save.setFixedSize(116, 34)
@@ -1196,7 +1206,7 @@ def install_frontend(w):
             themed_style(shape_swatch, f'background: {selected[0].fill_color};')
             p.btn_restore.setEnabled(False)
             p.set_link_available(not background_selected)
-        selection.setText('SELEÇÃO\n' + (getattr(selected[0], 'layer_name', '') or 'Objeto selecionado' if selected else 'Nenhum objeto'))
+        selection.setText(tr('SELEÇÃO') + '\n' + (getattr(selected[0], 'layer_name', '') or tr('Objeto selecionado') if selected else tr('Nenhum objeto')))
         if t.isEnabled() and len(selected) == 1:
             color_changed(getattr(selected[0].state, 'font_color', '#000000'))
             if hasattr(w, 'canvas_edit'):

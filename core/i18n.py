@@ -10,6 +10,7 @@ DEFAULT_LOCALE = "pt_BR"
 SUPPORTED_LANGUAGES = (
     ("pt_BR", "Português (Brasil)"),
     ("en_US", "English"),
+    ("es_ES", "Español"),
 )
 
 _app_translator = None

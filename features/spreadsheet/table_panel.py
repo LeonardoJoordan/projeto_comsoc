@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, QTimer
 
 from .clipboard import parse_clipboard_html_table, parse_tsv, parse_clipboard_html_fragment
 from .delegates import HTMLDelegate
-from .headers import QUANTITY_HEADER, SIGNATURE_HEADER
+from .headers import SIGNATURE_HEADER, is_quantity_header
 
 class RichTableWidget(QTableWidget):
     RICH_ROLE = Qt.ItemDataRole.UserRole
@@ -72,7 +72,7 @@ class RichTableWidget(QTableWidget):
 
     def _add_rows(self, count: int):
         # Detecta a presença das colunas funcionais pelos headers
-        has_qty_col = (self.columnCount() > 0 and self.horizontalHeaderItem(0).text() == QUANTITY_HEADER)
+        has_qty_col = (self.columnCount() > 0 and is_quantity_header(self.horizontalHeaderItem(0).text()))
         has_sig_col = (self.columnCount() > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
         
         for _ in range(count):
@@ -104,7 +104,7 @@ class RichTableWidget(QTableWidget):
         cols = self.columnCount()
         
         # Identifica os índices das colunas funcionais pelos headers atuais
-        has_qty_col = (cols > 0 and self.horizontalHeaderItem(0).text() == QUANTITY_HEADER)
+        has_qty_col = (cols > 0 and is_quantity_header(self.horizontalHeaderItem(0).text()))
         has_sig_col = (cols > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
         
         for r in rows_to_dup:
@@ -250,7 +250,7 @@ class RichTableWidget(QTableWidget):
         row_end = start_row + len(grid_struct) - 1
 
         # Identifica os índices das colunas funcionais
-        has_qty_col = (header.count() > 0 and self.horizontalHeaderItem(0).text() == QUANTITY_HEADER)
+        has_qty_col = (header.count() > 0 and is_quantity_header(self.horizontalHeaderItem(0).text()))
         has_sig_col = (header.count() > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
 
         for r, row_data in enumerate(grid_struct):
