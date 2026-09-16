@@ -3,8 +3,8 @@ from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QApplication, QTableWidget, QTableWidgetItem
+from PySide6.QtCore import QSettings, Qt
+from PySide6.QtWidgets import QApplication, QComboBox, QTableWidget, QTableWidgetItem
 
 from features.spreadsheet.headers import SIGNATURE_HEADER, quantity_header_label
 from features.workspace.main_window import MainWindow
@@ -61,3 +61,33 @@ def test_inactive_fields_keep_cell_data_but_do_not_feed_generation():
 
     assert plain == [{"modelo": "modelo_de_teste", "Ativo": "valor atual"}]
     assert rich == plain
+
+
+def test_model_reload_restores_last_selected_model(tmp_path, monkeypatch):
+    models = tmp_path / "models"
+    (models / "modelo_1").mkdir(parents=True)
+    (models / "modelo_4").mkdir()
+    settings = QSettings(
+        str(tmp_path / "settings.ini"), QSettings.Format.IniFormat
+    )
+    settings.setValue("workspace/last_model_id", "modelo_4")
+    combo = QComboBox()
+    loaded = []
+    harness = SimpleNamespace(
+        preview_panel=SimpleNamespace(cbo_models=combo),
+        settings=settings,
+        _on_model_changed=loaded.append,
+    )
+    monkeypatch.setattr(
+        "features.workspace.main_window.get_models_dir", lambda: models
+    )
+    monkeypatch.setattr(
+        "features.workspace.main_window.load_model_document",
+        lambda folder: {"name": "Modelo 4" if folder.name == "modelo_4" else "Modelo 1"},
+    )
+
+    MainWindow._reload_models_from_disk(harness)
+
+    assert combo.currentText() == "Modelo 4"
+    assert combo.currentData() == "modelo_4"
+    assert loaded == ["Modelo 4"]

@@ -7,6 +7,12 @@ from core.resources import PROJECT_ROOT
 
 
 UI_FONT_FAMILY = "Inter 18pt"
+DOCUMENT_FONT_FAMILY = UI_FONT_FAMILY
+
+
+def bundled_font_families() -> set[str]:
+    """Famílias disponibilizadas pelo próprio aplicativo, incluindo aliases legíveis."""
+    return {UI_FONT_FAMILY, "Inter"}
 
 
 def install_ui_font(app: QApplication) -> str:

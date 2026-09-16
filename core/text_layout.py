@@ -122,7 +122,8 @@ def build_document(box, content):
             cleaned = re.sub(name + r'\s*:[^;"]+;?', "", cleaned)
     cleaned = normalize_text_decoration(cleaned)
     cleaned = re.sub(r"(?i)</?a\b[^>]*>", "", cleaned)
-    font = QFont(box.get("font_family", "Arial"), int(box.get("font_size", 16)))
+    from core.ui_font import DOCUMENT_FONT_FAMILY
+    font = QFont(box.get("font_family", DOCUMENT_FONT_FAMILY), int(box.get("font_size", 16)))
     doc.setDefaultFont(font)
     if rich:
         doc.setDefaultStyleSheet("body { color: " + box.get("font_color", "#000000") + "; }")

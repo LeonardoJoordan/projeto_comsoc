@@ -2240,5 +2240,212 @@ Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta ses
 
 ¿Desea descartar los datos de estas columnas? Elija No para conservarlos durante esta sesión.</translation>
     </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>MÁSCARA</source>
+      <translation>MÁSCARA</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Cancelar mascaramento</source>
+      <translation>Cancelar enmascarado</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Concluir mascaramento</source>
+      <translation>Finalizar enmascarado</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Editar máscara</source>
+      <translation>Editar máscara</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Remover máscara</source>
+      <translation>Eliminar máscara</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Imagem vinculada a esta máscara</source>
+      <translation>Imagen vinculada a esta máscara</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Editando {image} dentro de {shape}</source>
+      <translation>Editando {image} dentro de {shape}</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Imagem vinculada a {shape}</source>
+      <translation>Imagen vinculada a {shape}</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Crie uma forma fechada para utilizá-la como máscara.</source>
+      <translation>Cree una forma cerrada para utilizarla como máscara.</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Mascarar com</source>
+      <translation>Enmascarar con</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Usar como máscara</source>
+      <translation>Usar como máscara</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>{count} imagem(ns) vinculada(s)</source>
+      <translation>{count} imagen(es) vinculada(s)</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Não há imagens disponíveis para mascaramento.</source>
+      <translation>No hay imágenes disponibles para el enmascarado.</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/editor_window.py" />
+      <source>Agrupar objetos selecionados (Ctrl+G)</source>
+      <translation>Agrupar objetos seleccionados (Ctrl+G)</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/editor_window.py" />
+      <source>Desagrupar objetos selecionados (Ctrl+Shift+G)</source>
+      <translation>Desagrupar objetos seleccionados (Ctrl+Shift+G)</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/editor_window.py" />
+      <source>Grupo {numero}</source>
+      <translation>Grupo {numero}</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/frontend.py" />
+      <source>Agrupar</source>
+      <translation>Agrupar</translation>
+    </message>
+    <message>
+      <location filename="../../features/editor/editor_window.py" />
+      <source>Máscara {numero}</source>
+      <translation>Máscara {numero}</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Informações do modelo…</source>
+      <translation>Información de la plantilla…</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Não informado</source>
+      <translation>No informado</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Importado</source>
+      <translation>Importado</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Criado neste aplicativo</source>
+      <translation>Creado en esta aplicación</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Modelo anterior a este registro</source>
+      <translation>Plantilla anterior a este registro</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Estado atual</source>
+      <translation>Estado actual</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Informações do modelo</source>
+      <translation>Información de la plantilla</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Origem</source>
+      <translation>Origen</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Atual</source>
+      <translation>Actual</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Registro:</source>
+      <translation>Registro:</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Data:</source>
+      <translation>Fecha:</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Nome:</source>
+      <translation>Nombre:</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Dimensões:</source>
+      <translation>Dimensiones:</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Páginas:</source>
+      <translation>Páginas:</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Página</source>
+      <translation>Página</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Caixa de texto</source>
+      <translation>Caja de texto</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Fontes</source>
+      <translation>Fuentes</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>{fonte} (ausente)</source>
+      <translation>{fonte} (ausente)</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Não informada</source>
+      <translation>No informada</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>FONTES POR CAIXA DE TEXTO</source>
+      <translation>FUENTES POR CAJA DE TEXTO</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Asset</source>
+      <translation>Recurso</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>ASSETS</source>
+      <translation>RECURSOS</translation>
+    </message>
+    <message>
+      <location filename="../../features/workspace/model_info_dialog.py" />
+      <source>Não foi possível ler as informações do modelo:
+{erro}</source>
+      <translation>No se pudo leer la información de la plantilla:
+{erro}</translation>
+    </message>
   </context>
 </TS>

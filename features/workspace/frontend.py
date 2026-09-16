@@ -233,10 +233,13 @@ def install_frontend(window):
         ('rename', tr('Renomear modelo'), buttons.btn_rename_model),
         ('delete', tr('Excluir modelo'), buttons.btn_remove_model),
     ):
+        if action_id == 'delete':
+            model_actions.addAction(
+                tr('Informações do modelo…'), window._open_model_info_dialog
+            )
+            model_actions.addSeparator()
         action = model_actions.addAction(label)
         action.triggered.connect(button.click)
-        if action_id == 'rename':
-            model_actions.addSeparator()
         if action_id == 'delete':
             delete_action = action
     def style_model_action_hover(action):

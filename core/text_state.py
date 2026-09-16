@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from core.ui_font import DOCUMENT_FONT_FAMILY
+
 @dataclass
 class TextState:
     """
@@ -7,7 +9,7 @@ class TextState:
     Isola os metadados de formatação global do conteúdo HTML (limpo).
     """
     html_content: str = "Placeholder"
-    font_family: str = "Arial"
+    font_family: str = DOCUMENT_FONT_FAMILY
     font_size: int = 16
     align: str = "left"
     vertical_align: str = "top"

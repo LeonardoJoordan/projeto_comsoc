@@ -158,6 +158,41 @@ def _paint_with_document_fade(item, painter, draw_content, outside_opacity=0.25)
     painter.restore()
 
 
+def _paint_with_mask_edit_fade(item, painter, draw_content, outside_opacity=0.25):
+    """Exibe o excedente da imagem somente durante a edição da máscara."""
+    parent = item.parentItem()
+    if not isinstance(parent, RectangleItem) or not getattr(parent, '_mask_editing', False):
+        draw_content()
+        return
+    mask_path = item.mapFromItem(parent, parent.drawing_path())
+    outside = QPainterPath()
+    outside.addRect(item.boundingRect())
+    outside = outside.subtracted(mask_path)
+
+    painter.save()
+    painter.setClipPath(outside, Qt.ClipOperation.IntersectClip)
+    painter.setOpacity(painter.opacity() * outside_opacity)
+    draw_content()
+    painter.restore()
+
+    painter.save()
+    painter.setClipPath(mask_path, Qt.ClipOperation.IntersectClip)
+    draw_content()
+    painter.restore()
+
+
+def _paint_with_mask_clip(item, painter, draw_content):
+    parent = item.parentItem()
+    if not isinstance(parent, RectangleItem):
+        draw_content()
+        return
+    painter.save()
+    painter.setClipPath(item.mapFromItem(parent, parent.drawing_path()),
+                        Qt.ClipOperation.IntersectClip)
+    draw_content()
+    painter.restore()
+
+
 def _snap_targets(scene):
     vertical_targets = []
     horizontal_targets = []
@@ -231,13 +266,21 @@ def _snap_position_to_guides(item, new_pos, w, h):
         else:
             continue
             
-        origin = sel_item.transformOriginPoint()
-        angle = sel_item.rotation()
         cand_pos = scene._drag_start_positions[sel_item] + abs_delta
-        
+
         local_points = [QPointF(0, 0), QPointF(iw, 0), QPointF(iw, ih), QPointF(0, ih)]
-        scene_points = [_rotated_point(cand_pos, origin, angle, p) for p in local_points]
-        center = _rotated_point(cand_pos, origin, angle, QPointF(iw / 2, ih / 2))
+        parent = sel_item.parentItem()
+        if parent is None:
+            current_anchor = sel_item.pos()
+            candidate_anchor = cand_pos
+        else:
+            # A posição de um item mascarado está no sistema local da forma,
+            # enquanto guias e limites do documento usam coordenadas da cena.
+            current_anchor = parent.mapToScene(sel_item.pos())
+            candidate_anchor = parent.mapToScene(cand_pos)
+        scene_shift = candidate_anchor - current_anchor
+        scene_points = [sel_item.mapToScene(point) + scene_shift for point in local_points]
+        center = sel_item.mapToScene(QPointF(iw / 2, ih / 2)) + scene_shift
 
         xs = [p.x() for p in scene_points]
         ys = [p.y() for p in scene_points]
@@ -263,7 +306,13 @@ def _snap_position_to_guides(item, new_pos, w, h):
     scene._group_snap_dx = best_dx
     scene._group_snap_dy = best_dy
 
-    return new_pos + QPointF(best_dx, best_dy)
+    scene_correction = QPointF(best_dx, best_dy)
+    parent = item.parentItem()
+    if parent is not None:
+        inverse, invertible = parent.sceneTransform().inverted()
+        if invertible:
+            scene_correction = inverse.map(scene_correction) - inverse.map(QPointF(0, 0))
+    return new_pos + scene_correction
 
 
 class ResizeHandle(QGraphicsRectItem):
@@ -600,6 +649,13 @@ class ResizeHandle(QGraphicsRectItem):
                 self._anchor_scene = parent.mapToScene(anchor_local)
                 if getattr(parent, 'shape_type', '') == 'line':
                     self._anchor_scene = parent.mapToScene(QPointF(self._initial_w if self.x_dir < 0 else 0, self._initial_h/2))
+                scene = parent.scene()
+                if scene and scene.views():
+                    window = scene.views()[0].window()
+                    if hasattr(window, 'begin_group_resize'):
+                        window.begin_group_resize(
+                            parent, self._anchor_scene, self._initial_w, self._initial_h
+                        )
             event.accept()
         else:
             super().mousePressEvent(event)
@@ -645,6 +701,10 @@ class ResizeHandle(QGraphicsRectItem):
                         parent.setPos(new_pos)
                     finally:
                         parent._resizing_from_handle = False
+                    if parent.scene() and parent.scene().views():
+                        window = parent.scene().views()[0].window()
+                        if hasattr(window, 'update_group_resize'):
+                            window.update_group_resize(parent, new_w, new_h)
                 
                 if parent.scene():
                     parent.scene().update() 
@@ -662,6 +722,8 @@ class ResizeHandle(QGraphicsRectItem):
                 win = self.scene().views()[0].window()
                 if hasattr(win, 'save_snapshot'):
                     win.save_snapshot()
+                if hasattr(win, 'end_group_resize'):
+                    win.end_group_resize()
             event.accept()
             return
         super().mouseReleaseEvent(event)
@@ -854,12 +916,18 @@ class ImageItem(QGraphicsPixmapItem):
         
         self.keep_proportion = True
         self.has_link = False
+        self.mask_shape_id = None
+        self.mask_order = 0
         _init_resize_handles(self)
         self.update_center()
 
     def itemChange(self, change, value):
         if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
-            can_resize = self.isSelected() and bool(
+            parent = self.parentItem()
+            mask_allows_edit = not isinstance(parent, RectangleItem) or bool(
+                getattr(parent, '_mask_editing', False)
+            )
+            can_resize = mask_allows_edit and self.isSelected() and bool(
                 self.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
             )
             _set_resize_handles_visible(self, can_resize)
@@ -879,16 +947,31 @@ class ImageItem(QGraphicsPixmapItem):
     def shape(self):
         path = QPainterPath()
         path.addRect(self.rect())
+        parent = self.parentItem()
+        if isinstance(parent, RectangleItem) and not getattr(parent, '_mask_editing', False):
+            path = path.intersected(self.mapFromItem(parent, parent.drawing_path()))
         return path
 
     def contains(self, point):
-        return self.rect().contains(point)
+        return self.shape().contains(point)
         
     def paint(self, painter, option, widget=None):
         def draw_content():
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
             painter.drawPixmap(self.rect(), self.pixmap(), QRectF(self.pixmap().rect()))
-        _paint_with_document_fade(self, painter, draw_content)
+        parent = self.parentItem()
+        if isinstance(parent, RectangleItem) and getattr(parent, '_mask_editing', False):
+            _paint_with_mask_edit_fade(
+                self, painter,
+                lambda: _paint_with_document_fade(self, painter, draw_content),
+            )
+        elif isinstance(parent, RectangleItem):
+            _paint_with_mask_clip(
+                self, painter,
+                lambda: _paint_with_document_fade(self, painter, draw_content),
+            )
+        else:
+            _paint_with_document_fade(self, painter, draw_content)
 
     def update_center(self):
         r = self.rect()
@@ -974,7 +1057,38 @@ class RectangleItem(ImageItem):
         self.outline_opacity = 1.0
         self.custom_name = 'Plano de fundo'
         self.keep_proportion = False
+        self._mask_editing = False
+        self._mask_overlay = None
+        self.mask_group_id = None
         self.resize_custom(width, height)
+
+    def masked_images(self):
+        return sorted(
+            (
+                child for child in self.childItems()
+                if isinstance(child, ImageItem) and not isinstance(child, RectangleItem)
+            ),
+            key=lambda child: getattr(child, 'mask_order', 0),
+        )
+
+    def refresh_mask_structure(self):
+        children = self.masked_images()
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemClipsChildrenToShape, False)
+        if not self._mask_editing:
+            # Fora do modo de enquadramento, a imagem é conteúdo da máscara:
+            # pode ser selecionada pela lista de camadas, mas não intercepta
+            # cliques nem pode ser arrastada diretamente sobre o canvas.
+            for child in children:
+                child.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+                child.hide_resize_handles()
+        if children:
+            if self._mask_overlay is None:
+                self._mask_overlay = MaskOutlineOverlay(self)
+            self._mask_overlay.setVisible(bool(self.outline_enabled))
+            self._mask_overlay.update()
+        elif self._mask_overlay is not None:
+            self._mask_overlay.setVisible(False)
+        self.update()
 
     def paint(self, painter, option, widget=None):
         if getattr(self, 'is_document_background', False):
@@ -1034,7 +1148,21 @@ class RectangleItem(ImageItem):
             return
         if getattr(self, 'shape_type', '') == 'line':
             h = 1
+        old_w = getattr(self, '_current_w', 0.0)
+        old_h = getattr(self, '_current_h', 0.0)
+        children = self.masked_images() if hasattr(self, '_mask_editing') else []
+        if self._mask_overlay is not None:
+            self._mask_overlay.prepareGeometryChange()
         super().resize_custom(w, h)
+        if children and old_w > 0 and old_h > 0 and not self._mask_editing:
+            scale_x = w / old_w
+            scale_y = h / old_h
+            for child in children:
+                child.setPos(child.x() * scale_x, child.y() * scale_y)
+                child.resize_custom(child.rect().width() * scale_x,
+                                    child.rect().height() * scale_y)
+        if self._mask_overlay is not None:
+            self._mask_overlay.update()
 
     def itemChange(self, change, value):
         if getattr(self, 'is_document_background', False):
@@ -1062,6 +1190,29 @@ class RectangleItem(ImageItem):
         self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
         self.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
         _set_resize_handles_visible(self, False)
+
+
+class MaskOutlineOverlay(QGraphicsItem):
+    """Contorno não interativo desenhado acima do conteúdo de uma máscara."""
+
+    def __init__(self, shape):
+        super().__init__(shape)
+        self.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.setZValue(1_000_000)
+
+    def boundingRect(self):
+        parent = self.parentItem()
+        return parent.boundingRect() if parent else QRectF()
+
+    def paint(self, painter, option, widget=None):
+        parent = self.parentItem()
+        if not isinstance(parent, RectangleItem) or not parent.outline_enabled:
+            return
+        from core.object_style import paint_shape_path
+        data = parent.style_data()
+        data['fill_opacity'] = 0.0
+        paint_shape_path(painter, parent.drawing_path(), data)
 
 
 class BackgroundItem(ImageItem):

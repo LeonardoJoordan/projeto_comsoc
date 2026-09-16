@@ -182,6 +182,24 @@ def _validate_page(page: Any, expected_id: str, *, legacy_source: bool) -> None:
     if len(object_ids) != len(set(object_ids)):
         raise ModelValidationError(f"Há object_id repetido na página {expected_id}.")
 
+    shapes = {item['object_id']: item for item in page.get('shapes', [])}
+    mask_orders = {}
+    for image in page.get('images', []):
+        mask_id = image.get('mask_shape_id')
+        if mask_id is None:
+            continue
+        shape = shapes.get(mask_id)
+        if shape is None or shape.get('shape_type') not in ('rectangle', 'ellipse', 'circle'):
+            raise ModelValidationError(
+                f"Imagem vinculada a uma máscara inexistente ou incompatível na página {expected_id}."
+            )
+        order = image.get('mask_order', 0)
+        if not isinstance(order, int) or order < 0:
+            raise ModelValidationError(f"Ordem interna de máscara inválida na página {expected_id}.")
+        if order in mask_orders.setdefault(mask_id, set()):
+            raise ModelValidationError(f"Ordem interna de máscara repetida na página {expected_id}.")
+        mask_orders[mask_id].add(order)
+
     layer_order = page.get("layer_order")
     if layer_order is None and legacy_source:
         return
@@ -386,7 +404,8 @@ def save_model_document(document: dict, model_dir: str | Path) -> Path:
     directory = Path(model_dir)
     directory.mkdir(parents=True, exist_ok=True)
     target = directory / V4_FILENAME
-    payload = persistent_model_document(document)
+    from core.model_info import ensure_origin_info
+    payload = persistent_model_document(ensure_origin_info(document))
     encoded = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
 
     temporary_path = None

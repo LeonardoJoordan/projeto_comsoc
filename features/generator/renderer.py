@@ -6,7 +6,7 @@ from pathlib import Path
 from core.render_cache import get_background_proxy_path, infer_model_dir
 from core.model_document import adapt_model_page, normalize_model_document
 from core.document_layers import layer_entries
-from core.object_style import draw_shape, outline_margin
+from core.object_style import draw_shape, outline_margin, rounded_rect_path
 from core.text_layout import PLACEHOLDER_PATTERN, build_document, text_geometry, resolve_rich_text
 
 
@@ -182,8 +182,21 @@ class NativeRenderer:
         if "layer_order" not in self.tpl and not self.tpl.get("shapes"):
             return self._paint_card_legacy(painter, row_rich, out_links, static_only, dynamic_only, row_plain)
         entries = layer_entries(self.tpl)
+        masked_images = {
+            image.get('object_id'): image
+            for image in self.tpl.get('images', [])
+            if image.get('mask_shape_id')
+        }
+        images_by_mask = {}
+        for image in masked_images.values():
+            images_by_mask.setdefault(image.get('mask_shape_id'), []).append(image)
         prefix = 0
         for _, kind, item in entries:
+            if kind == 'shape' and any(
+                child.get('has_link') and child.get('link_key')
+                for child in images_by_mask.get(item.get('object_id'), [])
+            ):
+                break
             if kind not in ("image", "shape") or (item.get("has_link") and item.get("link_key")):
                 break
             prefix += 1
@@ -193,11 +206,20 @@ class NativeRenderer:
             if dynamic_only and index < prefix:
                 continue
             if kind == "shape":
-                rect = draw_shape(painter, item)
+                children = sorted(images_by_mask.get(item.get('object_id'), []),
+                                  key=lambda value: value.get('mask_order', 0))
+                rect = (
+                    self._draw_mask_group(
+                        painter, item, children, row_rich, row_plain, out_links
+                    )
+                    if children else draw_shape(painter, item)
+                )
                 if rect is not None and item.get("has_link") and item.get("link_key") and out_links is not None:
                     url = self._resolve_link_url(item["link_key"], row_rich, row_plain)
                     if url:
                         out_links.append({"url": url, "rect": rect})
+                continue
+            if kind == 'image' and item.get('object_id') in masked_images:
                 continue
             # A child view avoids mutating a renderer shared by batch workers.
             layer = {**self.tpl, "images": [], "boxes": [], "signatures": [], "background_path": None}
@@ -207,6 +229,81 @@ class NativeRenderer:
             child.model_dir = self.model_dir
             child._image_cache = self._image_cache
             child._paint_card_legacy(painter, row_rich, out_links, row_plain=row_plain)
+
+    def _resolve_asset_path(self, raw_path):
+        path = Path(raw_path or '')
+        if not path.is_absolute() and self.model_dir:
+            path = self.model_dir / path
+        if path.exists():
+            return path
+        try:
+            from core.template_manager import slugify_model_name
+            from core.paths import get_models_dir
+            if 'name' in self.tpl:
+                candidate = get_models_dir() / slugify_model_name(self.tpl['name']) / str(raw_path or '')
+                if candidate.exists():
+                    return candidate
+        except ImportError:
+            pass
+        return path
+
+    @staticmethod
+    def _mask_local_path(shape):
+        w = float(shape.get('width', 0))
+        h = float(shape.get('height', 0))
+        bounds = QRectF(0, 0, w, h)
+        if shape.get('shape_type') in ('ellipse', 'circle'):
+            from PySide6.QtGui import QPainterPath
+            path = QPainterPath()
+            path.addEllipse(bounds)
+            return path
+        radii = dict(shape.get('corner_radii') or {})
+        radii.setdefault('all', max(0.0, float(shape.get('corner_radius', 0))))
+        return rounded_rect_path(bounds, radii)
+
+    def _draw_mask_group(self, painter, shape, images, row_rich, row_plain, out_links):
+        if not shape.get('visible', True):
+            return None
+        rect = draw_shape(painter, shape)
+        w = float(shape.get('width', 0))
+        h = float(shape.get('height', 0))
+        painter.save()
+        try:
+            painter.translate(float(shape.get('x', 0)) + w / 2,
+                              float(shape.get('y', 0)) + h / 2)
+            painter.rotate(float(shape.get('rotation', 0)))
+            painter.translate(-w / 2, -h / 2)
+            painter.setClipPath(self._mask_local_path(shape), Qt.ClipOperation.IntersectClip)
+            for image in images:
+                if not image.get('visible', True):
+                    continue
+                path = self._resolve_asset_path(image.get('path', ''))
+                if not path.exists():
+                    continue
+                source = self._get_image(path)
+                iw = float(image.get('width', 0))
+                ih = float(image.get('height', 0))
+                if source.isNull() or iw <= 0 or ih <= 0:
+                    continue
+                image_rect = self._draw_image_item(
+                    painter, source,
+                    float(image.get('x', 0)), float(image.get('y', 0)),
+                    iw, ih, image.get('rotation', 0),
+                    float(image.get('opacity', 1.0)) * float(shape.get('opacity', 1.0)),
+                )
+                if image.get('has_link') and image.get('link_key') and out_links is not None:
+                    url = self._resolve_link_url(image['link_key'], row_rich, row_plain)
+                    if url:
+                        clipped_rect = image_rect.intersected(rect) if rect is not None else image_rect
+                        if not clipped_rect.isEmpty():
+                            out_links.append({'url': url, 'rect': clipped_rect})
+        finally:
+            painter.restore()
+        if shape.get('outline_enabled'):
+            overlay = dict(shape)
+            overlay['fill_opacity'] = 0.0
+            draw_shape(painter, overlay)
+        return rect
 
     def _paint_card_legacy(self, painter: QPainter, row_rich: dict, out_links: list = None, static_only: bool = False, dynamic_only: bool = False, row_plain: dict = None):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)

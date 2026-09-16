@@ -2,17 +2,18 @@ import json
 import re
 import copy
 import shutil
+import math
 from pathlib import Path
 from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidget,
                                QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton,
                                QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
-                               QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout,
+                               QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout, QApplication,
                                QSizePolicy)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
                            QFont, QFontDatabase, QFontInfo)
-from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize
+from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF
 
 from .canvas_items import (DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, RectangleItem,
                            ImageItem, BackgroundItem, _reader_logical_size)
@@ -22,8 +23,11 @@ from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
 from core.render_cache import ensure_background_proxy, publish_thumbnail_cache
-from core.resources import action_icon_path, app_icon_path, state_icon_path
+from core.resources import action_icon_path, app_icon_path, state_icon_path, navigation_icon_path
+from core.theme_icons import themed_svg_icon
+from core.themes import theme_color
 from core.i18n import tr
+from core.ui_font import DOCUMENT_FONT_FAMILY
 from core.model_document import (
     add_blank_back_page,
     adapt_model_page,
@@ -39,6 +43,76 @@ from core.model_document import (
 
 
 _VISIBILITY_ICONS = {}
+
+
+class LayerGroupBadge(QPushButton):
+    """Badge clicável que também inicia o arraste das linhas do grupo."""
+
+    def __init__(self, text, layer_list, layer_item, select_callback, parent=None):
+        super().__init__(text, parent)
+        self._layer_list = layer_list
+        self._layer_item = layer_item
+        self._select_callback = select_callback
+        self._press_global = None
+        self._dragging = False
+        self.clicked.connect(select_callback)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_global = event.globalPosition().toPoint()
+            self._dragging = False
+            self._layer_list.setCurrentItem(self._layer_item)
+            self._select_callback()
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if (self._press_global is not None
+                and event.buttons() & Qt.MouseButton.LeftButton):
+            if ((event.globalPosition().toPoint() - self._press_global).manhattanLength()
+                    >= QApplication.startDragDistance()):
+                self._dragging = True
+                self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            if self._dragging:
+                viewport = self._layer_list.viewport()
+                local = viewport.mapFromGlobal(event.globalPosition().toPoint())
+                target = self._layer_list.itemAt(local)
+                if target is not None:
+                    rect = self._layer_list.visualItemRect(target)
+                    after = local.y() >= rect.center().y()
+                    window = self._layer_list.window()
+                    if hasattr(window, 'show_layer_group_drop_indicator'):
+                        window.show_layer_group_drop_indicator(
+                            self._layer_item, target, after=after
+                        )
+            event.accept()
+            return
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            if self._dragging:
+                viewport = self._layer_list.viewport()
+                local = viewport.mapFromGlobal(event.globalPosition().toPoint())
+                target = self._layer_list.itemAt(local)
+                if target is not None:
+                    rect = self._layer_list.visualItemRect(target)
+                    after = local.y() >= rect.center().y()
+                    window = self._layer_list.window()
+                    if hasattr(window, 'move_layer_group_from_badge'):
+                        window.move_layer_group_from_badge(
+                            self._layer_item, target, after=after
+                        )
+            window = self._layer_list.window()
+            if hasattr(window, 'hide_layer_group_drop_indicator'):
+                window.hide_layer_group_drop_indicator()
+            self._press_global = None
+            self._dragging = False
+            self.unsetCursor()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 def _visibility_icon(visible):
@@ -93,7 +167,7 @@ class EditorWindow(QMainWindow):
 
     @classmethod
     def _resolve_editor_font_family(cls, family: str, available_fonts: set[str]) -> str:
-        requested = str(family or "Arial").strip() or "Arial"
+        requested = str(family or DOCUMENT_FONT_FAMILY).strip() or DOCUMENT_FONT_FAMILY
         if cls._normalized_font_name(requested) in available_fonts:
             return requested
 
@@ -118,6 +192,12 @@ class EditorWindow(QMainWindow):
         self._page_selection = {"front": set(), "back": set()}
         self._object_clipboard = []
         self._clipboard_source_page = None
+        self._mask_edit_session = None
+        self._changing_mask_selection = False
+        self._changing_group_selection = False
+        self._selecting_from_layer_list = False
+        self._group_resize_session = None
+        self._layer_group_drop_indicator = None
         self._active_scene_baseline = None
         self.setWindowTitle(tr("Editor de modelos — FORNAX Forge"))
         self.setWindowIcon(QIcon(str(app_icon_path())))
@@ -609,6 +689,17 @@ class EditorWindow(QMainWindow):
         self.shortcut_paste.activated.connect(self.paste_copied_items)
         self.shortcut_select_all = QShortcut(QKeySequence.StandardKey.SelectAll, self)
         self.shortcut_select_all.activated.connect(self.select_all_items)
+        self.shortcut_group = QShortcut(QKeySequence("Ctrl+G"), self)
+        self.shortcut_group.activated.connect(self.group_selected_items)
+        self.shortcut_ungroup = QShortcut(QKeySequence("Ctrl+Shift+G"), self)
+        self.shortcut_ungroup.activated.connect(self.ungroup_selected_items)
+
+        self.shortcut_finish_mask = QShortcut(QKeySequence(Qt.Key.Key_Return), self)
+        self.shortcut_finish_mask.setEnabled(False)
+        self.shortcut_finish_mask.activated.connect(lambda: self.finish_mask_edit(True))
+        self.shortcut_cancel_mask = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
+        self.shortcut_cancel_mask.setEnabled(False)
+        self.shortcut_cancel_mask.activated.connect(lambda: self.finish_mask_edit(False))
 
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
         self.shortcut_save.activated.connect(self.export_to_json)
@@ -724,8 +815,7 @@ class EditorWindow(QMainWindow):
         )
 
     def closeEvent(self, event):
-        if getattr(self, 'canvas_edit', None):
-            self.canvas_edit.finish()
+        self._finish_page_interaction()
         saved_document_state = getattr(self, '_last_saved_document_state', None)
         current_has_multiple_pages = bool(
             self._model_document and len(self._model_document.get("pages", [])) > 1
@@ -1140,6 +1230,8 @@ class EditorWindow(QMainWindow):
             refresh()
 
     def _finish_page_interaction(self):
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
         if getattr(self, "canvas_edit", None):
             self.canvas_edit.finish()
         if getattr(self, "shape_drawing", None):
@@ -1277,7 +1369,7 @@ class EditorWindow(QMainWindow):
         self._refresh_page_controls()
 
     def export_to_json(self, skip_close_dialog=False):
-        self.canvas_edit.finish()
+        self._finish_page_interaction()
         data = self.get_current_scene_state()
         
         if not self._current_model_name:
@@ -1561,8 +1653,207 @@ class EditorWindow(QMainWindow):
         if removed:
             self.save_snapshot()
 
+    def _group_root(self, item):
+        if self._is_mask_image(item) and isinstance(item.parentItem(), RectangleItem):
+            return item.parentItem()
+        return item
+
+    def _groupable_items(self):
+        return [
+            item for item in self.scene.items()
+            if isinstance(item, (DesignerBox, ImageItem, SignatureItem))
+            and not getattr(item, 'is_document_background', False)
+            and not isinstance(item.parentItem(), RectangleItem)
+        ]
+
+    def _group_members(self, group_id):
+        if group_id is None:
+            return []
+        return [
+            item for item in self._groupable_items()
+            if getattr(item, 'group_id', None) == group_id
+        ]
+
+    def _next_group_id(self):
+        ids = [
+            int(group_id) for item in self._groupable_items()
+            if (group_id := getattr(item, 'group_id', None)) is not None
+            and str(group_id).isdigit()
+        ]
+        ids.extend(
+            int(mask_id) for item in self._mask_shapes()
+            if (mask_id := getattr(item, 'mask_group_id', None)) is not None
+            and str(mask_id).isdigit()
+        )
+        return max(ids, default=0) + 1
+
+    def select_group(self, group_id):
+        members = self._group_members(group_id)
+        if not members:
+            return
+        self._changing_group_selection = True
+        try:
+            self.scene.clearSelection()
+            for item in members:
+                if item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable:
+                    item.setSelected(True)
+        finally:
+            self._changing_group_selection = False
+        self.on_selection_changed()
+
+    def select_mask_group(self, shape):
+        if not isinstance(shape, RectangleItem) or not shape.masked_images():
+            return
+        members = [shape, *shape.masked_images()]
+        self._changing_group_selection = True
+        try:
+            # No canvas apenas a forma é selecionada: mover pai e filhos ao
+            # mesmo tempo aplicaria o deslocamento duas vezes às imagens.
+            self.scene.clearSelection()
+            if shape.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable:
+                shape.setSelected(True)
+        finally:
+            self._changing_group_selection = False
+        self.on_selection_changed()
+        self.layer_list.blockSignals(True)
+        try:
+            member_set = set(members)
+            for index in range(self.layer_list.count()):
+                row = self.layer_list.item(index)
+                row.setSelected(row.data(Qt.ItemDataRole.UserRole) in member_set)
+        finally:
+            self.layer_list.blockSignals(False)
+
+    def group_selected_items(self):
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
+        roots = []
+        for item in self.scene.selectedItems():
+            root = self._group_root(item)
+            if root in self._groupable_items() and root not in roots:
+                roots.append(root)
+        if len(roots) < 2:
+            return False
+        group_id = self._next_group_id()
+        for item in roots:
+            item.group_id = group_id
+        self.refresh_layer_list()
+        self.select_group(group_id)
+        self.save_snapshot()
+        return True
+
+    def ungroup_selected_items(self):
+        group_ids = {
+            getattr(self._group_root(item), 'group_id', None)
+            for item in self.scene.selectedItems()
+        }
+        group_ids.discard(None)
+        if not group_ids:
+            return False
+        members = [
+            item for item in self._groupable_items()
+            if getattr(item, 'group_id', None) in group_ids
+        ]
+        for item in members:
+            item.group_id = None
+        self._changing_group_selection = True
+        try:
+            self.scene.clearSelection()
+            for item in members:
+                if item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable:
+                    item.setSelected(True)
+        finally:
+            self._changing_group_selection = False
+        self.refresh_layer_list()
+        self.on_selection_changed()
+        self.save_snapshot()
+        return True
+
+    def toggle_selected_group(self):
+        selected = [self._group_root(item) for item in self.scene.selectedItems()]
+        group_ids = {getattr(item, 'group_id', None) for item in selected}
+        group_ids.discard(None)
+        if len(group_ids) == 1 and selected and all(
+            getattr(item, 'group_id', None) in group_ids for item in selected
+        ):
+            return self.ungroup_selected_items()
+        return self.group_selected_items()
+
+    def begin_group_resize(self, leader, anchor_scene, initial_w, initial_h):
+        group_id = getattr(self._group_root(leader), 'group_id', None)
+        members = self._group_members(group_id)
+        if group_id is None or leader not in members or len(members) < 2:
+            self._group_resize_session = None
+            return
+        snapshots = {}
+        for item in members:
+            rect = item.rect()
+            snapshots[item] = {
+                'center': item.mapToScene(item.transformOriginPoint()),
+                'width': float(rect.width()),
+                'height': float(rect.height()),
+            }
+        self._group_resize_session = {
+            'leader': leader,
+            'anchor': QPointF(anchor_scene),
+            'initial_w': max(float(initial_w), 0.001),
+            'initial_h': max(float(initial_h), 0.001),
+            'angle': math.radians(float(leader.rotation())),
+            'snapshots': snapshots,
+        }
+
+    def update_group_resize(self, leader, width, height):
+        session = self._group_resize_session
+        if not session or session['leader'] is not leader:
+            return
+        scale_x = max(float(width), 0.001) / session['initial_w']
+        scale_y = max(float(height), 0.001) / session['initial_h']
+        angle = session['angle']
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        anchor = session['anchor']
+        for item, snapshot in session['snapshots'].items():
+            if item is leader or item.scene() is not self.scene:
+                continue
+            vector = snapshot['center'] - anchor
+            local_x = vector.x() * cos_a + vector.y() * sin_a
+            local_y = -vector.x() * sin_a + vector.y() * cos_a
+            scaled = QPointF(local_x * scale_x, local_y * scale_y)
+            desired_center = anchor + QPointF(
+                scaled.x() * cos_a - scaled.y() * sin_a,
+                scaled.x() * sin_a + scaled.y() * cos_a,
+            )
+            new_w = max(1.0, snapshot['width'] * scale_x)
+            new_h = max(1.0, snapshot['height'] * scale_y)
+            if isinstance(item, DesignerBox):
+                item.setRect(0, 0, new_w, new_h)
+                item.recalculate_text_position()
+                item.update_center()
+            elif hasattr(item, 'resize_custom'):
+                item.resize_custom(new_w, new_h)
+            current_center = item.mapToScene(item.transformOriginPoint())
+            delta = desired_center - current_center
+            item.moveBy(delta.x(), delta.y())
+
+    def end_group_resize(self):
+        self._group_resize_session = None
+
     def duplicate_selected(self):
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
         selected_items = self.scene.selectedItems()
+        if any(getattr(self._group_root(item), 'group_id', None) is not None
+               for item in selected_items) or any(
+            (isinstance(item, RectangleItem) and item.masked_images())
+            or (self._is_mask_image(item) and isinstance(item.parentItem(), RectangleItem))
+            for item in selected_items
+        ):
+            previous_clipboard = copy.deepcopy(self._object_clipboard)
+            previous_page = self._clipboard_source_page
+            self.copy_selected_items()
+            self.paste_copied_items()
+            self._object_clipboard = previous_clipboard
+            self._clipboard_source_page = previous_page
+            return
         valid_items = [
             i for i in selected_items
             if isinstance(i, (DesignerBox, SignatureItem))
@@ -1629,17 +1920,41 @@ class EditorWindow(QMainWindow):
 
     def copy_selected_items(self):
         """Copia objetos como dados de página, sem duplicar os arquivos de asset."""
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
         selected = self._selection_keys()
         if not selected:
             return
         state = self.get_current_scene_state()
+        selected_object_ids = {
+            entry.get('object_id')
+            for kind, collection in (
+                ('text', 'boxes'), ('image', 'images'),
+                ('signature', 'signatures'), ('shape', 'shapes'),
+            )
+            for entry in state.get(collection, [])
+            if (kind, entry.get('layer_id')) in selected
+        }
+        images_by_mask = {}
+        for image in state.get('images', []):
+            if image.get('mask_shape_id'):
+                images_by_mask.setdefault(image['mask_shape_id'], []).append(image)
+        expanded = set(selected_object_ids)
+        for object_id in tuple(selected_object_ids):
+            if object_id in images_by_mask:
+                expanded.update(image['object_id'] for image in images_by_mask[object_id])
+            image = next((value for value in state.get('images', [])
+                          if value.get('object_id') == object_id), None)
+            if image and image.get('mask_shape_id'):
+                expanded.add(image['mask_shape_id'])
+                expanded.update(value['object_id'] for value in images_by_mask[image['mask_shape_id']])
         candidates = {}
         for kind, collection in (
             ("text", "boxes"), ("image", "images"),
             ("signature", "signatures"), ("shape", "shapes"),
         ):
             for entry in state.get(collection, []):
-                if (kind, entry.get("layer_id")) not in selected:
+                if entry.get('object_id') not in expanded:
                     continue
                 if entry.get("is_document_background"):
                     continue
@@ -1698,6 +2013,33 @@ class EditorWindow(QMainWindow):
             default=0.0,
         )
         pasted_ids = []
+        object_id_map = {}
+        used_group_ids = {
+            int(entry.get('group_id'))
+            for collection in collections.values()
+            for entry in state.get(collection, [])
+            if entry.get('group_id') is not None and str(entry.get('group_id')).isdigit()
+        }
+        used_group_ids.update(
+            int(entry.get('mask_group_id'))
+            for collection in collections.values()
+            for entry in state.get(collection, [])
+            if entry.get('mask_group_id') is not None
+            and str(entry.get('mask_group_id')).isdigit()
+        )
+        next_group_id = max(used_group_ids, default=0) + 1
+        group_id_map = {}
+        for _kind, source in self._object_clipboard:
+            source_group = source.get('group_id')
+            if source_group is not None and source_group not in group_id_map:
+                group_id_map[source_group] = next_group_id
+                next_group_id += 1
+        mask_group_id_map = {}
+        for _kind, source in self._object_clipboard:
+            source_mask_group = source.get('mask_group_id')
+            if source_mask_group is not None and source_mask_group not in mask_group_id_map:
+                mask_group_id_map[source_mask_group] = next_group_id
+                next_group_id += 1
         offset = 12.0 if self._clipboard_source_page == self._active_page_id else 0.0
 
         def free_name(raw):
@@ -1725,12 +2067,20 @@ class EditorWindow(QMainWindow):
             while object_id in used_object_ids:
                 object_id += "-copy"
             used_object_ids.add(object_id)
+            object_id_map[source.get('object_id')] = object_id
             entry["object_id"] = object_id
             entry["custom_name"] = free_name(entry.get("custom_name"))
             entry["z_value"] = max_z + order * 0.01
-            if "x" in entry:
+            if entry.get('group_id') is not None:
+                entry['group_id'] = group_id_map[entry['group_id']]
+            if entry.get('mask_group_id') is not None:
+                entry['mask_group_id'] = mask_group_id_map[entry['mask_group_id']]
+            old_mask_id = entry.get('mask_shape_id')
+            if old_mask_id:
+                entry['mask_shape_id'] = object_id_map.get(old_mask_id)
+            if "x" in entry and not entry.get('mask_shape_id'):
                 entry["x"] = float(entry["x"]) + offset
-            if "y" in entry:
+            if "y" in entry and not entry.get('mask_shape_id'):
                 entry["y"] = float(entry["y"]) + offset
             state.setdefault(collections[kind], []).append(entry)
             state.setdefault("layer_order", []).append(object_id)
@@ -1760,6 +2110,8 @@ class EditorWindow(QMainWindow):
 
     def select_all_items(self):
         """Seleciona todas as camadas visíveis e editáveis da página ativa."""
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
         self.scene.clearSelection()
         for item in self.scene.items():
             if not isinstance(item, (DesignerBox, ImageItem, SignatureItem, RectangleItem)):
@@ -1774,9 +2126,14 @@ class EditorWindow(QMainWindow):
         self.on_selection_changed()
 
     def delete_selected_items(self):
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
         selected = self.scene.selectedItems()
         if not selected: return
-        
+
+        for item in list(selected):
+            if isinstance(item, RectangleItem) and item.masked_images():
+                self.remove_mask(item, record=False)
         for item in selected: 
             if getattr(item, 'is_document_background', False):
                 continue
@@ -1791,13 +2148,21 @@ class EditorWindow(QMainWindow):
         sel = self.scene.selectedItems()
         if sel:
             item = sel[0]
-            item.setPos(mm_to_px(val), item.pos().y())
+            delta = mm_to_px(val) - item.pos().x()
+            group_id = getattr(self._group_root(item), 'group_id', None)
+            targets = self._group_members(group_id) if group_id is not None else [item]
+            for target in targets:
+                target.moveBy(delta, 0)
 
     def apply_position_y(self, val):
         sel = self.scene.selectedItems()
         if sel:
             item = sel[0]
-            item.setPos(item.pos().x(), mm_to_px(val))
+            delta = mm_to_px(val) - item.pos().y()
+            group_id = getattr(self._group_root(item), 'group_id', None)
+            targets = self._group_members(group_id) if group_id is not None else [item]
+            for target in targets:
+                target.moveBy(0, delta)
 
     def update_width(self, width_mm):
         item = self._get_selected()
@@ -1849,6 +2214,30 @@ class EditorWindow(QMainWindow):
 
     def update_rotation(self, angle):
         items = self._get_selected_items()
+        group_ids = {getattr(self._group_root(item), 'group_id', None) for item in items}
+        group_ids.discard(None)
+        if len(group_ids) == 1 and len(items) >= 2:
+            leader = items[0]
+            requested = -angle if getattr(leader, 'shape_type', '') == 'line' else angle
+            delta_angle = requested - leader.rotation()
+            bounds = QRectF()
+            for item in items:
+                bounds = bounds.united(item.sceneBoundingRect()) if not bounds.isNull() else item.sceneBoundingRect()
+            center = bounds.center()
+            radians = math.radians(delta_angle)
+            cos_a, sin_a = math.cos(radians), math.sin(radians)
+            for item in items:
+                item_center = item.mapToScene(item.transformOriginPoint())
+                vector = item_center - center
+                desired_center = center + QPointF(
+                    vector.x() * cos_a - vector.y() * sin_a,
+                    vector.x() * sin_a + vector.y() * cos_a,
+                )
+                item.setRotation(item.rotation() + delta_angle)
+                current_center = item.mapToScene(item.transformOriginPoint())
+                movement = desired_center - current_center
+                item.moveBy(movement.x(), movement.y())
+            return
         for item in items:
             if hasattr(item, 'update_center'):
                 item.update_center()
@@ -1949,6 +2338,33 @@ class EditorWindow(QMainWindow):
             sel = self.scene.selectedItems()
         except RuntimeError:
             return 
+        if self._mask_edit_session and not self._changing_mask_selection:
+            active = self._mask_edit_session['image']
+            if set(sel) != {active}:
+                self.finish_mask_edit(True)
+                sel = self.scene.selectedItems()
+
+        if not self._changing_group_selection and not self._selecting_from_layer_list:
+            group_ids = {
+                getattr(self._group_root(item), 'group_id', None)
+                for item in sel
+                if isinstance(item, (DesignerBox, ImageItem, SignatureItem))
+            }
+            group_ids.discard(None)
+            missing = [
+                member for group_id in group_ids
+                for member in self._group_members(group_id)
+                if member not in sel
+                and member.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
+            ]
+            if missing:
+                self._changing_group_selection = True
+                try:
+                    for member in missing:
+                        member.setSelected(True)
+                finally:
+                    self._changing_group_selection = False
+                sel = self.scene.selectedItems()
             
         # Filtro de prioridade: Guias só podem ser selecionadas sozinha
         has_non_guide = any(not isinstance(i, Guideline) for i in sel)
@@ -1964,6 +2380,26 @@ class EditorWindow(QMainWindow):
         images = [i for i in sel if isinstance(i, ImageItem)]
         signatures = [i for i in sel if isinstance(i, SignatureItem)]
         valid_items = [i for i in sel if isinstance(i, (DesignerBox, ImageItem, SignatureItem))]
+
+        if hasattr(self, 'btn_group_layer'):
+            selected_groups = {getattr(self._group_root(i), 'group_id', None) for i in valid_items}
+            selected_groups.discard(None)
+            is_complete_group = len(selected_groups) == 1 and bool(valid_items) and all(
+                getattr(self._group_root(item), 'group_id', None) in selected_groups
+                for item in valid_items
+            )
+            self.btn_group_layer.setEnabled(len(valid_items) >= 2 or bool(selected_groups))
+            self.btn_group_layer.setIcon(themed_svg_icon(action_icon_path(
+                'lock ratio' if is_complete_group else 'unlock ratio'
+            )))
+            self.btn_group_layer.setToolTip(
+                tr('Desagrupar objetos selecionados (Ctrl+Shift+G)')
+                if is_complete_group else tr('Agrupar objetos selecionados (Ctrl+G)')
+            )
+            if is_complete_group:
+                for grouped_item in valid_items[1:]:
+                    if hasattr(grouped_item, 'hide_resize_handles'):
+                        grouped_item.hide_resize_handles()
         
         self.update_position_ui()
 
@@ -2154,17 +2590,32 @@ class EditorWindow(QMainWindow):
         selected_list_items = self.layer_list.selectedItems()
         if not selected_list_items:
             return
+        target_items = [
+            entry.data(Qt.ItemDataRole.UserRole)
+            for entry in selected_list_items
+            if entry.data(Qt.ItemDataRole.UserRole) is not None
+        ]
 
-        self.scene.blockSignals(True)
-        self.scene.clearSelection()
-        for list_item in selected_list_items:
-            target_item = list_item.data(Qt.ItemDataRole.UserRole)
-            if target_item:
-                target_item.setSelected(True)
-        self.scene.blockSignals(False)
+        if self._mask_edit_session and not self._changing_mask_selection:
+            active = self._mask_edit_session['image']
+            targets = set(target_items)
+            if targets != {active}:
+                self.finish_mask_edit(True)
 
-        # Dispara manualmente para atualizar os painéis laterais
-        self.on_selection_changed()
+        self._selecting_from_layer_list = True
+        try:
+            self.scene.blockSignals(True)
+            self.scene.clearSelection()
+            for target_item in target_items:
+                if target_item.scene() is self.scene:
+                    target_item.setSelected(True)
+            self.scene.blockSignals(False)
+
+            # Dispara manualmente para atualizar os painéis laterais sem
+            # expandir automaticamente a seleção para o grupo inteiro.
+            self.on_selection_changed()
+        finally:
+            self._selecting_from_layer_list = False
 
         self.view.setFocus()
 
@@ -2174,6 +2625,95 @@ class EditorWindow(QMainWindow):
             is_visible = (list_item.checkState() == Qt.CheckState.Checked)
             target_item.setVisible(is_visible)
             self.save_snapshot()
+
+    def move_layer_group_from_badge(self, anchor_item, target_item, after=False):
+        """Reposiciona as linhas selecionadas como bloco, guiadas pelo badge."""
+        plan = self._layer_group_drop_plan(anchor_item, target_item, after)
+        self.hide_layer_group_drop_indicator()
+        if plan is None:
+            return False
+        rows, selected_items, reordered = plan
+
+        widgets = [(item, self.layer_list.itemWidget(item)) for item in rows]
+        model = self.layer_list.model()
+        self.layer_list.blockSignals(True)
+        model.blockSignals(True)
+        try:
+            for item in rows:
+                self.layer_list.removeItemWidget(item)
+            while self.layer_list.count():
+                self.layer_list.takeItem(0)
+            for item in reordered:
+                self.layer_list.addItem(item)
+                widget = next((value for row_item, value in widgets if row_item is item), None)
+                if widget is not None:
+                    self.layer_list.setItemWidget(item, widget)
+            self.layer_list.setCurrentItem(anchor_item)
+            for item in reordered:
+                item.setSelected(item in selected_items)
+        finally:
+            model.blockSignals(False)
+            self.layer_list.blockSignals(False)
+
+        self._on_layer_reordered(None, 0, 0, None, 0)
+        return True
+
+    def _layer_group_drop_plan(self, anchor_item, target_item, after=False):
+        selected_items = self.layer_list.selectedItems()
+        if anchor_item not in selected_items or len(selected_items) < 2:
+            return None
+        if target_item in selected_items:
+            return None
+
+        rows = [self.layer_list.item(index) for index in range(self.layer_list.count())]
+        selected = [item for item in rows if item in selected_items]
+        remaining = [item for item in rows if item not in selected_items]
+        if target_item not in remaining:
+            return None
+
+        # O membro arrastado comanda o bloco. Os integrantes anteriores e
+        # posteriores permanecem na mesma ordem ao redor dele.
+        anchor_offset = selected.index(anchor_item)
+        boundary = remaining.index(target_item) + (1 if after else 0)
+        insertion = max(0, min(len(remaining), boundary - anchor_offset))
+        reordered = remaining[:insertion] + selected + remaining[insertion:]
+        if reordered == rows:
+            return None
+        return rows, selected_items, reordered
+
+    def show_layer_group_drop_indicator(self, anchor_item, target_item, after=False):
+        plan = self._layer_group_drop_plan(anchor_item, target_item, after)
+        if plan is None:
+            self.hide_layer_group_drop_indicator()
+            return
+        _rows, selected_items, reordered = plan
+        first_group_row = next(item for item in reordered if item in selected_items)
+        insertion = reordered.index(first_group_row)
+        remaining = [item for item in _rows if item not in selected_items]
+        if insertion < len(remaining):
+            y = self.layer_list.visualItemRect(remaining[insertion]).top()
+        elif remaining:
+            y = self.layer_list.visualItemRect(remaining[-1]).bottom()
+        else:
+            y = 1
+
+        viewport = self.layer_list.viewport()
+        if self._layer_group_drop_indicator is None:
+            indicator = QFrame(viewport)
+            indicator.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+            indicator.setStyleSheet(
+                f'background: {theme_color("accent")}; border: none;'
+            )
+            self._layer_group_drop_indicator = indicator
+        self._layer_group_drop_indicator.setGeometry(
+            3, max(0, y - 1), max(1, viewport.width() - 6), 3
+        )
+        self._layer_group_drop_indicator.raise_()
+        self._layer_group_drop_indicator.show()
+
+    def hide_layer_group_drop_indicator(self):
+        if self._layer_group_drop_indicator is not None:
+            self._layer_group_drop_indicator.hide()
 
     def _on_layer_reordered(self, parent, start, end, destination, row):
         count = self.layer_list.count()
@@ -2185,7 +2725,17 @@ class EditorWindow(QMainWindow):
             if target:
                 items_in_order.append(target)
                 
-        objects = [item for item in items_in_order if not isinstance(item, BackgroundItem) and not getattr(item, 'is_document_background', False)]
+        for shape in self._mask_shapes():
+            displayed_children = [item for item in items_in_order if item.parentItem() is shape]
+            for mask_order, child in enumerate(reversed(displayed_children)):
+                child.mask_order = mask_order
+                child.setZValue(mask_order + 1)
+        objects = [
+            item for item in items_in_order
+            if not isinstance(item, BackgroundItem)
+            and not getattr(item, 'is_document_background', False)
+            and not isinstance(item.parentItem(), RectangleItem)
+        ]
         for index, item in enumerate(reversed(objects)):
             item.setZValue(index)
         
@@ -2193,10 +2743,184 @@ class EditorWindow(QMainWindow):
         self.refresh_layer_list()
         self.save_snapshot()
 
+    @staticmethod
+    def _is_mask_image(item):
+        return (
+            isinstance(item, ImageItem)
+            and not isinstance(item, (RectangleItem, BackgroundItem, SignatureItem))
+        )
+
+    def _mask_shapes(self):
+        return [
+            item for item in self.scene.items()
+            if isinstance(item, RectangleItem)
+            and not getattr(item, 'is_document_background', False)
+            and getattr(item, 'shape_type', '') in ('rectangle', 'ellipse', 'circle')
+        ]
+
+    def _free_mask_images(self):
+        return [
+            item for item in self.scene.items()
+            if self._is_mask_image(item) and not isinstance(item.parentItem(), RectangleItem)
+        ]
+
+    def create_mask(self, image, shape):
+        """Vincula uma imagem a uma forma e abre o enquadramento não destrutivo."""
+        if not self._is_mask_image(image) or shape not in self._mask_shapes():
+            return False
+        if isinstance(image.parentItem(), RectangleItem):
+            return False
+        before = self.get_current_scene_state()
+        if getattr(shape, 'mask_group_id', None) is None:
+            shape.mask_group_id = self._next_group_id()
+        shape_center = shape.rect().center()
+        image.setParentItem(shape)
+        image.mask_shape_id = f"shape:{shape.layer_id}"
+        image.mask_order = len(shape.masked_images()) - 1
+        image.setPos(
+            shape_center.x() - image.rect().width() / 2,
+            shape_center.y() - image.rect().height() / 2,
+        )
+        image.setZValue(image.mask_order + 1)
+        shape.refresh_mask_structure()
+        self.refresh_layer_list()
+        self.begin_mask_edit(image, before_state=before)
+        return True
+
+    def begin_mask_edit(self, image, before_state=None):
+        shape = image.parentItem() if self._is_mask_image(image) else None
+        if not isinstance(shape, RectangleItem):
+            return False
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
+        before_state = copy.deepcopy(before_state or self.get_current_scene_state())
+        tracked = [shape, *shape.masked_images()]
+        flags = {
+            item: (
+                bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
+                bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable),
+                item.acceptedMouseButtons(),
+            )
+            for item in tracked
+        }
+        self._mask_edit_session = {
+            'image': image,
+            'shape': shape,
+            'before': before_state,
+            'flags': flags,
+        }
+        self._changing_mask_selection = True
+        try:
+            shape._mask_editing = True
+            shape.refresh_mask_structure()
+            for child in shape.masked_images():
+                active = child is image
+                child.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, active)
+                child.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, active)
+                child.setAcceptedMouseButtons(
+                    Qt.MouseButton.LeftButton if active else Qt.MouseButton.NoButton
+                )
+            shape.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+            shape.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+            shape.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+            self.scene.clearSelection()
+            image.setSelected(True)
+        finally:
+            self._changing_mask_selection = False
+        self.shortcut_finish_mask.setEnabled(True)
+        self.shortcut_cancel_mask.setEnabled(True)
+        self.on_selection_changed()
+        if hasattr(self, '_refresh_mask_controls'):
+            self._refresh_mask_controls()
+        self.scene.update()
+        return True
+
+    def finish_mask_edit(self, commit=True):
+        session = self._mask_edit_session
+        if not session:
+            return False
+        self._mask_edit_session = None
+        self.shortcut_finish_mask.setEnabled(False)
+        self.shortcut_cancel_mask.setEnabled(False)
+        shape = session['shape']
+        if shape.scene() is self.scene:
+            shape._mask_editing = False
+            for item, (movable, selectable, buttons) in session['flags'].items():
+                if item.scene() is self.scene:
+                    item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, movable)
+                    item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, selectable)
+                    item.setAcceptedMouseButtons(buttons)
+            shape.refresh_mask_structure()
+        if not commit:
+            selected_id = getattr(session['image'], 'layer_id', None)
+            self._switching_page = True
+            try:
+                self.apply_scene_state(copy.deepcopy(session['before']), is_undo_redo=True)
+            finally:
+                self._switching_page = False
+            for item in self.scene.items():
+                if getattr(item, 'layer_id', None) == selected_id:
+                    item.setSelected(True)
+                    break
+        else:
+            self.save_snapshot()
+        self.refresh_layer_list()
+        self.on_selection_changed()
+        if hasattr(self, '_refresh_mask_controls'):
+            self._refresh_mask_controls()
+        self.scene.update()
+        return True
+
+    def remove_mask(self, selected=None, record=True):
+        selected = selected or self._get_selected()
+        if selected is None:
+            return False
+        if self._mask_edit_session:
+            self.finish_mask_edit(True)
+        if self._is_mask_image(selected) and isinstance(selected.parentItem(), RectangleItem):
+            shape = selected.parentItem()
+            images = [selected]
+            release_above = True
+        elif isinstance(selected, RectangleItem):
+            shape = selected
+            images = shape.masked_images()
+            release_above = False
+        else:
+            return False
+        if not images:
+            return False
+        image_count = len(images)
+        for index, image in enumerate(images):
+            scene_origin = image.mapToScene(QPointF(0, 0))
+            scene_rotation = shape.rotation() + image.rotation()
+            image.setParentItem(None)
+            image.mask_shape_id = None
+            image.mask_order = 0
+            image.setPos(scene_origin)
+            image.setRotation(scene_rotation)
+            if release_above:
+                image.setZValue(shape.zValue() + 0.01)
+            else:
+                # Ao desfazer a máscara pela forma, preserva a composição logo
+                # abaixo dela e mantém a ordem relativa que existia no grupo.
+                image.setZValue(shape.zValue() - (image_count - index) * 0.01)
+        for order, child in enumerate(shape.masked_images()):
+            child.mask_order = order
+            child.setZValue(order + 1)
+        if not shape.masked_images():
+            shape.mask_group_id = None
+        shape.refresh_mask_structure()
+        self.refresh_layer_list()
+        if record:
+            self.save_snapshot()
+        self.on_selection_changed()
+        return True
+
     def _next_object_z(self):
         return max((item.zValue() for item in self.scene.items()
                     if isinstance(item, (DesignerBox, ImageItem, SignatureItem))
-                    and not isinstance(item, BackgroundItem)), default=-1) + 1
+                    and not isinstance(item, BackgroundItem)
+                    and not isinstance(item.parentItem(), RectangleItem)), default=-1) + 1
 
     def _ensure_background_rectangle(self):
         rect = self._get_document_rect()
@@ -2232,7 +2956,7 @@ class EditorWindow(QMainWindow):
         )
         
         if ok and new_name.strip():
-            item.custom_name = new_name.strip()
+            item.custom_name = self._unique_layer_name(new_name.strip(), exclude=item)
             
             # 2. Atualizar a lista (isso limpa a seleção)
             self.refresh_layer_list()
@@ -2354,6 +3078,14 @@ class EditorWindow(QMainWindow):
                     item.hide_resize_handles()
             else:
                 item.setAcceptedMouseButtons(Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton) # Restaura a detecção de cliques
+            if isinstance(item, RectangleItem):
+                for child in item.masked_images():
+                    child.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, not new_locked)
+                    child.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, not new_locked)
+                    child.setAcceptedMouseButtons(
+                        Qt.MouseButton.NoButton if new_locked
+                        else Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
+                    )
                 
             # Aplica opacidade 1.0 (trancado) ou 0.15 (destrancado)
             effect.setOpacity(1.0 if new_locked else 0.15)
@@ -2403,6 +3135,16 @@ class EditorWindow(QMainWindow):
                 
                 btn_vis.clicked.connect(lambda checked=False, itm=item, eff=effect_vis, b=btn_vis: toggle_item_visibility(itm, eff, b))
                 ly.addWidget(btn_vis)
+
+                is_mask_child = self._is_mask_image(item) and isinstance(item.parentItem(), RectangleItem)
+                if is_mask_child:
+                    link_icon = QLabel()
+                    link_icon.setFixedSize(16, 20)
+                    link_icon.setPixmap(themed_svg_icon(
+                        navigation_icon_path('layer-child')
+                    ).pixmap(14, 14))
+                    link_icon.setToolTip(tr('Imagem vinculada a esta máscara'))
+                    ly.addWidget(link_icon)
                 
                 # --- Nome da Camada (CENTRO) ---
                 lbl = ElidedLayerLabel(display_name)
@@ -2410,6 +3152,40 @@ class EditorWindow(QMainWindow):
                 if is_locked:
                     lbl.setStyleSheet("color: #888888; font-style: italic;")
                 ly.addWidget(lbl, 1) # Toma todo o espaço restante
+
+                def add_group_badge(number, tooltip, callback):
+                    badge = LayerGroupBadge(
+                        str(number), self.layer_list, list_item, callback
+                    )
+                    badge.setFixedSize(20, 20)
+                    badge.setToolTip(tooltip)
+                    badge.setStyleSheet(
+                        f"QPushButton {{ border: 1px solid {theme_color('accent')}; border-radius: 5px; "
+                        f"padding: 0; background: transparent; color: {theme_color('accent')}; "
+                        "font-family: Inter; font-size: 10px; font-weight: 700; } "
+                        f"QPushButton:hover {{ background: {theme_color('selection')}; }}"
+                    )
+                    ly.addWidget(badge)
+
+                mask_shape = (
+                    item.parentItem() if is_mask_child else
+                    item if isinstance(item, RectangleItem) and item.masked_images() else None
+                )
+                mask_group_id = getattr(mask_shape, 'mask_group_id', None)
+                if mask_group_id is not None:
+                    add_group_badge(
+                        mask_group_id,
+                        tr('Máscara {numero}').format(numero=mask_group_id),
+                        lambda checked=False, shape=mask_shape: self.select_mask_group(shape),
+                    )
+
+                group_id = getattr(self._group_root(item), 'group_id', None)
+                if group_id is not None and not is_mask_child:
+                    add_group_badge(
+                        group_id,
+                        tr('Grupo {numero}').format(numero=group_id),
+                        lambda checked=False, gid=group_id: self.select_group(gid),
+                    )
                 
                 # --- Botão Bloqueio (Cadeado - DIREITA) ---
                 btn_lock = QPushButton()
@@ -2436,8 +3212,16 @@ class EditorWindow(QMainWindow):
                 self.layer_list.addItem(list_item)
                 self.layer_list.setItemWidget(list_item, w)
 
-        objects = assinaturas + textos + imagens
-        add_items(sorted(objects, key=lambda item: (item.zValue(), -(item.layer_id or 0)), reverse=True))
+        objects = [
+            item for item in assinaturas + textos + imagens
+            if not isinstance(item.parentItem(), RectangleItem)
+        ]
+        for item in sorted(objects, key=lambda value: (value.zValue(), -(value.layer_id or 0)), reverse=True):
+            add_items([item])
+            if isinstance(item, RectangleItem):
+                add_items(sorted(item.masked_images(),
+                                 key=lambda child: child.mask_order,
+                                 reverse=True))
         if fundo:
             # A base branca é parte do documento e nunca um objeto editável.
             fundo.setVisible(False)
@@ -2488,6 +3272,7 @@ class EditorWindow(QMainWindow):
                     "indent_px": item.state.indent_px,
                     "line_height": item.state.line_height,
                     "layer_id": getattr(item, 'layer_id', None),
+                    "group_id": getattr(item, 'group_id', None),
                     "keep_proportion": getattr(item, 'keep_proportion', True),
                     "z_value": round(float(item.zValue()), 2)
                 })
@@ -2508,6 +3293,7 @@ class EditorWindow(QMainWindow):
                     "longest_side": round(float(max(pix_rect.width(), pix_rect.height())), 2),
                     "rotation": round(float(item.rotation()), 2),
                     "layer_id": getattr(item, 'layer_id', None),
+                    "group_id": getattr(item, 'group_id', None),
                     "keep_proportion": getattr(item, 'keep_proportion', True),
                     "z_value": round(float(item.zValue()), 2)
                 })
@@ -2515,6 +3301,7 @@ class EditorWindow(QMainWindow):
             elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
                 pos = item.pos()
                 pix_rect = item.rect() if hasattr(item, 'rect') else item.pixmap().rect()
+                mask_parent = item.parentItem() if self._is_mask_image(item) else None
                 images_data.append({
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
@@ -2530,8 +3317,14 @@ class EditorWindow(QMainWindow):
                     "has_link": getattr(item, "has_link", False),
                     "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
                     "layer_id": getattr(item, 'layer_id', None),
+                    "group_id": getattr(item, 'group_id', None),
                     "keep_proportion": getattr(item, 'keep_proportion', True),
-                    "z_value": round(float(item.zValue()), 2)
+                    "z_value": round(float(item.zValue()), 4),
+                    "mask_shape_id": (
+                        f"shape:{mask_parent.layer_id}"
+                        if isinstance(mask_parent, RectangleItem) else None
+                    ),
+                    "mask_order": int(getattr(item, 'mask_order', 0)),
                 })
 
         ordered_placeholders = [self.lst_placeholders.item(i).text() for i in range(self.lst_placeholders.count())]
@@ -2580,6 +3373,7 @@ class EditorWindow(QMainWindow):
                 entry.pop('path', None)
                 entry.update(item.style_data())
                 entry['is_document_background'] = getattr(item, 'is_document_background', False)
+                entry['mask_group_id'] = getattr(item, 'mask_group_id', None)
                 shapes.append(entry)
         data['shapes'] = shapes
         data['editable_background_initialized'] = True
@@ -2590,7 +3384,19 @@ class EditorWindow(QMainWindow):
             for index, entry in enumerate(data[group]):
                 entry['object_id'] = f"{kind}:{entry.get('layer_id', index)}"
                 entries.append(entry)
-        data['layer_order'] = [entry['object_id'] for entry in sorted(entries, key=lambda entry: entry['z_value'])]
+        by_mask = {}
+        for entry in data['images']:
+            if entry.get('mask_shape_id'):
+                by_mask.setdefault(entry['mask_shape_id'], []).append(entry)
+        masked_ids = {entry['object_id'] for values in by_mask.values() for entry in values}
+        roots = [entry for entry in entries if entry['object_id'] not in masked_ids]
+        order = []
+        for entry in sorted(roots, key=lambda value: value['z_value']):
+            order.append(entry['object_id'])
+            children = sorted(by_mask.get(entry['object_id'], []),
+                              key=lambda value: value.get('mask_order', 0))
+            order.extend(child['object_id'] for child in children)
+        data['layer_order'] = order
         return data
 
     def apply_scene_state(self, data: dict, is_undo_redo: bool = False):
@@ -2679,6 +3485,7 @@ class EditorWindow(QMainWindow):
                 sig = SignatureItem(str(sig_path))
                 sig.custom_name = sig_data.get("custom_name", "")
                 sig.layer_id = sig_data.get("layer_id")
+                sig.group_id = sig_data.get("group_id")
                 sig.setPos(sig_data["x"], sig_data["y"])
                 if "width" in sig_data and "height" in sig_data:
                     sig.resize_custom(sig_data["width"], sig_data["height"])
@@ -2707,6 +3514,7 @@ class EditorWindow(QMainWindow):
                 img = ImageItem(str(img_path))
                 img.custom_name = img_data.get("custom_name", "")
                 img.layer_id = img_data.get("layer_id")
+                img.group_id = img_data.get("group_id")
                 img.setPos(img_data.get("x", 0), img_data.get("y", 0))
                 
                 if "width" in img_data and "height" in img_data:
@@ -2719,6 +3527,8 @@ class EditorWindow(QMainWindow):
                 img.keep_proportion = img_data.get("keep_proportion", True)
                 img.setZValue(img_data.get("z_value", 1))
                 img.has_link = img_data.get("has_link", False)
+                img.mask_shape_id = img_data.get("mask_shape_id")
+                img.mask_order = int(img_data.get("mask_order", 0))
                 img.setVisible(img_data.get("visible", True))
                 img.setOpacity(img_data.get("opacity", 1.0))
                 if img_data.get("locked", False):
@@ -2739,11 +3549,14 @@ class EditorWindow(QMainWindow):
             box.custom_name = b.get("custom_name", "")
             box.state.rich_text_version = b.get('rich_text_version', 0)
             box.layer_id = b.get("layer_id")
+            box.group_id = b.get("group_id")
             
             if "html" in b:
                 box.state.html_content = b["html"]
                 
-            box.state.font_family = self._resolve_editor_font_family(b.get("font_family", "Arial"), available_fonts)
+            box.state.font_family = self._resolve_editor_font_family(
+                b.get("font_family", DOCUMENT_FONT_FAMILY), available_fonts
+            )
             box.state.font_size = b.get("font_size", 16)
             box.state.font_color = b.get("font_color", "#000000")
             box.state.vertical_align = b.get("vertical_align", "top")
@@ -2812,6 +3625,8 @@ class EditorWindow(QMainWindow):
                 item.corner_radii = {key: radius for key in (
                     'top_left', 'top_right', 'bottom_right', 'bottom_left')}
             item.layer_id = entry.get('layer_id')
+            item.group_id = entry.get('group_id')
+            item.mask_group_id = entry.get('mask_group_id')
             item.custom_name = entry.get('custom_name', 'Plano de fundo')
             item.setPos(entry.get('x', 0), entry.get('y', 0))
             item.setRotation(entry.get('rotation', 0))
@@ -2828,6 +3643,24 @@ class EditorWindow(QMainWindow):
                     ('is_document_background' not in entry and entry.get('custom_name') == 'Plano de fundo')):
                 if not any(getattr(other, 'is_document_background', False) for other in self.scene.items() if other is not item):
                     item.bind_document(self._get_document_rect())
+        shapes_by_id = {
+            f"shape:{item.layer_id}": item
+            for item in self.scene.items()
+            if isinstance(item, RectangleItem)
+        }
+        for image in [item for item in self.scene.items() if self._is_mask_image(item)]:
+            shape = shapes_by_id.get(getattr(image, 'mask_shape_id', None))
+            if shape is None:
+                image.mask_shape_id = None
+                continue
+            stored_pos = QPointF(image.pos())
+            image.setParentItem(shape)
+            image.setPos(stored_pos)
+            image.setZValue(image.mask_order + 1)
+        for shape in shapes_by_id.values():
+            if shape.masked_images() and getattr(shape, 'mask_group_id', None) is None:
+                shape.mask_group_id = self._next_group_id()
+            shape.refresh_mask_structure()
         self._ensure_background_rectangle()
 
         # Atualiza Placeholders e Lista de Camadas
@@ -2857,7 +3690,7 @@ class EditorWindow(QMainWindow):
 
     def save_snapshot(self):
         """Dispara um salvamento na memória (chamado ao soltar o mouse ou terminar uma edição)."""
-        if getattr(self, '_restoring_history', False):
+        if getattr(self, '_restoring_history', False) or self._mask_edit_session:
             return
         state = self._capture_document_history_state()
         if self.history._current_index >= 0:
@@ -2874,6 +3707,7 @@ class EditorWindow(QMainWindow):
             del self._pending_history_page_id
 
     def undo(self):
+        self._finish_page_interaction()
         current = None
         if self.history._current_index >= 0:
             current = self.history._undo_stack[self.history._current_index]
@@ -2883,6 +3717,7 @@ class EditorWindow(QMainWindow):
             self._restore_history_state(state, preferred_page=preferred)
 
     def redo(self):
+        self._finish_page_interaction()
         state = self.history.redo()
         if state:
             self._restore_history_state(state, preferred_page=state.get("__action_page_id"))
@@ -2989,6 +3824,15 @@ class EditorWindow(QMainWindow):
         self.btn_dup_layer.setStyleSheet(btn_style)
         self.btn_dup_layer.clicked.connect(self.duplicate_selected)
 
+        self.btn_group_layer = QPushButton()
+        self.btn_group_layer.setIcon(themed_svg_icon(action_icon_path("unlock ratio")))
+        self.btn_group_layer.setIconSize(QSize(18, 18))
+        self.btn_group_layer.setFixedSize(32, 30)
+        self.btn_group_layer.setStyleSheet(btn_style)
+        self.btn_group_layer.setEnabled(False)
+        self.btn_group_layer.setToolTip(tr('Agrupar objetos selecionados (Ctrl+G)'))
+        self.btn_group_layer.clicked.connect(self.toggle_selected_group)
+
         self.btn_del_layer = QPushButton()
         self.btn_del_layer.setIcon(QIcon(str(action_icon_path("delete"))))
         self.btn_del_layer.setIconSize(QSize(18, 18))
@@ -3007,6 +3851,7 @@ class EditorWindow(QMainWindow):
         layout.addStretch() # Empurra os próximos botões para a direita
         layout.addWidget(self.btn_ren_layer) # <- NOVO BOTÃO AQUI
         layout.addWidget(self.btn_dup_layer)
+        layout.addWidget(self.btn_group_layer)
         layout.addWidget(self.btn_del_layer)
 
         return container

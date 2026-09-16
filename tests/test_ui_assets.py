@@ -58,7 +58,7 @@ def test_action_icons_are_valid_svg_icons():
     for name in (
         "link", "lock ratio", "unlock ratio", "rotate-left", "rotate-right",
         "undo", "redo", "delete", "duplicate", "edit", "expand-content",
-        "more", "more-vertical",
+        "more", "more-vertical", "group",
     ):
         path = action_icon_path(name)
         assert path.is_file()
@@ -83,7 +83,7 @@ def test_navigation_icons_are_valid_svg_icons():
 
     for name in (
         "chevron-down", "chevron-up", "double-chevron-left",
-        "double-chevron-right", "left-arrow", "right-arrow",
+        "double-chevron-right", "left-arrow", "right-arrow", "layer-child",
     ):
         path = navigation_icon_path(name)
         assert path.is_file()

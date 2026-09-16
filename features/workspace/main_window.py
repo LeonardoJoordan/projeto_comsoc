@@ -5,6 +5,7 @@ import json
 import tempfile
 import copy
 import time
+from datetime import datetime
 from pathlib import Path
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
@@ -29,7 +30,6 @@ from features.workspace.export_models_dialog import ExportModelsDialog
 from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 from core.settings import get_app_settings
-from core.font_utils import format_font_list, missing_template_fonts
 from core.render_cache import ensure_background_proxy, get_thumbnail_cache_path
 from core.resources import object_icon_path
 from core.output_folders import create_forge_output_dir
@@ -46,6 +46,8 @@ from core.model_document import (
     resolve_model_file,
     save_model_document,
 )
+from core.model_info import build_model_snapshot, current_model_snapshot, ensure_origin_info
+from features.workspace.model_info_dialog import ModelInfoDialog
 from features.spreadsheet.headers import SIGNATURE_HEADER, quantity_header_label, is_quantity_header
 
 
@@ -262,6 +264,7 @@ class MainWindow(QMainWindow):
         self._inactive_table_fields = set()
         self.preview_renderer = None # Persistência do Renderer para o Live Preview
         self._preview_renderers = []
+        self.settings = get_app_settings()
         
         # Garante que um usuário novato não veja uma tela em branco
         self._ensure_starter_pack()
@@ -288,8 +291,6 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_import_models.clicked.connect(self._on_import_models)
         self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
 
-        self.settings = get_app_settings()
-        
         # Restaura a geometria e o estado da janela (posição e tamanho)
         geometry = self.settings.value("geometry")
         if geometry:
@@ -376,20 +377,28 @@ class MainWindow(QMainWindow):
             if not folder.is_dir(): continue
             try:
                 data = load_model_document(folder)
-                found.append(data.get("name", folder.name))
+                found.append((folder.name, data.get("name", folder.name)))
             except Exception:
                 continue
 
-        for name in found:
-            self.preview_panel.cbo_models.addItem(name)
+        for model_id, name in found:
+            self.preview_panel.cbo_models.addItem(name, model_id)
 
         self.preview_panel.cbo_models.blockSignals(False)
 
-        target_index = 0 
+        target_index = 0
         if select_name:
             idx = self.preview_panel.cbo_models.findText(select_name)
             if idx >= 0:
                 target_index = idx
+        else:
+            last_model_id = str(
+                self.settings.value("workspace/last_model_id", "") or ""
+            )
+            if last_model_id:
+                idx = self.preview_panel.cbo_models.findData(last_model_id)
+                if idx >= 0:
+                    target_index = idx
 
         if self.preview_panel.cbo_models.count() > 0:
             self.preview_panel.cbo_models.setCurrentIndex(target_index)
@@ -528,8 +537,6 @@ class MainWindow(QMainWindow):
                 names = set(zip_ref.namelist())
                 
                 models_in_zip = {} # Mapeamento (Nome Legível do JSON -> Nome da Pasta no Zip)
-                missing_fonts_by_model = {}
-                
                 for zip_slug in sorted(top_level_folders):
                     json_path = next((f"{zip_slug}/{filename}" for filename in (V4_FILENAME, V3_FILENAME)
                                       if f"{zip_slug}/{filename}" in names), None)
@@ -540,7 +547,6 @@ class MainWindow(QMainWindow):
                             document = normalize_model_document(json.loads(f.read().decode('utf-8')))
                             name = document.get("name", zip_slug)
                             models_in_zip[name] = zip_slug
-                            missing_fonts_by_model[name] = missing_template_fonts(document)
                     except (KeyError, ValueError, UnicodeError, json.JSONDecodeError):
                         continue
                         
@@ -551,7 +557,7 @@ class MainWindow(QMainWindow):
                 # Etapa 2: Checagem de Conflitos e Abertura da Janela de Decisão
                 existing_slugs = set(d.name for d in models_dir.iterdir() if d.is_dir())
                 
-                dlg = ImportModelsDialog(self, list(models_in_zip.keys()), existing_slugs, missing_fonts_by_model)
+                dlg = ImportModelsDialog(self, list(models_in_zip.keys()), existing_slugs)
                 if not dlg.exec():
                     return # O usuário clicou em Cancelar
                     
@@ -601,6 +607,9 @@ class MainWindow(QMainWindow):
                             # Entra no modelo temporário e atualiza o JSON dele silenciosamente
                             imported_document['name'] = target_name
 
+                        imported_document["origin_info"] = build_model_snapshot(
+                            imported_document, source="imported"
+                        )
                         save_model_document(imported_document, source_dir)
                         
                         # Instala a pasta completa e restaura a versão anterior se
@@ -700,6 +709,11 @@ class MainWindow(QMainWindow):
             self._update_table_columns([])
             return
 
+        model_id = self.preview_panel.cbo_models.currentData()
+        if model_id:
+            self.settings.setValue("workspace/last_model_id", str(model_id))
+            self.settings.sync()
+
         slug = slugify_model_name(name)
         model_dir = get_models_dir() / slug
         try:
@@ -751,14 +765,6 @@ class MainWindow(QMainWindow):
                     self._refresh_imposition_presets()
                     self._refresh_preview_navigation()
 
-                    missing_fonts = missing_template_fonts(document)
-                    if missing_fonts:
-                        if len(missing_fonts) == 1:
-                            msg = tr("Este modelo usa uma fonte não encontrada no sistema: {fontes}").format(fontes=format_font_list(missing_fonts))
-                        else:
-                            msg = tr("Este modelo usa fontes não encontradas no sistema: {fontes}").format(fontes=format_font_list(missing_fonts))
-                        self.log_panel.append(tr("<b>AVISO:</b> {mensagem}").format(mensagem=msg))
-                    
                     try:
                         # Cria o "Chef" na memória (operação ultraleve, sem desenho)
                         self._preview_renderers = renderers_for_document(document)
@@ -1193,13 +1199,8 @@ class MainWindow(QMainWindow):
         model_dir = get_models_dir() / slug
         try:
             json_path = resolve_model_file(model_dir)
-            missing_fonts = missing_template_fonts(load_model_document(model_dir))
         except Exception:
             json_path = None
-            missing_fonts = []
-
-        if missing_fonts and not self._confirm_open_model_with_missing_fonts(missing_fonts):
-            return
 
         self.editor_window = EditorWindow(self)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
@@ -1209,26 +1210,27 @@ class MainWindow(QMainWindow):
         
         self.editor_window.show()
 
-    def _confirm_open_model_with_missing_fonts(self, missing_fonts: list[str]) -> bool:
-        font_names = format_font_list(missing_fonts)
-        if len(missing_fonts) == 1:
-            headline = tr("Está faltando a fonte {fontes}.").format(fontes=font_names)
-        else:
-            headline = tr("Estão faltando as fontes {fontes}.").format(fontes=font_names)
-
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle(tr("Fonte ausente"))
-        msg_box.setIcon(QMessageBox.Icon.Warning)
-        msg_box.setText(
-            tr("<b>{aviso}</b><br><br>Se você prosseguir para a edição, a fonte será substituída pela fonte padrão do sistema e o modelo sofrerá uma mudança visual.").format(aviso=headline)
-        )
-
-        btn_cancel = msg_box.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
-        btn_open = msg_box.addButton(tr("Abrir mesmo assim"), QMessageBox.ButtonRole.AcceptRole)
-        msg_box.setDefaultButton(btn_cancel)
-        msg_box.exec()
-
-        return msg_box.clickedButton() == btn_open
+    def _open_model_info_dialog(self):
+        model_name = self.preview_panel.cbo_models.currentText()
+        if not model_name:
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo primeiro."))
+            return
+        model_id = self.preview_panel.cbo_models.currentData()
+        model_dir = get_models_dir() / str(model_id or slugify_model_name(model_name))
+        try:
+            document = load_model_document(model_dir)
+            if not isinstance(document.get("origin_info"), dict):
+                document = ensure_origin_info(document, source="legacy")
+                save_model_document(document, model_dir)
+            model_file = resolve_model_file(model_dir)
+            saved_at = datetime.fromtimestamp(model_file.stat().st_mtime).astimezone().isoformat(timespec="seconds")
+            current = current_model_snapshot(document, captured_at=saved_at)
+            ModelInfoDialog(document["origin_info"], current, self).exec()
+        except Exception as error:
+            QMessageBox.critical(
+                self, tr("Erro"),
+                tr("Não foi possível ler as informações do modelo:\n{erro}").format(erro=error),
+            )
 
     def _on_editor_saved(self, model_name, placeholders, file_path, *, previous_name=None):
         table = self.table_panel.table

@@ -6,14 +6,13 @@ from core.template_manager import slugify_model_name
 from core.i18n import tr
 
 class ImportModelsDialog(QDialog):
-    def __init__(self, parent, zip_models, existing_slugs, missing_fonts_by_model=None):
+    def __init__(self, parent, zip_models, existing_slugs):
         super().__init__(parent)
         self.setWindowTitle(tr("Importação de modelos"))
         self.resize(900, 500)
         
         self.zip_models = zip_models
         self.existing_slugs = existing_slugs
-        self.missing_fonts_by_model = missing_fonts_by_model or {}
         self.decisions = {}
         
         layout = QVBoxLayout(self)
@@ -96,14 +95,8 @@ class ImportModelsDialog(QDialog):
             self.table.setItem(row, 1, QTableWidgetItem(model_name))
             
             # 3. Coluna Observação
-            missing_fonts = self.missing_fonts_by_model.get(model_name, [])
-            if missing_fonts:
-                label = tr("Fonte ausente") if len(missing_fonts) == 1 else tr("Fontes ausentes")
-                item_note = QTableWidgetItem(f"{label}: {', '.join(missing_fonts)}")
-                item_note.setForeground(Qt.GlobalColor.darkYellow)
-            else:
-                item_note = QTableWidgetItem("-")
-                item_note.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            item_note = QTableWidgetItem("-")
+            item_note.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, 2, item_note)
             
             # 4. Colunas Status e Resolução

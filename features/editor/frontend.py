@@ -14,7 +14,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QIcon, QPixmap
 from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtGui import QPainter
-from .canvas_items import mm_to_px, px_to_mm
+from .canvas_items import RectangleItem, mm_to_px, px_to_mm
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QSplitter, QFrame, QLineEdit, QAbstractSpinBox, QColorDialog,
@@ -542,6 +542,7 @@ def install_frontend(w):
     for b, label, asset_name in [
         (w.btn_ren_layer, tr('Renomear'), 'edit'),
         (w.btn_dup_layer, tr('Duplicar'), 'duplicate'),
+        (w.btn_group_layer, tr('Agrupar'), 'unlock ratio'),
         (w.btn_del_layer, tr('Excluir'), 'delete'),
     ]:
         b.setText('')
@@ -618,6 +619,7 @@ def install_frontend(w):
             selected[0].fill_color = color.name()
             selected[0].fill_opacity = fill_alpha.value() / 100
             selected[0].update()
+            selected[0].refresh_mask_structure()
             shape_color.setText(color.name())
             themed_style(shape_swatch, f'background: {color.name()};')
             w.save_snapshot()
@@ -742,6 +744,7 @@ def install_frontend(w):
             item.corner_radii_linked = sync_radii.isChecked()
             item.corner_radius = item.corner_radii['top_left']
             item.update()
+            item.refresh_mask_structure()
             w.save_snapshot()
         finally:
             updating_radii['active'] = False
@@ -826,6 +829,7 @@ def install_frontend(w):
             item.outline_width = mm_to_px(outline_width.value())
         item.outline_position = 'center' if is_line else ('inside' if getattr(item, 'is_document_background', False) else outline_position.currentData())
         item.update()
+        item.refresh_mask_structure()
         themed_style(outline_swatch, f'background: {color.name()};')
         for control in (outline_color, outline_swatch, outline_width, outline_position, outline_alpha, outline_join):
             control.setEnabled(item.outline_enabled)
@@ -850,6 +854,136 @@ def install_frontend(w):
     p.chk_link.setText(tr('Habilitar link'))
     p.chk_link.setToolTip(tr('Adiciona ao objeto um link clicável nos arquivos PDF.'))
     row(pl, p.btn_restore, p.chk_link)
+
+    mask_controls, mask_layout = column()
+    mask_controls.setObjectName('maskControls')
+    mask_layout.setContentsMargins(0, 8, 0, 0)
+    mask_layout.setSpacing(6)
+    mask_heading = QLabel(tr('MÁSCARA'))
+    mask_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    themed_style(mask_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
+    mask_layout.addWidget(mask_heading)
+    mask_status = QLabel()
+    mask_status.setObjectName('muted')
+    mask_status.setWordWrap(True)
+    mask_layout.addWidget(mask_status)
+    mask_target = QComboBox()
+    mask_target.setObjectName('maskTarget')
+    mask_layout.addWidget(mask_target)
+    mask_create = QPushButton()
+    mask_create.setObjectName('maskCreate')
+    mask_layout.addWidget(mask_create)
+    mask_child = QComboBox()
+    mask_child.setObjectName('maskChild')
+    mask_layout.addWidget(mask_child)
+    mask_actions = row(mask_layout)
+    mask_edit = QPushButton(tr('Editar máscara'))
+    mask_remove = QPushButton(tr('Remover máscara'))
+    mask_edit.setObjectName('maskEdit')
+    mask_remove.setObjectName('maskRemove')
+    mask_actions.addWidget(mask_edit, 1)
+    mask_actions.addWidget(mask_remove, 1)
+    mask_session_actions = row(mask_layout)
+    mask_cancel = QPushButton(tr('Cancelar mascaramento'))
+    mask_finish = QPushButton(tr('Concluir mascaramento'))
+    mask_cancel.setObjectName('maskCancel')
+    mask_finish.setObjectName('primary')
+    mask_session_actions.addWidget(mask_cancel, 1)
+    mask_session_actions.addWidget(mask_finish, 1)
+    pl.addWidget(mask_controls)
+
+    def refresh_mask_controls():
+        from .canvas_items import RectangleItem
+        selected = w.scene.selectedItems()
+        item = selected[0] if len(selected) == 1 else None
+        session = w._mask_edit_session
+        mask_controls.setVisible(bool(session) or item is not None)
+        for control in (mask_target, mask_create, mask_child, mask_edit,
+                        mask_remove, mask_cancel, mask_finish):
+            control.setVisible(False)
+        if session:
+            shape = session['shape']
+            image = session['image']
+            mask_status.setText(tr('Editando {image} dentro de {shape}').format(
+                image=w._generate_layer_name(image.layer_id, image),
+                shape=w._generate_layer_name(shape.layer_id, shape),
+            ))
+            mask_cancel.setVisible(True)
+            mask_finish.setVisible(True)
+            return
+        mask_status.clear()
+        if item is None:
+            mask_controls.setVisible(False)
+            return
+        if w._is_mask_image(item):
+            parent = item.parentItem()
+            if isinstance(parent, RectangleItem):
+                mask_status.setText(tr('Imagem vinculada a {shape}').format(
+                    shape=w._generate_layer_name(parent.layer_id, parent)))
+                mask_edit.setVisible(True)
+                mask_remove.setVisible(True)
+            else:
+                shapes = sorted(w._mask_shapes(), key=lambda value: value.custom_name.casefold())
+                if not shapes:
+                    mask_status.setText(tr('Crie uma forma fechada para utilizá-la como máscara.'))
+                    return
+                mask_target.clear()
+                for shape in shapes:
+                    mask_target.addItem(w._generate_layer_name(shape.layer_id, shape), shape)
+                mask_target.setVisible(True)
+                mask_create.setText(tr('Mascarar com'))
+                mask_create.setVisible(True)
+            return
+        if isinstance(item, RectangleItem) and item in w._mask_shapes():
+            children = item.masked_images()
+            free_images = sorted(w._free_mask_images(), key=lambda value: value.custom_name.casefold())
+            if free_images:
+                mask_target.clear()
+                for image in free_images:
+                    mask_target.addItem(w._generate_layer_name(image.layer_id, image), image)
+                mask_target.setVisible(True)
+                mask_create.setText(tr('Usar como máscara'))
+                mask_create.setVisible(True)
+            if children:
+                mask_child.clear()
+                for image in reversed(children):
+                    mask_child.addItem(w._generate_layer_name(image.layer_id, image), image)
+                mask_child.setVisible(True)
+                mask_edit.setVisible(True)
+                mask_remove.setVisible(True)
+                mask_status.setText(tr('{count} imagem(ns) vinculada(s)').format(count=len(children)))
+            elif not free_images:
+                mask_status.setText(tr('Não há imagens disponíveis para mascaramento.'))
+            return
+        mask_controls.setVisible(False)
+
+    def create_selected_mask():
+        selected = w.scene.selectedItems()
+        if len(selected) != 1:
+            return
+        item = selected[0]
+        target = mask_target.currentData()
+        if w._is_mask_image(item):
+            w.create_mask(item, target)
+        elif isinstance(item, RectangleItem):
+            w.create_mask(target, item)
+
+    def edit_selected_mask():
+        selected = w.scene.selectedItems()
+        if len(selected) != 1:
+            return
+        item = selected[0]
+        image = item if w._is_mask_image(item) else mask_child.currentData()
+        if image is not None:
+            w.begin_mask_edit(image)
+
+    mask_create.clicked.connect(create_selected_mask)
+    mask_edit.clicked.connect(edit_selected_mask)
+    mask_remove.clicked.connect(lambda: w.remove_mask())
+    mask_cancel.clicked.connect(lambda: w.finish_mask_edit(False))
+    mask_finish.clicked.connect(lambda: w.finish_mask_edit(True))
+    w._refresh_mask_controls = refresh_mask_controls
+
     prop_section = Section(tr('Propriedades'), props)
     il.addWidget(prop_section)
     t = w.editor_texto_panel
@@ -1195,7 +1329,7 @@ def install_frontend(w):
 
     def sync_enabled():
         from shiboken6 import isValid
-        if not isValid(w.scene):
+        if not isValid(w.scene) or not isValid(p):
             return
         for control in moved:
             control.setEnabled(p.isEnabled())
@@ -1291,6 +1425,7 @@ def install_frontend(w):
             themed_style(shape_swatch, f'background: {selected[0].fill_color};')
             p.btn_restore.setEnabled(False)
             p.set_link_available(not background_selected)
+        refresh_mask_controls()
         selection.setText(tr('SELEÇÃO') + '\n' + (getattr(selected[0], 'layer_name', '') or tr('Objeto selecionado') if selected else tr('Nenhum objeto')))
         if t.isEnabled() and len(selected) == 1:
             color_changed(getattr(selected[0].state, 'font_color', '#000000'))
