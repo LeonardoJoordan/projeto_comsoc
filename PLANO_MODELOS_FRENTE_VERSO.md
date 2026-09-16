@@ -1,6 +1,6 @@
 # Modelos com frente e verso — plano de implementação
 
-Estado: Etapas 0 e 1 concluídas; Etapa 2 aguardando início.
+Estado: Etapas 0–9 concluídas; validação automatizada da Etapa 10 concluída, com verificações nativas e prova física pendentes.
 Base: inspeção do código em 15/09/2026.
 Escopo: FORNAX Forge, editor Qt Widgets atual, uma ou duas páginas por modelo.
 
@@ -290,12 +290,12 @@ Objetivo: visualizar lado do item e face da folha final sem regressão de colage
 
 Objetivo: entregar todos os controles e mensagens com o padrão visual atual.
 
-- [ ] Revisar estados indisponíveis, textos explicativos, confirmações de remoção e contadores.
-- [ ] Usar ícones SVG existentes quando adequados; listar qualquer novo asset necessário sem recorrer a emojis de controle.
-- [ ] Traduzir textos em `pt_BR`, `en_US`, `es_ES`; compilar catálogos e conferir placeholders.
-- [ ] Revisar largura dos controles nos três idiomas, atalhos, foco e acessibilidade por teclado.
-- [ ] Documentar arquivos gerados, Cópias, versão do modelo, recuperação e impressão duplex.
-- [ ] Revisar todos os consumidores do arquivo antigo para encontrar acessos diretos esquecidos.
+- [x] Revisar estados indisponíveis, textos explicativos, confirmações de remoção e contadores.
+- [x] Usar ícones SVG existentes quando adequados; listar qualquer novo asset necessário sem recorrer a emojis de controle.
+- [x] Traduzir textos em `pt_BR`, `en_US`, `es_ES`; compilar catálogos e conferir placeholders.
+- [x] Revisar largura dos controles nos três idiomas, atalhos, foco e acessibilidade por teclado.
+- [x] Documentar arquivos gerados, Cópias, versão do modelo, recuperação e impressão duplex.
+- [x] Revisar todos os consumidores do arquivo antigo para encontrar acessos diretos esquecidos.
 
 **Saída:** não há ações sem implementação, textos incompletos ou caminho que salve só a página ativa.
 
@@ -305,16 +305,16 @@ Objetivo: entregar todos os controles e mensagens com o padrão visual atual.
 
 Objetivo: provar integridade, desempenho e correspondência gráfica antes de disponibilizar a funcionalidade como concluída.
 
-- [ ] Rodar suíte atual e testes novos focados nos riscos deste plano.
-- [ ] Comparar modelos de referência de uma página; conferir texto rico, fonte Amiri e alinhamento vertical, transparência, contorno, imagens, assinaturas e links.
-- [ ] Validar modelo de duas páginas com conteúdos distintos e com conteúdo compartilhado.
-- [ ] Conferir PNG/PDF, dimensões em mm, metadados relevantes, ordem, links e contagens.
-- [ ] Testar importação/exportação ZIP, modelo movido de pasta, duplicação, renomeação, gravação interrompida e recuperação.
-- [ ] Repetir medições da etapa 0; investigar aumento de latência/memória sem justificativa antes de liberar.
-- [ ] Testar rapidamente alternar lado/modelo/modo durante carregamento e encerrar com worker ativo.
+- [x] Rodar suíte atual e testes novos focados nos riscos deste plano.
+- [x] Comparar modelos de referência de uma página; conferir texto rico, fonte Amiri e alinhamento vertical, transparência, contorno, imagens, assinaturas e links.
+- [x] Validar modelo de duas páginas com conteúdos distintos e com conteúdo compartilhado.
+- [x] Conferir PNG/PDF, dimensões em mm, metadados relevantes, ordem, links e contagens.
+- [x] Testar importação/exportação ZIP, modelo movido de pasta, duplicação, renomeação, gravação interrompida e recuperação.
+- [x] Repetir medições da etapa 0; investigar aumento de latência/memória sem justificativa antes de liberar.
+- [x] Testar rapidamente alternar lado/modelo/modo durante carregamento e encerrar com worker ativo.
 - [ ] Validar fluxo visual em Linux, Windows e macOS; registrar plataforma realmente testada e pendências.
 - [ ] Validar prova física duplex com o operador; registrar borda, orientação e resultado.
-- [ ] Registrar limitações conhecidas, versão e caminho de retorno aos backups.
+- [x] Registrar limitações conhecidas, versão e caminho de retorno aos backups.
 
 **Saída:** critérios atendidos com evidências. Teste headless não substitui inspeção visual nativa nem impressão física; itens dependentes do usuário permanecem explicitamente pendentes, sem marcar conclusão total.
 
@@ -362,8 +362,8 @@ Ao concluir uma etapa, marcar seus itens e registrar evidências abaixo. Se houv
 | 6 | Concluída | PNG pag1/pag2; PDF por item multipágina; PDF agrupado ordenado; links por página; publicação temporária e limpeza de falhas; 83 testes + 10 subtestes aprovados | Alinhar decisões de imposição e iniciar a Etapa 7 |
 | 7 | Implementação concluída; nova prova física pendente | Teste físico confirmou coincidência das posições. Em paisagem, o driver deixou o verso de cabeça para baixo; cada cartão e seus links agora recebem rotação interna de 180° sem mudar a vaga. Retrato mantém a inversão de colunas; paisagem mantém a inversão de linhas; rotação automática preservada | Reimprimir em duplex paisagem com virada lateral e confirmar orientação após o corte |
 | 8 | Concluída | Estados independentes de item/cópia, página, folha e face; seletor Frente/Verso; transição item↔folha sincronizada; worker priorizado e cache limitado a 12 faces; respostas obsoletas descartadas; 90 testes + 10 subtestes e 4 testes do editor aprovados | Iniciar revisão de interface, idiomas e documentação da Etapa 9 |
-| 9 | Não iniciada | — | — |
-| 10 | Não iniciada | — | — |
+| 9 | Concluída | Controles de páginas revisados com `more-vertical.svg`, tooltips e nomes acessíveis; 437 traduções compiladas por idioma, sem entradas inacabadas; teste automático cobre textos e placeholders; larguras conferidas em pt_BR/en_US/es_ES; guia em `docs/MODELOS_FRENTE_VERSO.md`; consumidores v3/v4 auditados | Iniciar a validação final da Etapa 10; inspeção visual nativa e nova prova física continuam pertencendo à etapa final |
+| 10 | Validação automatizada concluída; liberação pendente | 94 testes + 10 subtestes gerais e 30 do editor; três modelos reais v3 idênticos pixel a pixel após adaptação; PNG/PDF/links/ordem validados; ZIP, mudança de pasta, duplicação, renomeação e recuperação aprovados; desempenho estável; relatório em `docs/VALIDACAO_FRENTE_VERSO.md` | Validar interface nativa em Linux/Windows/macOS e repetir a prova física duplex em paisagem após a correção de orientação |
 
 ### Correção arquitetural após a Etapa 8
 

@@ -2216,5 +2216,29 @@ Enter a name to save this preset:</translation>
       <source>↔️ Frente e verso alinhados com rotação automática e virada lateral.</source>
       <translation>↔️ Front and back aligned with automatic rotation and side-edge flipping.</translation>
     </message>
+    <message>
+      <source>Exibir a página {numero} no editor</source>
+      <translation>Show page {numero} in the editor</translation>
+    </message>
+    <message>
+      <source>Ações da página {numero}</source>
+      <translation>Page {numero} actions</translation>
+    </message>
+    <message>
+      <source>Adicionar o verso ao modelo</source>
+      <translation>Add a back page to the template</translation>
+    </message>
+    <message>
+      <source>Estes campos não são mais usados pelo modelo:
+
+{campos}
+
+Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
+      <translation>These fields are no longer used by the template:
+
+{campos}
+
+Do you want to discard the data in these columns? Choose No to keep them for this session.</translation>
+    </message>
   </context>
 </TS>

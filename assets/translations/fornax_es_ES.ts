@@ -2216,5 +2216,29 @@ Asigne un nombre para guardar este preajuste:</translation>
       <source>↔️ Frente e verso alinhados com rotação automática e virada lateral.</source>
       <translation>↔️ Anverso y reverso alineados con rotación automática y giro lateral.</translation>
     </message>
+    <message>
+      <source>Exibir a página {numero} no editor</source>
+      <translation>Mostrar la página {numero} en el editor</translation>
+    </message>
+    <message>
+      <source>Ações da página {numero}</source>
+      <translation>Acciones de la página {numero}</translation>
+    </message>
+    <message>
+      <source>Adicionar o verso ao modelo</source>
+      <translation>Añadir el reverso al modelo</translation>
+    </message>
+    <message>
+      <source>Estes campos não são mais usados pelo modelo:
+
+{campos}
+
+Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
+      <translation>Estos campos ya no se utilizan en el modelo:
+
+{campos}
+
+¿Desea descartar los datos de estas columnas? Elija No para conservarlos durante esta sesión.</translation>
+    </message>
   </context>
 </TS>

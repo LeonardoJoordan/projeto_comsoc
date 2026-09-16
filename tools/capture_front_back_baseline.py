@@ -16,6 +16,10 @@ from pathlib import Path
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from PySide6.QtCore import QMimeData
 from PySide6.QtGui import QImageReader
 from PySide6.QtWidgets import QApplication, QTableWidgetItem
@@ -28,7 +32,6 @@ from features.generator.workers import DirectRenderWorker
 from features.spreadsheet.table_panel import RichTableWidget
 
 
-ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "tests" / "fixtures" / "front_back_baseline" / "template_v3.json"
 
 
@@ -105,7 +108,10 @@ def main():
 
     pdf_dir = references / "pdf"
     pdf_dir.mkdir(exist_ok=True)
-    worker = DirectRenderWorker([(0, row, row, "fixture")], renderer, pdf_dir, "PDF", False, 80.0, 50.0)
+    worker = DirectRenderWorker(
+        [(0, 0, 0, row, row, "fixture")],
+        renderer, pdf_dir, "PDF", False, 80.0, 50.0,
+    )
     errors = []
     worker.error_occurred.connect(errors.append)
     _, pdf_time = timed(worker.run)

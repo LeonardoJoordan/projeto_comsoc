@@ -16,6 +16,8 @@ O FORNAX Forge é um aplicativo desktop para criar modelos gráficos, alimentar 
 - imposição em folhas, marcas de corte, sangria e links em PDF;
 - biblioteca local de modelos com importação e exportação em ZIP.
 
+O fluxo de criação, exportação, recuperação e impressão duplex está descrito em [Modelos com frente e verso](docs/MODELOS_FRENTE_VERSO.md).
+
 O motor de renderização é compartilhado pelo editor, pela prévia e pela geração final. Isso mantém posição, tipografia, transparência e dimensões físicas consistentes ao longo do fluxo.
 
 ## Estrutura atual
