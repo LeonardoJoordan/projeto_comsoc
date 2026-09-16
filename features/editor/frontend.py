@@ -587,6 +587,23 @@ def install_frontend(w):
     il.setContentsMargins(0, 0, 0, 0)
     il.setSpacing(1)
     props, pl = column()
+    def property_heading(layout, title, *, separated=False):
+        if separated:
+            separator = QFrame()
+            separator.setObjectName('propertySectionSeparator')
+            separator.setFixedHeight(1)
+            themed_style(
+                separator,
+                'QFrame#propertySectionSeparator { background: @border@; border: none; margin: 0; }',
+            )
+            layout.addWidget(separator)
+        heading = QLabel(title)
+        heading.setObjectName('propertySectionHeading')
+        heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        themed_style(heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
+        layout.addWidget(heading)
+        return heading
+
     shape_color = QLineEdit('#ffffff')
     shape_color.setMaxLength(7)
     fill_alpha = QDoubleSpinBox()
@@ -601,10 +618,7 @@ def install_frontend(w):
     shape_layout.setContentsMargins(0, 0, 0, 0)
     fill_controls, fill_layout = column()
     fill_layout.setContentsMargins(0, 0, 0, 0)
-    fill_heading = QLabel(tr('PREENCHIMENTO'))
-    fill_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    themed_style(fill_heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
-    fill_layout.addWidget(fill_heading)
+    fill_heading = property_heading(fill_layout, tr('PREENCHIMENTO'))
     fill_row = row(fill_layout, shape_swatch, shape_color, compact(
         state_icon_path('opacity'), fill_alpha, '%', 85, tr('Opacidade do preenchimento')
     ))
@@ -670,10 +684,9 @@ def install_frontend(w):
     outline_details_layout.addWidget(join_field)
     rectangle_radius, rectangle_radius_layout = column()
     rectangle_radius_layout.setContentsMargins(0, 0, 0, 0)
-    radius_heading = QLabel(tr('ARREDONDAMENTO DE BORDAS'))
-    radius_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    themed_style(radius_heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
-    rectangle_radius_layout.addWidget(radius_heading)
+    radius_heading = property_heading(
+        rectangle_radius_layout, tr('ARREDONDAMENTO DE BORDAS'), separated=True
+    )
     sync_radii = QPushButton()
     sync_radii.setObjectName('syncCornerRadii')
     sync_radii.setCheckable(True)
@@ -690,6 +703,7 @@ def install_frontend(w):
     corner_grid.setHorizontalSpacing(8)
     corner_grid.setVerticalSpacing(8)
     corner_spins = {}
+    corner_fields = {}
     for index, (key, title) in enumerate((
         ('top_left', tr('Sup. esquerdo')), ('top_right', tr('Sup. direito')),
         ('bottom_left', tr('Inf. esquerdo')), ('bottom_right', tr('Inf. direito')),
@@ -703,11 +717,27 @@ def install_frontend(w):
         control = field(title, compact('', spin, 'mm', None))
         corner_grid.addWidget(control, index // 2, index % 2)
         corner_spins[key] = spin
+        corner_fields[key] = control
     corner_grid.setColumnStretch(0, 1)
     corner_grid.setColumnStretch(1, 1)
-    corner_grid.addWidget(sync_radii, 0, 2, 2, 1, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight)
+    sync_radii_slot = QWidget()
+    sync_radii_layout = QVBoxLayout(sync_radii_slot)
+    sync_radii_layout.setSpacing(0)
+    reference_layout = corner_fields['top_right'].layout()
+    reference_label = reference_layout.itemAt(0).widget()
+    label_offset = reference_label.sizeHint().height() + reference_layout.spacing()
+    sync_radii_layout.setContentsMargins(0, label_offset, 0, 0)
+    sync_radii_layout.addWidget(
+        sync_radii, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+    )
+    corner_grid.addWidget(sync_radii_slot, 0, 2, 2, 1)
     rectangle_radius_layout.addLayout(corner_grid)
     shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), rectangle_radius)
+
+    outline_heading_container, outline_heading_layout = column()
+    outline_heading_layout.setContentsMargins(0, 0, 0, 0)
+    outline_heading = property_heading(outline_heading_layout, tr('CONTORNO'), separated=True)
+    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), outline_heading_container)
 
     radius = QDoubleSpinBox()
     radius.setObjectName('shapeCornerRadius')
@@ -853,16 +883,20 @@ def install_frontend(w):
     p.btn_restore.setMaximumSize(16777215, 16777215)
     p.chk_link.setText(tr('Habilitar link'))
     p.chk_link.setToolTip(tr('Adiciona ao objeto um link clicável nos arquivos PDF.'))
-    row(pl, p.btn_restore, p.chk_link)
+    pl.addWidget(p.btn_restore)
+
+    link_controls, link_layout = column()
+    link_controls.setObjectName('linkControls')
+    link_layout.setContentsMargins(0, 0, 0, 0)
+    link_layout.setSpacing(6)
+    link_heading = property_heading(link_layout, tr('LINK'), separated=True)
+    link_layout.addWidget(p.chk_link)
 
     dynamic_controls, dynamic_layout = column()
     dynamic_controls.setObjectName('dynamicImageControls')
-    dynamic_layout.setContentsMargins(0, 8, 0, 0)
+    dynamic_layout.setContentsMargins(0, 0, 0, 0)
     dynamic_layout.setSpacing(6)
-    dynamic_heading = QLabel(tr('IMAGEM VARIÁVEL'))
-    dynamic_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    themed_style(dynamic_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
-    dynamic_layout.addWidget(dynamic_heading)
+    dynamic_heading = property_heading(dynamic_layout, tr('IMAGEM VARIÁVEL'), separated=True)
     dynamic_enabled = QCheckBox(tr('Usar imagem indicada na tabela'))
     dynamic_enabled.setObjectName('dynamicImageEnabled')
     dynamic_layout.addWidget(dynamic_enabled)
@@ -882,7 +916,6 @@ def install_frontend(w):
     dynamic_hint.setWordWrap(True)
     dynamic_details_layout.addWidget(dynamic_hint)
     dynamic_layout.addWidget(dynamic_details)
-    pl.addWidget(dynamic_controls)
 
     updating_dynamic = {'active': False}
 
@@ -924,12 +957,9 @@ def install_frontend(w):
 
     mask_controls, mask_layout = column()
     mask_controls.setObjectName('maskControls')
-    mask_layout.setContentsMargins(0, 8, 0, 0)
+    mask_layout.setContentsMargins(0, 0, 0, 0)
     mask_layout.setSpacing(6)
-    mask_heading = QLabel(tr('MÁSCARA'))
-    mask_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    themed_style(mask_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
-    mask_layout.addWidget(mask_heading)
+    mask_heading = property_heading(mask_layout, tr('MÁSCARA'), separated=True)
     mask_enabled = QCheckBox(tr('Usar máscara'))
     mask_enabled.setObjectName('maskEnabled')
     mask_layout.addWidget(mask_enabled)
@@ -965,7 +995,11 @@ def install_frontend(w):
     mask_session_actions.addWidget(mask_cancel, 1)
     mask_session_actions.addWidget(mask_finish, 1)
     mask_layout.addWidget(mask_details)
+    # Ordem visual estável das propriedades de formas:
+    # preenchimento, arredondamento, contorno, máscara, link e imagem variável.
     pl.addWidget(mask_controls)
+    pl.addWidget(link_controls)
+    pl.addWidget(dynamic_controls)
 
     updating_mask = {'active': False}
 
@@ -1028,10 +1062,18 @@ def install_frontend(w):
                 mask_create.setText(tr('Mascarar com'))
                 mask_create.setVisible(True)
             return
-        if isinstance(item, RectangleItem) and item in w._mask_shapes():
+        if isinstance(item, RectangleItem):
             children = item.masked_images()
-            free_images = sorted(w._free_mask_images(), key=lambda value: value.custom_name.casefold())
+            mask_available = (
+                item.shape_type in ('rectangle', 'ellipse', 'circle')
+                and not getattr(item, 'is_document_background', False)
+                and not bool(item.dynamic_image_field)
+            )
             mask_enabled.setVisible(True)
+            if not mask_available:
+                set_mask_checkbox(bool(children), enabled=False)
+                return
+            free_images = sorted(w._free_mask_images(), key=lambda value: value.custom_name.casefold())
             set_mask_checkbox(bool(children))
             mask_details.setVisible(bool(children))
             if free_images:
@@ -1483,6 +1525,7 @@ def install_frontend(w):
         w.btn_del_layer.setEnabled(bool(selected) and not background_selected)
         shape_controls.setVisible(is_shape)
         p.btn_restore.setVisible(restore_visible)
+        link_controls.setVisible(len(selected) == 1)
         dynamic_controls.setVisible(False)
         if is_shape:
             item = selected[0]
@@ -1493,11 +1536,9 @@ def install_frontend(w):
                 and not item.masked_images()
                 and item.shape_type in ('rectangle', 'ellipse', 'circle')
             )
-            dynamic_controls.setVisible(
-                not is_line
-                and not background_selected
-                and (not item.masked_images() or bool(item.dynamic_image_field))
-            )
+            # Os submenus permanecem estáveis para qualquer forma. Recursos
+            # incompatíveis continuam visíveis, porém bloqueados.
+            dynamic_controls.setVisible(True)
             updating_dynamic['active'] = True
             try:
                 dynamic_enabled.setEnabled(dynamic_available or bool(item.dynamic_image_field))
@@ -1507,11 +1548,15 @@ def install_frontend(w):
                 dynamic_details.setVisible(bool(item.dynamic_image_field))
             finally:
                 updating_dynamic['active'] = False
-            fill_controls.setVisible(not is_line)
-            outline_enabled.setVisible(not is_line)
+            fill_controls.setVisible(True)
+            fill_controls.setEnabled(not is_line)
+            outline_heading_container.setVisible(True)
+            outline_enabled.setVisible(True)
+            outline_enabled.setEnabled(not is_line)
             position_field.setVisible(not is_line)
             join_field.setVisible(item.shape_type == 'rectangle')
-            rectangle_radius.setVisible(item.shape_type == 'rectangle')
+            rectangle_radius.setVisible(True)
+            rectangle_radius.setEnabled(item.shape_type == 'rectangle')
             # A linha mantém um único arredondamento para suas duas extremidades.
             shape_layout.removeWidget(radius_field)
             thickness_row.removeWidget(radius_field)

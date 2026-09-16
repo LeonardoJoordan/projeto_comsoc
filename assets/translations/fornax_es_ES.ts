@@ -2447,6 +2447,8 @@ Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta ses
       <translation>No se pudo leer la información de la plantilla:
 {erro}</translation>
     </message>
+    <message><source>CONTORNO</source><translation>CONTORNO</translation></message>
+    <message><source>LINK</source><translation>ENLACE</translation></message>
     <message><source>IMAGEM VARIÁVEL</source><translation>IMAGEN VARIABLE</translation></message>
     <message><source>Usar máscara</source><translation>Usar máscara</translation></message>
     <message><source>Usar imagem indicada na tabela</source><translation>Usar la imagen indicada en la tabla</translation></message>

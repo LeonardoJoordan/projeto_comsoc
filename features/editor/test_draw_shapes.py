@@ -1,6 +1,6 @@
 import unittest
 from PySide6.QtCore import Qt, QPoint
-from PySide6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton
+from PySide6.QtWidgets import QApplication, QCheckBox, QDoubleSpinBox, QLabel, QPushButton
 from PySide6.QtTest import QTest
 from .editor_window import EditorWindow
 from .canvas_items import RectangleItem
@@ -101,7 +101,17 @@ class DrawShapesTest(unittest.TestCase):
         rectangle = self.draw('rectangle', QPoint(350, 330))
         top_left = self.w.findChild(QDoubleSpinBox, 'shapeCornerRadius_top_left')
         top_right = self.w.findChild(QDoubleSpinBox, 'shapeCornerRadius_top_right')
+        bottom_right = self.w.findChild(QDoubleSpinBox, 'shapeCornerRadius_bottom_right')
         sync = self.w.findChild(QPushButton, 'syncCornerRadii')
+        self.app.processEvents()
+        top_box = top_right.parentWidget()
+        bottom_box = bottom_right.parentWidget()
+        desired_center = (
+            top_box.mapTo(self.w, QPoint(0, 0)).y()
+            + bottom_box.mapTo(self.w, QPoint(0, bottom_box.height())).y()
+        ) / 2
+        actual_center = sync.mapTo(self.w, QPoint(0, sync.height() // 2)).y()
+        self.assertAlmostEqual(actual_center, desired_center, delta=1)
         self.assertTrue(sync.isChecked())
         top_left.setValue(4)
         top_left.editingFinished.emit()
@@ -136,3 +146,27 @@ class DrawShapesTest(unittest.TestCase):
                         and not getattr(i, 'is_document_background', False))
         self.assertTrue(restored.has_link)
         self.assertIn('Link - Quadrado', self.w.get_all_model_placeholders())
+
+    def test_shape_property_sections_keep_order_and_disable_incompatible_options(self):
+        self.draw('rectangle', QPoint(350, 330))
+        self.app.processEvents()
+
+        headings = [
+            label for label in self.w.findChildren(QLabel, 'propertySectionHeading')
+            if label.isVisible()
+        ]
+        headings.sort(key=lambda label: label.mapTo(self.w, QPoint(0, 0)).y())
+        self.assertEqual(
+            [label.text() for label in headings],
+            ['PREENCHIMENTO', 'ARREDONDAMENTO DE BORDAS', 'CONTORNO',
+             'MÁSCARA', 'LINK', 'IMAGEM VARIÁVEL'],
+        )
+
+        dynamic = self.w.findChild(QCheckBox, 'dynamicImageEnabled')
+        mask = self.w.findChild(QCheckBox, 'maskEnabled')
+        self.assertTrue(mask.isVisible())
+        self.assertTrue(mask.isEnabled())
+        dynamic.click()
+        self.app.processEvents()
+        self.assertTrue(mask.isVisible())
+        self.assertFalse(mask.isEnabled())

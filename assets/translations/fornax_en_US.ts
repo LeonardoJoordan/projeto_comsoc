@@ -2447,6 +2447,8 @@ Do you want to discard the data in these columns? Choose No to keep them for thi
       <translation>Could not read the template information:
 {erro}</translation>
     </message>
+    <message><source>CONTORNO</source><translation>OUTLINE</translation></message>
+    <message><source>LINK</source><translation>LINK</translation></message>
     <message><source>IMAGEM VARIÁVEL</source><translation>VARIABLE IMAGE</translation></message>
     <message><source>Usar máscara</source><translation>Use mask</translation></message>
     <message><source>Usar imagem indicada na tabela</source><translation>Use image specified in the table</translation></message>
