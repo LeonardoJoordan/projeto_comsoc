@@ -1,10 +1,11 @@
 import unittest
 
-from PySide6.QtCore import QPointF, Qt
-from PySide6.QtWidgets import QApplication, QPushButton
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt
+from PySide6.QtGui import QTextCursor, QTextDocument
+from PySide6.QtWidgets import QApplication, QGraphicsSceneMouseEvent, QPushButton
 from PySide6.QtTest import QTest
 
-from .canvas_items import RectangleItem
+from .canvas_items import DesignerBox, ImageItem, RectangleItem, ResizeHandle
 from .editor_window import EditorWindow, LayerGroupBadge
 
 
@@ -160,14 +161,218 @@ class BasicGroupsTest(unittest.TestCase):
 
             initial_width = first.rect().width()
             initial_height = first.rect().height()
+            first.keep_proportion = False
             second_size = second.rect().size()
             anchor = first.mapToScene(QPointF(0, 0))
             window.begin_group_resize(first, anchor, initial_width, initial_height)
-            first.resize_custom(initial_width * 2, initial_height * 2)
-            window.update_group_resize(first, initial_width * 2, initial_height * 2)
+            first.resize_custom(initial_width * 2, initial_height * 1.25)
+            window.update_group_resize(first, initial_width * 2, initial_height * 1.25)
             window.end_group_resize()
+            self.assertAlmostEqual(first.rect().width(), initial_width * 2)
+            self.assertAlmostEqual(first.rect().height(), initial_height * 2)
             self.assertAlmostEqual(second.rect().width(), second_size.width() * 2)
             self.assertAlmostEqual(second.rect().height(), second_size.height() * 2)
+        finally:
+            self.close(window)
+
+    def test_group_resize_scales_text_typography_and_rich_character_sizes(self):
+        window, first, _second = self.make_window()
+        try:
+            text = DesignerBox(130, 25, 140, 50, 'Texto')
+            text.layer_id = window._get_next_layer_id()
+            text.custom_name = 'Texto'
+            text.state.font_size = 12
+            text.state.indent_px = 4
+            text.state.rich_text_version = 1
+            text.state.html_content = '<p><span style="font-size:10pt">Texto</span></p>'
+            text.apply_state()
+            window.scene.addItem(text)
+            first.setSelected(True)
+            text.setSelected(True)
+            window.group_selected_items()
+
+            initial_width = first.rect().width()
+            initial_height = first.rect().height()
+            text_size = text.rect().size()
+            anchor = first.mapToScene(QPointF(0, 0))
+            window.begin_group_resize(first, anchor, initial_width, initial_height)
+            window.update_group_resize(first, initial_width * 2, initial_height * 2)
+            window.end_group_resize()
+
+            self.assertEqual(text.state.font_size, 24)
+            self.assertAlmostEqual(text.state.indent_px, 8)
+            self.assertAlmostEqual(text.rect().width(), text_size.width() * 2)
+            self.assertAlmostEqual(text.rect().height(), text_size.height() * 2)
+            document = QTextDocument()
+            document.setHtml(text.state.html_content)
+            cursor = QTextCursor(document)
+            cursor.movePosition(QTextCursor.MoveOperation.NextCharacter,
+                                QTextCursor.MoveMode.KeepAnchor)
+            self.assertAlmostEqual(cursor.charFormat().fontPointSize(), 20)
+        finally:
+            self.close(window)
+
+    def test_group_resize_scales_mask_contents_once(self):
+        window, shape, second = self.make_window()
+        try:
+            image = ImageItem()
+            image.layer_id = window._get_next_layer_id()
+            image.custom_name = 'Foto'
+            image.resize_custom(60, 30)
+            window.scene.addItem(image)
+            window.create_mask(image, shape)
+            window.finish_mask_edit(True)
+            image.setPos(10, 8)
+            child_size = image.rect().size()
+            child_position = QPointF(image.pos())
+
+            shape.setSelected(True)
+            second.setSelected(True)
+            window.group_selected_items()
+            initial_width = shape.rect().width()
+            initial_height = shape.rect().height()
+            anchor = shape.mapToScene(QPointF(0, 0))
+            window.begin_group_resize(shape, anchor, initial_width, initial_height)
+            window.update_group_resize(shape, initial_width * 2, initial_height * 2)
+            window.end_group_resize()
+
+            self.assertAlmostEqual(image.rect().width(), child_size.width() * 2)
+            self.assertAlmostEqual(image.rect().height(), child_size.height() * 2)
+            self.assertAlmostEqual(image.x(), child_position.x() * 2)
+            self.assertAlmostEqual(image.y(), child_position.y() * 2)
+        finally:
+            self.close(window)
+
+    def test_group_handle_forces_proportion_and_creates_one_history_action(self):
+        window, first, second = self.make_window()
+        try:
+            first.keep_proportion = False
+            second.keep_proportion = False
+            first.setSelected(True)
+            second.setSelected(True)
+            window.group_selected_items()
+            initial_index = window.history._current_index
+            initial_first_size = first.rect().size()
+            initial_second_size = second.rect().size()
+            handle = next(
+                child for child in first.childItems()
+                if isinstance(child, ResizeHandle) and child.name == 'bottom_right'
+            )
+            press = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMousePress)
+            press.setButton(Qt.MouseButton.LeftButton)
+            press.setScenePos(handle.scenePos())
+            handle.mousePressEvent(press)
+            anchor = QPointF(handle._anchor_scene)
+            move = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseMove)
+            move.setScenePos(anchor + QPointF(220, 45))
+            handle.mouseMoveEvent(move)
+            release = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseRelease)
+            release.setButton(Qt.MouseButton.LeftButton)
+            handle.mouseReleaseEvent(release)
+
+            first_factor = first.rect().width() / initial_first_size.width()
+            self.assertAlmostEqual(
+                first.rect().height() / initial_first_size.height(), first_factor
+            )
+            self.assertAlmostEqual(
+                second.rect().width() / initial_second_size.width(), first_factor
+            )
+            self.assertAlmostEqual(
+                second.rect().height() / initial_second_size.height(), first_factor
+            )
+            self.assertEqual(window.history._current_index, initial_index + 1)
+
+            window.undo()
+            restored = sorted(window._group_members(1), key=lambda item: item.layer_id)
+            self.assertAlmostEqual(restored[0].rect().width(), initial_first_size.width())
+            self.assertAlmostEqual(restored[1].rect().width(), initial_second_size.width())
+            window.redo()
+            redone = sorted(window._group_members(1), key=lambda item: item.layer_id)
+            self.assertAlmostEqual(
+                redone[1].rect().width() / initial_second_size.width(), first_factor
+            )
+        finally:
+            self.close(window)
+
+    def test_individually_selected_group_member_keeps_individual_resize(self):
+        window, first, second = self.make_window()
+        try:
+            first.setSelected(True)
+            second.setSelected(True)
+            window.group_selected_items()
+            window._selecting_from_layer_list = True
+            try:
+                window.scene.clearSelection()
+                first.setSelected(True)
+            finally:
+                window._selecting_from_layer_list = False
+            window.begin_group_resize(
+                first, first.mapToScene(QPointF(0, 0)),
+                first.rect().width(), first.rect().height(),
+            )
+            self.assertIsNone(window._group_resize_session)
+        finally:
+            self.close(window)
+
+    def test_multiple_selection_uses_one_frame_and_resizes_ungrouped_items(self):
+        window, first, second = self.make_window()
+        try:
+            first.setSelected(True)
+            second.setSelected(True)
+            self.app.processEvents()
+            frame = window._selection_frame
+            self.assertTrue(frame.isVisible())
+            self.assertEqual(
+                window.view.rubberBandSelectionMode(),
+                Qt.ItemSelectionMode.ContainsItemShape,
+            )
+            self.assertTrue(all(not handle.isVisible() for handle in first.resize_handles.values()))
+            self.assertTrue(all(not handle.isVisible() for handle in second.resize_handles.values()))
+            first_size = first.rect().size()
+            second_size = second.rect().size()
+            initial_index = window.history._current_index
+            handle = next(
+                handle for handle in frame.handles
+                if handle.x_dir == 1 and handle.y_dir == 1
+            )
+            press = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMousePress)
+            press.setButton(Qt.MouseButton.LeftButton)
+            press.setScenePos(handle.scenePos())
+            handle.mousePressEvent(press)
+            bounds = QRectF(handle._initial_rect)
+            move = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseMove)
+            move.setScenePos(handle._anchor + QPointF(
+                bounds.width() * 1.5, bounds.height() * 1.5
+            ))
+            handle.mouseMoveEvent(move)
+            release = QGraphicsSceneMouseEvent(QEvent.Type.GraphicsSceneMouseRelease)
+            release.setButton(Qt.MouseButton.LeftButton)
+            handle.mouseReleaseEvent(release)
+
+            self.assertAlmostEqual(first.rect().width(), first_size.width() * 1.5)
+            self.assertAlmostEqual(first.rect().height(), first_size.height() * 1.5)
+            self.assertAlmostEqual(second.rect().width(), second_size.width() * 1.5)
+            self.assertAlmostEqual(second.rect().height(), second_size.height() * 1.5)
+            self.assertEqual(window.history._current_index, initial_index + 1)
+            self.assertEqual(set(window.scene.selectedItems()), {first, second})
+        finally:
+            self.close(window)
+
+    def test_rubber_band_selects_only_fully_contained_items(self):
+        window, first, second = self.make_window()
+        try:
+            window.show()
+            self.app.processEvents()
+            viewport = window.view.viewport()
+            start = window.view.mapFromScene(QPointF(60, 20))
+            end = window.view.mapFromScene(QPointF(210, 140))
+            QTest.mousePress(viewport, Qt.MouseButton.LeftButton, pos=start)
+            QTest.mouseMove(viewport, end, delay=20)
+            QTest.mouseRelease(viewport, Qt.MouseButton.LeftButton, pos=end)
+            self.app.processEvents()
+
+            self.assertNotIn(first, window.scene.selectedItems())
+            self.assertIn(second, window.scene.selectedItems())
         finally:
             self.close(window)
 

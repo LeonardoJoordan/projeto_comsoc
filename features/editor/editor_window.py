@@ -12,11 +12,13 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidg
                                QSizePolicy)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
-                           QFont, QFontDatabase, QFontInfo)
-from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF
+                           QFont, QFontDatabase, QFontInfo, QTextDocument)
+from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF, QTimer
+from shiboken6 import isValid
 
 from .canvas_items import (DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, RectangleItem,
-                           ImageItem, BackgroundItem, _reader_logical_size)
+                           ImageItem, BackgroundItem, SelectionTransformFrame,
+                           _reader_logical_size, _set_resize_handles_visible)
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
 from core.template_manager import slugify_model_name
 from core.history_manager import HistoryManager
@@ -43,6 +45,32 @@ from core.model_document import (
 
 
 _VISIBILITY_ICONS = {}
+
+
+def _scaled_rich_text_html(html, factor):
+    """Escala somente tamanhos explícitos; a fonte padrão vem do TextState."""
+    document = QTextDocument()
+    document.setHtml(str(html or ""))
+    fragments = []
+    block = document.begin()
+    while block.isValid():
+        iterator = block.begin()
+        while not iterator.atEnd():
+            fragment = iterator.fragment()
+            if fragment.isValid():
+                size = fragment.charFormat().fontPointSize()
+                if size > 0:
+                    fragments.append((fragment.position(), fragment.length(), size))
+            iterator += 1
+        block = block.next()
+    for position, length, size in reversed(fragments):
+        cursor = QTextCursor(document)
+        cursor.setPosition(position)
+        cursor.setPosition(position + length, QTextCursor.MoveMode.KeepAnchor)
+        char_format = QTextCharFormat()
+        char_format.setFontPointSize(max(1.0, size * factor))
+        cursor.mergeCharFormat(char_format)
+    return document.toHtml()
 
 
 class LayerGroupBadge(QPushButton):
@@ -403,6 +431,14 @@ class EditorWindow(QMainWindow):
         self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.view.setBackgroundBrush(QBrush(QColor("#e0e0e0")))
         self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        self.view.setRubberBandSelectionMode(Qt.ItemSelectionMode.ContainsItemShape)
+
+        self._selection_frame = SelectionTransformFrame(self)
+        self.scene.addItem(self._selection_frame)
+        self.scene._multi_selection_active = False
+        self._selection_frame_timer = QTimer(self)
+        self._selection_frame_timer.setSingleShot(True)
+        self._selection_frame_timer.timeout.connect(self._refresh_selection_frame)
         
         # Otimização de UX: Zoom segue o ponteiro do mouse
         self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
@@ -1675,6 +1711,65 @@ class EditorWindow(QMainWindow):
             if getattr(item, 'group_id', None) == group_id
         ]
 
+    def _selected_transform_roots(self):
+        roots = []
+        for item in self.scene.selectedItems():
+            if not isinstance(item, (DesignerBox, ImageItem, SignatureItem)):
+                continue
+            root = self._group_root(item)
+            if (
+                root not in roots
+                and root in self._groupable_items()
+                and root.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+            ):
+                roots.append(root)
+        return roots
+
+    def _ensure_selection_frame(self):
+        frame = getattr(self, '_selection_frame', None)
+        if frame is None or not isValid(frame):
+            frame = SelectionTransformFrame(self)
+            self._selection_frame = frame
+            self.scene.addItem(frame)
+        elif frame.scene() is None:
+            self.scene.addItem(frame)
+        return frame
+
+    def _queue_selection_frame_refresh(self, *_):
+        if hasattr(self, '_selection_frame_timer') and not self._selection_frame_timer.isActive():
+            self._selection_frame_timer.start(0)
+
+    def _refresh_selection_frame(self, *_):
+        frame = self._ensure_selection_frame()
+        members = self._selected_transform_roots()
+        active = len(members) >= 2
+        self.scene._multi_selection_active = active
+        if not active:
+            frame.hide()
+            if len(members) == 1 and hasattr(members[0], 'resize_handles'):
+                parent = members[0].parentItem()
+                mask_blocks_handles = (
+                    isinstance(parent, RectangleItem)
+                    and not getattr(parent, '_mask_editing', False)
+                )
+                _set_resize_handles_visible(
+                    members[0],
+                    not mask_blocks_handles
+                    and bool(members[0].flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable),
+                )
+            for item in members:
+                item.update()
+            return
+        bounds = QRectF()
+        for item in members:
+            item.hide_resize_handles()
+            rect = item.sceneBoundingRect()
+            bounds = rect if bounds.isNull() else bounds.united(rect)
+        frame.update_bounds(bounds)
+        frame.show()
+        for item in members:
+            item.update()
+
     def _next_group_id(self):
         ids = [
             int(group_id) for item in self._groupable_items()
@@ -1780,12 +1875,7 @@ class EditorWindow(QMainWindow):
             return self.ungroup_selected_items()
         return self.group_selected_items()
 
-    def begin_group_resize(self, leader, anchor_scene, initial_w, initial_h):
-        group_id = getattr(self._group_root(leader), 'group_id', None)
-        members = self._group_members(group_id)
-        if group_id is None or leader not in members or len(members) < 2:
-            self._group_resize_session = None
-            return
+    def _capture_resize_snapshots(self, members):
         snapshots = {}
         for item in members:
             rect = item.rect()
@@ -1794,13 +1884,89 @@ class EditorWindow(QMainWindow):
                 'width': float(rect.width()),
                 'height': float(rect.height()),
             }
+            if isinstance(item, DesignerBox):
+                snapshots[item]['text'] = {
+                    'font_size': float(item.state.font_size),
+                    'indent_px': float(item.state.indent_px),
+                    'html': item.state.html_content,
+                    'rich': item.state.rich_text_version == 1,
+                }
+            if isinstance(item, RectangleItem):
+                snapshots[item]['shape_style'] = {
+                    'outline_width': float(item.outline_width),
+                    'corner_radius': float(item.corner_radius),
+                    'corner_radii': dict(item.corner_radii),
+                }
+        return snapshots
+
+    def _apply_resize_session_scale(self, scale):
+        session = self._group_resize_session
+        if not session:
+            return
+        scale = max(float(scale), 0.001)
+        angle = session['angle']
+        cos_a, sin_a = math.cos(angle), math.sin(angle)
+        anchor = session['anchor']
+        for item, snapshot in session['snapshots'].items():
+            if item.scene() is not self.scene:
+                continue
+            vector = snapshot['center'] - anchor
+            local_x = vector.x() * cos_a + vector.y() * sin_a
+            local_y = -vector.x() * sin_a + vector.y() * cos_a
+            scaled = QPointF(local_x * scale, local_y * scale)
+            desired_center = anchor + QPointF(
+                scaled.x() * cos_a - scaled.y() * sin_a,
+                scaled.x() * sin_a + scaled.y() * cos_a,
+            )
+            new_w = max(1.0, snapshot['width'] * scale)
+            new_h = max(1.0, snapshot['height'] * scale)
+            if isinstance(item, DesignerBox):
+                item.setRect(0, 0, new_w, new_h)
+                text = snapshot['text']
+                item.state.font_size = max(1, round(text['font_size'] * scale))
+                item.state.indent_px = text['indent_px'] * scale
+                if text['rich']:
+                    item.state.html_content = _scaled_rich_text_html(text['html'], scale)
+                item.apply_state()
+                item.update_center()
+            elif hasattr(item, 'resize_custom'):
+                if isinstance(item, RectangleItem):
+                    style = snapshot['shape_style']
+                    item.prepareGeometryChange()
+                    item.outline_width = max(0.1, style['outline_width'] * scale)
+                    item.corner_radius = max(0.0, style['corner_radius'] * scale)
+                    item.corner_radii = {
+                        key: max(0.0, float(value) * scale)
+                        for key, value in style['corner_radii'].items()
+                    }
+                item.resize_custom(new_w, new_h)
+            current_center = item.mapToScene(item.transformOriginPoint())
+            delta = desired_center - current_center
+            item.moveBy(delta.x(), delta.y())
+
+    def begin_group_resize(self, leader, anchor_scene, initial_w, initial_h):
+        group_id = getattr(self._group_root(leader), 'group_id', None)
+        members = [
+            item for item in self._group_members(group_id)
+            if item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+        ]
+        selected_roots = {self._group_root(item) for item in self.scene.selectedItems()}
+        if (
+            group_id is None
+            or leader not in members
+            or len(members) < 2
+            or any(item not in selected_roots for item in members)
+        ):
+            self._group_resize_session = None
+            return
         self._group_resize_session = {
             'leader': leader,
             'anchor': QPointF(anchor_scene),
             'initial_w': max(float(initial_w), 0.001),
             'initial_h': max(float(initial_h), 0.001),
             'angle': math.radians(float(leader.rotation())),
-            'snapshots': snapshots,
+            'rotation': float(leader.rotation()),
+            'snapshots': self._capture_resize_snapshots(members),
         }
 
     def update_group_resize(self, leader, width, height):
@@ -1809,34 +1975,45 @@ class EditorWindow(QMainWindow):
             return
         scale_x = max(float(width), 0.001) / session['initial_w']
         scale_y = max(float(height), 0.001) / session['initial_h']
-        angle = session['angle']
-        cos_a, sin_a = math.cos(angle), math.sin(angle)
-        anchor = session['anchor']
-        for item, snapshot in session['snapshots'].items():
-            if item is leader or item.scene() is not self.scene:
-                continue
-            vector = snapshot['center'] - anchor
-            local_x = vector.x() * cos_a + vector.y() * sin_a
-            local_y = -vector.x() * sin_a + vector.y() * cos_a
-            scaled = QPointF(local_x * scale_x, local_y * scale_y)
-            desired_center = anchor + QPointF(
-                scaled.x() * cos_a - scaled.y() * sin_a,
-                scaled.x() * sin_a + scaled.y() * cos_a,
-            )
-            new_w = max(1.0, snapshot['width'] * scale_x)
-            new_h = max(1.0, snapshot['height'] * scale_y)
-            if isinstance(item, DesignerBox):
-                item.setRect(0, 0, new_w, new_h)
-                item.recalculate_text_position()
-                item.update_center()
-            elif hasattr(item, 'resize_custom'):
-                item.resize_custom(new_w, new_h)
-            current_center = item.mapToScene(item.transformOriginPoint())
-            delta = desired_center - current_center
-            item.moveBy(delta.x(), delta.y())
+        # Um grupo é sempre escalado uniformemente. A maior variação indica a
+        # dimensão conduzida pela alça lateral ou de canto.
+        scale = scale_x if abs(scale_x - 1.0) >= abs(scale_y - 1.0) else scale_y
+        scale = max(scale, 0.001)
+        self._apply_resize_session_scale(scale)
 
     def end_group_resize(self):
         self._group_resize_session = None
+
+    def begin_multi_selection_resize(self, anchor_scene, bounds):
+        members = self._selected_transform_roots()
+        if len(members) < 2:
+            return False
+        self._group_resize_session = {
+            'leader': None,
+            'anchor': QPointF(anchor_scene),
+            'initial_w': max(float(bounds.width()), 0.001),
+            'initial_h': max(float(bounds.height()), 0.001),
+            'angle': 0.0,
+            'rotation': 0.0,
+            'snapshots': self._capture_resize_snapshots(members),
+            'multi_selection': True,
+        }
+        return True
+
+    def update_multi_selection_resize(self, scale):
+        session = self._group_resize_session
+        if not session or not session.get('multi_selection'):
+            return
+        self._apply_resize_session_scale(scale)
+        self._refresh_selection_frame()
+
+    def end_multi_selection_resize(self):
+        session = self._group_resize_session
+        if not session or not session.get('multi_selection'):
+            return
+        self._group_resize_session = None
+        self._refresh_selection_frame()
+        self.save_snapshot()
 
     def duplicate_selected(self):
         if self._mask_edit_session:
@@ -2397,10 +2574,7 @@ class EditorWindow(QMainWindow):
                 tr('Desagrupar objetos selecionados (Ctrl+Shift+G)')
                 if is_complete_group else tr('Agrupar objetos selecionados (Ctrl+G)')
             )
-            if is_complete_group:
-                for grouped_item in valid_items[1:]:
-                    if hasattr(grouped_item, 'hide_resize_handles'):
-                        grouped_item.hide_resize_handles()
+        self._refresh_selection_frame()
         
         self.update_position_ui()
 
@@ -3919,7 +4093,9 @@ class EditorWindow(QMainWindow):
         total_rect = self._get_document_rect()
         for item in self.scene.items():
             # Ignora as linhas guia infinitas e o papel branco de fallback
-            if isinstance(item, Guideline) or item == getattr(self, 'fallback_bg', None):
+            if (isinstance(item, Guideline)
+                    or item == getattr(self, 'fallback_bg', None)
+                    or getattr(item, '_is_selection_overlay', False)):
                 continue
             total_rect = total_rect.united(item.sceneBoundingRect())
         return total_rect

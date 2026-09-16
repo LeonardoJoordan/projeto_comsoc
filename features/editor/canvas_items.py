@@ -226,6 +226,15 @@ def _get_dynamic_snap_distance(scene):
     return base_dist / math.sqrt(zoom)
 
 
+def _queue_selection_frame_refresh(item):
+    scene = item.scene()
+    if not scene or not scene.views():
+        return
+    window = scene.views()[0].window()
+    if hasattr(window, '_queue_selection_frame_refresh'):
+        window._queue_selection_frame_refresh()
+
+
 def _snap_position_to_guides(item, new_pos, w, h):
     scene = item.scene()
     if not scene:
@@ -631,7 +640,25 @@ class ResizeHandle(QGraphicsRectItem):
         self.setRect(-half, -half, handle_size, handle_size)
 
     def _keep_proportion(self):
-        return getattr(self.parentItem(), 'keep_proportion', True) or getattr(self, '_shift_proportion', False)
+        parent = self.parentItem()
+        group_id = getattr(parent, 'group_id', None)
+        grouped = False
+        scene = parent.scene() if parent is not None else None
+        if group_id is not None and scene is not None:
+            members = [
+                item for item in scene.items()
+                if getattr(item, 'group_id', None) == group_id
+                and item.parentItem() is None
+                and not getattr(item, 'is_document_background', False)
+                and item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+            ]
+            selected = set(scene.selectedItems())
+            grouped = len(members) >= 2 and all(item in selected for item in members)
+        return (
+            grouped
+            or getattr(parent, 'keep_proportion', True)
+            or getattr(self, '_shift_proportion', False)
+        )
 
     def paint(self, painter, option, widget=None):
         self.update_handle_size()
@@ -675,6 +702,21 @@ class ResizeHandle(QGraphicsRectItem):
                 if getattr(parent, 'shape_type', '') == 'line':
                     length = max(1, math.hypot(scene_delta.x(), scene_delta.y()))
                     angle = math.atan2(scene_delta.y(), scene_delta.x())
+                    window = None
+                    if parent.scene() and parent.scene().views():
+                        window = parent.scene().views()[0].window()
+                    group_session = getattr(window, '_group_resize_session', None)
+                    if group_session and group_session.get('leader') is parent:
+                        fixed_rotation = float(group_session['rotation'])
+                        angle = math.radians(
+                            fixed_rotation - (180 if self.x_dir < 0 else 0)
+                        )
+                        direction = QPointF(math.cos(angle), math.sin(angle))
+                        length = max(
+                            1,
+                            scene_delta.x() * direction.x()
+                            + scene_delta.y() * direction.y(),
+                        )
                     if self._shift_proportion:
                         angle = round(angle / (math.pi / 4)) * math.pi / 4
                     endpoint = anchor_scene + QPointF(length * math.cos(angle), length * math.sin(angle))
@@ -686,6 +728,8 @@ class ResizeHandle(QGraphicsRectItem):
                         parent.setPos(center.x()-length/2, center.y()-0.5)
                     finally:
                         parent._resizing_from_handle = False
+                    if window is not None and hasattr(window, 'update_group_resize'):
+                        window.update_group_resize(parent, length, self._initial_h)
                     event.accept()
                     return
                 local_delta = _unrotated_vector(scene_delta, parent.rotation())
@@ -727,6 +771,113 @@ class ResizeHandle(QGraphicsRectItem):
             event.accept()
             return
         super().mouseReleaseEvent(event)
+
+
+class SelectionResizeHandle(QGraphicsRectItem):
+    """Alça da moldura temporária criada por uma seleção múltipla."""
+
+    def __init__(self, frame, x_dir, y_dir, cursor):
+        super().__init__(-6, -6, 12, 12, frame)
+        from core.themes import theme_color
+        self.x_dir = x_dir
+        self.y_dir = y_dir
+        self._frame = frame
+        self._active = False
+        self.setBrush(QBrush(QColor("#ffffff")))
+        self.setPen(QPen(QColor(theme_color('canvas_selection')), 2))
+        self.setCursor(cursor)
+        self.setZValue(2)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations, True)
+
+    def mousePressEvent(self, event):
+        if event.button() != Qt.MouseButton.LeftButton:
+            super().mousePressEvent(event)
+            return
+        rect = QRectF(self._frame.rect())
+        anchor_x = rect.right() if self.x_dir < 0 else rect.left() if self.x_dir > 0 else rect.center().x()
+        anchor_y = rect.bottom() if self.y_dir < 0 else rect.top() if self.y_dir > 0 else rect.center().y()
+        self._anchor = QPointF(anchor_x, anchor_y)
+        self._initial_rect = rect
+        self._pointer_offset = event.scenePos() - self.scenePos()
+        self._active = self._frame.window.begin_multi_selection_resize(
+            self._anchor, rect
+        )
+        event.accept()
+
+    def mouseMoveEvent(self, event):
+        if not self._active:
+            super().mouseMoveEvent(event)
+            return
+        delta = event.scenePos() - self._pointer_offset - self._anchor
+        width = max(self._initial_rect.width(), 0.001)
+        height = max(self._initial_rect.height(), 0.001)
+        if self.x_dir and self.y_dir:
+            base = QPointF(width * self.x_dir, height * self.y_dir)
+            scale = (delta.x() * base.x() + delta.y() * base.y()) / (
+                base.x() ** 2 + base.y() ** 2
+            )
+        elif self.x_dir:
+            scale = (delta.x() * self.x_dir) / width
+        else:
+            scale = (delta.y() * self.y_dir) / height
+        self._frame.window.update_multi_selection_resize(max(0.02, scale))
+        event.accept()
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton and self._active:
+            self._active = False
+            self._frame.window.end_multi_selection_resize()
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
+
+
+class SelectionTransformFrame(QGraphicsRectItem):
+    """Moldura única da seleção múltipla, sem entrar no modelo salvo."""
+
+    HANDLE_SPECS = (
+        (-1, -1, Qt.CursorShape.SizeFDiagCursor),
+        (0, -1, Qt.CursorShape.SizeVerCursor),
+        (1, -1, Qt.CursorShape.SizeBDiagCursor),
+        (1, 0, Qt.CursorShape.SizeHorCursor),
+        (1, 1, Qt.CursorShape.SizeFDiagCursor),
+        (0, 1, Qt.CursorShape.SizeVerCursor),
+        (-1, 1, Qt.CursorShape.SizeBDiagCursor),
+        (-1, 0, Qt.CursorShape.SizeHorCursor),
+    )
+
+    def __init__(self, window):
+        super().__init__()
+        from core.themes import theme_color
+        self.window = window
+        self._is_selection_overlay = True
+        pen = QPen(QColor(theme_color('canvas_selection')), 1.5, Qt.PenStyle.DashLine)
+        pen.setCosmetic(True)
+        self.setPen(pen)
+        self.setBrush(Qt.BrushStyle.NoBrush)
+        self.setZValue(10_000_000)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self.handles = [
+            SelectionResizeHandle(self, x_dir, y_dir, cursor)
+            for x_dir, y_dir, cursor in self.HANDLE_SPECS
+        ]
+        self.hide()
+
+    def update_bounds(self, bounds):
+        bounds = QRectF(bounds)
+        if self.rect() != bounds:
+            self.setRect(bounds)
+        left, right = bounds.left(), bounds.right()
+        top, bottom = bounds.top(), bounds.bottom()
+        cx, cy = bounds.center().x(), bounds.center().y()
+        positions = (
+            QPointF(left, top), QPointF(cx, top), QPointF(right, top),
+            QPointF(right, cy), QPointF(right, bottom), QPointF(cx, bottom),
+            QPointF(left, bottom), QPointF(left, cy),
+        )
+        for handle, position in zip(self.handles, positions):
+            handle.setPos(position)
 
 
 RESIZE_HANDLE_SPECS = (
@@ -785,6 +936,17 @@ def _update_resize_handles(item):
 def _set_resize_handles_visible(item, visible):
     if not hasattr(item, 'resize_handles'):
         return
+    scene = item.scene()
+    if visible and scene:
+        roots = {
+            selected.parentItem()
+            if isinstance(selected.parentItem(), RectangleItem)
+            else selected
+            for selected in scene.selectedItems()
+            if hasattr(selected, 'resize_handles')
+        }
+        if len(roots) >= 2:
+            visible = False
     for handle in item.resize_handles.values():
         handle.setVisible(visible)
 
@@ -936,6 +1098,8 @@ class ImageItem(QGraphicsPixmapItem):
             new_pos = value
             w, h = self._current_w, self._current_h
             return _snap_position_to_guides(self, new_pos, w, h)
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            _queue_selection_frame_refresh(self)
         return super().itemChange(change, value)
 
     def rect(self):
@@ -1282,6 +1446,8 @@ class SignatureItem(QGraphicsPixmapItem):
             new_pos = value
             w, h = self._current_w, self._current_h
             return _snap_position_to_guides(self, new_pos, w, h)
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            _queue_selection_frame_refresh(self)
         return super().itemChange(change, value)
 
     def rect(self):
@@ -1471,10 +1637,15 @@ class DesignerBox(QGraphicsRectItem):
             rect = self.rect()
             w, h = rect.width(), rect.height()
             return _snap_position_to_guides(self, new_pos, w, h)
+        if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged:
+            _queue_selection_frame_refresh(self)
         return super().itemChange(change, value)
     
     def paint(self, painter, option, widget=None):
-        if self.isSelected():
+        multi_selection = bool(
+            self.scene() and getattr(self.scene(), '_multi_selection_active', False)
+        )
+        if self.isSelected() and not multi_selection:
             from core.themes import theme_color
             self.setPen(QPen(QColor(theme_color('canvas_selection')), 2, Qt.PenStyle.DashLine))
             self.setBrush(QBrush(QColor(0, 100, 255, 30)))

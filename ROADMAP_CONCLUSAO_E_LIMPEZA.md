@@ -24,7 +24,7 @@ Este documento orienta a sequência de trabalho até a conclusão das funcionali
 
 ### 2. Redimensionamento proporcional de grupos
 
-**Status:** pendente.
+**Status:** concluída e verificada em 16/09/2026.
 
 **Direção:** revisar o agrupamento e as transformações já existentes antes de definir o comportamento que falta.
 
@@ -102,3 +102,12 @@ Ao encerrar uma etapa ou sessão, registrar brevemente:
 - **Verificação executada:** 107 testes e 10 subtestes da suíte principal, 49 testes do editor, compilação dos módulos alterados e abertura básica do workspace em modo offscreen.
 - **Pendências ou decisões em aberto:** validação visual manual com fotografias reais em PNG, PDF e imposição permanece para a etapa 3, junto da revisão integrada dos fluxos.
 - **Próximo ponto de retomada:** reavaliar o agrupamento e definir o escopo concreto da etapa 2, redimensionamento proporcional de grupos.
+
+### Registro — etapa 2
+
+- **Etapa e estado:** redimensionamento proporcional de grupos concluído.
+- **Concluído e verificado:** qualquer seleção de dois ou mais objetos, permanente ou temporária, recebe uma única moldura com oito alças e sem alças individuais; o redimensionamento aplica uma escala uniforme a toda a área selecionada; a seleção por arraste aceita somente itens totalmente contidos; a seleção múltipla também funciona pelo painel de camadas com Ctrl; posições relativas e rotações são preservadas; caixas de texto escalam dimensões, fonte global, recuo e tamanhos ricos por caractere; formas escalam contorno e arredondamentos; formas usadas como máscara escalam suas imagens internas uma única vez; linhas mantêm a direção durante a escala coletiva; itens bloqueados não são transformados.
+- **Histórico e persistência:** cada gesto de redimensionamento gera uma única alteração no histórico, com undo e redo restaurando o conjunto; os valores finais continuam sendo gravados nas propriedades nativas dos objetos, sem transformações temporárias dependentes da interface.
+- **Verificação executada:** 56 testes do editor, incluindo moldura coletiva, seleção por contenção integral, escala proporcional, tipografia rica, máscaras e histórico; 107 testes e 10 subtestes da suíte principal; compilação dos módulos e verificação de whitespace.
+- **Pendências ou decisões em aberto:** a avaliação visual com composições reais e grupos grandes fica reunida na etapa 3 de estabilização.
+- **Próximo ponto de retomada:** iniciar a etapa 3 revisando os fluxos completos e definindo uma matriz curta de regressões e desempenho antes de qualquer limpeza estrutural.
