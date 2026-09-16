@@ -2447,5 +2447,31 @@ Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta ses
       <translation>No se pudo leer la información de la plantilla:
 {erro}</translation>
     </message>
+    <message><source>IMAGEM VARIÁVEL</source><translation>IMAGEN VARIABLE</translation></message>
+    <message><source>Usar máscara</source><translation>Usar máscara</translation></message>
+    <message><source>Usar imagem indicada na tabela</source><translation>Usar la imagen indicada en la tabla</translation></message>
+    <message><source>Ex.: Foto</source><translation>Ej.: Foto</translation></message>
+    <message><source>Preencher e cortar</source><translation>Rellenar y recortar</translation></message>
+    <message><source>Ajustar imagem inteira</source><translation>Ajustar imagen completa</translation></message>
+    <message><source>Campo da tabela</source><translation>Campo de la tabla</translation></message>
+    <message><source>Enquadramento</source><translation>Ajuste</translation></message>
+    <message><source>A pasta das imagens é escolhida na tela principal.</source><translation>La carpeta de imágenes se selecciona en la pantalla principal.</translation></message>
+    <message><source>Imagem</source><translation>Imagen</translation></message>
+    <message><source>Imagem {numero}</source><translation>Imagen {numero}</translation></message>
+    <message><source>IMAGENS VARIÁVEIS</source><translation>IMÁGENES VARIABLES</translation></message>
+    <message><source>Selecione a pasta que contém as imagens</source><translation>Seleccione la carpeta que contiene las imágenes</translation></message>
+    <message><source>Pasta usada para localizar os arquivos indicados na tabela</source><translation>Carpeta usada para localizar los archivos indicados en la tabla</translation></message>
+    <message><source>Selecionar pasta de imagens</source><translation>Seleccionar carpeta de imágenes</translation></message>
+    <message><source>Selecione uma pasta de imagens válida.</source><translation>Seleccione una carpeta de imágenes válida.</translation></message>
+    <message><source>Pasta pronta para {quantidade} campo(s) de imagem.</source><translation>Carpeta lista para {quantidade} campo(s) de imagen.</translation></message>
+    <message><source>Arquivo ambíguo; informe também a extensão.</source><translation>Archivo ambiguo; incluya también la extensión.</translation></message>
+    <message><source>Imagem não encontrada na pasta configurada.</source><translation>Imagen no encontrada en la carpeta configurada.</translation></message>
+    <message><source>{quantidade} referência(s) de imagem precisam de atenção.</source><translation>{quantidade} referencia(s) de imagen requieren atención.</translation></message>
+    <message><source>Pasta de imagens necessária</source><translation>Carpeta de imágenes necesaria</translation></message>
+    <message><source>Selecione uma pasta de imagens válida antes de gerar o material.</source><translation>Seleccione una carpeta de imágenes válida antes de generar el material.</translation></message>
+    <message><source>há mais de um arquivo com esse nome</source><translation>hay más de un archivo con ese nombre</translation></message>
+    <message><source>o arquivo não foi encontrado</source><translation>no se encontró el archivo</translation></message>
+    <message><source>Imagens não resolvidas</source><translation>Imágenes sin resolver</translation></message>
+    <message><source>{quantidade} referência(s) de imagem precisam ser corrigidas. A primeira está na linha {linha}, campo '{campo}': '{valor}' ({motivo}).</source><translation>{quantidade} referencia(s) de imagen deben corregirse. La primera está en la fila {linha}, campo '{campo}': '{valor}' ({motivo}).</translation></message>
   </context>
 </TS>

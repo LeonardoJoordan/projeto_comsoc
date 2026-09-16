@@ -88,13 +88,22 @@ def _ordered_unique(values):
     return list(dict.fromkeys(value for value in values if isinstance(value, str) and value))
 
 
-def _required_link_fields(page: dict) -> list[str]:
-    """Campos de link são dados da tabela, inclusive quando vivem só no verso."""
+def _required_page_fields(page: dict) -> list[str]:
+    """Campos funcionais também pertencem à tabela, inclusive no verso."""
     return _ordered_unique(
-        item.get("link_key")
-        for collection in ("boxes", "images", "shapes")
-        for item in page.get(collection, [])
-        if item.get("has_link") and item.get("link_key")
+        [
+            *(
+                item.get("link_key")
+                for collection in ("boxes", "images", "shapes")
+                for item in page.get(collection, [])
+                if item.get("has_link") and item.get("link_key")
+            ),
+            *(
+                shape.get("dynamic_image_field")
+                for shape in page.get("shapes", [])
+                if shape.get("dynamic_image_field")
+            ),
+        ]
     )
 
 
@@ -103,7 +112,7 @@ def _reconcile_document_fields(document: dict, preferred_order=()) -> None:
     required = _ordered_unique(
         field_id
         for page in document.get("pages", [])
-        for field_id in [*page.get("field_ids", []), *_required_link_fields(page)]
+        for field_id in [*page.get("field_ids", []), *_required_page_fields(page)]
     )
     required_set = set(required)
     document["placeholders"] = _ordered_unique([
@@ -183,6 +192,29 @@ def _validate_page(page: Any, expected_id: str, *, legacy_source: bool) -> None:
         raise ModelValidationError(f"Há object_id repetido na página {expected_id}.")
 
     shapes = {item['object_id']: item for item in page.get('shapes', [])}
+    for shape in shapes.values():
+        field = shape.get("dynamic_image_field")
+        if field is not None and not isinstance(field, str):
+            raise ModelValidationError(
+                f"Campo de imagem dinâmica inválido na página {expected_id}."
+            )
+        if isinstance(field, str) and field and not field.strip():
+            raise ModelValidationError(
+                f"Campo de imagem dinâmica inválido na página {expected_id}."
+            )
+        if field:
+            if shape.get("shape_type") not in ("rectangle", "ellipse", "circle"):
+                raise ModelValidationError(
+                    f"Imagem dinâmica exige uma forma fechada na página {expected_id}."
+                )
+            if shape.get("is_document_background"):
+                raise ModelValidationError(
+                    f"O plano de fundo não pode ser uma imagem dinâmica na página {expected_id}."
+                )
+            if shape.get("dynamic_image_fit", "cover") not in ("cover", "contain"):
+                raise ModelValidationError(
+                    f"Enquadramento de imagem dinâmica inválido na página {expected_id}."
+                )
     mask_orders = {}
     for image in page.get('images', []):
         mask_id = image.get('mask_shape_id')
@@ -192,6 +224,10 @@ def _validate_page(page: Any, expected_id: str, *, legacy_source: bool) -> None:
         if shape is None or shape.get('shape_type') not in ('rectangle', 'ellipse', 'circle'):
             raise ModelValidationError(
                 f"Imagem vinculada a uma máscara inexistente ou incompatível na página {expected_id}."
+            )
+        if shape.get("dynamic_image_field"):
+            raise ModelValidationError(
+                f"Uma forma dinâmica não pode conter imagens fixas na página {expected_id}."
             )
         order = image.get('mask_order', 0)
         if not isinstance(order, int) or order < 0:

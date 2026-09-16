@@ -2447,5 +2447,31 @@ Do you want to discard the data in these columns? Choose No to keep them for thi
       <translation>Could not read the template information:
 {erro}</translation>
     </message>
+    <message><source>IMAGEM VARIÁVEL</source><translation>VARIABLE IMAGE</translation></message>
+    <message><source>Usar máscara</source><translation>Use mask</translation></message>
+    <message><source>Usar imagem indicada na tabela</source><translation>Use image specified in the table</translation></message>
+    <message><source>Ex.: Foto</source><translation>Example: Photo</translation></message>
+    <message><source>Preencher e cortar</source><translation>Fill and crop</translation></message>
+    <message><source>Ajustar imagem inteira</source><translation>Fit entire image</translation></message>
+    <message><source>Campo da tabela</source><translation>Table field</translation></message>
+    <message><source>Enquadramento</source><translation>Fitting</translation></message>
+    <message><source>A pasta das imagens é escolhida na tela principal.</source><translation>The image folder is selected on the main screen.</translation></message>
+    <message><source>Imagem</source><translation>Image</translation></message>
+    <message><source>Imagem {numero}</source><translation>Image {numero}</translation></message>
+    <message><source>IMAGENS VARIÁVEIS</source><translation>VARIABLE IMAGES</translation></message>
+    <message><source>Selecione a pasta que contém as imagens</source><translation>Select the folder containing the images</translation></message>
+    <message><source>Pasta usada para localizar os arquivos indicados na tabela</source><translation>Folder used to locate the files specified in the table</translation></message>
+    <message><source>Selecionar pasta de imagens</source><translation>Select image folder</translation></message>
+    <message><source>Selecione uma pasta de imagens válida.</source><translation>Select a valid image folder.</translation></message>
+    <message><source>Pasta pronta para {quantidade} campo(s) de imagem.</source><translation>Folder ready for {quantidade} image field(s).</translation></message>
+    <message><source>Arquivo ambíguo; informe também a extensão.</source><translation>Ambiguous file; include the extension.</translation></message>
+    <message><source>Imagem não encontrada na pasta configurada.</source><translation>Image not found in the configured folder.</translation></message>
+    <message><source>{quantidade} referência(s) de imagem precisam de atenção.</source><translation>{quantidade} image reference(s) need attention.</translation></message>
+    <message><source>Pasta de imagens necessária</source><translation>Image folder required</translation></message>
+    <message><source>Selecione uma pasta de imagens válida antes de gerar o material.</source><translation>Select a valid image folder before generating the material.</translation></message>
+    <message><source>há mais de um arquivo com esse nome</source><translation>there is more than one file with this name</translation></message>
+    <message><source>o arquivo não foi encontrado</source><translation>the file was not found</translation></message>
+    <message><source>Imagens não resolvidas</source><translation>Unresolved images</translation></message>
+    <message><source>{quantidade} referência(s) de imagem precisam ser corrigidas. A primeira está na linha {linha}, campo '{campo}': '{valor}' ({motivo}).</source><translation>{quantidade} image reference(s) need correction. The first is on row {linha}, field '{campo}': '{valor}' ({motivo}).</translation></message>
   </context>
 </TS>

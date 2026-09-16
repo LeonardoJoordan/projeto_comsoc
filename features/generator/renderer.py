@@ -8,15 +8,20 @@ from core.model_document import adapt_model_page, normalize_model_document
 from core.document_layers import layer_entries
 from core.object_style import draw_shape, outline_margin, rounded_rect_path
 from core.text_layout import PLACEHOLDER_PATTERN, build_document, text_geometry, resolve_rich_text
+from core.dynamic_images import resolve_dynamic_image
 
 
-def renderers_for_document(document: dict) -> list["NativeRenderer"]:
+def renderers_for_document(document: dict, dynamic_image_dir=None) -> list["NativeRenderer"]:
     """Cria o mesmo renderizador legado para cada prancheta do documento."""
     normalized = normalize_model_document(document)
-    return [
+    renderers = [
         NativeRenderer(adapt_model_page(normalized, page["page_id"]))
         for page in normalized["pages"]
     ]
+    directory = dynamic_image_dir or document.get("__dynamic_image_dir")
+    for renderer in renderers:
+        renderer.set_dynamic_image_directory(directory)
+    return renderers
 
 class NativeRenderer:
     def __init__(self, template_data: dict):
@@ -30,11 +35,18 @@ class NativeRenderer:
         self._image_cache = {}
         self._static_base_cache = None
         self._pixmap_cache = {}
+        self.dynamic_image_dir = self.tpl.get("__dynamic_image_dir")
+
+    def set_dynamic_image_directory(self, directory):
+        self.dynamic_image_dir = str(directory) if directory else None
+        self._static_base_cache = None
+        return self
 
     def fork(self):
         """Cria um renderizador com caches mutáveis próprios para outra thread."""
         renderer = NativeRenderer(self.tpl)
         renderer.model_dir = self.model_dir
+        renderer.dynamic_image_dir = self.dynamic_image_dir
         if self._static_base_cache is not None:
             renderer._static_base_cache = self._static_base_cache.copy()
         return renderer
@@ -192,6 +204,8 @@ class NativeRenderer:
             images_by_mask.setdefault(image.get('mask_shape_id'), []).append(image)
         prefix = 0
         for _, kind, item in entries:
+            if kind == "shape" and item.get("dynamic_image_field"):
+                break
             if kind == 'shape' and any(
                 child.get('has_link') and child.get('link_key')
                 for child in images_by_mask.get(item.get('object_id'), [])
@@ -209,6 +223,10 @@ class NativeRenderer:
                 children = sorted(images_by_mask.get(item.get('object_id'), []),
                                   key=lambda value: value.get('mask_order', 0))
                 rect = (
+                    self._draw_dynamic_image_shape(
+                        painter, item, row_rich, row_plain
+                    )
+                    if item.get("dynamic_image_field") else
                     self._draw_mask_group(
                         painter, item, children, row_rich, row_plain, out_links
                     )
@@ -229,6 +247,56 @@ class NativeRenderer:
             child.model_dir = self.model_dir
             child._image_cache = self._image_cache
             child._paint_card_legacy(painter, row_rich, out_links, row_plain=row_plain)
+
+    def _draw_dynamic_image_shape(self, painter, shape, row_rich, row_plain):
+        """Desenha a forma e, quando disponível, a imagem externa do registro."""
+        if not shape.get("visible", True):
+            return None
+        rect = draw_shape(painter, shape)
+        field = shape.get("dynamic_image_field")
+        values = row_plain if row_plain is not None and field in row_plain else row_rich
+        result = resolve_dynamic_image(self.dynamic_image_dir, (values or {}).get(field, ""))
+        if result.path is None:
+            return rect
+        source = self._get_image(result.path)
+        if source.isNull():
+            return rect
+
+        w = float(shape.get("width", 0))
+        h = float(shape.get("height", 0))
+        if w <= 0 or h <= 0:
+            return rect
+        sw, sh = float(source.width()), float(source.height())
+        if sw <= 0 or sh <= 0:
+            return rect
+
+        painter.save()
+        try:
+            painter.translate(float(shape.get("x", 0)) + w / 2,
+                              float(shape.get("y", 0)) + h / 2)
+            painter.rotate(float(shape.get("rotation", 0)))
+            painter.translate(-w / 2, -h / 2)
+            painter.setClipPath(self._mask_local_path(shape), Qt.ClipOperation.IntersectClip)
+            painter.setOpacity(float(shape.get("opacity", 1.0)))
+            if shape.get("dynamic_image_fit", "cover") == "contain":
+                scale = min(w / sw, h / sh)
+                target_w, target_h = sw * scale, sh * scale
+                target = QRectF((w - target_w) / 2, (h - target_h) / 2,
+                                target_w, target_h)
+                painter.drawImage(target, source, QRectF(source.rect()))
+            else:
+                scale = max(w / sw, h / sh)
+                source_w, source_h = w / scale, h / scale
+                source_rect = QRectF((sw - source_w) / 2, (sh - source_h) / 2,
+                                     source_w, source_h)
+                painter.drawImage(QRectF(0, 0, w, h), source, source_rect)
+        finally:
+            painter.restore()
+        if shape.get("outline_enabled"):
+            overlay = dict(shape)
+            overlay["fill_opacity"] = 0.0
+            draw_shape(painter, overlay)
+        return rect
 
     def _resolve_asset_path(self, raw_path):
         path = Path(raw_path or '')

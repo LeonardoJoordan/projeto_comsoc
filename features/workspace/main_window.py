@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
                                   QInputDialog, QComboBox, QTableWidgetItem)
 from PySide6.QtCore import Qt, QSignalBlocker, QTimer, QThread
-from PySide6.QtGui import QPainter, QImage, QIcon, QPageLayout, QPalette, QColor
+from PySide6.QtGui import QPainter, QImage, QIcon, QPageLayout, QPalette, QColor, QBrush
 
 from features.preview.preview_panel import PreviewPanel
 from features.preview.sheet_preview_worker import SheetPreviewWorker
@@ -33,6 +33,8 @@ from core.settings import get_app_settings
 from core.render_cache import ensure_background_proxy, get_thumbnail_cache_path
 from core.resources import object_icon_path
 from core.output_folders import create_forge_output_dir
+from core.dynamic_images import dynamic_image_fields, resolve_dynamic_image
+from core.themes import themed_style, theme_color
 from core.i18n import tr
 from core.model_document import (
     V3_FILENAME,
@@ -290,6 +292,9 @@ class MainWindow(QMainWindow):
         self.controls_panel.btn_config_model.clicked.connect(self._open_model_dialog)
         self.controls_panel.btn_import_models.clicked.connect(self._on_import_models)
         self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
+        self.table_panel.btn_dynamic_image_dir.clicked.connect(
+            self._select_dynamic_image_directory
+        )
 
         # Restaura a geometria e o estado da janela (posição e tamanho)
         geometry = self.settings.value("geometry")
@@ -490,6 +495,14 @@ class MainWindow(QMainWindow):
             data = load_model_document(actual_dir)
             data["name"] = new_name
             save_model_document(data, actual_dir)
+            old_key = f"workspace/dynamic_images/{old_slug}"
+            new_key = f"workspace/dynamic_images/{new_slug}"
+            remembered = self.settings.value(old_key, "")
+            if remembered and not self.settings.value(new_key, ""):
+                self.settings.setValue(new_key, remembered)
+            if old_key != new_key:
+                self.settings.remove(old_key)
+            self.settings.sync()
             
             self.log_panel.append(tr("Modelo renomeado: '{anterior}' → '{novo}'").format(anterior=old_name, novo=new_name))
             self._reload_models_from_disk(select_name=new_name)
@@ -520,6 +533,8 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, tr("Erro"), tr("Falha ao excluir: {erro}").format(erro=e))
             return
 
+        self.settings.remove(self._dynamic_image_settings_key())
+        self.settings.sync()
         self.log_panel.append(tr("Modelo excluído: {nome}").format(nome=model_name))
         self._reload_models_from_disk()
 
@@ -761,6 +776,7 @@ class MainWindow(QMainWindow):
                     
                     self.cached_model_data = data
                     self.cached_model_document = document
+                    self._configure_dynamic_images_for_model(document)
                     self.preview_panel.set_page_navigation(len(document["pages"]), 0)
                     self._refresh_imposition_presets()
                     self._refresh_preview_navigation()
@@ -1069,6 +1085,7 @@ class MainWindow(QMainWindow):
         self._preview_refresh_timer.start()
 
     def _refresh_preview_after_data_change(self):
+        self._refresh_dynamic_image_status()
         self._refresh_preview_navigation()
         if self._preview_mode == "sheet":
             self._render_current_sheet_preview()
@@ -1528,6 +1545,106 @@ class MainWindow(QMainWindow):
             "active_preset_name": active_name,
         }
 
+    def _dynamic_image_settings_key(self):
+        model_id = self.preview_panel.cbo_models.currentData()
+        if not model_id:
+            model_id = slugify_model_name(self.preview_panel.cbo_models.currentText())
+        return f"workspace/dynamic_images/{model_id}"
+
+    def _configure_dynamic_images_for_model(self, document):
+        fields = dynamic_image_fields(document)
+        footer = self.table_panel.dynamic_image_footer
+        footer.setVisible(bool(fields))
+        if not fields:
+            self.table_panel.txt_dynamic_image_dir.clear()
+            self.table_panel.lbl_dynamic_image_status.clear()
+            document.pop("__dynamic_image_dir", None)
+            return
+        directory = str(self.settings.value(self._dynamic_image_settings_key(), "") or "")
+        self.table_panel.txt_dynamic_image_dir.setText(directory)
+        self.table_panel.txt_dynamic_image_dir.setToolTip(directory or tr(
+            "Pasta usada para localizar os arquivos indicados na tabela"
+        ))
+        document["__dynamic_image_dir"] = directory
+        self._refresh_dynamic_image_status()
+
+    def _select_dynamic_image_directory(self):
+        current = self.table_panel.txt_dynamic_image_dir.text().strip()
+        directory = QFileDialog.getExistingDirectory(
+            self, tr("Selecionar pasta de imagens"), current
+        )
+        if not directory:
+            return
+        self.settings.setValue(self._dynamic_image_settings_key(), directory)
+        self.settings.sync()
+        self.table_panel.txt_dynamic_image_dir.setText(directory)
+        self.table_panel.txt_dynamic_image_dir.setToolTip(directory)
+        if self.cached_model_document is not None:
+            self.cached_model_document["__dynamic_image_dir"] = directory
+        for renderer in self._preview_renderers:
+            renderer.set_dynamic_image_directory(directory)
+        self._invalidate_sheet_previews()
+        self._refresh_dynamic_image_status()
+        self._refresh_preview_after_data_change()
+
+    def _refresh_dynamic_image_status(self):
+        document = self.cached_model_document or {}
+        fields = dynamic_image_fields(document)
+        footer = getattr(self.table_panel, "dynamic_image_footer", None)
+        if footer is None:
+            return
+        footer.setVisible(bool(fields))
+        if not fields:
+            return
+        directory = self.table_panel.txt_dynamic_image_dir.text().strip()
+        status_label = self.table_panel.lbl_dynamic_image_status
+        if not directory or not Path(directory).is_dir():
+            status_label.setText(tr("Selecione uma pasta de imagens válida."))
+            themed_style(status_label, "color: @danger@; font-size: 11px;")
+        else:
+            status_label.setText(tr("Pasta pronta para {quantidade} campo(s) de imagem.").format(
+                quantidade=len(fields)
+            ))
+            themed_style(status_label, "color: @success@; font-size: 11px;")
+
+        table = self.table_panel.table
+        headers = {
+            table.horizontalHeaderItem(column).text(): column
+            for column in range(table.columnCount())
+            if table.horizontalHeaderItem(column)
+        }
+        counts = {"not_found": 0, "ambiguous": 0, "invalid": 0}
+        old_blocked = table.blockSignals(True)
+        try:
+            for field in fields:
+                column = headers.get(field)
+                if column is None:
+                    continue
+                for row in range(table.rowCount()):
+                    item = table.item(row, column)
+                    if item is None:
+                        continue
+                    result = resolve_dynamic_image(directory, item.text())
+                    if result.status in counts:
+                        counts[result.status] += 1
+                        item.setForeground(QBrush(QColor(theme_color("danger"))))
+                        item.setToolTip(
+                            tr("Arquivo ambíguo; informe também a extensão.")
+                            if result.status == "ambiguous" else
+                            tr("Imagem não encontrada na pasta configurada.")
+                        )
+                    else:
+                        item.setForeground(QBrush(QColor(theme_color("text"))))
+                        item.setToolTip(str(result.path) if result.path else "")
+        finally:
+            table.blockSignals(old_blocked)
+        problems = sum(counts.values())
+        if problems:
+            status_label.setText(tr("{quantidade} referência(s) de imagem precisam de atenção.").format(
+                quantidade=problems
+            ))
+            themed_style(status_label, "color: @danger@; font-size: 11px;")
+
     def _generate_cards_async(self):
         rows_plain, rows_rich, source_rows = self._scrape_table_data(include_sources=True)
         if not rows_plain:
@@ -1537,6 +1654,38 @@ class MainWindow(QMainWindow):
         current_name = self.preview_panel.cbo_models.currentText()
         if not current_name:
             self.log_panel.append(tr("ERRO: nenhum modelo selecionado."))
+            return
+
+        dynamic_fields = dynamic_image_fields(self.cached_model_document or {})
+        dynamic_directory = self.table_panel.txt_dynamic_image_dir.text().strip()
+        if dynamic_fields and not Path(dynamic_directory).is_dir():
+            QMessageBox.warning(
+                self, tr("Pasta de imagens necessária"),
+                tr("Selecione uma pasta de imagens válida antes de gerar o material."),
+            )
+            return
+        unresolved = []
+        for production_index, row_data in enumerate(rows_plain):
+            row_number = source_rows[production_index] + 1
+            for field_name in dynamic_fields:
+                value = row_data.get(field_name, "")
+                result = resolve_dynamic_image(dynamic_directory, value)
+                if value and result.status != "ok":
+                    unresolved.append((row_number, field_name, value, result.status))
+        if unresolved:
+            first = unresolved[0]
+            reason = (
+                tr("há mais de um arquivo com esse nome")
+                if first[3] == "ambiguous" else tr("o arquivo não foi encontrado")
+            )
+            QMessageBox.warning(
+                self, tr("Imagens não resolvidas"),
+                tr("{quantidade} referência(s) de imagem precisam ser corrigidas. "
+                   "A primeira está na linha {linha}, campo '{campo}': '{valor}' ({motivo}).").format(
+                    quantidade=len(unresolved), linha=first[0], campo=first[1],
+                    valor=first[2], motivo=reason,
+                ),
+            )
             return
         
         _, export_format, _ = self._current_export_mode()
@@ -1565,12 +1714,15 @@ class MainWindow(QMainWindow):
             self.log_panel.append(tr("ERRO: modelo '{nome}' não encontrado.").format(nome=self.active_model_name))
             return
 
+        if dynamic_image_fields(document):
+            document["__dynamic_image_dir"] = dynamic_directory
+
         imposition_cfg = self._resolve_imposition_settings()
         for page in document["pages"]:
             page_data = adapt_model_page(document, page["page_id"])
             ensure_background_proxy(model_dir, page_data)
 
-        renderers = renderers_for_document(document)
+        renderers = renderers_for_document(document, dynamic_directory)
 
         custom_path = self.txt_output_path.text().strip()
         if not custom_path:

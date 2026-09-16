@@ -855,6 +855,73 @@ def install_frontend(w):
     p.chk_link.setToolTip(tr('Adiciona ao objeto um link clicável nos arquivos PDF.'))
     row(pl, p.btn_restore, p.chk_link)
 
+    dynamic_controls, dynamic_layout = column()
+    dynamic_controls.setObjectName('dynamicImageControls')
+    dynamic_layout.setContentsMargins(0, 8, 0, 0)
+    dynamic_layout.setSpacing(6)
+    dynamic_heading = QLabel(tr('IMAGEM VARIÁVEL'))
+    dynamic_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    themed_style(dynamic_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
+    dynamic_layout.addWidget(dynamic_heading)
+    dynamic_enabled = QCheckBox(tr('Usar imagem indicada na tabela'))
+    dynamic_enabled.setObjectName('dynamicImageEnabled')
+    dynamic_layout.addWidget(dynamic_enabled)
+    dynamic_details, dynamic_details_layout = column()
+    dynamic_details_layout.setContentsMargins(0, 0, 0, 0)
+    dynamic_field = QLineEdit()
+    dynamic_field.setObjectName('dynamicImageField')
+    dynamic_field.setPlaceholderText(tr('Ex.: Foto'))
+    dynamic_fit = QComboBox()
+    dynamic_fit.setObjectName('dynamicImageFit')
+    dynamic_fit.addItem(tr('Preencher e cortar'), 'cover')
+    dynamic_fit.addItem(tr('Ajustar imagem inteira'), 'contain')
+    dynamic_details_layout.addWidget(field(tr('Campo da tabela'), dynamic_field))
+    dynamic_details_layout.addWidget(field(tr('Enquadramento'), dynamic_fit))
+    dynamic_hint = QLabel(tr('A pasta das imagens é escolhida na tela principal.'))
+    dynamic_hint.setObjectName('muted')
+    dynamic_hint.setWordWrap(True)
+    dynamic_details_layout.addWidget(dynamic_hint)
+    dynamic_layout.addWidget(dynamic_details)
+    pl.addWidget(dynamic_controls)
+
+    updating_dynamic = {'active': False}
+
+    def _default_dynamic_field():
+        existing = set(w.get_all_model_placeholders())
+        candidate = tr('Imagem')
+        suffix = 2
+        while candidate in existing:
+            candidate = tr('Imagem {numero}').format(numero=suffix)
+            suffix += 1
+        return candidate
+
+    def apply_dynamic_image():
+        if updating_dynamic['active']:
+            return
+        selected = w.scene.selectedItems()
+        if len(selected) != 1 or not isinstance(selected[0], RectangleItem):
+            return
+        item = selected[0]
+        enabled = dynamic_enabled.isChecked()
+        value = dynamic_field.text().strip()
+        if enabled and not value:
+            value = _default_dynamic_field()
+            dynamic_field.setText(value)
+        if enabled:
+            item.dynamic_image_field = value
+        else:
+            item.dynamic_image_field = ''
+            dynamic_field.clear()
+        item.dynamic_image_fit = dynamic_fit.currentData() or 'cover'
+        dynamic_details.setVisible(enabled)
+        w.sync_placeholders_list()
+        w.save_snapshot()
+        refresh_mask_controls()
+
+    dynamic_enabled.toggled.connect(apply_dynamic_image)
+    dynamic_field.editingFinished.connect(apply_dynamic_image)
+    dynamic_fit.activated.connect(apply_dynamic_image)
+
     mask_controls, mask_layout = column()
     mask_controls.setObjectName('maskControls')
     mask_layout.setContentsMargins(0, 8, 0, 0)
@@ -863,34 +930,52 @@ def install_frontend(w):
     mask_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
     themed_style(mask_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
     mask_layout.addWidget(mask_heading)
+    mask_enabled = QCheckBox(tr('Usar máscara'))
+    mask_enabled.setObjectName('maskEnabled')
+    mask_layout.addWidget(mask_enabled)
+    mask_details, mask_details_layout = column()
+    mask_details.setObjectName('maskDetails')
+    mask_details_layout.setContentsMargins(0, 0, 0, 0)
+    mask_details_layout.setSpacing(6)
     mask_status = QLabel()
     mask_status.setObjectName('muted')
     mask_status.setWordWrap(True)
-    mask_layout.addWidget(mask_status)
+    mask_details_layout.addWidget(mask_status)
     mask_target = QComboBox()
     mask_target.setObjectName('maskTarget')
-    mask_layout.addWidget(mask_target)
+    mask_details_layout.addWidget(mask_target)
     mask_create = QPushButton()
     mask_create.setObjectName('maskCreate')
-    mask_layout.addWidget(mask_create)
+    mask_details_layout.addWidget(mask_create)
     mask_child = QComboBox()
     mask_child.setObjectName('maskChild')
-    mask_layout.addWidget(mask_child)
-    mask_actions = row(mask_layout)
+    mask_details_layout.addWidget(mask_child)
+    mask_actions = row(mask_details_layout)
     mask_edit = QPushButton(tr('Editar máscara'))
     mask_remove = QPushButton(tr('Remover máscara'))
     mask_edit.setObjectName('maskEdit')
     mask_remove.setObjectName('maskRemove')
     mask_actions.addWidget(mask_edit, 1)
     mask_actions.addWidget(mask_remove, 1)
-    mask_session_actions = row(mask_layout)
+    mask_session_actions = row(mask_details_layout)
     mask_cancel = QPushButton(tr('Cancelar mascaramento'))
     mask_finish = QPushButton(tr('Concluir mascaramento'))
     mask_cancel.setObjectName('maskCancel')
     mask_finish.setObjectName('primary')
     mask_session_actions.addWidget(mask_cancel, 1)
     mask_session_actions.addWidget(mask_finish, 1)
+    mask_layout.addWidget(mask_details)
     pl.addWidget(mask_controls)
+
+    updating_mask = {'active': False}
+
+    def set_mask_checkbox(checked, enabled=True):
+        updating_mask['active'] = True
+        try:
+            mask_enabled.setEnabled(enabled)
+            mask_enabled.setChecked(checked)
+        finally:
+            updating_mask['active'] = False
 
     def refresh_mask_controls():
         from .canvas_items import RectangleItem
@@ -898,6 +983,8 @@ def install_frontend(w):
         item = selected[0] if len(selected) == 1 else None
         session = w._mask_edit_session
         mask_controls.setVisible(bool(session) or item is not None)
+        mask_enabled.setVisible(False)
+        mask_details.setVisible(False)
         for control in (mask_target, mask_create, mask_child, mask_edit,
                         mask_remove, mask_cancel, mask_finish):
             control.setVisible(False)
@@ -908,6 +995,9 @@ def install_frontend(w):
                 image=w._generate_layer_name(image.layer_id, image),
                 shape=w._generate_layer_name(shape.layer_id, shape),
             ))
+            mask_enabled.setVisible(True)
+            set_mask_checkbox(True, enabled=False)
+            mask_details.setVisible(True)
             mask_cancel.setVisible(True)
             mask_finish.setVisible(True)
             return
@@ -917,12 +1007,16 @@ def install_frontend(w):
             return
         if w._is_mask_image(item):
             parent = item.parentItem()
+            mask_enabled.setVisible(True)
             if isinstance(parent, RectangleItem):
+                set_mask_checkbox(True)
+                mask_details.setVisible(True)
                 mask_status.setText(tr('Imagem vinculada a {shape}').format(
                     shape=w._generate_layer_name(parent.layer_id, parent)))
                 mask_edit.setVisible(True)
                 mask_remove.setVisible(True)
             else:
+                set_mask_checkbox(False)
                 shapes = sorted(w._mask_shapes(), key=lambda value: value.custom_name.casefold())
                 if not shapes:
                     mask_status.setText(tr('Crie uma forma fechada para utilizá-la como máscara.'))
@@ -937,6 +1031,9 @@ def install_frontend(w):
         if isinstance(item, RectangleItem) and item in w._mask_shapes():
             children = item.masked_images()
             free_images = sorted(w._free_mask_images(), key=lambda value: value.custom_name.casefold())
+            mask_enabled.setVisible(True)
+            set_mask_checkbox(bool(children))
+            mask_details.setVisible(bool(children))
             if free_images:
                 mask_target.clear()
                 for image in free_images:
@@ -956,6 +1053,24 @@ def install_frontend(w):
                 mask_status.setText(tr('Não há imagens disponíveis para mascaramento.'))
             return
         mask_controls.setVisible(False)
+
+    def toggle_mask_panel(checked):
+        if updating_mask['active']:
+            return
+        selected = w.scene.selectedItems()
+        item = selected[0] if len(selected) == 1 else None
+        if item is None:
+            return
+        has_mask = (
+            w._is_mask_image(item) and isinstance(item.parentItem(), RectangleItem)
+        ) or (
+            isinstance(item, RectangleItem) and bool(item.masked_images())
+        )
+        if not checked and has_mask:
+            w.remove_mask(item)
+            refresh_mask_controls()
+            return
+        mask_details.setVisible(checked)
 
     def create_selected_mask():
         selected = w.scene.selectedItems()
@@ -982,6 +1097,7 @@ def install_frontend(w):
     mask_remove.clicked.connect(lambda: w.remove_mask())
     mask_cancel.clicked.connect(lambda: w.finish_mask_edit(False))
     mask_finish.clicked.connect(lambda: w.finish_mask_edit(True))
+    mask_enabled.toggled.connect(toggle_mask_panel)
     w._refresh_mask_controls = refresh_mask_controls
 
     prop_section = Section(tr('Propriedades'), props)
@@ -1367,9 +1483,30 @@ def install_frontend(w):
         w.btn_del_layer.setEnabled(bool(selected) and not background_selected)
         shape_controls.setVisible(is_shape)
         p.btn_restore.setVisible(restore_visible)
+        dynamic_controls.setVisible(False)
         if is_shape:
             item = selected[0]
             is_line = item.shape_type == 'line'
+            dynamic_available = (
+                not is_line
+                and not background_selected
+                and not item.masked_images()
+                and item.shape_type in ('rectangle', 'ellipse', 'circle')
+            )
+            dynamic_controls.setVisible(
+                not is_line
+                and not background_selected
+                and (not item.masked_images() or bool(item.dynamic_image_field))
+            )
+            updating_dynamic['active'] = True
+            try:
+                dynamic_enabled.setEnabled(dynamic_available or bool(item.dynamic_image_field))
+                dynamic_enabled.setChecked(bool(item.dynamic_image_field))
+                dynamic_field.setText(item.dynamic_image_field)
+                dynamic_fit.setCurrentIndex(max(0, dynamic_fit.findData(item.dynamic_image_fit)))
+                dynamic_details.setVisible(bool(item.dynamic_image_field))
+            finally:
+                updating_dynamic['active'] = False
             fill_controls.setVisible(not is_line)
             outline_enabled.setVisible(not is_line)
             position_field.setVisible(not is_line)

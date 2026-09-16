@@ -1550,11 +1550,12 @@ class EditorWindow(QMainWindow):
                 if getattr(item.state, 'has_link', False):
                     name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
                     add(f"Link - {name}")
-            elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
+            elif isinstance(item, RectangleItem) and not getattr(item, 'is_document_background', False):
+                add(getattr(item, 'dynamic_image_field', ''))
                 if getattr(item, 'has_link', False):
                     name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
                     add(f"Link - {name}")
-            elif isinstance(item, RectangleItem) and not getattr(item, 'is_document_background', False):
+            elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
                 if getattr(item, 'has_link', False):
                     name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
                     add(f"Link - {name}")
@@ -2756,6 +2757,7 @@ class EditorWindow(QMainWindow):
             if isinstance(item, RectangleItem)
             and not getattr(item, 'is_document_background', False)
             and getattr(item, 'shape_type', '') in ('rectangle', 'ellipse', 'circle')
+            and not getattr(item, 'dynamic_image_field', '')
         ]
 
     def _free_mask_images(self):
@@ -2891,6 +2893,7 @@ class EditorWindow(QMainWindow):
             return False
         image_count = len(images)
         for index, image in enumerate(images):
+            was_selected = image.isSelected()
             scene_origin = image.mapToScene(QPointF(0, 0))
             scene_rotation = shape.rotation() + image.rotation()
             image.setParentItem(None)
@@ -2904,6 +2907,21 @@ class EditorWindow(QMainWindow):
                 # Ao desfazer a máscara pela forma, preserva a composição logo
                 # abaixo dela e mantém a ordem relativa que existia no grupo.
                 image.setZValue(shape.zValue() - (image_count - index) * 0.01)
+            # Enquanto pertence à máscara, a imagem deixa de receber eventos do
+            # mouse para que o arraste no canvas mova a forma. Ao soltá-la, esse
+            # estado precisa ser restaurado; as flags de movimento, sozinhas,
+            # não fazem o item voltar a responder ao mouse.
+            interactive = bool(
+                image.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable
+                and image.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable
+            )
+            image.setAcceptedMouseButtons(
+                Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
+                if interactive else Qt.MouseButton.NoButton
+            )
+            if was_selected:
+                image.setSelected(False)
+                image.setSelected(True)
         for order, child in enumerate(shape.masked_images()):
             child.mask_order = order
             child.setZValue(order + 1)
@@ -3627,6 +3645,8 @@ class EditorWindow(QMainWindow):
             item.layer_id = entry.get('layer_id')
             item.group_id = entry.get('group_id')
             item.mask_group_id = entry.get('mask_group_id')
+            item.dynamic_image_field = str(entry.get('dynamic_image_field') or '').strip()
+            item.dynamic_image_fit = entry.get('dynamic_image_fit', 'cover')
             item.custom_name = entry.get('custom_name', 'Plano de fundo')
             item.setPos(entry.get('x', 0), entry.get('y', 0))
             item.setRotation(entry.get('rotation', 0))

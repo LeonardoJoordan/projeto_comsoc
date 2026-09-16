@@ -1060,6 +1060,8 @@ class RectangleItem(ImageItem):
         self._mask_editing = False
         self._mask_overlay = None
         self.mask_group_id = None
+        self.dynamic_image_field = ""
+        self.dynamic_image_fit = "cover"
         self.resize_custom(width, height)
 
     def masked_images(self):
@@ -1107,7 +1109,8 @@ class RectangleItem(ImageItem):
             'shape_type', 'fill_color', 'fill_opacity', 'outline_enabled',
             'outline_color', 'outline_opacity', 'outline_width',
             'outline_position', 'outline_join', 'corner_radius',
-            'corner_radii', 'corner_radii_linked')}
+            'corner_radii', 'corner_radii_linked', 'dynamic_image_field',
+            'dynamic_image_fit')}
 
     def drawing_path(self):
         path = QPainterPath()

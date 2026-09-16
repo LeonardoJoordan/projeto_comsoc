@@ -5,7 +5,10 @@ from pathlib import Path
 from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtGui import QColor, QImage, QPainter
-from PySide6.QtWidgets import QApplication, QComboBox, QGraphicsScene, QPushButton
+from PySide6.QtWidgets import (
+    QApplication, QCheckBox, QComboBox, QGraphicsScene, QLineEdit,
+    QPushButton, QWidget,
+)
 
 from features.generator.renderer import NativeRenderer
 from .canvas_items import Guideline, ImageItem, RectangleItem, _snap_position_to_guides
@@ -130,17 +133,52 @@ class ImageMaskTest(unittest.TestCase):
             try:
                 shape.setSelected(True)
                 self.app.processEvents()
+                enabled = window.findChild(QCheckBox, 'maskEnabled')
+                details = window.findChild(QWidget, 'maskDetails')
                 target = window.findChild(QComboBox, 'maskTarget')
                 create = window.findChild(QPushButton, 'maskCreate')
+                self.assertIsNotNone(enabled)
+                self.assertFalse(enabled.isChecked())
+                self.assertTrue(details.isHidden())
                 self.assertIsNotNone(target)
                 self.assertIsNotNone(create)
                 self.assertIs(target.currentData(), image)
 
+                enabled.click()
+                self.app.processEvents()
+                self.assertFalse(details.isHidden())
                 create.click()
                 self.app.processEvents()
                 self.assertIs(image.parentItem(), shape)
                 self.assertIsNotNone(window._mask_edit_session)
                 window.finish_mask_edit(True)
+                self.app.processEvents()
+                self.assertTrue(enabled.isChecked())
+                enabled.click()
+                self.app.processEvents()
+                self.assertIsNone(image.parentItem())
+            finally:
+                self._close(window)
+
+    def test_disabling_dynamic_image_fully_releases_shape_for_masking(self):
+        with tempfile.TemporaryDirectory() as folder:
+            asset = self._asset(folder)
+            window, shape, _image = self._window_objects(asset)
+            try:
+                shape.setSelected(True)
+                self.app.processEvents()
+                dynamic = window.findChild(QCheckBox, 'dynamicImageEnabled')
+                field = window.findChild(QLineEdit, 'dynamicImageField')
+                dynamic.setChecked(True)
+                self.app.processEvents()
+                self.assertTrue(shape.dynamic_image_field)
+
+                dynamic.setChecked(False)
+                self.app.processEvents()
+
+                self.assertEqual(shape.dynamic_image_field, '')
+                self.assertEqual(field.text(), '')
+                self.assertIn(shape, window._mask_shapes())
             finally:
                 self._close(window)
 
@@ -261,6 +299,11 @@ class ImageMaskTest(unittest.TestCase):
                 self.assertEqual(shape.masked_images(), [])
                 self.assertIsNone(shape.mask_group_id)
                 self.assertTrue(all(image.parentItem() is None for image in (first, second)))
+                self.assertTrue(all(
+                    image.acceptedMouseButtons()
+                    == Qt.MouseButton.LeftButton | Qt.MouseButton.RightButton
+                    for image in (first, second)
+                ))
                 self.assertTrue(all(image.zValue() < shape.zValue() for image in (first, second)))
                 self.assertLess(first.zValue(), second.zValue())
             finally:

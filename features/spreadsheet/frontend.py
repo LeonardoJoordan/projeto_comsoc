@@ -2,7 +2,7 @@ from core.themes import themed_style, theme_color, theme_manager
 """Apresentação da planilha; preserva os controles e as operações da tabela."""
 from PySide6.QtCore import Qt, QSize, QSignalBlocker, Signal
 from PySide6.QtWidgets import (
-    QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QTextEdit,
+    QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QTextEdit, QLineEdit,
 )
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QFont, QTextCharFormat, QTextCursor
 from shiboken6 import isValid
@@ -259,6 +259,40 @@ def install_frontend(panel):
     layout.addWidget(table, 1)
     table.show()
 
+    image_footer = QFrame()
+    image_footer.setObjectName('dynamicImageFooter')
+    image_footer_layout = QVBoxLayout(image_footer)
+    image_footer_layout.setContentsMargins(14, 9, 14, 11)
+    image_footer_layout.setSpacing(6)
+    image_title = QLabel(tr('IMAGENS VARIÁVEIS'))
+    image_title.setObjectName('sheetSectionTitle')
+    image_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    image_footer_layout.addWidget(image_title)
+    image_row = QHBoxLayout()
+    image_row.setSpacing(8)
+    image_path = QLineEdit()
+    image_path.setObjectName('dynamicImageDirectory')
+    image_path.setReadOnly(True)
+    image_path.setPlaceholderText(tr('Selecione a pasta que contém as imagens'))
+    image_path.setToolTip(tr('Pasta usada para localizar os arquivos indicados na tabela'))
+    image_button = QPushButton('…')
+    image_button.setObjectName('dynamicImageBrowse')
+    image_button.setFixedSize(34, 30)
+    image_button.setToolTip(tr('Selecionar pasta de imagens'))
+    image_row.addWidget(image_path, 1)
+    image_row.addWidget(image_button)
+    image_footer_layout.addLayout(image_row)
+    image_status = QLabel()
+    image_status.setObjectName('dynamicImageStatus')
+    image_status.setWordWrap(True)
+    image_footer_layout.addWidget(image_status)
+    layout.addWidget(image_footer)
+    image_footer.hide()
+    panel.dynamic_image_footer = image_footer
+    panel.txt_dynamic_image_dir = image_path
+    panel.btn_dynamic_image_dir = image_button
+    panel.lbl_dynamic_image_status = image_status
+
     def update_format_buttons(bold, italic, underline):
         for button, checked in zip(
             (format_buttons['b'], format_buttons['i'], format_buttons['u']),
@@ -371,6 +405,10 @@ def install_frontend(panel):
         QTextEdit#cellEditor:focus { border-color: @accent@; }
         QTextEdit#cellEditor:disabled { color: @disabled@; background: @panel@; }
         QLabel#sheetHint { background: @panel@; color: @muted@; padding: 9px 14px; font-size: 11px; border-bottom: 1px solid @border@; }
+        QFrame#dynamicImageFooter { background: @panel@; border: none; border-top: 1px solid @border@; }
+        QLabel#dynamicImageStatus { color: @muted@; font-size: 11px; }
+        QLineEdit#dynamicImageDirectory { min-height: 28px; max-height: 28px; }
+        QPushButton#dynamicImageBrowse { padding: 0; min-height: 28px; max-height: 28px; }
         QPushButton#sheetSquare, QPushButton#sheetAction, QPushButton#sheetLineAction { background: transparent; color: @text@; border: 1px solid transparent; border-radius: 5px; }
         QPushButton#sheetSquare:hover, QPushButton#sheetAction:hover, QPushButton#sheetLineAction:hover { background: @hover@; }
         QPushButton#sheetSquare:pressed, QPushButton#sheetAction:checked, QPushButton#sheetLineAction:checked { background: @selection@; color: @text@; }

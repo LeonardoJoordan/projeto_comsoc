@@ -1,0 +1,104 @@
+# FORNAX Forge — Roadmap de conclusão e limpeza
+
+Este documento orienta a sequência de trabalho até a conclusão das funcionalidades previstas e a eliminação da dívida técnica identificada. Não é um plano detalhado de implementação: o projeto deverá ser reavaliado ao iniciar cada etapa.
+
+## Como seguir este roadmap
+
+- Antes de cada etapa, conferir o código e os comportamentos atuais, alinhar as decisões pendentes e definir seu escopo concreto.
+- Fazer somente as preparações estruturais necessárias à etapa em execução. A limpeza ampla acontece depois de estabilizar as funcionalidades.
+- Preservar o layout aprovado, a responsividade e a equivalência entre editor, prévia e arquivos gerados.
+- Não confundir compatibilidade necessária com código descartável. Remoções exigem conferir consumidores, modelos antigos e distribuição.
+- Marcar uma etapa como concluída somente após verificar seu resultado. Registrar abaixo o que terminou e qualquer pendência para a próxima sessão.
+
+## Sequência prevista
+
+### 1. Imagens dinâmicas por registro
+
+**Status:** concluída e verificada em 16/09/2026.
+
+**Direção:** permitir que uma forma receba uma fotografia indicada na tabela, localizada em uma pasta externa. Revisar as decisões de interface e tratamento de erros antes da implementação.
+
+**Cuidados principais:** manter a pasta como preferência local por modelo; preservar a posição do cabeçalho e das primeiras linhas da tabela; definir nomes ambíguos, arquivos ausentes e enquadramento; compartilhar a resolução e o desenho da imagem entre prévia e geração; não aumentar desnecessariamente o custo de colar grandes lotes.
+
+**Resultado esperado:** personalizar imagens por linha, com pasta lembrada no rodapé do painel de dados e resultados consistentes na prévia, PNG e PDF, inclusive em modelos de duas páginas.
+
+### 2. Redimensionamento proporcional de grupos
+
+**Status:** pendente.
+
+**Direção:** revisar o agrupamento e as transformações já existentes antes de definir o comportamento que falta.
+
+**Cuidados principais:** proporções, rotação, textos, imagens e máscaras; evitar deslocamentos ou escalas aplicados duas vezes; preservar vínculos, bloqueios e ordem de camadas; desfazer e refazer a operação como uma única alteração.
+
+**Resultado esperado:** redimensionar o conjunto de forma previsível, preservando as relações entre seus elementos, com salvamento e histórico corretos.
+
+### 3. Estabilização e fechamento do escopo funcional
+
+**Status:** pendente.
+
+**Direção:** revisar os fluxos completos após as duas funcionalidades e resolver regressões antes da limpeza ampla. Confirmar se ainda existe alguma função indispensável à versão pretendida.
+
+**Cuidados principais:** modelos antigos e novos, cópia entre páginas, máscaras, grupos, fontes, dados em lote, frente e verso e imposição; medir responsividade e geração com cargas representativas.
+
+**Resultado esperado:** uma versão funcional de referência, com verificações reproduzíveis e um marco no Git para comparar o comportamento durante a refatoração.
+
+### 4. Construção direta da interface atual
+
+**Status:** pendente.
+
+**Direção:** eliminar a montagem de interfaces antigas que depois são ocultadas ou desmontadas. Começar pelo workspace e avançar por editor e tabela em mudanças separadas.
+
+**Cuidados principais:** controles ocultos ainda podem sustentar sinais, atalhos e ações; substituir essas dependências antes de removê-los. Conferir foco, seleção, menus, tamanho dos painéis e ciclo de abertura e fechamento das janelas.
+
+**Resultado esperado:** o programa cria diretamente o layout aprovado, sem containers legados usados como suporte e sem botões invisíveis intermediando ações.
+
+### 5. Organização interna e isolamento da compatibilidade
+
+**Status:** pendente.
+
+**Direção:** reavaliar os controladores grandes e separar responsabilidades onde houver benefício concreto. Isolar a leitura e conversão de estruturas antigas.
+
+**Cuidados principais:** preservar o caminho compartilhado de renderização, os contratos do JSON, os assets, o histórico e a recuperação de arquivos. Não remover suporte a modelos antigos ou migrações apenas por conterem referências ao legado.
+
+**Resultado esperado:** responsabilidades claras, menos duplicação e compatibilidade concentrada em pontos identificáveis, sem mudar a aparência dos documentos nem os fluxos aprovados.
+
+### 6. Consistência visual, recursos e organização do projeto
+
+**Status:** pendente.
+
+**Direção:** concluir a centralização das cores de interface; revisar ícones, fontes, textos, traduções, documentação, testes e arquivos incluídos nos pacotes.
+
+**Cuidados principais:** distinguir cores da interface das cores da arte; comprovar que um recurso não é usado antes de excluí-lo; preservar licenças, fixtures e ferramentas úteis. Artefatos locais ignorados pelo Git e dados do usuário não são código morto e não devem ser apagados indiscriminadamente.
+
+**Resultado esperado:** temas coerentes, recursos necessários bem definidos, documentação atual separada do histórico e empacotamento sem resíduos desnecessários.
+
+### 7. Auditoria final da limpeza
+
+**Status:** pendente.
+
+**Direção:** comparar o programa com a referência da etapa 3 e revisar novamente as dívidas identificadas, considerando a estrutura que existir neste momento.
+
+**Cuidados principais:** conferir fluxos completos, desempenho, persistência, modelos antigos e resultado de impressão; testar os sistemas operacionais e pacotes disponíveis. Não declarar validação multiplataforma com base apenas nos testes do Linux.
+
+**Resultado esperado:** dívida técnica identificada resolvida ou explicitamente justificada como compatibilidade necessária, sem regressões conhecidas nos fluxos verificados e com limitações de validação registradas.
+
+## Depois deste roadmap
+
+Com as funcionalidades e o layout estabilizados, criar o tutorial, revisar suas traduções e concluir a preparação para distribuição. O tutorial fica fora da limpeza técnica para evitar refazê-lo durante as mudanças.
+
+## Registro de continuidade
+
+Ao encerrar uma etapa ou sessão, registrar brevemente:
+
+- **Etapa e estado:**
+- **Concluído e verificado:**
+- **Pendências ou decisões em aberto:**
+- **Próximo ponto de retomada:**
+
+### Registro — etapa 1
+
+- **Etapa e estado:** imagens dinâmicas por registro concluídas.
+- **Concluído e verificado:** formas fechadas podem criar um campo de imagem; a pasta externa fica lembrada localmente por modelo; nomes com ou sem extensão são resolvidos com diagnóstico de ausência e ambiguidade; há enquadramento por preenchimento/corte ou ajuste integral; prévia, cache estático e geração compartilham o mesmo renderizador; o recurso participa da união de campos das duas páginas sem incorporar a pasta ao arquivo do modelo; interface e mensagens foram traduzidas para inglês e espanhol.
+- **Verificação executada:** 107 testes e 10 subtestes da suíte principal, 49 testes do editor, compilação dos módulos alterados e abertura básica do workspace em modo offscreen.
+- **Pendências ou decisões em aberto:** validação visual manual com fotografias reais em PNG, PDF e imposição permanece para a etapa 3, junto da revisão integrada dos fluxos.
+- **Próximo ponto de retomada:** reavaliar o agrupamento e definir o escopo concreto da etapa 2, redimensionamento proporcional de grupos.
