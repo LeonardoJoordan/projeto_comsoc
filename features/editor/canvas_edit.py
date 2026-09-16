@@ -37,6 +37,7 @@ class CanvasEdit(QObject):
         cursor.movePosition(QTextCursor.MoveOperation.End)
         text.setTextCursor(cursor)
         for name in ('shortcut_delete', 'shortcut_dup', 'shortcut_copy', 'shortcut_paste',
+                     'shortcut_select_all',
                      'shortcut_rename', 'shortcut_undo', 'shortcut_redo', 'shortcut_redo_alt'):
             shortcut = getattr(self.window, name, None)
             if shortcut:

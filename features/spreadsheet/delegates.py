@@ -1,13 +1,55 @@
 import re
 from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QStyleOptionViewItem,
                                QApplication, QTextEdit, QToolTip, QAbstractItemDelegate)
-from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont, QPen, QColor)
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont, QPen, QColor,
+                           QTextOption)
+from PySide6.QtCore import Qt, QEvent, QRectF
+
+
+RICH_TEXT_STYLESHEET = "b, strong { font-weight: 800; }"
+
+
+def rich_text_document(html, font, color, *, no_wrap=False):
+    """Monta o documento usado tanto na célula quanto nos testes visuais."""
+    doc = QTextDocument()
+    doc.setDefaultFont(font)
+    doc.setDefaultStyleSheet(
+        f"body {{ color: {color}; }} {RICH_TEXT_STYLESHEET}"
+    )
+    doc.setHtml(html)
+    _promote_bold_fragments(doc)
+    doc.setDocumentMargin(0 if no_wrap else 2)
+    if no_wrap:
+        option = doc.defaultTextOption()
+        option.setWrapMode(QTextOption.WrapMode.NoWrap)
+        doc.setDefaultTextOption(option)
+    return doc
+
+
+def _promote_bold_fragments(document):
+    ranges = []
+    block = document.begin()
+    while block.isValid():
+        iterator = block.begin()
+        while not iterator.atEnd():
+            fragment = iterator.fragment()
+            if fragment.isValid() and fragment.charFormat().fontWeight() >= QFont.Weight.Bold:
+                ranges.append((fragment.position(), fragment.length()))
+            iterator += 1
+        block = block.next()
+    for position, length in ranges:
+        cursor = QTextCursor(document)
+        cursor.setPosition(position)
+        cursor.setPosition(position + length, QTextCursor.MoveMode.KeepAnchor)
+        fmt = cursor.charFormat()
+        fmt.setFontWeight(QFont.Weight.ExtraBold)
+        cursor.mergeCharFormat(fmt)
 
 class RichTextEditor(QTextEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setAcceptRichText(True)
+        self.document().setDefaultStyleSheet(RICH_TEXT_STYLESHEET)
         self.setFrameShape(QTextEdit.Shape.NoFrame)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
@@ -27,7 +69,7 @@ class RichTextEditor(QTextEdit):
 
     def _toggle_weight(self):
         fmt = self.currentCharFormat()
-        new_weight = QFont.Weight.Normal if fmt.fontWeight() > QFont.Weight.Normal else QFont.Weight.Bold
+        new_weight = QFont.Weight.Normal if fmt.fontWeight() > QFont.Weight.Normal else QFont.Weight.ExtraBold
         fmt.setFontWeight(new_weight)
         self.mergeCurrentCharFormat(fmt)
 
@@ -68,9 +110,15 @@ class HTMLDelegate(QStyledItemDelegate):
         self.initStyleOption(options, index)
         style = options.widget.style() if options.widget else QApplication.style()
 
-        # No modo compacto cada célula ocupa uma única linha. O conteúdo real
-        # permanece intacto no modelo, na barra fx e no tooltip.
+        rich_text = index.data(Qt.ItemDataRole.UserRole)
+
+        # No modo compacto cada célula continua em uma única linha, mas agora
+        # preserva negrito, itálico e sublinhado do conteúdo rico.
         if not options.widget or not options.widget.wordWrap():
+            if rich_text:
+                self._paint_compact_rich_text(painter, options, index, rich_text, style)
+                self._paint_current(painter, options, index)
+                return
             text = str(index.data(Qt.ItemDataRole.DisplayRole) or '')
             options.text = re.sub(r'\s*[\r\n]+\s*', ' ', text)
             options.features &= ~QStyleOptionViewItem.ViewItemFeature.WrapText
@@ -81,8 +129,6 @@ class HTMLDelegate(QStyledItemDelegate):
             self._paint_current(painter, options, index)
             return
         
-        rich_text = index.data(Qt.ItemDataRole.UserRole)
-        
         if not rich_text:
             super().paint(painter, options, index)
             self._paint_current(painter, options, index)
@@ -91,18 +137,11 @@ class HTMLDelegate(QStyledItemDelegate):
         painter.save()
         style.drawPrimitive(QStyle.PrimitiveElement.PE_PanelItemViewItem, options, painter, options.widget)
 
-        doc = QTextDocument()
-        doc.setDefaultFont(options.font)
-        doc.setHtml(rich_text)
+        selected = bool(options.state & QStyle.StateFlag.State_Selected)
+        role = QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Text
+        text_color = options.palette.color(QPalette.ColorGroup.Normal, role).name()
+        doc = rich_text_document(rich_text, options.font, text_color)
         doc.setTextWidth(options.rect.width())
-        doc.setDocumentMargin(2)
-
-        if options.state & QStyle.StateFlag.State_Selected:
-            text_color = options.palette.color(QPalette.ColorGroup.Normal, QPalette.ColorRole.HighlightedText).name()
-        else:
-            text_color = options.palette.color(QPalette.ColorGroup.Normal, QPalette.ColorRole.Text).name()
-            
-        doc.setDefaultStyleSheet(f"body {{ color: {text_color}; }}")
 
         content_height = doc.size().height()
         y_offset = max(0, (options.rect.height() - content_height) / 2)
@@ -112,6 +151,46 @@ class HTMLDelegate(QStyledItemDelegate):
         doc.drawContents(painter)
         painter.restore()
         self._paint_current(painter, options, index)
+
+    def _paint_compact_rich_text(self, painter, options, index, rich_text, style):
+        style.drawPrimitive(
+            QStyle.PrimitiveElement.PE_PanelItemViewItem,
+            options,
+            painter,
+            options.widget,
+        )
+        selected = bool(options.state & QStyle.StateFlag.State_Selected)
+        role = QPalette.ColorRole.HighlightedText if selected else QPalette.ColorRole.Text
+        text_color = options.palette.color(QPalette.ColorGroup.Normal, role)
+        doc = rich_text_document(rich_text, options.font, text_color.name(), no_wrap=True)
+
+        content = options.rect.adjusted(8, 0, -8, 0)
+        available = max(0, content.width())
+        clipped = doc.idealWidth() > available
+        ellipsis = '…'
+        ellipsis_width = options.fontMetrics.horizontalAdvance(ellipsis) if clipped else 0
+        draw_width = max(0, available - ellipsis_width)
+        doc.setTextWidth(max(doc.idealWidth(), 1))
+        content_height = doc.size().height()
+        y_offset = max(0, (content.height() - content_height) / 2)
+
+        painter.save()
+        painter.translate(content.left(), content.top() + y_offset)
+        painter.setClipRect(QRectF(0, 0, draw_width, content.height()))
+        doc.drawContents(painter)
+        painter.restore()
+
+        if clipped:
+            painter.save()
+            painter.setPen(text_color)
+            ellipsis_rect = QRectF(
+                content.right() - ellipsis_width + 1,
+                content.top(),
+                ellipsis_width,
+                content.height(),
+            )
+            painter.drawText(ellipsis_rect, Qt.AlignmentFlag.AlignVCenter, ellipsis)
+            painter.restore()
 
     def _paint_current(self, painter, option, index):
         if option.widget and option.widget.currentIndex() == index:

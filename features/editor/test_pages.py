@@ -5,9 +5,9 @@ import tempfile
 
 from PySide6.QtCore import QPoint
 from PySide6.QtGui import QColor, QImage
-from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton
+from PySide6.QtWidgets import QApplication, QMessageBox, QPushButton, QGraphicsItem
 
-from .canvas_items import DesignerBox, ImageItem
+from .canvas_items import DesignerBox, ImageItem, RectangleItem, SignatureItem
 from .editor_window import EditorWindow
 from core.model_document import load_model_document
 
@@ -217,11 +217,21 @@ class EditorPagesTest(unittest.TestCase):
                 box = next(item for item in window.scene.items() if isinstance(item, DesignerBox))
                 box.state.font_family = "Amiri"
                 box.state.font_size = 37
+                box.state.html_content = '<p><span style="font-family:Amiri; font-size:37pt; color:#923456">Texto rico</span></p>'
+                box.custom_name = "Texto"
+                box.setRotation(17)
+                box.setOpacity(0.65)
+                box.state.has_link = True
+                box.setZValue(8)
                 box.apply_state()
                 picture = ImageItem(str(asset))
                 picture.custom_name = "Imagem compartilhada"
                 picture.layer_id = window._get_next_layer_id()
                 picture.setPos(80, 90)
+                picture.setRotation(-12)
+                picture.setOpacity(0.7)
+                picture.has_link = True
+                picture.setZValue(4)
                 window.scene.addItem(picture)
                 window.scene.clearSelection()
                 box.setSelected(True)
@@ -236,8 +246,16 @@ class EditorPagesTest(unittest.TestCase):
                 pasted_image = next(item for item in window.scene.items() if type(item) is ImageItem)
                 self.assertEqual(pasted_box.state.font_family, "Amiri")
                 self.assertEqual(pasted_box.state.font_size, 37)
+                self.assertIn("Texto rico", pasted_box.state.html_content)
+                self.assertEqual(pasted_box.rotation(), 17)
+                self.assertAlmostEqual(pasted_box.opacity(), 0.65)
+                self.assertTrue(pasted_box.state.has_link)
                 self.assertEqual(Path(pasted_image._original_path), asset)
                 self.assertEqual((pasted_image.x(), pasted_image.y()), (80.0, 90.0))
+                self.assertEqual(pasted_image.rotation(), -12)
+                self.assertAlmostEqual(pasted_image.opacity(), 0.7)
+                self.assertTrue(pasted_image.has_link)
+                self.assertLess(pasted_image.zValue(), pasted_box.zValue())
                 self.assertEqual(window.history._current_index, history_before + 1)
 
                 window.switch_model_page("front")
@@ -246,6 +264,125 @@ class EditorPagesTest(unittest.TestCase):
                 self.assertNotEqual(pasted_image.layer_id, original_image.layer_id)
             finally:
                 self.close_window(window)
+
+    def test_copy_mixed_selection_preserves_layer_order_shapes_signatures_and_names(self):
+        with tempfile.TemporaryDirectory() as directory:
+            asset = Path(directory) / "assinatura.png"
+            image = QImage(30, 12, QImage.Format_ARGB32)
+            image.fill(QColor("#552288"))
+            self.assertTrue(image.save(str(asset), "PNG"))
+            window = self.make_window()
+            try:
+                window.add_new_box()
+                text = next(item for item in window.scene.items() if isinstance(item, DesignerBox))
+                text.custom_name = "Texto 2"
+                text.setZValue(9)
+
+                shape = RectangleItem(70, 45, "#abc123")
+                shape.layer_id = window._get_next_layer_id()
+                shape.custom_name = "Quadrado"
+                shape.outline_enabled = True
+                shape.outline_width = 3.5
+                shape.has_link = True
+                shape.setPos(25, 35)
+                shape.setRotation(23)
+                shape.setZValue(3)
+                window.scene.addItem(shape)
+
+                signature = SignatureItem(str(asset))
+                signature.layer_id = window._get_next_layer_id()
+                signature.custom_name = "Assinatura"
+                signature.resize_custom(90, 36)
+                signature.setPos(100, 120)
+                signature.setRotation(-8)
+                signature.setOpacity(0.55)
+                signature.setZValue(6)
+                window.scene.addItem(signature)
+
+                window.scene.clearSelection()
+                for item in (text, shape, signature):
+                    item.setSelected(True)
+                window.copy_selected_items()
+                self.assertEqual([kind for kind, _entry in window._object_clipboard], [
+                    "shape", "signature", "text",
+                ])
+
+                window.add_model_page()
+                window.add_new_box()
+                existing_text = next(item for item in window.scene.items() if isinstance(item, DesignerBox))
+                existing_text.custom_name = "Texto"
+                existing_text_2 = DesignerBox(text="Outro")
+                existing_text_2.layer_id = window._get_next_layer_id()
+                existing_text_2.custom_name = "Texto 2"
+                window.scene.addItem(existing_text_2)
+                window.save_snapshot()
+                history_before = window.history._current_index
+
+                window.paste_copied_items()
+
+                selected = window.scene.selectedItems()
+                pasted_shape = next(item for item in selected if isinstance(item, RectangleItem))
+                pasted_signature = next(item for item in selected if isinstance(item, SignatureItem))
+                pasted_text = next(item for item in selected if isinstance(item, DesignerBox))
+                self.assertEqual(pasted_text.custom_name, "Texto 3")
+                self.assertEqual(pasted_shape.fill_color, "#abc123")
+                self.assertTrue(pasted_shape.outline_enabled)
+                self.assertEqual(pasted_shape.outline_width, 3.5)
+                self.assertTrue(pasted_shape.has_link)
+                self.assertEqual((pasted_shape.x(), pasted_shape.y()), (25.0, 35.0))
+                self.assertEqual(pasted_shape.rotation(), 23)
+                self.assertEqual(Path(pasted_signature._original_path), asset)
+                self.assertEqual((pasted_signature.x(), pasted_signature.y()), (100.0, 120.0))
+                self.assertEqual(pasted_signature.rotation(), -8)
+                self.assertAlmostEqual(pasted_signature.opacity(), 0.55)
+                self.assertLess(pasted_shape.zValue(), pasted_signature.zValue())
+                self.assertLess(pasted_signature.zValue(), pasted_text.zValue())
+                self.assertEqual(window.history._current_index, history_before + 1)
+                self.assertEqual(len({getattr(item, "layer_id", None) for item in selected}), 3)
+
+                window.undo()
+                self.assertFalse(any(
+                    getattr(item, "custom_name", "") in {"Quadrado", "Assinatura", "Texto 3"}
+                    for item in window.scene.items()
+                ))
+                window.redo()
+                self.assertEqual(
+                    {
+                        getattr(item, "custom_name", "") for item in window.scene.items()
+                        if getattr(item, "custom_name", "") in {"Quadrado", "Assinatura", "Texto 3"}
+                    },
+                    {"Quadrado", "Assinatura", "Texto 3"},
+                )
+            finally:
+                self.close_window(window)
+
+    def test_select_all_chooses_only_visible_unlocked_layers(self):
+        window = self.make_window()
+        try:
+            window.add_new_box()
+            first = next(item for item in window.scene.items() if isinstance(item, DesignerBox))
+            second = DesignerBox(text="Segundo")
+            second.layer_id = window._get_next_layer_id()
+            window.scene.addItem(second)
+            hidden = RectangleItem(40, 30, "#112233")
+            hidden.layer_id = window._get_next_layer_id()
+            hidden.setVisible(False)
+            window.scene.addItem(hidden)
+            locked = RectangleItem(40, 30, "#445566")
+            locked.layer_id = window._get_next_layer_id()
+            locked.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+            window.scene.addItem(locked)
+
+            window.scene.clearSelection()
+            window.select_all_items()
+
+            self.assertEqual(set(window.scene.selectedItems()), {first, second})
+            self.assertFalse(any(
+                getattr(item, "is_document_background", False)
+                for item in window.scene.selectedItems()
+            ))
+        finally:
+            self.close_window(window)
 
 
 if __name__ == "__main__":

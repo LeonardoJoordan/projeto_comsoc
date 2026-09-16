@@ -115,6 +115,49 @@ def _document_rect(scene):
     return scene.sceneRect()
 
 
+def _paint_with_document_fade(item, painter, draw_content, outside_opacity=0.25):
+    """Pinta conteúdo fora da página atenuado, sem afetar filhos/alças.
+
+    A opacidade do painter já inclui a opacidade própria e a dos pais do item;
+    multiplicá-la mantém o comportamento cumulativo esperado.
+    """
+    scene = item.scene()
+    if scene is None:
+        draw_content()
+        return
+
+    document = _document_rect(scene)
+    scene_bounds = item.sceneBoundingRect()
+    if document.contains(scene_bounds):
+        draw_content()
+        return
+    if not document.intersects(scene_bounds):
+        painter.save()
+        painter.setOpacity(painter.opacity() * outside_opacity)
+        draw_content()
+        painter.restore()
+        return
+
+    document_path = QPainterPath()
+    document_path.addRect(document)
+    local_document = item.mapFromScene(document_path)
+
+    outside = QPainterPath()
+    outside.addRect(item.boundingRect())
+    outside = outside.subtracted(local_document)
+
+    painter.save()
+    painter.setClipPath(outside, Qt.ClipOperation.IntersectClip)
+    painter.setOpacity(painter.opacity() * outside_opacity)
+    draw_content()
+    painter.restore()
+
+    painter.save()
+    painter.setClipPath(local_document, Qt.ClipOperation.IntersectClip)
+    draw_content()
+    painter.restore()
+
+
 def _snap_targets(scene):
     vertical_targets = []
     horizontal_targets = []
@@ -842,8 +885,10 @@ class ImageItem(QGraphicsPixmapItem):
         return self.rect().contains(point)
         
     def paint(self, painter, option, widget=None):
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        painter.drawPixmap(self.rect(), self.pixmap(), QRectF(self.pixmap().rect()))
+        def draw_content():
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            painter.drawPixmap(self.rect(), self.pixmap(), QRectF(self.pixmap().rect()))
+        _paint_with_document_fade(self, painter, draw_content)
 
     def update_center(self):
         r = self.rect()
@@ -935,8 +980,13 @@ class RectangleItem(ImageItem):
         if getattr(self, 'is_document_background', False):
             painter.setClipRect(self.rect())
         from core.object_style import paint_shape_path
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        paint_shape_path(painter, self.drawing_path(), self.style_data())
+        def draw_content():
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            paint_shape_path(painter, self.drawing_path(), self.style_data())
+        if getattr(self, 'is_document_background', False):
+            draw_content()
+        else:
+            _paint_with_document_fade(self, painter, draw_content)
 
     def style_data(self):
         return {key: getattr(self, key) for key in (
@@ -1095,8 +1145,10 @@ class SignatureItem(QGraphicsPixmapItem):
         return self.rect().contains(point)
         
     def paint(self, painter, option, widget=None):
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        painter.drawPixmap(self.rect(), self.pixmap(), QRectF(self.pixmap().rect()))
+        def draw_content():
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+            painter.drawPixmap(self.rect(), self.pixmap(), QRectF(self.pixmap().rect()))
+        _paint_with_document_fade(self, painter, draw_content)
 
     def update_center(self):
         r = self.rect()
@@ -1169,7 +1221,10 @@ class BleedTextItem(QGraphicsTextItem):
         # de caracteres desenhados pelo documento de texto.
         clean_option = QStyleOptionGraphicsItem(option)
         clean_option.state &= ~QStyle.StateFlag.State_HasFocus
-        super().paint(painter, clean_option, widget)
+        _paint_with_document_fade(
+            self, painter,
+            lambda: super(BleedTextItem, self).paint(painter, clean_option, widget),
+        )
 
     def boundingRect(self):
         rect = super().boundingRect()

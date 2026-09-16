@@ -1,12 +1,12 @@
 import tempfile
 import unittest
 from pathlib import Path
-from PySide6.QtWidgets import QApplication
-from PySide6.QtGui import QImage, QColor
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QApplication, QGraphicsScene
+from PySide6.QtGui import QImage, QColor, QPainter, QFont
+from PySide6.QtCore import Qt, QRectF
 from core.document_layers import layer_entries
 from .editor_window import EditorWindow
-from .canvas_items import ImageItem, BackgroundItem, RectangleItem
+from .canvas_items import ImageItem, BackgroundItem, RectangleItem, SignatureItem, BleedTextItem
 
 
 class UnifiedLayersTest(unittest.TestCase):
@@ -47,6 +47,88 @@ class UnifiedLayersTest(unittest.TestCase):
             self.assertEqual(w.layer_list.count(), 2)
             w._last_saved_state = w.get_current_scene_state()
             w.close()
+
+    def test_objects_outside_document_are_painted_with_quarter_effective_opacity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            asset = Path(folder) / "solid.png"
+            source = QImage(100, 25, QImage.Format.Format_ARGB32)
+            source.fill(QColor("#ff0000"))
+            self.assertTrue(source.save(str(asset), "PNG"))
+
+            scene = QGraphicsScene(0, 0, 150, 100)
+            scene._document_rect = QRectF(0, 0, 100, 100)
+
+            image = ImageItem(str(asset))
+            image.resize_custom(100, 25)
+            image.setPos(50, 0)
+            image.setOpacity(0.8)
+            scene.addItem(image)
+
+            signature = SignatureItem(str(asset))
+            signature.resize_custom(100, 25)
+            signature.setPos(50, 35)
+            signature.setOpacity(0.6)
+            scene.addItem(signature)
+
+            shape = RectangleItem(100, 25, "#00ff00")
+            shape.setPos(50, 70)
+            shape.setOpacity(0.8)
+            shape.fill_opacity = 0.5
+            scene.addItem(shape)
+
+            rendered = QImage(150, 100, QImage.Format.Format_ARGB32)
+            rendered.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(rendered)
+            scene.render(painter, QRectF(0, 0, 150, 100), QRectF(0, 0, 150, 100))
+            painter.end()
+
+            for y, inside_alpha, outside_alpha in (
+                (12, 204, 51),
+                (47, 153, 38),
+                (82, 102, 25),
+            ):
+                self.assertAlmostEqual(rendered.pixelColor(75, y).alpha(), inside_alpha, delta=2)
+                self.assertAlmostEqual(rendered.pixelColor(125, y).alpha(), outside_alpha, delta=2)
+
+            image.setSelected(True)
+            self.assertTrue(all(handle.opacity() == 1.0 for handle in image.resize_handles.values()))
+
+    def test_rotated_image_and_text_follow_the_same_document_boundary(self):
+        with tempfile.TemporaryDirectory() as folder:
+            asset = Path(folder) / "solid.png"
+            source = QImage(100, 40, QImage.Format.Format_ARGB32)
+            source.fill(QColor("#2244ff"))
+            self.assertTrue(source.save(str(asset), "PNG"))
+
+            scene = QGraphicsScene(0, 0, 160, 130)
+            scene._document_rect = QRectF(0, 0, 100, 130)
+            image = ImageItem(str(asset))
+            image.resize_custom(100, 40)
+            image.setPos(45, 5)
+            image.setRotation(18)
+            image.setOpacity(0.8)
+            scene.addItem(image)
+
+            text = BleedTextItem("MMMMMMMMMMMM")
+            text.setFont(QFont("Liberation Sans", 20))
+            text.setTextWidth(110)
+            text.setPos(50, 70)
+            scene.addItem(text)
+
+            rendered = QImage(160, 130, QImage.Format.Format_ARGB32)
+            rendered.fill(Qt.GlobalColor.transparent)
+            painter = QPainter(rendered)
+            scene.render(painter, QRectF(0, 0, 160, 130), QRectF(0, 0, 160, 130))
+            painter.end()
+
+            image_inside = max(rendered.pixelColor(x, y).alpha() for x in range(100) for y in range(65))
+            image_outside = max(rendered.pixelColor(x, y).alpha() for x in range(100, 160) for y in range(65))
+            text_inside = max(rendered.pixelColor(x, y).alpha() for x in range(100) for y in range(70, 130))
+            text_outside = max(rendered.pixelColor(x, y).alpha() for x in range(100, 160) for y in range(70, 130))
+            self.assertAlmostEqual(image_inside, 204, delta=2)
+            self.assertAlmostEqual(image_outside, 51, delta=2)
+            self.assertEqual(text_inside, 255)
+            self.assertIn(text_outside, range(62, 66))
 
     def test_editable_background_roundtrip(self):
         w = EditorWindow()

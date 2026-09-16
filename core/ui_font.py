@@ -6,15 +6,15 @@ from PySide6.QtWidgets import QApplication
 from core.resources import PROJECT_ROOT
 
 
-UI_FONT_FAMILY = "Inter"
+UI_FONT_FAMILY = "Inter 18pt"
 
 
 def install_ui_font(app: QApplication) -> str:
     font_dir = PROJECT_ROOT / "assets" / "fonts" / "ui"
-    files = (
-        font_dir / "Inter-VariableFont_opsz,wght.ttf",
-        font_dir / "Inter-Italic-VariableFont_opsz,wght.ttf",
-    )
+    # As fontes variáveis eram expostas pelo Qt somente como Regular e Italic
+    # em algumas plataformas. As variantes estáticas garantem que pesos como
+    # Bold e ExtraBold sejam resolvidos para os desenhos reais da família.
+    files = tuple(sorted(font_dir.glob("Inter_18pt-*.ttf")))
     families = []
     for path in files:
         font_id = QFontDatabase.addApplicationFont(str(path))

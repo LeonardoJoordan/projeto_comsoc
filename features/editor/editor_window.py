@@ -607,6 +607,8 @@ class EditorWindow(QMainWindow):
         self.shortcut_copy.activated.connect(self.copy_selected_items)
         self.shortcut_paste = QShortcut(QKeySequence.StandardKey.Paste, self)
         self.shortcut_paste.activated.connect(self.paste_copied_items)
+        self.shortcut_select_all = QShortcut(QKeySequence.StandardKey.SelectAll, self)
+        self.shortcut_select_all.activated.connect(self.select_all_items)
 
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
         self.shortcut_save.activated.connect(self.export_to_json)
@@ -1631,7 +1633,7 @@ class EditorWindow(QMainWindow):
         if not selected:
             return
         state = self.get_current_scene_state()
-        clipboard = []
+        candidates = {}
         for kind, collection in (
             ("text", "boxes"), ("image", "images"),
             ("signature", "signatures"), ("shape", "shapes"),
@@ -1641,7 +1643,22 @@ class EditorWindow(QMainWindow):
                     continue
                 if entry.get("is_document_background"):
                     continue
-                clipboard.append((kind, copy.deepcopy(entry)))
+                candidates[entry.get("object_id")] = (kind, copy.deepcopy(entry))
+
+        # `layer_order` está da camada inferior para a superior. Preservar essa
+        # sequência evita que uma seleção mista mude sua sobreposição ao colar.
+        clipboard = [
+            candidates[object_id]
+            for object_id in state.get("layer_order", [])
+            if object_id in candidates
+        ]
+        copied_ids = {entry.get("object_id") for _kind, entry in clipboard}
+        clipboard.extend(
+            pair for object_id, pair in sorted(
+                candidates.items(), key=lambda item: float(item[1][1].get("z_value", 0))
+            )
+            if object_id not in copied_ids
+        )
         if clipboard:
             self._object_clipboard = clipboard
             self._clipboard_source_page = self._active_page_id
@@ -1688,6 +1705,9 @@ class EditorWindow(QMainWindow):
             if base.casefold() not in used_names:
                 used_names.add(base.casefold())
                 return base
+            numbered = re.fullmatch(r"(.+?)\s+(\d+)", base)
+            if numbered and numbered.group(1).strip().casefold() in used_names:
+                base = numbered.group(1).strip()
             suffix = 2
             while f"{base} {suffix}".casefold() in used_names:
                 suffix += 1
@@ -1736,6 +1756,21 @@ class EditorWindow(QMainWindow):
         self.sync_placeholders_list()
         self.refresh_layer_list()
         self.save_snapshot()
+        self.on_selection_changed()
+
+    def select_all_items(self):
+        """Seleciona todas as camadas visíveis e editáveis da página ativa."""
+        self.scene.clearSelection()
+        for item in self.scene.items():
+            if not isinstance(item, (DesignerBox, ImageItem, SignatureItem, RectangleItem)):
+                continue
+            if getattr(item, "is_document_background", False):
+                continue
+            if not item.isVisible():
+                continue
+            if not item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsSelectable:
+                continue
+            item.setSelected(True)
         self.on_selection_changed()
 
     def delete_selected_items(self):

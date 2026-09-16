@@ -2,9 +2,9 @@ from core.themes import themed_style, theme_color, theme_manager
 """Apresentação da planilha; preserva os controles e as operações da tabela."""
 from PySide6.QtCore import Qt, QSize, QSignalBlocker, Signal
 from PySide6.QtWidgets import (
-    QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QPlainTextEdit,
+    QFrame, QLabel, QHBoxLayout, QVBoxLayout, QPushButton, QTextEdit,
 )
-from PySide6.QtGui import QIcon, QPixmap, QPainter
+from PySide6.QtGui import QIcon, QPixmap, QPainter, QFont, QTextCharFormat, QTextCursor
 from shiboken6 import isValid
 from pathlib import Path
 from features.editor.frontend import icon
@@ -13,12 +13,94 @@ from core.theme_icons import themed_svg_icon
 from core.i18n import tr
 
 
-class CellContentEditor(QPlainTextEdit):
+class CellContentEditor(QTextEdit):
     """Campo superior: Enter confirma; Shift+Enter cria uma nova linha."""
 
     commitRequested = Signal()
+    formatStateChanged = Signal(bool, bool, bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAcceptRichText(True)
+        self.document().setDefaultStyleSheet("b, strong { font-weight: 800; }")
+        self.currentCharFormatChanged.connect(lambda *_: self._emit_format_state())
+        self.cursorPositionChanged.connect(self._emit_format_state)
+
+    def _emit_format_state(self):
+        fmt = self.currentCharFormat()
+        self.formatStateChanged.emit(
+            fmt.fontWeight() >= QFont.Weight.Bold,
+            fmt.fontItalic(),
+            fmt.fontUnderline(),
+        )
+
+    def toggle_format(self, kind):
+        current = self.currentCharFormat()
+        fmt = QTextCharFormat()
+        if kind == 'b':
+            fmt.setFontWeight(
+                QFont.Weight.Normal
+                if current.fontWeight() >= QFont.Weight.Bold else QFont.Weight.ExtraBold
+            )
+        elif kind == 'i':
+            fmt.setFontItalic(not current.fontItalic())
+        elif kind == 'u':
+            fmt.setFontUnderline(not current.fontUnderline())
+        else:
+            return
+        cursor = self.textCursor()
+        if cursor.hasSelection():
+            cursor.mergeCharFormat(fmt)
+            self.setTextCursor(cursor)
+        else:
+            self.mergeCurrentCharFormat(fmt)
+        self.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self._emit_format_state()
+
+    def has_rich_formatting(self):
+        block = self.document().begin()
+        while block.isValid():
+            iterator = block.begin()
+            while not iterator.atEnd():
+                fragment = iterator.fragment()
+                if fragment.isValid():
+                    fmt = fragment.charFormat()
+                    if (fmt.fontWeight() >= QFont.Weight.Bold
+                            or fmt.fontItalic() or fmt.fontUnderline()):
+                        return True
+                iterator += 1
+            block = block.next()
+        return False
+
+    def set_rich_html(self, html):
+        self.setHtml(html)
+        ranges = []
+        block = self.document().begin()
+        while block.isValid():
+            iterator = block.begin()
+            while not iterator.atEnd():
+                fragment = iterator.fragment()
+                if fragment.isValid() and fragment.charFormat().fontWeight() >= QFont.Weight.Bold:
+                    ranges.append((fragment.position(), fragment.length()))
+                iterator += 1
+            block = block.next()
+        for position, length in ranges:
+            cursor = self.textCursor()
+            cursor.setPosition(position)
+            cursor.setPosition(position + length, QTextCursor.MoveMode.KeepAnchor)
+            fmt = cursor.charFormat()
+            fmt.setFontWeight(QFont.Weight.ExtraBold)
+            cursor.mergeCharFormat(fmt)
 
     def keyPressEvent(self, event):
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            formats = {
+                Qt.Key.Key_B: 'b', Qt.Key.Key_I: 'i', Qt.Key.Key_U: 'u',
+            }
+            if event.key() in formats:
+                self.toggle_format(formats[event.key()])
+                event.accept()
+                return
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
             if not event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
                 self.commitRequested.emit()
@@ -125,6 +207,7 @@ def install_frontend(panel):
     formula_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
     editor_row.addWidget(formula_label)
     cell_editor = CellContentEditor()
+    panel.cell_editor = cell_editor
     cell_editor.setObjectName('cellEditor')
     cell_editor.setPlaceholderText(tr('Selecione uma célula para visualizar ou editar seu conteúdo'))
     cell_editor.setFixedHeight(58)
@@ -134,6 +217,7 @@ def install_frontend(panel):
     format_row = QHBoxLayout()
     format_row.setContentsMargins(44, 0, 12, 8)
     format_row.setSpacing(8)
+    format_buttons = {}
     for asset_name, tag, tooltip in [
         ('bold', 'b', tr('Negrito · Ctrl+B')),
         ('italic', 'i', tr('Itálico · Ctrl+I')),
@@ -141,12 +225,15 @@ def install_frontend(panel):
     ]:
         button = QPushButton()
         button.setObjectName('sheetSquare')
+        button.setCheckable(True)
         button.setFixedSize(30, 30)
         button.setToolTip(tooltip)
         button.setIcon(themed_svg_icon(align_icon_path(asset_name)))
         button.setIconSize(QSize(14, 14))
-        button.clicked.connect(lambda checked=False, t=tag: panel.table._toggle_format(t))
+        button.clicked.connect(lambda checked=False, t=tag: cell_editor.toggle_format(t))
+        format_buttons[tag] = button
         format_row.addWidget(button)
+    panel.format_buttons = format_buttons
     format_row.addStretch(1)
     formula_layout.addLayout(format_row)
     layout.addWidget(formula_bar)
@@ -172,6 +259,15 @@ def install_frontend(panel):
     layout.addWidget(table, 1)
     table.show()
 
+    def update_format_buttons(bold, italic, underline):
+        for button, checked in zip(
+            (format_buttons['b'], format_buttons['i'], format_buttons['u']),
+            (bold, italic, underline),
+        ):
+            with QSignalBlocker(button):
+                button.setChecked(checked)
+    cell_editor.formatStateChanged.connect(update_format_buttons)
+
     def update_state(*_):
         if not isValid(table) or not isValid(count):
             return
@@ -196,10 +292,17 @@ def install_frontend(panel):
         )
         item = table.item(row, column) if row >= 0 and column >= 0 else None
         with QSignalBlocker(cell_editor):
-            cell_editor.setPlainText(item.text() if item else '')
+            rich = item.data(table.RICH_ROLE) if item else None
+            if rich:
+                cell_editor.set_rich_html(rich)
+            else:
+                cell_editor.setPlainText(item.text() if item else '')
         cell_editor.setEnabled(row >= 0 and column >= 0)
+        cell_editor._emit_format_state()
 
+    updating_from_formula = False
     def update_from_formula():
+        nonlocal updating_from_formula
         row, column = table.currentRow(), table.currentColumn()
         if row < 0 or column < 0:
             return
@@ -209,18 +312,29 @@ def install_frontend(panel):
             item = QTableWidgetItem()
             table.setItem(row, column, item)
         value = cell_editor.toPlainText()
-        if item.text() != value:
-            item.setText(value)
-            item.setData(table.RICH_ROLE, None)
+        rich = cell_editor.toHtml() if cell_editor.has_rich_formatting() else None
+        if item.text() != value or item.data(table.RICH_ROLE) != rich:
+            updating_from_formula = True
+            try:
+                item.setText(value)
+                item.setData(table.RICH_ROLE, rich)
+            finally:
+                updating_from_formula = False
+            table.viewport().update()
 
     def refresh_formula_from_item(item):
         if item.row() == table.currentRow() and item.column() == table.currentColumn():
+            if updating_from_formula:
+                return
             # A edição no campo superior já contém este mesmo valor. Recarregá-lo
             # a cada tecla levaria o cursor para o início e inverteria a digitação.
-            if cell_editor.toPlainText() == item.text():
-                return
             with QSignalBlocker(cell_editor):
-                cell_editor.setPlainText(item.text())
+                rich = item.data(table.RICH_ROLE)
+                if rich:
+                    cell_editor.set_rich_html(rich)
+                else:
+                    cell_editor.setPlainText(item.text())
+            cell_editor._emit_format_state()
 
     table.currentCellChanged.connect(load_cell_editor)
     table.itemChanged.connect(refresh_formula_from_item)
@@ -253,9 +367,9 @@ def install_frontend(panel):
         QFrame#sheetToolbar { background: @surface@; border: none; border-bottom: 1px solid @border@; }
         QFrame#formulaBar { background: @panel@; border: none; border-bottom: 1px solid @border@; }
         QLabel#formulaLabel { color: @accent@; font-size: 13px; font-style: italic; }
-        QPlainTextEdit#cellEditor { background: @field@; color: @text@; border: 1px solid @border@; border-radius: 5px; padding: 5px 8px; selection-background-color: @selection@; }
-        QPlainTextEdit#cellEditor:focus { border-color: @accent@; }
-        QPlainTextEdit#cellEditor:disabled { color: @disabled@; background: @panel@; }
+        QTextEdit#cellEditor { background: @field@; color: @text@; border: 1px solid @border@; border-radius: 5px; padding: 5px 8px; selection-background-color: @selection@; }
+        QTextEdit#cellEditor:focus { border-color: @accent@; }
+        QTextEdit#cellEditor:disabled { color: @disabled@; background: @panel@; }
         QLabel#sheetHint { background: @panel@; color: @muted@; padding: 9px 14px; font-size: 11px; border-bottom: 1px solid @border@; }
         QPushButton#sheetSquare, QPushButton#sheetAction, QPushButton#sheetLineAction { background: transparent; color: @text@; border: 1px solid transparent; border-radius: 5px; }
         QPushButton#sheetSquare:hover, QPushButton#sheetAction:hover, QPushButton#sheetLineAction:hover { background: @hover@; }

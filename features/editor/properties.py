@@ -589,7 +589,7 @@ class EditorDeTextoPanel(QWidget):
         
         self.txt_content = CleanTextEdit()
         self.txt_content.setMinimumHeight(160)
-        themed_style(self.txt_content, "background-color: @field@; color: @text@; border: 1px solid @border@; font-family: 'Inter', sans-serif; font-size: 11pt;")
+        themed_style(self.txt_content, "background-color: @field@; color: @text@; border: 1px solid @border@; font-family: 'Inter 18pt', sans-serif; font-size: 11pt;")
         self.txt_content.textChanged.connect(self._emit_clean_html)
         
         # INSERE A CAIXA NO LAYOUT PARA ELA APARECER

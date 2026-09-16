@@ -8,7 +8,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QFontDatabase, QIcon
 from PySide6.QtWidgets import QApplication
 
 from core.resources import (
@@ -21,8 +21,11 @@ from core.ui_font import install_ui_font
 def test_bundled_inter_font_is_registered_and_applied():
     app = QApplication.instance() or QApplication([])
 
-    assert install_ui_font(app) == "Inter"
-    assert app.font().family() == "Inter"
+    assert install_ui_font(app) == "Inter 18pt"
+    assert app.font().family() == "Inter 18pt"
+    styles = QFontDatabase.styles("Inter 18pt")
+    assert "Bold" in styles
+    assert "ExtraBold" in styles
 
 
 def test_object_icons_are_valid_svg_icons():
