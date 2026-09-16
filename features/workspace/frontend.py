@@ -89,6 +89,12 @@ QPushButton#danger { color: @danger@; }
 QPushButton#previewPrevious, QPushButton#previewNext {
     min-height: 0; padding: 0; border-radius: 5px; font-size: 15px;
 }
+QPushButton#previewPageButton {
+    min-height: 0; padding: 0 8px; border-radius: 5px;
+}
+QPushButton#previewPageButton:checked {
+    background: @selection@; border-color: @accent@;
+}
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit {
     background: @field@; color: @text@; border: 1px solid @border@;
     border-radius: 5px; padding: 5px; min-height: 20px;

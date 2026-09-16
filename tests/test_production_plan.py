@@ -35,6 +35,43 @@ def test_imposition_plan_reports_no_pages_when_item_does_not_fit():
     assert plan.pages == ()
 
 
+def test_duplex_plan_keeps_a4_portrait_and_reverses_columns_on_back():
+    plan = build_imposition_plan(
+        ["A", "B", "C", "D"],
+        _settings(duplex=True),
+    )
+
+    assert plan.duplex is True
+    assert plan.assembler.sheet_w_mm == 100.0
+    assert plan.assembler.sheet_h_mm == 100.0
+    assert plan.sheets[0].front == ("A", "B", "C", "D")
+    assert plan.sheets[0].back == ("B", "A", "D", "C")
+
+
+def test_duplex_partial_sheet_preserves_empty_physical_slots():
+    plan = build_imposition_plan(["A", "B", "C"], _settings(duplex=True))
+
+    assert plan.sheets[0].front == ("A", "B", "C", None)
+    assert plan.sheets[0].back == ("B", "A", None, "C")
+
+
+def test_duplex_preserves_automatic_landscape_rotation_and_maps_back_rows():
+    settings = _settings(
+        target_w_mm=60.0, target_h_mm=40.0,
+        sheet_w_mm=100.0, sheet_h_mm=140.0,
+    )
+    normal = build_imposition_plan([1], settings)
+    duplex = build_imposition_plan([1], {**settings, "duplex": True})
+
+    assert normal.assembler.sheet_w_mm == 140.0
+    assert normal.assembler.sheet_h_mm == 100.0
+    assert duplex.assembler.sheet_w_mm == 140.0
+    assert duplex.assembler.sheet_h_mm == 100.0
+    plan = build_imposition_plan(["A", "B", "C", "D"], {**settings, "duplex": True})
+    assert plan.sheets[0].front == ("A", "B", "C", "D")
+    assert plan.sheets[0].back == ("C", "D", "A", "B")
+
+
 def test_preview_navigation_only_offers_sheet_mode_when_available():
     app = QApplication.instance() or QApplication([])
     panel = PreviewPanel()
@@ -52,6 +89,25 @@ def test_preview_navigation_only_offers_sheet_mode_when_available():
 
     panel.set_navigation("item", 0, 3, sheet_available=True)
     assert panel.lbl_navigation_kind.text() == "Item"
+
+    panel.deleteLater()
+    app.processEvents()
+
+
+def test_preview_page_selector_only_appears_for_front_and_back_models():
+    app = QApplication.instance() or QApplication([])
+    panel = PreviewPanel()
+    requested = []
+    panel.pageChanged.connect(requested.append)
+
+    panel.set_page_navigation(1, 0)
+    assert panel.page_selector.isHidden()
+
+    panel.set_page_navigation(2, 1)
+    assert not panel.page_selector.isHidden()
+    assert panel.btn_back.isChecked()
+    panel.btn_front.click()
+    assert requested == [0]
 
     panel.deleteLater()
     app.processEvents()

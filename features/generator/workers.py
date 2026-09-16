@@ -6,6 +6,8 @@ from PySide6.QtGui import QImage, QPainter, QPdfWriter, QPageLayout, QPageSize
 from .imposition import SheetAssembler
 from .pdf_links import inject_pdf_links
 from core.i18n import tr
+from core.model_document import resolve_model_file
+from core.render_cache import publish_thumbnail_cache, source_revision
 
 
 def physical_page(width_mm, height_mm):
@@ -22,13 +24,16 @@ def pdf_painter(writer):
 
 
 class DirectRenderWorker(QThread):
-    card_finished = Signal(str, int, list)
+    card_finished = Signal(object, int, object)
     error_occurred = Signal(str)
 
-    def __init__(self, chunk_data, renderer, output_dir, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0):
+    def __init__(self, chunk_data, renderers, output_dir, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0):
         super().__init__()
         self.chunk_data = chunk_data
-        self.renderer = renderer
+        if not isinstance(renderers, (list, tuple)):
+            renderers = [renderers]
+        self.renderers = [renderer.fork() for renderer in renderers]
+        self.renderer = self.renderers[0]
         self.output_dir = output_dir
         self.export_format = export_format
         self.single_pdf = single_pdf
@@ -41,87 +46,101 @@ class DirectRenderWorker(QThread):
 
     def run(self):
         try:
-            writer = None
-            painter = None
-            layout = None
-            out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
-
-            if self.single_pdf and self.export_format == "PDF":
-                writer = QPdfWriter(str(out_path_single))
-                writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                layout = writer.pageLayout()
-                layout.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
-                layout.setMargins(QMarginsF(0, 0, 0, 0))
-                writer.setPageLayout(layout)
-                painter = pdf_painter(writer)
-
-            for i, (original_idx, row_plain, row_rich, filename) in enumerate(self.chunk_data):
+            for original_idx, source_row, copy_index, row_plain, row_rich, filename in self.chunk_data:
                 if not self._is_running: break
-                
-                local_links = []
-                
+                links_by_page = {}
+                temporary_paths = []
                 if self.export_format == "PDF":
-                    img = self.renderer.render_to_qimage(row_plain, row_rich, out_links=local_links)
-                    if self.single_pdf:
-                        if i > 0:
+                    out_path = self.output_dir / f"{filename}.pdf"
+                    temporary = self.output_dir / f".{filename}.{original_idx}.partial.pdf"
+                    temporary_paths.append(temporary)
+                    writer = QPdfWriter(str(temporary))
+                    writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
+                    layout = writer.pageLayout()
+                    layout.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
+                    layout.setMargins(QMarginsF(0, 0, 0, 0))
+                    writer.setPageLayout(layout)
+                    painter = pdf_painter(writer)
+                    for page_index, renderer in enumerate(self.renderers):
+                        if not self._is_running:
+                            break
+                        if page_index:
                             writer.newPage()
-                        painter.drawImage(layout.paintRectPixels(writer.resolution()), img)
-                        self.card_finished.emit(out_path_single.name, original_idx, local_links)
-                    else:
-                        out_path = self.output_dir / f"{filename}.pdf"
-                        writer_single = QPdfWriter(str(out_path))
-                        writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                        layout_single = writer_single.pageLayout()
-                        layout_single.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
-                        layout_single.setMargins(QMarginsF(0, 0, 0, 0))
-                        writer_single.setPageLayout(layout_single)
-                        painter_single = pdf_painter(writer_single)
-                        painter_single.drawImage(layout_single.paintRectPixels(writer_single.resolution()), img)
-                        painter_single.end()
-                        
-                        del painter_single
-                        del layout_single
-                        del writer_single
-                        
-                        # --- PÓS-PROCESSAMENTO: Injeção de Hiperlinks ---
-                        if local_links and not self.single_pdf:
-                            try:
-                                canvas_w = self.renderer.tpl.get("canvas_size", {}).get("w", 1000)
-                                canvas_h = self.renderer.tpl.get("canvas_size", {}).get("h", 1000)
-                                inject_pdf_links(
-                                    out_path,
-                                    {0: local_links},
-                                    canvas_w,
-                                    canvas_h,
-                                )
-                                
-                            except Exception as e:
-                                self.error_occurred.emit(tr("Falha ao adicionar links ao PDF {arquivo}: {erro}").format(arquivo=out_path.name, erro=e))
-                                
-                        self.card_finished.emit(out_path.name, original_idx, local_links)
+                        local_links = []
+                        image = renderer.render_to_qimage(row_plain, row_rich, out_links=local_links)
+                        painter.drawImage(layout.paintRectPixels(writer.resolution()), image)
+                        links_by_page[page_index] = local_links
+                    painter.end()
+                    del painter
+                    del layout
+                    del writer
+                    if not self._is_running:
+                        temporary.unlink(missing_ok=True)
+                        break
+                    if any(links_by_page.values()):
+                        canvas = self.renderers[0].tpl.get("canvas_size", {})
+                        inject_pdf_links(
+                            temporary, links_by_page,
+                            canvas.get("w", 1000), canvas.get("h", 1000),
+                        )
+                    temporary.replace(out_path)
+                    temporary_paths.clear()
+                    output_names = [out_path.name]
                 else:
-                    out_path = self.output_dir / f"{filename}.png"
-                    self.renderer.render_row(row_plain, row_rich, out_path, out_links=local_links,
-                                             target_w_mm=self.target_w_mm, target_h_mm=self.target_h_mm)
-                    self.card_finished.emit(out_path.name, original_idx, local_links)
-            
-            if painter:
-                painter.end()
+                    output_names = []
+                    staged = []
+                    multiple_pages = len(self.renderers) > 1
+                    for page_index, renderer in enumerate(self.renderers):
+                        if not self._is_running:
+                            break
+                        suffix = f"_pag{page_index + 1}" if multiple_pages else ""
+                        out_path = self.output_dir / f"{filename}{suffix}.png"
+                        temporary = self.output_dir / f".{filename}{suffix}.{original_idx}.partial.png"
+                        temporary_paths.append(temporary)
+                        local_links = []
+                        renderer.render_row(
+                            row_plain, row_rich, temporary, out_links=local_links,
+                            target_w_mm=self.target_w_mm, target_h_mm=self.target_h_mm,
+                        )
+                        links_by_page[page_index] = local_links
+                        staged.append((temporary, out_path))
+                    if not self._is_running:
+                        for temporary in temporary_paths:
+                            temporary.unlink(missing_ok=True)
+                        break
+                    for temporary, out_path in staged:
+                        temporary.replace(out_path)
+                        output_names.append(out_path.name)
+                    temporary_paths.clear()
+
+                self.card_finished.emit(output_names, original_idx, links_by_page)
 
         except Exception as e:
+            active_painter = locals().get("painter")
+            if active_painter is not None and active_painter.isActive():
+                active_painter.end()
+            painter = None
+            layout = None
+            writer = None
+            for path in locals().get("temporary_paths", []):
+                path.unlink(missing_ok=True)
             self.error_occurred.emit(str(e))
 
 class PageRenderWorker(QThread):
-    page_finished = Signal(int, str, str) 
+    page_finished = Signal(int, object, int, object, str)
     error_occurred = Signal(str)
 
-    def __init__(self, tasks, renderer, output_dir, imposition_settings, export_format="PNG", single_pdf=False):
+    def __init__(self, tasks, renderers, output_dir, imposition_settings, export_format="PNG", single_pdf=False):
         super().__init__()
         self.tasks = tasks
-        self.renderer = renderer
+        if not isinstance(renderers, (list, tuple)):
+            renderers = [renderers]
+        self.renderers = [renderer.fork() for renderer in renderers]
+        self.renderer = self.renderers[0]
         self.output_dir = output_dir
         self.export_format = export_format
         self.single_pdf = single_pdf
+        self.duplex = bool(imposition_settings.get("duplex", False))
         
         w_mm = imposition_settings.get("target_w_mm", 100)
         h_mm = imposition_settings.get("target_h_mm", 150)
@@ -130,7 +149,10 @@ class PageRenderWorker(QThread):
         crop_marks = imposition_settings.get("crop_marks", True)
         bleed_margin = imposition_settings.get("bleed_margin", False)
         
-        self.assembler = SheetAssembler(w_mm, h_mm, sheet_w, sheet_h, crop_marks, bleed_margin)
+        self.assembler = SheetAssembler(
+            w_mm, h_mm, sheet_w, sheet_h, crop_marks, bleed_margin,
+            auto_rotate=True,
+        )
         
         self._is_running = True
 
@@ -138,80 +160,109 @@ class PageRenderWorker(QThread):
         self._is_running = False
 
     def run(self):
+        temporary_paths = []
         try:
-            writer = None
-            painter = None
-            layout = None
-            out_path_single = self.output_dir / f"{self.output_dir.name}_Imposicao.pdf"
-
-            if self.single_pdf and self.export_format == "PDF":
-                writer = QPdfWriter(str(out_path_single))
-                
-                # A folha física agora é gerada com precisão em milímetros baseada na montagem final
-                writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                layout = writer.pageLayout()
-                w_sheet_mm = self.assembler.sheet_w_mm
-                h_sheet_mm = self.assembler.sheet_h_mm
-                layout.setPageSize(physical_page(w_sheet_mm, h_sheet_mm))
-                layout.setMargins(QMarginsF(0, 0, 0, 0))
-                writer.setPageLayout(layout)
-                painter = pdf_painter(writer)
-
-            for i, page_task in enumerate(self.tasks):
+            for page_task in self.tasks:
                 if not self._is_running: break
 
                 page_num = page_task["page_num"]
-                cards_data = page_task["cards"]
-                
-                card_images = []
-                for (original_idx, r_plain, r_rich, fname) in cards_data:
-                    img = self.renderer.render_to_qimage(r_plain, r_rich)
-                    card_images.append(img)
-                
-                sheet_img = self.assembler.render_sheet(card_images)
-                out_name = page_task["output_filename"]
-                out_path = self.output_dir / out_name
-                
-                if self.export_format == "PDF":
-                    if self.single_pdf:
-                        if i > 0:
-                            writer.newPage()
-                        painter.drawImage(layout.paintRectPixels(writer.resolution()), sheet_img)
-                        final_name = out_path_single.name
-                    else:
-                        out_path = out_path.with_suffix(".pdf")
-                        writer_single = QPdfWriter(str(out_path))
-                        
-                        # Mesmo cálculo milimétrico para os PDFs Avulsos do modo de Imposição
-                        writer_single.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
-                        layout_single = writer_single.pageLayout()
-                        w_sheet_mm = self.assembler.sheet_w_mm
-                        h_sheet_mm = self.assembler.sheet_h_mm
-                        layout_single.setPageSize(physical_page(w_sheet_mm, h_sheet_mm))
-                        layout_single.setMargins(QMarginsF(0, 0, 0, 0))
-                        writer_single.setPageLayout(layout_single)
-                        painter_single = pdf_painter(writer_single)
-                        painter_single.drawImage(layout_single.paintRectPixels(writer_single.resolution()), sheet_img)
-                        painter_single.end()
-                        del painter_single
-                        del layout_single
-                        del writer_single
-                        final_name = out_path.name
-                else:
-                    if not sheet_img.save(str(out_path), "PNG"):
-                        raise OSError(f"Não foi possível gravar {out_path}.")
-                    final_name = out_path.name
-                
-                msg = f"🖨️ FOLHA {page_task['page_num']:02d} OK ({len(card_images)} itens)"
-                self.page_finished.emit(len(card_images), final_name, msg)
-                
-                card_images.clear()
-                del sheet_img
+                face_tasks = [(0, page_task["front"])]
+                if page_task.get("back") is not None:
+                    face_tasks.append((1, page_task["back"]))
 
-            if painter:
-                painter.end()
+                face_images = []
+                links_by_face = {}
+                for face_index, slots in face_tasks:
+                    renderer = self.renderers[face_index]
+                    card_images = []
+                    card_links = []
+                    for task in slots:
+                        if task is None:
+                            card_images.append(None)
+                            card_links.append([])
+                            continue
+                        _, _, _, row_plain, row_rich, _ = task
+                        links = []
+                        card_images.append(renderer.render_to_qimage(row_plain, row_rich, out_links=links))
+                        card_links.append(links)
+                    sheet_links = []
+                    canvas = renderer.tpl.get("canvas_size", {})
+                    face_images.append(self.assembler.render_sheet(
+                        card_images,
+                        preserve_slots=self.duplex,
+                        card_links=card_links,
+                        canvas_size=(canvas.get("w", 1000), canvas.get("h", 1000)),
+                        out_links=sheet_links,
+                        rotate_cards_180=(
+                            self.duplex
+                            and face_index == 1
+                            and self.assembler.orientation == QPageLayout.Orientation.Landscape
+                        ),
+                    ))
+                    links_by_face[face_index] = sheet_links
+
+                output_base = page_task["output_base"]
+                final_names = []
+                if self.export_format == "PDF":
+                    out_path = self.output_dir / f"{output_base}.pdf"
+                    temporary = self.output_dir / f".{output_base}.{page_num}.partial.pdf"
+                    temporary_paths.append(temporary)
+                    writer = QPdfWriter(str(temporary))
+                    layout = writer.pageLayout()
+                    layout.setPageSize(physical_page(self.assembler.sheet_w_mm, self.assembler.sheet_h_mm))
+                    layout.setMargins(QMarginsF(0, 0, 0, 0))
+                    writer.setPageLayout(layout)
+                    painter = pdf_painter(writer)
+                    for face_index, image in enumerate(face_images):
+                        if face_index:
+                            writer.newPage()
+                        painter.drawImage(layout.paintRectPixels(writer.resolution()), image)
+                    painter.end()
+                    del painter, layout, writer
+                    if not self._is_running:
+                        temporary.unlink(missing_ok=True)
+                        break
+                    if any(links_by_face.values()):
+                        inject_pdf_links(
+                            temporary, links_by_face,
+                            self.assembler.sheet_w, self.assembler.sheet_h,
+                        )
+                    temporary.replace(out_path)
+                    temporary_paths.clear()
+                    final_names.append(out_path.name)
+                else:
+                    staged = []
+                    suffixes = ("_frente", "_verso") if self.duplex else ("",)
+                    for face_index, image in enumerate(face_images):
+                        suffix = suffixes[face_index]
+                        out_path = self.output_dir / f"{output_base}{suffix}.png"
+                        temporary = self.output_dir / f".{output_base}{suffix}.{page_num}.partial.png"
+                        temporary_paths.append(temporary)
+                        if not image.save(str(temporary), "PNG"):
+                            raise OSError(tr("Não foi possível gravar {arquivo}.").format(arquivo=out_path))
+                        staged.append((temporary, out_path))
+                    if not self._is_running:
+                        for temporary in temporary_paths:
+                            temporary.unlink(missing_ok=True)
+                        break
+                    for temporary, out_path in staged:
+                        temporary.replace(out_path)
+                        final_names.append(out_path.name)
+                    temporary_paths.clear()
+
+                num_cards = sum(task is not None for task in page_task["front"])
+                msg = tr("🖨️ FOLHA {folha:02d} OK ({itens} itens)").format(folha=page_num, itens=num_cards)
+                self.page_finished.emit(num_cards, final_names, page_num - 1, links_by_face, msg)
 
         except Exception as e:
+            active_painter = locals().get("painter")
+            if active_painter is not None and active_painter.isActive():
+                active_painter.end()
+            painter = None
+            layout = None
+            writer = None
+            for path in temporary_paths:
+                path.unlink(missing_ok=True)
             self.error_occurred.emit(tr("Erro no processamento: {erro}\n{detalhes}").format(erro=e, detalhes=traceback.format_exc()))
             
             
@@ -231,14 +282,20 @@ class HybridAssemblerWorker(QThread):
         self.all_links = all_links or {}
         self.canvas_w = canvas_w
         self.canvas_h = canvas_h
+        self._is_running = True
+
+    def stop(self):
+        self._is_running = False
 
     def run(self):
+        temporary_pdf = None
         try:
             out_path_single = self.output_dir / f"{self.output_dir.name}_Completo.pdf"
             if self.is_imposition:
                 out_path_single = self.output_dir / f"{self.output_dir.name}_Imposicao.pdf"
+            temporary_pdf = self.output_dir / f".{out_path_single.name}.partial.pdf"
 
-            writer = QPdfWriter(str(out_path_single))
+            writer = QPdfWriter(str(temporary_pdf))
             writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
             
             layout = writer.pageLayout()
@@ -253,7 +310,10 @@ class HybridAssemblerWorker(QThread):
                 bleed = self.imposition_settings.get("bleed_margin", False)
 
                 # Recalcula a orientação vencedora para o PDF final
-                temp_asm = SheetAssembler(tw, th, sheet_w, sheet_h, marks, bleed)
+                temp_asm = SheetAssembler(
+                    tw, th, sheet_w, sheet_h, marks, bleed,
+                    auto_rotate=True,
+                )
                 layout.setPageSize(physical_page(temp_asm.sheet_w_mm, temp_asm.sheet_h_mm))
             else:
                 layout.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
@@ -264,7 +324,11 @@ class HybridAssemblerWorker(QThread):
             # Os arquivos já virão ordenados perfeitamente pelo índice
             sorted_files = sorted(self.generated_files)
 
+            cancelled = False
             for i, filename in enumerate(sorted_files):
+                if not self._is_running:
+                    cancelled = True
+                    break
                 if i > 0:
                     writer.newPage()
                 img_path = self.work_dir / filename
@@ -282,11 +346,15 @@ class HybridAssemblerWorker(QThread):
             del layout
             del writer
 
+            if cancelled or not self._is_running:
+                temporary_pdf.unlink(missing_ok=True)
+                return
+
             # --- PÓS-PROCESSAMENTO: Injeção de Hiperlinks no PDF Único ---
-            if not self.is_imposition and self.all_links:
+            if self.all_links:
                 try:
                     inject_pdf_links(
-                        out_path_single,
+                        temporary_pdf,
                         self.all_links,
                         self.canvas_w,
                         self.canvas_h,
@@ -294,10 +362,19 @@ class HybridAssemblerWorker(QThread):
                 except Exception as e:
                     raise OSError(f"Erro ao injetar links no PDF Híbrido: {e}") from e
 
+            temporary_pdf.replace(out_path_single)
             shutil.rmtree(self.work_dir, ignore_errors=True)
             self.finished_assembly.emit()
             
         except Exception as e:
+            active_painter = locals().get("painter")
+            if active_painter is not None and active_painter.isActive():
+                active_painter.end()
+            painter = None
+            layout = None
+            writer = None
+            if temporary_pdf is not None:
+                temporary_pdf.unlink(missing_ok=True)
             self.error_occurred.emit(str(e))
 
 class PreviewRenderWorker(QThread):
@@ -309,9 +386,13 @@ class PreviewRenderWorker(QThread):
         self.model_name = model_name
         self.template_data = template_data
         self.model_dir = model_dir
-        import hashlib
-        source = model_dir / "template_v3.json"
-        self._source_hash = hashlib.sha256(source.read_bytes()).digest() if source.is_file() else None
+        try:
+            source = resolve_model_file(model_dir)
+        except FileNotFoundError:
+            source = model_dir / "template_v4.json"
+        self._source_path = source
+        self._source_revision = source_revision(source)
+        self.page_id = template_data.get("__page_id", "front")
 
     def run(self):
         try:
@@ -320,20 +401,25 @@ class PreviewRenderWorker(QThread):
             
             renderer = NativeRenderer(self.template_data)
             
-            cache_folder = self.model_dir / ".render_cache"
-            cache_folder.mkdir(parents=True, exist_ok=True)
-            thumb_path = cache_folder / "thumbnail_raw.png"
-            
             # Prepara os placeholders para a thumbnail crua
             placeholders = self.template_data.get("placeholders", [])
             row_rich = {p: f"{{{p}}}" for p in placeholders}
             
             img = renderer.render_preview_image(row_rich, max_side=1600)
-            import hashlib
-            source = self.model_dir / "template_v3.json"
-            if self._source_hash is not None and (not source.is_file() or hashlib.sha256(source.read_bytes()).digest() != self._source_hash):
+            try:
+                source = resolve_model_file(self.model_dir)
+            except FileNotFoundError:
                 return
-            if not img.save(str(thumb_path), "PNG"):
+            if (
+                source != self._source_path
+                or self._source_revision is not None
+                and source_revision(source) != self._source_revision
+            ):
+                return
+            thumb_path = publish_thumbnail_cache(
+                self.model_dir, source, img, self.page_id, self._source_revision,
+            )
+            if thumb_path is None:
                 raise OSError("Não foi possível gravar a miniatura.")
 
             # Avisa a Janela Principal que terminou

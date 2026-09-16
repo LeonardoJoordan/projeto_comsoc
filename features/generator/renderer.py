@@ -4,17 +4,40 @@ from html import unescape
 import re
 from pathlib import Path
 from core.render_cache import get_background_proxy_path, infer_model_dir
+from core.model_document import adapt_model_page, normalize_model_document
 from core.document_layers import layer_entries
 from core.object_style import draw_shape, outline_margin
-from core.text_layout import build_document, text_geometry, resolve_rich_text
+from core.text_layout import PLACEHOLDER_PATTERN, build_document, text_geometry, resolve_rich_text
+
+
+def renderers_for_document(document: dict) -> list["NativeRenderer"]:
+    """Cria o mesmo renderizador legado para cada prancheta do documento."""
+    normalized = normalize_model_document(document)
+    return [
+        NativeRenderer(adapt_model_page(normalized, page["page_id"]))
+        for page in normalized["pages"]
+    ]
 
 class NativeRenderer:
     def __init__(self, template_data: dict):
+        if template_data.get("schema_version") == 4 and isinstance(template_data.get("pages"), list):
+            raise ValueError(
+                "NativeRenderer recebe uma única página. Use renderers_for_document()."
+            )
         self.tpl = template_data
-        self.model_dir = infer_model_dir(template_data)
+        self.page_id = self.tpl.get("__page_id", "front")
+        self.model_dir = infer_model_dir(self.tpl)
         self._image_cache = {}
         self._static_base_cache = None
         self._pixmap_cache = {}
+
+    def fork(self):
+        """Cria um renderizador com caches mutáveis próprios para outra thread."""
+        renderer = NativeRenderer(self.tpl)
+        renderer.model_dir = self.model_dir
+        if self._static_base_cache is not None:
+            renderer._static_base_cache = self._static_base_cache.copy()
+        return renderer
 
     def _get_image(self, path) -> QImage:
         path_str = str(path)
@@ -137,7 +160,7 @@ class NativeRenderer:
         def repl(match):
             key = match.group(1)
             return str(row_rich.get(key, ""))
-        return re.sub(r"\{([a-zA-Z0-9_]+)\}", repl, html)
+        return re.sub(PLACEHOLDER_PATTERN, repl, html)
     
 
     @staticmethod
@@ -304,7 +327,7 @@ class NativeRenderer:
 
             def replace_optional_block(match):
                 block_content = match.group(1)
-                vars_in_block = re.findall(r"\{([a-zA-Z0-9_]+)\}", block_content)
+                vars_in_block = re.findall(PLACEHOLDER_PATTERN, block_content)
 
                 for var in vars_in_block:
                     if _is_empty_placeholder_value(var):
@@ -312,7 +335,7 @@ class NativeRenderer:
 
                 return block_content
 
-            optional_block_pattern = r"\|([^|]*\{[a-zA-Z0-9_]+\}[^|]*)\|"
+            optional_block_pattern = r"\|([^|]*\{[\w]+\}[^|]*)\|"
 
             return re.sub(optional_block_pattern, replace_optional_block, html_text)
         
@@ -338,7 +361,7 @@ class NativeRenderer:
             # 2. Depois mantém a regra antiga:
             # se ainda sobrou placeholder vazio fora dos blocos opcionais,
             # a caixa inteira continua sumindo.
-            needed_vars = re.findall(r"\{([a-zA-Z0-9_]+)\}", html_processado)
+            needed_vars = re.findall(PLACEHOLDER_PATTERN, html_processado)
             should_skip = False
 
             for var in needed_vars:

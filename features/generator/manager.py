@@ -1,6 +1,7 @@
 from PySide6.QtCore import Signal, QObject
 import os
 import math
+import shutil
 
 # Imports corrigidos para a nova arquitetura
 from core.naming_engine import build_output_filename
@@ -14,11 +15,17 @@ class RenderManager(QObject):
     finished_process = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, renderer, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0):
+    def __init__(self, renderers, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0, source_rows=None):
         super().__init__()
-        self.renderer = renderer
+        if not isinstance(renderers, (list, tuple)):
+            renderers = [renderers]
+        if not renderers:
+            raise ValueError("Ao menos uma página deve ser fornecida para renderização.")
+        self.page_renderers = list(renderers)
+        self.renderer = self.page_renderers[0]
         self.rows_plain = rows_plain
         self.rows_rich = rows_rich
+        self.source_rows = list(source_rows) if source_rows is not None else list(range(len(rows_plain)))
         self.output_dir = output_dir
         self.pattern = filename_pattern
         self.export_format = export_format.upper()
@@ -65,19 +72,26 @@ class RenderManager(QObject):
         all_tasks_data = []
         used_names = set()
         
+        copy_counts = {}
         for i in range(len(self.rows_plain)):
             row = self.rows_plain[i]
             fname = build_output_filename(self.pattern, row, used_names)
+            source_row = self.source_rows[i] if i < len(self.source_rows) else i
+            copy_counts[source_row] = copy_counts.get(source_row, 0) + 1
+            copy_index = copy_counts[source_row]
             
             # Indexação oculta: Garante que mesmo processados fora de ordem,
             # os arquivos sejam montados na sequência exata da planilha.
             if self.is_hybrid and not self.is_imposition:
                 fname = f"{i:05d}_{fname}"
                 
-            all_tasks_data.append( (i, self.rows_plain[i], self.rows_rich[i], fname) )
+            all_tasks_data.append(
+                (i, source_row, copy_index, self.rows_plain[i], self.rows_rich[i], fname)
+            )
 
         # Gera a base estática de forma síncrona na Thread Principal antes de acionar os Workers
-        self.renderer.pre_render_static_base()
+        for page_renderer in self.page_renderers:
+            page_renderer.pre_render_static_base()
 
         if self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
@@ -91,29 +105,42 @@ class RenderManager(QObject):
             w.stop()
             w.quit()
             w.wait()
+        assembler = getattr(self, "assembler_worker", None)
+        if assembler is not None and assembler.isRunning():
+            assembler.stop()
+            assembler.wait()
+        if getattr(self, "is_hybrid", False):
+            shutil.rmtree(self.work_dir, ignore_errors=True)
 
     def _start_imposition_mode(self, all_data, num_threads):
-        plan = build_imposition_plan(all_data, self.imposition_settings)
+        settings = dict(self.imposition_settings)
+        settings["duplex"] = len(self.page_renderers) > 1
+        self.imposition_settings = settings
+        plan = build_imposition_plan(all_data, settings)
         capacity = plan.capacity
         
         if capacity <= 0:
             self._on_worker_error(tr("O modelo é grande demais para as margens da folha."))
             return
             
-        total_pages = len(plan.pages)
-        self.log_updated.emit(tr("📚 Imposição: {itens} itens em {folhas} folhas (capacidade: {capacidade} por folha).").format(itens=len(all_data), folhas=total_pages, capacidade=capacity))
+        total_pages = len(plan.sheets)
+        self.log_updated.emit(tr("📚 Imposição: {itens} itens em {folhas} folhas físicas (capacidade: {capacidade} por folha).").format(itens=len(all_data), folhas=total_pages, capacidade=capacity))
+        if plan.duplex:
+            self.log_updated.emit(tr("↔️ Frente e verso alinhados com rotação automática e virada lateral."))
+            if self.export_format == "PDF" and not self.single_pdf:
+                self.log_updated.emit(tr("📄 PDF por folha: cada arquivo terá frente e verso."))
         self.log_updated.emit(tr("🚀 Distribuindo o trabalho entre {threads} threads…").format(threads=num_threads))
 
         pages_jobs = []
         safe_pattern = self.pattern.replace("{", "").replace("}", "")
 
-        for page_idx, page_cards in enumerate(plan.pages):
-            page_num = page_idx + 1
-            
+        for sheet in plan.sheets:
+            page_num = sheet.number
             job = {
                 "page_num": page_num,
-                "output_filename": f"{safe_pattern}_Folha_{page_num:02d}.png",
-                "cards": page_cards
+                "output_base": f"{safe_pattern}_Folha_{page_num:02d}",
+                "front": sheet.front,
+                "back": sheet.back,
             }
             pages_jobs.append(job)
 
@@ -126,7 +153,7 @@ class RenderManager(QObject):
             
             if not worker_tasks: continue
             
-            w = PageRenderWorker(worker_tasks, self.renderer, self.work_dir, self.imposition_settings, self.worker_format, False)
+            w = PageRenderWorker(worker_tasks, self.page_renderers, self.work_dir, settings, self.worker_format, False)
             w.page_finished.connect(self._on_page_finished)
             w.error_occurred.connect(self._on_worker_error)
             
@@ -134,7 +161,7 @@ class RenderManager(QObject):
             w.start()
 
     def _start_direct_mode(self, all_data, num_threads):
-        self.log_updated.emit(tr("🚀 Processando {arquivos} arquivos em {threads} threads…").format(arquivos=len(all_data), threads=num_threads))
+        self.log_updated.emit(tr("🚀 Processando {itens} itens em {threads} threads…").format(itens=len(all_data), threads=num_threads))
         
         chunk_size = math.ceil(len(all_data) / num_threads)
         
@@ -145,7 +172,7 @@ class RenderManager(QObject):
             
             if not chunk: continue
             
-            w = DirectRenderWorker(chunk, self.renderer, self.work_dir, self.worker_format, False, self.target_w_mm, self.target_h_mm)
+            w = DirectRenderWorker(chunk, self.page_renderers, self.work_dir, self.worker_format, False, self.target_w_mm, self.target_h_mm)
             w.card_finished.connect(self._on_direct_card_finished)
             w.error_occurred.connect(self._on_worker_error)
             
@@ -156,6 +183,18 @@ class RenderManager(QObject):
         self.log_updated.emit(tr("📦 Montando o PDF agrupado em segundo plano…"))
         canvas_w = self.renderer.tpl.get("canvas_size", {}).get("w", 1000)
         canvas_h = self.renderer.tpl.get("canvas_size", {}).get("h", 1000)
+        if self.is_imposition:
+            from .imposition import SheetAssembler
+            assembler = SheetAssembler(
+                self.imposition_settings.get("target_w_mm", 100),
+                self.imposition_settings.get("target_h_mm", 150),
+                self.imposition_settings.get("sheet_w_mm", 210),
+                self.imposition_settings.get("sheet_h_mm", 297),
+                self.imposition_settings.get("crop_marks", True),
+                self.imposition_settings.get("bleed_margin", False),
+                auto_rotate=True,
+            )
+            canvas_w, canvas_h = assembler.sheet_w, assembler.sheet_h
         self.assembler_worker = HybridAssemblerWorker(
             self.generated_files, self.work_dir, self.output_dir, 
             self.is_imposition, self.imposition_settings, 
@@ -168,27 +207,35 @@ class RenderManager(QObject):
         self.assembler_worker.error_occurred.connect(self._on_hybrid_assembly_error)
         self.assembler_worker.start()    
 
-    def _on_page_finished(self, num_cards, filename, msg):
+    def _on_page_finished(self, num_cards, filenames, sheet_index, links_by_face, msg):
         if not self._is_running: return
         self.cards_done += num_cards
         self.log_updated.emit(msg)
-        self.generated_files.append(filename)
+        face_count = len(self.page_renderers)
+        for face_index, links in links_by_face.items():
+            if links:
+                self.all_cards_links[sheet_index * face_count + int(face_index)] = links
+        self.generated_files.extend(filenames)
         self._update_progress()
 
-    def _on_direct_card_finished(self, filename, original_idx, local_links):
+    def _on_direct_card_finished(self, filenames, original_idx, links_by_page):
         if not self._is_running: return
-        
-        if local_links:
-            self.all_cards_links[original_idx] = local_links
+
+        page_count = len(self.page_renderers)
+        for page_index, local_links in links_by_page.items():
+            if local_links:
+                self.all_cards_links[original_idx * page_count + int(page_index)] = local_links
             
         self.cards_done += 1
-        self.log_updated.emit(tr("[{concluidos}/{total}] Salvo: {arquivo}").format(concluidos=self.cards_done, total=self.total_cards, arquivo=filename))
-        self.generated_files.append(filename)
+        display_name = ", ".join(filenames)
+        self.log_updated.emit(tr("[{concluidos}/{total}] Salvo: {arquivo}").format(concluidos=self.cards_done, total=self.total_cards, arquivo=display_name))
+        self.generated_files.extend(filenames)
         self._update_progress()
 
     def _on_hybrid_assembly_finished(self):
         out_name = f"{self.output_dir.name}_Imposicao.pdf" if self.is_imposition else f"{self.output_dir.name}_Completo.pdf"
         self.generated_files = [out_name]
+        self.progress_updated.emit(100)
         self.finished_process.emit()
         self.log_updated.emit(tr("✅ Processo finalizado com sucesso!"))
 
@@ -208,17 +255,18 @@ class RenderManager(QObject):
         if self.cards_done >= self.total_cards:
             if self._is_running and not getattr(self, '_finish_emitted', False):
                 self._finish_emitted = True
-                self.progress_updated.emit(100)
-                
                 if getattr(self, 'is_hybrid', False):
                     self._start_hybrid_assembly()
                 else:
+                    self.progress_updated.emit(100)
                     self.finished_process.emit()
                     self.log_updated.emit(tr("✅ Processo finalizado com sucesso!"))
     
     def _update_progress(self):
         done = min(self.cards_done, self.total_cards)
         percent = int((done / self.total_cards) * 100)
+        if getattr(self, "is_hybrid", False):
+            percent = min(percent, 95)
         self.progress_updated.emit(percent)
         
         # Como o _update_progress é chamado SEMPRE no final do log_updated.emit,

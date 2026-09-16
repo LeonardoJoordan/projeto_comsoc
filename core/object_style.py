@@ -26,16 +26,16 @@ def rounded_rect_path(bounds, radii):
     path.moveTo(left + tl, top)
     path.lineTo(right - tr, top)
     if tr:
-        path.quadTo(right, top, right, top + tr)
+        path.arcTo(QRectF(right - 2 * tr, top, 2 * tr, 2 * tr), 90, -90)
     path.lineTo(right, bottom - br)
     if br:
-        path.quadTo(right, bottom, right - br, bottom)
+        path.arcTo(QRectF(right - 2 * br, bottom - 2 * br, 2 * br, 2 * br), 0, -90)
     path.lineTo(left + bl, bottom)
     if bl:
-        path.quadTo(left, bottom, left, bottom - bl)
+        path.arcTo(QRectF(left, bottom - 2 * bl, 2 * bl, 2 * bl), 270, -90)
     path.lineTo(left, top + tl)
     if tl:
-        path.quadTo(left, top, left + tl, top)
+        path.arcTo(QRectF(left, top, 2 * tl, 2 * tl), 180, -90)
     path.closeSubpath()
     return path
 

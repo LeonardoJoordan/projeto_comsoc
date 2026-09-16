@@ -2116,5 +2116,105 @@ Enter a name to save this preset:</translation>
       <source>FORNAX - Forja nº {numero}</source>
       <translation>FORNAX - Forge No. {numero}</translation>
     </message>
+    <message>
+      <source>Página {numero}</source>
+      <translation>Page {numero}</translation>
+    </message>
+    <message>
+      <source>Ações da página</source>
+      <translation>Page actions</translation>
+    </message>
+    <message>
+      <source>+ Página</source>
+      <translation>+ Page</translation>
+    </message>
+    <message>
+      <source>Limpar página</source>
+      <translation>Clear page</translation>
+    </message>
+    <message>
+      <source>Remover página</source>
+      <translation>Remove page</translation>
+    </message>
+    <message>
+      <source>Remover todo o conteúdo desta página e deixá-la em branco?</source>
+      <translation>Remove all content from this page and leave it blank?</translation>
+    </message>
+    <message>
+      <source>Remover esta página do modelo? Esta ação pode ser desfeita.</source>
+      <translation>Remove this page from the template? This action can be undone.</translation>
+    </message>
+    <message>
+      <source>A exportação de modelos com frente e verso ainda está em implementação.</source>
+      <translation>Exporting two-page templates is still being implemented.</translation>
+    </message>
+    <message>
+      <source>A variável só pode conter letras, números e subtraços (_). Remova espaços ou símbolos.</source>
+      <translation>The variable may contain only letters, numbers, and underscores (_). Remove spaces or symbols.</translation>
+    </message>
+    <message>
+      <source>Campos removidos</source>
+      <translation>Removed fields</translation>
+    </message>
+    <message>
+      <source>Estes campos não são mais usados pelo modelo:\n\n{campos}\n\nDeseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
+      <translation>These fields are no longer used by the template:\n\n{campos}\n\nDo you want to discard the data in these columns? Choose No to keep it for this session.</translation>
+    </message>
+    <message>
+      <source>Campo inativo: não será usado na geração.</source>
+      <translation>Inactive field: it will not be used during generation.</translation>
+    </message>
+    <message>
+      <source>A imposição de modelos com frente e verso ainda está em implementação. Selecione a definição do modelo para exportar as duas páginas diretamente.</source>
+      <translation>Imposition for two-page templates is still being implemented. Select the template definition to export both pages directly.</translation>
+    </message>
+    <message>
+      <source>🚀 Processando {itens} itens em {threads} threads…</source>
+      <translation>🚀 Processing {itens} items across {threads} threads…</translation>
+    </message>
+    <message>
+      <source>=== Processo interrompido por erro ===</source>
+      <translation>=== Process stopped due to an error ===</translation>
+    </message>
+    <message>
+      <source>📚 Imposição: {itens} itens em {folhas} folhas físicas (capacidade: {capacidade} por folha).</source>
+      <translation>📚 Imposition: {itens} items on {folhas} physical sheets (capacity: {capacidade} per sheet).</translation>
+    </message>
+    <message>
+      <source>↔️ Frente e verso alinhados para folha vertical com virada lateral.</source>
+      <translation>↔️ Front and back aligned for portrait sheets with side-edge flipping.</translation>
+    </message>
+    <message>
+      <source>📄 PDF por folha: cada arquivo terá frente e verso.</source>
+      <translation>📄 PDF per sheet: each file will contain its front and back.</translation>
+    </message>
+    <message>
+      <source>Não foi possível gravar {arquivo}.</source>
+      <translation>Could not write {arquivo}.</translation>
+    </message>
+    <message>
+      <source>🖨️ FOLHA {folha:02d} OK ({itens} itens)</source>
+      <translation>🖨️ SHEET {folha:02d} OK ({itens} items)</translation>
+    </message>
+    <message>
+      <source>Frente</source>
+      <translation>Front</translation>
+    </message>
+    <message>
+      <source>Verso</source>
+      <translation>Back</translation>
+    </message>
+    <message>
+      <source>Número da folha física</source>
+      <translation>Physical sheet number</translation>
+    </message>
+    <message>
+      <source>Cada cópia é contada como um item</source>
+      <translation>Each copy is counted as one item</translation>
+    </message>
+    <message>
+      <source>↔️ Frente e verso alinhados com rotação automática e virada lateral.</source>
+      <translation>↔️ Front and back aligned with automatic rotation and side-edge flipping.</translation>
+    </message>
   </context>
 </TS>

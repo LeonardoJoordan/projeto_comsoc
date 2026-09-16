@@ -1,10 +1,10 @@
 import unittest
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QFontDatabase, QFontMetrics
+from PySide6.QtGui import QFont, QFontDatabase, QFontMetrics, QTextCursor
 from PySide6.QtTest import QTest
 from core.text_layout import (
-    REFERENCE_GLYPHS, build_document, line_reference_ink_bounds, text_geometry,
+    REFERENCE_GLYPHS, build_document, line_reference_ink_bounds, resolve_rich_text, text_geometry,
 )
 from .editor_window import EditorWindow
 from .canvas_items import DesignerBox
@@ -70,6 +70,75 @@ class CanvasEditingTest(unittest.TestCase):
         box.state.rich_text_version = 1
         box.apply_state()
         self.assertAlmostEqual(box.text_item.pos().y(), renderer_y)
+
+    def test_rich_placeholder_replacement_preserves_its_font_and_size(self):
+        if "Amiri" not in QFontDatabase.families():
+            self.skipTest("Fonte Amiri não instalada")
+        html = '<p><span style="font-family:Amiri; font-size:45pt">{nome}</span></p>'
+        data = {
+            "w": 500, "h": 100, "html": html,
+            "font_family": "Liberation Sans", "font_size": 16,
+            "rich_text_version": 1,
+        }
+
+        resolved = resolve_rich_text(data, {"nome": "Leonardo"})
+        doc = build_document(data, resolved)
+        cursor = QTextCursor(doc)
+        cursor.setPosition(1)
+        fmt = cursor.charFormat()
+
+        self.assertEqual(doc.toPlainText(), "Leonardo")
+        self.assertEqual(fmt.fontFamilies()[0], "Amiri")
+        self.assertEqual(round(fmt.fontPointSize()), 45)
+
+    def test_rich_placeholder_ignores_qt_cell_font_and_size(self):
+        html = '<p><span style="font-family:Liberation Serif; font-size:31pt; color:#123456">{nome}</span></p>'
+        qt_cell_html = (
+            '<html><head><meta name="qrichtext" content="1" /></head>'
+            '<body style="font-family:Inter; font-size:9pt; color:#abcdef">'
+            '<p><span style="font-family:Arial; font-size:7pt; font-weight:700;">Leonardo</span></p>'
+            '</body></html>'
+        )
+        data = {
+            "w": 500, "h": 100, "html": html,
+            "font_family": "Liberation Sans", "font_size": 16,
+            "rich_text_version": 1,
+        }
+
+        resolved = resolve_rich_text(data, {"nome": qt_cell_html})
+        doc = build_document(data, resolved)
+        cursor = QTextCursor(doc)
+        cursor.setPosition(1)
+        fmt = cursor.charFormat()
+
+        self.assertEqual(doc.toPlainText(), "Leonardo")
+        self.assertEqual(fmt.fontFamilies()[0], "Liberation Serif")
+        self.assertEqual(round(fmt.fontPointSize()), 31)
+        self.assertEqual(fmt.foreground().color().name(), "#123456")
+        self.assertGreater(fmt.fontWeight(), QFont.Weight.Normal)
+
+    def test_rich_placeholder_keeps_cell_italic_and_underline_only(self):
+        html = '<p><span style="font-family:Liberation Sans; font-size:22pt">{nome}</span></p>'
+        qt_cell_html = (
+            '<span style="font-family:Arial; font-size:8pt; font-style:italic; '
+            'text-decoration: underline;">Texto</span>'
+        )
+        data = {
+            "w": 500, "h": 100, "html": html,
+            "font_family": "Liberation Sans", "font_size": 16,
+            "rich_text_version": 1,
+        }
+
+        resolved = resolve_rich_text(data, {"nome": qt_cell_html})
+        doc = build_document(data, resolved)
+        cursor = QTextCursor(doc)
+        cursor.setPosition(1)
+        fmt = cursor.charFormat()
+
+        self.assertEqual(doc.toPlainText(), "Texto")
+        self.assertEqual(round(fmt.fontPointSize()), 22)
+        self.assertTrue(fmt.fontItalic())
+        self.assertTrue(fmt.fontUnderline())
 
     def test_undo_redo_preserves_collapsed_inspector_section(self):
         w = EditorWindow()

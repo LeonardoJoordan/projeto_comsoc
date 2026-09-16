@@ -1,7 +1,7 @@
 import math
 
-from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPageLayout
-from PySide6.QtCore import Qt, QPointF
+from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPageLayout, QTransform
+from PySide6.QtCore import Qt, QPointF, QRectF
 
 DPI = 300
 EPS_MM = 1e-6
@@ -15,7 +15,7 @@ def _fit_count_mm(available_mm, item_mm):
     return max(0, math.floor((available_mm + EPS_MM) / item_mm))
 
 class SheetAssembler:
-    def __init__(self, target_w_mm: float, target_h_mm: float, sheet_w_mm: float = 210.0, sheet_h_mm: float = 297.0, crop_marks: bool = True, bleed_margin: bool = False):
+    def __init__(self, target_w_mm: float, target_h_mm: float, sheet_w_mm: float = 210.0, sheet_h_mm: float = 297.0, crop_marks: bool = True, bleed_margin: bool = False, auto_rotate: bool = True):
         self.target_w_mm = target_w_mm
         self.target_h_mm = target_h_mm
         self.crop_marks = crop_marks
@@ -54,7 +54,7 @@ class SheetAssembler:
         rows_l = _fit_count_mm(usable_w_mm, target_h_mm)
         cap_l = cols_l * rows_l
         
-        if cap_l > cap_p:
+        if auto_rotate and cap_l > cap_p:
             self.sheet_w_mm = sheet_h_mm
             self.sheet_h_mm = sheet_w_mm
             self.cols = cols_l
@@ -86,7 +86,9 @@ class SheetAssembler:
     def _grid_y(self, row: int):
         return mm_to_px_300(self.margin_top_mm + (row * self.target_h_mm))
 
-    def render_sheet(self, cards: list[QImage]) -> QImage:
+    def render_sheet(self, cards: list[QImage | None], *, preserve_slots=False,
+                     card_links=None, canvas_size=None, out_links=None,
+                     rotate_cards_180=False) -> QImage:
         sheet = QImage(self.sheet_w, self.sheet_h, QImage.Format_ARGB32)
         sheet.setDotsPerMeterX(round(DPI / 0.0254))
         sheet.setDotsPerMeterY(round(DPI / 0.0254))
@@ -108,8 +110,8 @@ class SheetAssembler:
             return sheet
 
         # Calcula a malha efetivamente ocupada nesta folha
-        actual_cols = min(self.cols, limit)
-        actual_rows = (limit + self.cols - 1) // self.cols
+        actual_cols = self.cols if preserve_slots else min(self.cols, limit)
+        actual_rows = self.rows if preserve_slots else (limit + self.cols - 1) // self.cols
         
         for r in range(self.rows):
             for c in range(self.cols):
@@ -120,13 +122,41 @@ class SheetAssembler:
                 y = self._grid_y(r)
                 cell_w = max(1, self._grid_x(c + 1) - x)
                 cell_h = max(1, self._grid_y(r + 1) - y)
-                
-                scaled_image = original_img.scaled(
-                    cell_w, cell_h,
-                    Qt.AspectRatioMode.IgnoreAspectRatio, 
-                    Qt.TransformationMode.SmoothTransformation
-                )
-                painter.drawImage(x, y, scaled_image)
+
+                if original_img is not None:
+                    scaled_image = original_img.scaled(
+                        cell_w, cell_h,
+                        Qt.AspectRatioMode.IgnoreAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation
+                    )
+                    if rotate_cards_180:
+                        scaled_image = scaled_image.transformed(
+                            QTransform().rotate(180),
+                            Qt.TransformationMode.SmoothTransformation,
+                        )
+                    painter.drawImage(x, y, scaled_image)
+                    if out_links is not None and card_links and idx < len(card_links):
+                        canvas_w, canvas_h = canvas_size or (original_img.width(), original_img.height())
+                        scale_x = cell_w / max(1, canvas_w)
+                        scale_y = cell_h / max(1, canvas_h)
+                        for link in card_links[idx] or []:
+                            rect = link.get("rect")
+                            if rect is None:
+                                continue
+                            rect_x = rect.x()
+                            rect_y = rect.y()
+                            if rotate_cards_180:
+                                rect_x = canvas_w - rect.x() - rect.width()
+                                rect_y = canvas_h - rect.y() - rect.height()
+                            out_links.append({
+                                "url": link.get("url", ""),
+                                "rect": QRectF(
+                                    x + rect_x * scale_x,
+                                    y + rect_y * scale_y,
+                                    rect.width() * scale_x,
+                                    rect.height() * scale_y,
+                                ),
+                            })
                 idx += 1
 
         if self.crop_marks:

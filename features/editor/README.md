@@ -6,11 +6,13 @@ Na raiz do projeto:
 
 ```bash
 .venv/bin/python features/editor/main.py
-.venv/bin/python features/editor/main.py --model /caminho/template_v3.json
+.venv/bin/python features/editor/main.py --model /caminho/da/pasta-do-modelo
 ```
 
 O segundo comando abre o modelo real: use uma cópia da pasta do modelo para
 experimentos que envolvam salvar, substituir imagens ou excluir recursos.
+O leitor aceita modelos legados `template_v3.json` e dá precedência ao documento
+`template_v4.json`. O editor publica novos salvamentos em v4.
 
 Verificação sem interface gráfica e captura:
 

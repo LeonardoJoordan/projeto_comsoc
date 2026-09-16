@@ -7,6 +7,7 @@ from core.object_style import outline_pen
 
 ALIGNMENTS = {"left": Qt.AlignLeft, "center": Qt.AlignHCenter, "right": Qt.AlignRight, "justify": Qt.AlignJustify}
 REFERENCE_GLYPHS = "AÇgjpqy|{}"
+PLACEHOLDER_PATTERN = r"\{([\w]+)\}"
 
 
 def line_reference_ink_bounds(doc, block, line):
@@ -31,7 +32,45 @@ def line_reference_ink_bounds(doc, block, line):
 def variables_in_html(content):
     doc = QTextDocument()
     doc.setHtml(content)
-    return re.findall(r"\{([a-zA-Z0-9_]+)\}", doc.toPlainText())
+    return re.findall(PLACEHOLDER_PATTERN, doc.toPlainText())
+
+
+def _html_plain_text(content):
+    """Extrai texto real de um fragmento HTML, incluindo entidades do Qt."""
+    doc = QTextDocument()
+    doc.setHtml(str(content or ""))
+    return doc.toPlainText()
+
+
+def _insert_cell_html(cursor, html, base_format):
+    """Insere uma célula preservando a tipografia definida no modelo.
+
+    O QTextEdit da planilha inclui fonte, tamanho e cor padrão em seu HTML. Esses
+    atributos pertencem à interface da planilha, não ao conteúdo do modelo. Da
+    célula importamos somente as ênfases que o usuário pode editar na tabela.
+    """
+    source = QTextDocument()
+    source.setHtml(str(html or ""))
+
+    block = source.begin()
+    first_block = True
+    while block.isValid():
+        if not first_block:
+            cursor.insertText("\n", base_format)
+        first_block = False
+
+        iterator = block.begin()
+        while not iterator.atEnd():
+            fragment = iterator.fragment()
+            if fragment.isValid():
+                source_format = fragment.charFormat()
+                output_format = QTextCharFormat(base_format)
+                output_format.setFontWeight(source_format.fontWeight())
+                output_format.setFontItalic(source_format.fontItalic())
+                output_format.setFontUnderline(source_format.fontUnderline())
+                cursor.insertText(fragment.text(), output_format)
+            iterator += 1
+        block = block.next()
 
 
 def resolve_rich_text(box, values):
@@ -45,11 +84,13 @@ def resolve_rich_text(box, values):
         cursor.setPosition(len(text[:end].encode("utf-16-le")) // 2, QTextCursor.KeepAnchor)
 
     def empty(name):
-        return not re.sub(r"<[^>]+>", "", str(values.get(name, ""))).strip()
+        value = str(values.get(name, ""))
+        plain_value = _html_plain_text(value) if re.search(r"<[^>]+>", value) else value
+        return not plain_value.strip()
 
     plain = doc.toPlainText()
-    for match in reversed(list(re.finditer(r"\|([^|]*\{[a-zA-Z0-9_]+\}[^|]*)\|", plain))):
-        if any(empty(name) for name in re.findall(r"\{([a-zA-Z0-9_]+)\}", match[1])):
+    for match in reversed(list(re.finditer(r"\|([^|]*\{[\w]+\}[^|]*)\|", plain))):
+        if any(empty(name) for name in re.findall(PLACEHOLDER_PATTERN, match[1])):
             select(plain, match.start(), match.end())
             cursor.removeSelectedText()
         else:
@@ -58,12 +99,17 @@ def resolve_rich_text(box, values):
             select(plain, match.start(), match.start()+1)
             cursor.removeSelectedText()
     plain = doc.toPlainText()
-    matches = list(re.finditer(r"\{([a-zA-Z0-9_]+)\}", plain))
+    matches = list(re.finditer(PLACEHOLDER_PATTERN, plain))
     if any(empty(match[1]) for match in matches):
         return None
     for match in reversed(matches):
         select(plain, match.start(), match.end())
-        cursor.insertHtml(str(values[match[1]]))
+        value = str(values[match[1]])
+        placeholder_format = QTextCharFormat(cursor.charFormat())
+        if re.search(r"<[^>]+>", value):
+            _insert_cell_html(cursor, value, placeholder_format)
+        else:
+            cursor.insertText(value, placeholder_format)
     return doc.toHtml()
 
 def build_document(box, content):

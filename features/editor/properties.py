@@ -10,6 +10,7 @@ import re
 from .canvas_items import DesignerBox, SignatureItem, ImageItem, BackgroundItem, px_to_mm
 from core.custom_widgets import MathDoubleSpinBox
 from core.html_utils import normalize_text_decoration
+from core.text_layout import PLACEHOLDER_PATTERN
 from core.resources import action_icon_path, align_icon_path
 from core.theme_icons import themed_svg_icon
 from core.i18n import tr
@@ -903,8 +904,8 @@ class EditorDeTextoPanel(QWidget):
             return
             
         selected_text = cursor.selectedText()
-        if not re.match(r"^[a-zA-Z0-9_]+$", selected_text):
-            QMessageBox.warning(self, tr("Caracteres inválidos"), tr("A variável só pode conter letras (sem acentos), números e subtraços (_). Remova espaços ou símbolos."))
+        if not re.fullmatch(r"[\w]+", selected_text):
+            QMessageBox.warning(self, tr("Caracteres inválidos"), tr("A variável só pode conter letras, números e subtraços (_). Remova espaços ou símbolos."))
             return
             
         cursor.insertText(f"{{{selected_text}}}")
@@ -921,7 +922,7 @@ class EditorDeTextoPanel(QWidget):
             return
             
         selected_text = cursor.selectedText()
-        if not re.search(r"\{[a-zA-Z0-9_]+\}", selected_text):
+        if not re.search(PLACEHOLDER_PATTERN, selected_text):
             QMessageBox.warning(self, tr("Ausência de variável"), tr("Um trecho opcional precisa conter pelo menos uma variável válida (ex.: {Nome}) para funcionar."))
             return
             

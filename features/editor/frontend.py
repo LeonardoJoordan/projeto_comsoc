@@ -39,6 +39,13 @@ QPushButton:hover { background: @hover@; border-color: @border_strong@; }
 QPushButton:checked { background: @selection@; border-color: @accent@; }
 QPushButton:disabled { color: @disabled@; background: @surface@; }
 QPushButton#primary { background: @accent@; color: @on_accent@; border: none; }
+QFrame#pageSelector { background: transparent; }
+QFrame#pageButton { background: transparent; border: 1px solid @border@; border-radius: 6px; }
+QFrame#pageButton QPushButton { border: none; border-radius: 0; background: @button@; }
+QFrame#pageButton QPushButton#pageMain { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+QFrame#pageButton QPushButton#pageMore { border-left: 1px solid @border@; border-top-right-radius: 5px; border-bottom-right-radius: 5px; padding: 0; }
+QFrame#pageButton[active="true"] { border-color: @accent@; }
+QFrame#pageButton[active="true"] QPushButton { background: @selection@; }
 QPushButton[squareControl="true"] {
  padding: 0; min-width: 28px; max-width: 28px;
  min-height: 28px; max-height: 28px; border: 1px solid @border@;
@@ -165,16 +172,18 @@ def compact(name, control, suffix='', width=100, accessible_name=None):
 
 
 class FooterSaveAlignment(QObject):
-    """Mantém o botão do rodapé centralizado sob o inspetor lateral."""
-    def __init__(self, window, sidebar, footer_bar, footer_layout, button):
+    """Alinha salvar ao inspetor e páginas ao centro do canvas."""
+    def __init__(self, window, sidebar, canvas, footer_bar, footer_layout, button, pages):
         super().__init__(window)
         self.window = window
         self.sidebar = sidebar
+        self.canvas = canvas
         self.footer_bar = footer_bar
         self.footer_layout = footer_layout
         self.button = button
+        self.pages = pages
         self._update_pending = False
-        for watched in (window, sidebar, footer_bar):
+        for watched in (window, sidebar, canvas, footer_bar, pages):
             watched.installEventFilter(self)
 
     def schedule(self):
@@ -196,6 +205,13 @@ class FooterSaveAlignment(QObject):
         )
         self.footer_layout.setContentsMargins(14, 5, max(14, right_margin), 5)
         self.footer_layout.activate()
+        canvas_center_global = self.canvas.mapToGlobal(QPoint(self.canvas.width() // 2, 0))
+        canvas_center = self.footer_bar.mapFromGlobal(canvas_center_global).x()
+        self.pages.move(
+            round(canvas_center - self.pages.width() / 2),
+            round((self.footer_bar.height() - self.pages.height()) / 2),
+        )
+        self.pages.raise_()
 
     def eventFilter(self, watched, event):
         if event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
@@ -1064,16 +1080,78 @@ def install_frontend(w):
     footer_bar.setFixedHeight(44)
     footer = QHBoxLayout(footer_bar)
     footer.setContentsMargins(14, 5, 14, 5)
-    footer.addWidget(QLabel(tr('Página 1 de 1')))
     footer.addStretch()
     w.btn_save.setText(tr('Salvar modelo'))
     w.btn_save.setMinimumSize(0, 0)
     w.btn_save.setMaximumSize(16777215, 16777215)
     w.btn_save.setFixedSize(116, 34)
     footer.addWidget(w.btn_save)
+    page_selector = QFrame(footer_bar)
+    page_selector.setObjectName('pageSelector')
+    page_layout = QHBoxLayout(page_selector)
+    page_layout.setContentsMargins(0, 0, 0, 0)
+    page_layout.setSpacing(6)
+
+    def show_page_menu(page_id, anchor):
+        menu = QMenu(anchor)
+        clear_action = menu.addAction(tr('Limpar página'))
+        clear_action.triggered.connect(lambda: w.clear_model_page(page_id))
+        if w._model_document and len(w._model_document.get('pages', [])) > 1:
+            remove_action = menu.addAction(tr('Remover página'))
+            remove_action.triggered.connect(lambda: w.remove_model_page(page_id))
+        menu.exec(anchor.mapToGlobal(QPoint(0, anchor.height())))
+
+    def rebuild_page_selector():
+        while page_layout.count():
+            item = page_layout.takeAt(0)
+            old_widget = item.widget()
+            if old_widget:
+                old_widget.hide()
+                old_widget.setParent(None)
+                old_widget.deleteLater()
+        document = w._model_document
+        page_ids = [page['page_id'] for page in document.get('pages', [])] if document else ['front']
+        for index, page_id in enumerate(page_ids, start=1):
+            group = QFrame(page_selector)
+            group.setObjectName('pageButton')
+            group.setProperty('active', page_id == w._active_page_id)
+            group_layout = QHBoxLayout(group)
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(0)
+            main = QPushButton(tr('Página {numero}').format(numero=index), group)
+            main.setObjectName('pageMain')
+            main.setFixedHeight(34)
+            main.setMinimumWidth(82)
+            main.clicked.connect(lambda _checked=False, target=page_id: w.switch_model_page(target))
+            more = QPushButton('⋯', group)
+            more.setObjectName('pageMore')
+            more.setFixedSize(28, 34)
+            more.setToolTip(tr('Ações da página'))
+            more.clicked.connect(lambda _checked=False, target=page_id, anchor=more: show_page_menu(target, anchor))
+            group_layout.addWidget(main)
+            group_layout.addWidget(more)
+            page_layout.addWidget(group)
+        if len(page_ids) < 2:
+            add_page = QPushButton(tr('+ Página'), page_selector)
+            add_page.setFixedHeight(34)
+            add_page.setMinimumWidth(82)
+            add_page.clicked.connect(w.add_model_page)
+            page_layout.addWidget(add_page)
+        page_layout.invalidate()
+        page_layout.activate()
+        widgets = [page_layout.itemAt(i).widget() for i in range(page_layout.count())]
+        width = sum(widget.sizeHint().width() for widget in widgets)
+        width += page_layout.spacing() * max(0, len(widgets) - 1)
+        height = max((widget.sizeHint().height() for widget in widgets), default=34)
+        page_selector.resize(width, height)
+        if hasattr(w, '_footer_save_alignment'):
+            w._footer_save_alignment.schedule()
+
+    w._update_page_controls = rebuild_page_selector
+    rebuild_page_selector()
     outer.addWidget(footer_bar)
     w._footer_save_alignment = FooterSaveAlignment(
-        w, right, footer_bar, footer, w.btn_save
+        w, right, split.widget(1), footer_bar, footer, w.btn_save, page_selector
     )
     split.splitterMoved.connect(lambda *_: w._footer_save_alignment.schedule())
     w._footer_save_alignment.schedule()

@@ -1,0 +1,64 @@
+{
+  "name": "Referência de compatibilidade",
+  "canvas_size": {"w": 320, "h": 200},
+  "target_w_mm": 80.0,
+  "target_h_mm": 50.0,
+  "background_path": null,
+  "placeholders": ["Nome", "Cargo", "Site"],
+  "boxes": [
+    {
+      "object_id": "text:1", "layer_id": 1, "custom_name": "Nome e cargo",
+      "id": "Nome Cargo", "html": "<p><span style=\"font-size:22px; font-weight:700; color:#20242e;\">{Nome}</span><br><span style=\"font-size:12px; color:#435066;\">{Cargo}</span></p>",
+      "rich_text_version": 1, "visible": true, "opacity": 1.0, "locked": false,
+      "x": 28, "y": 45, "w": 190, "h": 80, "rotation": 0,
+      "font_family": "Liberation Sans", "font_size": 22, "font_color": "#20242e",
+      "has_link": false, "link_key": "", "align": "left", "vertical_align": "middle",
+      "indent_px": 0, "line_height": 1.15, "keep_proportion": false, "z_value": 1
+    }
+  ],
+  "images": [
+    {
+      "object_id": "image:2", "layer_id": 2, "custom_name": "Imagem de referência",
+      "path": "assets/reference-image.svg", "visible": true, "opacity": 0.9, "locked": false,
+      "x": 224, "y": 38, "width": 72, "height": 54, "rotation": 0,
+      "has_link": true, "link_key": "Site", "keep_proportion": true, "z_value": 2
+    }
+  ],
+  "signatures": [
+    {
+      "object_id": "signature:3", "layer_id": 3, "custom_name": "Assinatura de referência",
+      "path": "assets/reference-signature.svg", "visible": true, "opacity": 1.0, "locked": false,
+      "x": 190, "y": 145, "width": 108, "height": 32, "rotation": 0,
+      "keep_proportion": true, "z_value": 3
+    }
+  ],
+  "shapes": [
+    {
+      "object_id": "shape:0", "layer_id": 0, "custom_name": "Plano de fundo",
+      "shape_type": "rectangle", "is_document_background": true,
+      "x": 0, "y": 0, "width": 320, "height": 200, "rotation": 0,
+      "visible": true, "opacity": 1.0, "locked": true, "keep_proportion": true, "z_value": -100,
+      "fill_color": "#f3f0e9", "fill_opacity": 1.0,
+      "outline_enabled": false, "outline_color": "#000000", "outline_opacity": 1.0,
+      "outline_width": 0.0, "outline_position": "inside", "outline_join": "miter",
+      "corner_radius": 0.0, "corner_radii": {"top_left": 0.0, "top_right": 0.0, "bottom_right": 0.0, "bottom_left": 0.0}
+    },
+    {
+      "object_id": "shape:4", "layer_id": 4, "custom_name": "Faixa",
+      "shape_type": "rectangle", "is_document_background": false,
+      "x": 0, "y": 0, "width": 320, "height": 22, "rotation": 0,
+      "visible": true, "opacity": 1.0, "locked": false, "keep_proportion": false, "z_value": 4,
+      "fill_color": "#34394a", "fill_opacity": 1.0,
+      "outline_enabled": true, "outline_color": "#0d0f15", "outline_opacity": 0.8,
+      "outline_width": 1.0, "outline_position": "inside", "outline_join": "miter",
+      "corner_radius": 0.0, "corner_radii": {"top_left": 0.0, "top_right": 0.0, "bottom_right": 0.0, "bottom_left": 0.0}
+    }
+  ],
+  "layer_order": ["shape:0", "text:1", "image:2", "signature:3", "shape:4"],
+  "guidelines": [{"pos": 160.0, "vertical": true, "visible": true}],
+  "guidelines_locked": false,
+  "guidelines_visible": true,
+  "doc_proportion_locked": true,
+  "doc_aspect_ratio": 1.6,
+  "editable_background_initialized": true
+}

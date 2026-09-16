@@ -21,10 +21,18 @@ def template_font_families(template_data: dict) -> list[str]:
     fonts = []
     seen = set()
 
-    for box in template_data.get("boxes", []):
+    if template_data.get("schema_version") == 4 and isinstance(template_data.get("pages"), list):
+        boxes = [box for page in template_data["pages"] for box in page.get("boxes", [])]
+    else:
+        boxes = template_data.get("boxes", [])
+
+    for box in boxes:
         families = [str(box.get("font_family", "")).strip()]
         if box.get("rich_text_version") == 1:
-            for match in re.findall(r'font-family\s*:\s*([^;]+)', unescape(box.get("html", "")), re.I):
+            for match in re.findall(
+                r'font-family\s*:\s*(.+?)(?=;|["\'](?:\s|>)|$)',
+                unescape(box.get("html", "")), re.I,
+            ):
                 families.extend(part.strip(" '\"") for part in match.split(","))
         for family in families:
             normalized = _normalized_font_name(family)

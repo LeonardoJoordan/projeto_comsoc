@@ -12,6 +12,7 @@ O FORNAX Forge é um aplicativo desktop para criar modelos gráficos, alimentar 
 - tabela para colar dados vindos de Excel, LibreOffice Calc ou Google Sheets;
 - prévia do resultado antes da geração do lote;
 - PNG por item, PDF por item ou PDF agrupado;
+- modelos com frente e verso, com PNGs identificados por página e PDFs multipágina;
 - imposição em folhas, marcas de corte, sangria e links em PDF;
 - biblioteca local de modelos com importação e exportação em ZIP.
 
@@ -57,7 +58,7 @@ Em **Exibir > Tema da interface**, escolha entre os cinco temas padrão: **Carbo
 
 O FORNAX Forge usa o identificador técnico `com.leobelisario.FornaxForge`. No primeiro acesso, dados encontrados no diretório da instalação COMSOC são copiados para a nova área. Modelos já existentes no destino são preservados integralmente, sem mesclar assets. A cópia é verificada antes de ser publicada, sua conclusão fica registrada e a origem não é apagada. Uma interrupção pode ser retomada; modelos excluídos após a migração não são recriados. Conflitos podem ser resolvidos posteriormente pela importação de modelos.
 
-As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Os modelos continuam usando `template_v3.json`; a mudança de marca não altera o formato interno.
+As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Modelos existentes em `template_v3.json` continuam compatíveis. Novos salvamentos usam o documento versionado `template_v4.json`; quando um v4 anterior existe, ele é mantido como cópia de recuperação.
 
 Em uma instalação Flatpak, cada identificador possui uma sandbox própria. Nesse caso, use **Modelo > Exportar modelos** no COMSOC e **Modelo > Importar modelos** no FORNAX Forge quando a sandbox nova não conseguir acessar os dados antigos.
 

@@ -21,9 +21,21 @@ from core.template_manager import slugify_model_name
 from core.history_manager import HistoryManager
 from core.paths import get_models_dir
 from core.custom_widgets import MathDoubleSpinBox
-from core.render_cache import ensure_background_proxy
+from core.render_cache import ensure_background_proxy, publish_thumbnail_cache
 from core.resources import action_icon_path, app_icon_path, state_icon_path
 from core.i18n import tr
+from core.model_document import (
+    add_blank_back_page,
+    adapt_model_page,
+    clear_model_page as clear_document_page,
+    iter_page_asset_paths,
+    load_model_document,
+    load_recovery_documents,
+    normalize_model_document,
+    replace_model_page,
+    remove_model_page as remove_document_page,
+    save_model_document,
+)
 
 
 _VISIBILITY_ICONS = {}
@@ -101,6 +113,12 @@ class EditorWindow(QMainWindow):
         self._workspace_session_active = False
         self._current_model_name = None
         self._current_model_dir = None
+        self._model_document = None
+        self._active_page_id = "front"
+        self._page_selection = {"front": set(), "back": set()}
+        self._object_clipboard = []
+        self._clipboard_source_page = None
+        self._active_scene_baseline = None
         self.setWindowTitle(tr("Editor de modelos — FORNAX Forge"))
         self.setWindowIcon(QIcon(str(app_icon_path())))
         self.resize(1200, 800)
@@ -585,6 +603,11 @@ class EditorWindow(QMainWindow):
         self.shortcut_dup = QShortcut(QKeySequence("Ctrl+D"), self)
         self.shortcut_dup.activated.connect(self.duplicate_selected)
 
+        self.shortcut_copy = QShortcut(QKeySequence.StandardKey.Copy, self)
+        self.shortcut_copy.activated.connect(self.copy_selected_items)
+        self.shortcut_paste = QShortcut(QKeySequence.StandardKey.Paste, self)
+        self.shortcut_paste.activated.connect(self.paste_copied_items)
+
         self.shortcut_save = QShortcut(QKeySequence("Ctrl+S"), self)
         self.shortcut_save.activated.connect(self.export_to_json)
 
@@ -606,7 +629,7 @@ class EditorWindow(QMainWindow):
         self.shortcut_delete.activated.connect(self.delete_selected_items)
 
         # --- SISTEMA DE UNDO/REDO ---
-        self.history = HistoryManager(max_steps=100)
+        self.history = HistoryManager(max_steps=100, max_bytes=64 * 1024 * 1024)
         
         # Conecta o estado da pilha aos novos botões da UI
         self.history.canUndoChanged.connect(self.btn_undo.setEnabled)
@@ -639,6 +662,7 @@ class EditorWindow(QMainWindow):
         self.refresh_layer_list()
         self.save_snapshot()
         self._last_saved_state = self.get_current_scene_state()
+        self._last_saved_document_state = self._capture_document_history_state()
 
         from .frontend import install_frontend
         install_frontend(self)
@@ -684,6 +708,8 @@ class EditorWindow(QMainWindow):
 
     def _normalize_state_for_compare(self, state):
         normalized = copy.deepcopy(state)
+        normalized.pop("__active_page_id", None)
+        normalized.pop("__action_page_id", None)
         for key in ("boxes", "images", "signatures", "guidelines"):
             if isinstance(normalized.get(key), list):
                 normalized[key].sort(key=self._state_item_sort_key)
@@ -698,9 +724,24 @@ class EditorWindow(QMainWindow):
     def closeEvent(self, event):
         if getattr(self, 'canvas_edit', None):
             self.canvas_edit.finish()
-        current_state = self.get_current_scene_state()
+        saved_document_state = getattr(self, '_last_saved_document_state', None)
+        current_has_multiple_pages = bool(
+            self._model_document and len(self._model_document.get("pages", [])) > 1
+        )
+        saved_had_multiple_pages = bool(
+            saved_document_state
+            and len(saved_document_state.get("document", {}).get("pages", [])) > 1
+        )
+        if current_has_multiple_pages or saved_had_multiple_pages:
+            current_state = self._capture_document_history_state()
+            saved_state = saved_document_state
+        else:
+            # Compatibilidade para integrações antigas que ainda atribuem o
+            # estado plano diretamente antes de fechar a janela.
+            current_state = self.get_current_scene_state()
+            saved_state = self._last_saved_state
         if hasattr(self, '_last_saved_state') and self._last_saved_state is not None:
-            if not self._states_equal_for_close(current_state, self._last_saved_state):
+            if not self._states_equal_for_close(current_state, saved_state):
                 msg_box = QMessageBox(self)
                 msg_box.setWindowTitle(tr("Alterações não salvas"))
                 msg_box.setIcon(QMessageBox.Icon.Warning)
@@ -760,11 +801,8 @@ class EditorWindow(QMainWindow):
             if resolved == assets_dir or assets_dir in resolved.parents:
                 used_assets.add(resolved)
 
-        add_if_local_asset(template_data.get("background_path"))
-        for sig in template_data.get("signatures", []):
-            add_if_local_asset(sig.get("path"))
-        for img in template_data.get("images", []):
-            add_if_local_asset(img.get("path"))
+        for _page_id, _kind, raw_path in iter_page_asset_paths(template_data):
+            add_if_local_asset(raw_path)
 
         return used_assets
 
@@ -773,20 +811,22 @@ class EditorWindow(QMainWindow):
         if not model_dir:
             return
 
-        template_path = model_dir / "template_v3.json"
         assets_dir = model_dir / "assets"
-        if not template_path.exists() or not assets_dir.exists():
+        if not assets_dir.exists():
             return
 
         try:
-            with open(template_path, "r", encoding="utf-8") as f:
-                template_data = json.load(f)
+            template_data = load_model_document(model_dir)
         except Exception as e:
             print(f"[WARN] Limpeza de assets cancelada: não foi possível ler o modelo. {e}")
             return
 
         try:
-            used_assets = self._collect_used_asset_paths(template_data, model_dir)
+            documents = [template_data, *load_recovery_documents(model_dir)]
+            used_assets = set().union(*(
+                self._collect_used_asset_paths(document, model_dir)
+                for document in documents
+            ))
             asset_paths = list(assets_dir.rglob("*"))
         except OSError as e:
             print(f"[WARN] Limpeza de assets cancelada: não foi possível varrer a pasta assets. {e}")
@@ -839,6 +879,16 @@ class EditorWindow(QMainWindow):
         updates[str(original_path)] = str(model_dir / saved)
 
     def _rewrite_state_asset_paths(self, state: dict, updates: dict[str, str]):
+        if state.get("__document_history__") and isinstance(state.get("document"), dict):
+            for page in state["document"].get("pages", []):
+                page_state = {
+                    "background_path": page.get("background_path"),
+                    "signatures": page.get("signatures", []),
+                    "images": page.get("images", []),
+                }
+                self._rewrite_state_asset_paths(page_state, updates)
+                page["background_path"] = page_state["background_path"]
+            return
         bg_path = state.get("background_path")
         if bg_path in updates:
             state["background_path"] = updates[bg_path]
@@ -996,28 +1046,233 @@ class EditorWindow(QMainWindow):
             img.setdefault("layer_id", None)
 
         return data
+
+    def _selection_keys(self) -> set[tuple[str, int]]:
+        keys = set()
+        for item in self.scene.selectedItems():
+            layer_id = getattr(item, "layer_id", None)
+            if layer_id is None:
+                continue
+            if isinstance(item, DesignerBox):
+                kind = "text"
+            elif isinstance(item, SignatureItem):
+                kind = "signature"
+            elif isinstance(item, RectangleItem):
+                kind = "shape"
+            elif isinstance(item, ImageItem):
+                kind = "image"
+            else:
+                continue
+            keys.add((kind, layer_id))
+        return keys
+
+    def _restore_page_selection(self):
+        wanted = self._page_selection.get(self._active_page_id, set())
+        if not wanted:
+            return
+        for item in self.scene.items():
+            layer_id = getattr(item, "layer_id", None)
+            kind = (
+                "text" if isinstance(item, DesignerBox) else
+                "signature" if isinstance(item, SignatureItem) else
+                "shape" if isinstance(item, RectangleItem) else
+                "image" if isinstance(item, ImageItem) else None
+            )
+            if (kind, layer_id) in wanted:
+                item.setSelected(True)
+
+    def _synchronize_document_backgrounds(self, document: dict) -> dict:
+        canvas = document["canvas_size"]
+        for page in document["pages"]:
+            for shape in page.get("shapes", []):
+                if not shape.get("is_document_background"):
+                    continue
+                shape.update({
+                    "x": 0.0, "y": 0.0,
+                    "width": float(canvas["w"]), "height": float(canvas["h"]),
+                    "rotation": 0.0, "z_value": -100.0,
+                    "locked": True, "keep_proportion": False,
+                    "outline_position": "inside",
+                })
+        return document
+
+    def _capture_document_history_state(self) -> dict:
+        page_data = self.get_current_scene_state()
+        previous_canvas = (
+            copy.deepcopy(self._model_document.get("canvas_size"))
+            if self._model_document is not None else None
+        )
+        if self._model_document is None:
+            document = normalize_model_document(page_data)
+        elif (
+            self._active_scene_baseline is None
+            or self._normalize_state_for_compare(page_data)
+            != self._normalize_state_for_compare(self._active_scene_baseline)
+        ):
+            document = replace_model_page(self._model_document, page_data, self._active_page_id)
+        else:
+            document = self._model_document
+        current_canvas = document.get("canvas_size")
+        dimensions_changed = previous_canvas is not None and (
+            float(previous_canvas.get("w", 0)) != float(current_canvas.get("w", 0))
+            or float(previous_canvas.get("h", 0)) != float(current_canvas.get("h", 0))
+        )
+        # A página inativa deve permanecer literalmente intacta durante uma
+        # edição comum. Os fundos das duas páginas só precisam ser sincronizados
+        # quando a dimensão compartilhada do documento realmente muda.
+        self._model_document = (
+            self._synchronize_document_backgrounds(document)
+            if dimensions_changed else document
+        )
+        self._active_scene_baseline = copy.deepcopy(page_data)
+        return {
+            "__document_history__": True,
+            "__active_page_id": self._active_page_id,
+            "__action_page_id": getattr(self, "_pending_history_page_id", self._active_page_id),
+            "document": copy.deepcopy(self._model_document),
+        }
+
+    def _refresh_page_controls(self):
+        refresh = getattr(self, "_update_page_controls", None)
+        if refresh:
+            refresh()
+
+    def _finish_page_interaction(self):
+        if getattr(self, "canvas_edit", None):
+            self.canvas_edit.finish()
+        if getattr(self, "shape_drawing", None):
+            self.shape_drawing.cancel()
+
+    def switch_model_page(self, page_id: str):
+        if page_id == self._active_page_id:
+            return
+        if not self._model_document or page_id not in {
+            page["page_id"] for page in self._model_document["pages"]
+        }:
+            return
+        self._finish_page_interaction()
+        self.save_snapshot()
+        self._page_selection[self._active_page_id] = self._selection_keys()
+        self._active_page_id = page_id
+        self._switching_page = True
+        try:
+            data = self._migrate_model_data(adapt_model_page(self._model_document, page_id))
+            self.apply_scene_state(data, is_undo_redo=False)
+        finally:
+            self._switching_page = False
+        self._active_scene_baseline = self.get_current_scene_state()
+        self._restore_page_selection()
+        self.save_snapshot()
+        self._refresh_page_controls()
+
+    def add_model_page(self):
+        self._finish_page_interaction()
+        self.save_snapshot()
+        self._page_selection[self._active_page_id] = self._selection_keys()
+        self._model_document = add_blank_back_page(self._model_document)
+        self._active_page_id = "back"
+        self._page_selection["back"] = set()
+        self._switching_page = True
+        try:
+            self.apply_scene_state(
+                self._migrate_model_data(adapt_model_page(self._model_document, "back")),
+                is_undo_redo=False,
+            )
+        finally:
+            self._switching_page = False
+        self._active_scene_baseline = self.get_current_scene_state()
+        self._pending_history_page_id = "back"
+        self.save_snapshot()
+        self._refresh_page_controls()
+
+    def clear_model_page(self, page_id: str):
+        answer = QMessageBox.question(
+            self, tr("Limpar página"),
+            tr("Remover todo o conteúdo desta página e deixá-la em branco?"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._finish_page_interaction()
+        self.save_snapshot()
+        self._model_document = clear_document_page(self._model_document, page_id)
+        self._page_selection[page_id] = set()
+        if page_id == self._active_page_id:
+            self._switching_page = True
+            try:
+                self.apply_scene_state(
+                    self._migrate_model_data(adapt_model_page(self._model_document, page_id)),
+                    is_undo_redo=False,
+                )
+            finally:
+                self._switching_page = False
+            self._active_scene_baseline = self.get_current_scene_state()
+        self._pending_history_page_id = page_id
+        self.save_snapshot()
+        self._refresh_page_controls()
+
+    def remove_model_page(self, page_id: str):
+        if not self._model_document or len(self._model_document["pages"]) < 2:
+            return
+        answer = QMessageBox.question(
+            self, tr("Remover página"),
+            tr("Remover esta página do modelo? Esta ação pode ser desfeita."),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self._finish_page_interaction()
+        self.save_snapshot()
+        self._page_selection[self._active_page_id] = self._selection_keys()
+        old_back_selection = self._page_selection.get("back", set())
+        self._model_document = remove_document_page(self._model_document, page_id)
+        self._active_page_id = "front"
+        self._page_selection = {
+            "front": old_back_selection if page_id == "front" else self._page_selection.get("front", set()),
+            "back": set(),
+        }
+        self._switching_page = True
+        try:
+            self.apply_scene_state(
+                self._migrate_model_data(adapt_model_page(self._model_document, "front")),
+                is_undo_redo=False,
+            )
+        finally:
+            self._switching_page = False
+        self._active_scene_baseline = self.get_current_scene_state()
+        self._restore_page_selection()
+        self._pending_history_page_id = page_id
+        self.save_snapshot()
+        self._refresh_page_controls()
     
     def load_from_json(self, file_path):
         path = Path(file_path)
-        if not path.exists():
+        model_dir = path if path.is_dir() else path.parent
+        try:
+            document = load_model_document(model_dir)
+        except FileNotFoundError:
             return
-
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
+        data = adapt_model_page(document, "front")
         data = self._migrate_model_data(data)
         self._current_model_name = data.get("name", "")
-        self._current_model_dir = path.parent
+        self._current_model_dir = model_dir
+        self._model_document = document
+        self._active_page_id = "front"
         self.setWindowTitle(tr("Editor de modelos — {modelo}").format(modelo=self._current_model_name))
         
         # O apply_scene_state faz todo o trabalho duro de desenhar
         self.apply_scene_state(data, is_undo_redo=False)
+        self._active_scene_baseline = self.get_current_scene_state()
         self._zoom_to_fit()
         
         # Limpa o histórico e salva o Estado #0
         self.history.clear()
         self.save_snapshot()
         self._last_saved_state = self.get_current_scene_state()
+        self._last_saved_document_state = self._capture_document_history_state()
+        self._refresh_page_controls()
 
     def export_to_json(self, skip_close_dialog=False):
         self.canvas_edit.finish()
@@ -1060,22 +1315,22 @@ class EditorWindow(QMainWindow):
 
         ensure_background_proxy(model_dir, data)
 
-        file_path = model_dir / "template_v3.json"
-        
-        if file_path.exists():
+        document = self._model_document
+        if document is None:
             try:
-                with open(file_path, "r", encoding="utf-8") as f:
-                    old_data = json.load(f)
-                
-                for key in ["last_export_format", "last_single_pdf", "output_suffix", "imposition_settings"]:
-                    if key in old_data:
-                        data[key] = old_data[key]
+                document = load_model_document(model_dir)
+            except FileNotFoundError:
+                document = normalize_model_document(data)
             except Exception as e:
                 print(f"Aviso: Não foi possível preservar os metadados antigos. {e}")
-                
-        data["name"] = model_name
-        with open(file_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=4, ensure_ascii=False)
+                document = normalize_model_document(data)
+
+        document = replace_model_page(document, data, self._active_page_id)
+        document["name"] = model_name
+        file_path = save_model_document(document, model_dir)
+        document["__model_dir"] = str(model_dir.resolve())
+        document["__model_file"] = str(file_path.resolve())
+        self._model_document = document
 
         self._apply_saved_asset_paths(saved_asset_paths)
 
@@ -1085,22 +1340,20 @@ class EditorWindow(QMainWindow):
             # Instancia o renderizador com os dados fresquinhos do modelo
             thumb_renderer = NativeRenderer(data)
             
-            # Força o caminho físico da pasta de cache
-            cache_folder = model_dir / ".render_cache"
-            cache_folder.mkdir(parents=True, exist_ok=True)
-            thumb_path = cache_folder / "thumbnail_raw.png"
-            
             # Gera o Pixmap estático (sem row_rich para manter placeholders brutos)
-            # Salvamos a QImage nativa direto no disco de forma limpa
-            preview_pix = thumb_renderer.render_to_pixmap(row_rich=None, max_side=1600)
-            preview_pix.save(str(thumb_path), "PNG")
+            preview_image = thumb_renderer.render_preview_image(row_rich=None, max_side=1600)
+            if publish_thumbnail_cache(
+                model_dir, file_path, preview_image, self._active_page_id,
+            ) is None:
+                raise OSError("Não foi possível gravar a miniatura.")
         except Exception as e:
-            print(f"[WARN] Falha ao gerar a thumbnail_raw em background: {e}")
+            print(f"[WARN] Falha ao atualizar a miniatura do modelo: {e}")
 
         # Emite o sinal depois do cache visual ser atualizado.
-        self.modelSaved.emit(model_name, data["placeholders"], str(file_path))
+        self.modelSaved.emit(model_name, document["placeholders"], str(file_path))
 
         self._last_saved_state = self.get_current_scene_state()
+        self._last_saved_document_state = self._capture_document_history_state()
         
         if skip_close_dialog:
             self.close()
@@ -1189,19 +1442,49 @@ class EditorWindow(QMainWindow):
                 if update_ui:
                     self.save_snapshot()
 
-    def get_all_model_placeholders(self):
-        placeholders = set()
+    def get_current_page_placeholders(self):
+        placeholders = []
+
+        def add(value):
+            if value and value not in placeholders:
+                placeholders.append(value)
+
         for item in self.scene.items():
             if isinstance(item, DesignerBox):
-                placeholders.update(item.get_placeholders())
+                for name in item.get_placeholders():
+                    add(name)
                 if getattr(item.state, 'has_link', False):
                     name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
-                    placeholders.add(f"Link - {name}")
+                    add(f"Link - {name}")
             elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
                 if getattr(item, 'has_link', False):
                     name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
-                    placeholders.add(f"Link - {name}")
-        return sorted(list(placeholders))
+                    add(f"Link - {name}")
+            elif isinstance(item, RectangleItem) and not getattr(item, 'is_document_background', False):
+                if getattr(item, 'has_link', False):
+                    name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
+                    add(f"Link - {name}")
+        return placeholders
+
+    def get_all_model_placeholders(self):
+        current = self.get_current_page_placeholders()
+        inactive = []
+        if self._model_document:
+            inactive = [
+                field_id
+                for page in self._model_document.get("pages", [])
+                if page.get("page_id") != self._active_page_id
+                for field_id in page.get("field_ids", [])
+            ]
+        required = set(current + inactive)
+        preferred = (
+            [self.lst_placeholders.item(i).text() for i in range(self.lst_placeholders.count())]
+            if hasattr(self, "lst_placeholders") else []
+        )
+        return list(dict.fromkeys([
+            *(value for value in preferred if value in required),
+            *(value for value in current + inactive if value in required),
+        ]))
     
     def add_new_box(self):
         center = self.view.mapToScene(self.view.viewport().rect().center())
@@ -1339,6 +1622,119 @@ class EditorWindow(QMainWindow):
 
         self.refresh_layer_list()
         self.sync_placeholders_list()
+        self.save_snapshot()
+        self.on_selection_changed()
+
+    def copy_selected_items(self):
+        """Copia objetos como dados de página, sem duplicar os arquivos de asset."""
+        selected = self._selection_keys()
+        if not selected:
+            return
+        state = self.get_current_scene_state()
+        clipboard = []
+        for kind, collection in (
+            ("text", "boxes"), ("image", "images"),
+            ("signature", "signatures"), ("shape", "shapes"),
+        ):
+            for entry in state.get(collection, []):
+                if (kind, entry.get("layer_id")) not in selected:
+                    continue
+                if entry.get("is_document_background"):
+                    continue
+                clipboard.append((kind, copy.deepcopy(entry)))
+        if clipboard:
+            self._object_clipboard = clipboard
+            self._clipboard_source_page = self._active_page_id
+
+    def paste_copied_items(self):
+        """Cola a seleção na página ativa como objetos independentes."""
+        if not self._object_clipboard:
+            return
+        self._finish_page_interaction()
+        state = self.get_current_scene_state()
+        collections = {
+            "text": "boxes", "image": "images",
+            "signature": "signatures", "shape": "shapes",
+        }
+        used_ids = {
+            entry.get("layer_id")
+            for collection in collections.values()
+            for entry in state.get(collection, [])
+            if isinstance(entry.get("layer_id"), int)
+        }
+        used_object_ids = {
+            entry.get("object_id")
+            for collection in collections.values()
+            for entry in state.get(collection, [])
+        }
+        used_names = {
+            str(entry.get("custom_name", "")).strip().casefold()
+            for collection in collections.values()
+            for entry in state.get(collection, [])
+            if str(entry.get("custom_name", "")).strip()
+        }
+        next_id = 0
+        max_z = max(
+            (float(entry.get("z_value", 0))
+             for collection in collections.values()
+             for entry in state.get(collection, [])),
+            default=0.0,
+        )
+        pasted_ids = []
+        offset = 12.0 if self._clipboard_source_page == self._active_page_id else 0.0
+
+        def free_name(raw):
+            base = str(raw or "Objeto").strip() or "Objeto"
+            if base.casefold() not in used_names:
+                used_names.add(base.casefold())
+                return base
+            suffix = 2
+            while f"{base} {suffix}".casefold() in used_names:
+                suffix += 1
+            result = f"{base} {suffix}"
+            used_names.add(result.casefold())
+            return result
+
+        for order, (kind, source) in enumerate(self._object_clipboard, start=1):
+            while next_id in used_ids:
+                next_id += 1
+            entry = copy.deepcopy(source)
+            entry["layer_id"] = next_id
+            used_ids.add(next_id)
+            object_id = f"{kind}:{next_id}"
+            while object_id in used_object_ids:
+                object_id += "-copy"
+            used_object_ids.add(object_id)
+            entry["object_id"] = object_id
+            entry["custom_name"] = free_name(entry.get("custom_name"))
+            entry["z_value"] = max_z + order * 0.01
+            if "x" in entry:
+                entry["x"] = float(entry["x"]) + offset
+            if "y" in entry:
+                entry["y"] = float(entry["y"]) + offset
+            state.setdefault(collections[kind], []).append(entry)
+            state.setdefault("layer_order", []).append(object_id)
+            pasted_ids.append((kind, next_id))
+            next_id += 1
+
+        self._switching_page = True
+        try:
+            self.apply_scene_state(state, is_undo_redo=False)
+        finally:
+            self._switching_page = False
+        self.scene.clearSelection()
+        for item in self.scene.items():
+            layer_id = getattr(item, "layer_id", None)
+            kind = (
+                "text" if isinstance(item, DesignerBox) else
+                "signature" if isinstance(item, SignatureItem) else
+                "shape" if isinstance(item, RectangleItem) else
+                "image" if isinstance(item, ImageItem) else None
+            )
+            if (kind, layer_id) in pasted_ids:
+                item.setSelected(True)
+        self.sync_placeholders_list()
+        self.refresh_layer_list()
         self.save_snapshot()
         self.on_selection_changed()
 
@@ -2113,6 +2509,8 @@ class EditorWindow(QMainWindow):
             "target_h_mm": self.spin_phys_h.value(),
             "background_path": self.background_path,
             "placeholders": ordered_placeholders,
+            "__page_field_ids": self.get_current_page_placeholders(),
+            "__page_fields_authoritative": True,
             "signatures": signatures_data,
             "images": images_data,
             "boxes": boxes_data,
@@ -2176,10 +2574,11 @@ class EditorWindow(QMainWindow):
                         entry['path'] = str(Path(model_dir) / asset)
         old_bg = self.background_path
         selected_layer_ids = set()
-        sel = self.scene.selectedItems()
-        for s in sel:
-            if isinstance(s, (DesignerBox, ImageItem, SignatureItem)) and getattr(s, 'layer_id', None) is not None:
-                selected_layer_ids.add(s.layer_id)
+        if not getattr(self, '_switching_page', False):
+            sel = self.scene.selectedItems()
+            for s in sel:
+                if isinstance(s, (DesignerBox, ImageItem, SignatureItem)) and getattr(s, 'layer_id', None) is not None:
+                    selected_layer_ids.add(s.layer_id)
 
         self.scene.clearSelection()
         self.scene.clear()
@@ -2425,20 +2824,35 @@ class EditorWindow(QMainWindow):
         """Dispara um salvamento na memória (chamado ao soltar o mouse ou terminar uma edição)."""
         if getattr(self, '_restoring_history', False):
             return
-        state = self.get_current_scene_state()
+        state = self._capture_document_history_state()
+        if self.history._current_index >= 0:
+            current = self.history._undo_stack[self.history._current_index]
+            if (
+                current.get("__document_history__")
+                and current.get("document") == state.get("document")
+            ):
+                if hasattr(self, "_pending_history_page_id"):
+                    del self._pending_history_page_id
+                return
         self.history.push(state)
+        if hasattr(self, "_pending_history_page_id"):
+            del self._pending_history_page_id
 
     def undo(self):
+        current = None
+        if self.history._current_index >= 0:
+            current = self.history._undo_stack[self.history._current_index]
         state = self.history.undo()
         if state:
-            self._restore_history_state(state)
+            preferred = current.get("__action_page_id") if current else None
+            self._restore_history_state(state, preferred_page=preferred)
 
     def redo(self):
         state = self.history.redo()
         if state:
-            self._restore_history_state(state)
+            self._restore_history_state(state, preferred_page=state.get("__action_page_id"))
 
-    def _restore_history_state(self, state):
+    def _restore_history_state(self, state, preferred_page=None):
         sections = getattr(self, '_inspector_sections', {})
         inspector_state = {
             name: section.header.isChecked()
@@ -2446,7 +2860,23 @@ class EditorWindow(QMainWindow):
         }
         self._restoring_history = True
         try:
-            self.apply_scene_state(state, is_undo_redo=True)
+            if state.get("__document_history__"):
+                self._page_selection[self._active_page_id] = self._selection_keys()
+                self._model_document = copy.deepcopy(state["document"])
+                requested_page = preferred_page or state.get("__active_page_id", self._active_page_id)
+                available = {page["page_id"] for page in self._model_document["pages"]}
+                self._active_page_id = requested_page if requested_page in available else "front"
+                self._switching_page = True
+                try:
+                    page = adapt_model_page(self._model_document, self._active_page_id)
+                    self.apply_scene_state(self._migrate_model_data(page), is_undo_redo=True)
+                finally:
+                    self._switching_page = False
+                self._active_scene_baseline = self.get_current_scene_state()
+                self._restore_page_selection()
+                self._refresh_page_controls()
+            else:
+                self.apply_scene_state(state, is_undo_redo=True)
         finally:
             self._restoring_history = False
         restore_inspector = getattr(self, '_restore_inspector_state', None)

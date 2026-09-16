@@ -2116,5 +2116,105 @@ Asigne un nombre para guardar este preajuste:</translation>
       <source>FORNAX - Forja nº {numero}</source>
       <translation>FORNAX - Forja n.º {numero}</translation>
     </message>
+    <message>
+      <source>Página {numero}</source>
+      <translation>Página {numero}</translation>
+    </message>
+    <message>
+      <source>Ações da página</source>
+      <translation>Acciones de la página</translation>
+    </message>
+    <message>
+      <source>+ Página</source>
+      <translation>+ Página</translation>
+    </message>
+    <message>
+      <source>Limpar página</source>
+      <translation>Limpiar página</translation>
+    </message>
+    <message>
+      <source>Remover página</source>
+      <translation>Eliminar página</translation>
+    </message>
+    <message>
+      <source>Remover todo o conteúdo desta página e deixá-la em branco?</source>
+      <translation>¿Eliminar todo el contenido de esta página y dejarla en blanco?</translation>
+    </message>
+    <message>
+      <source>Remover esta página do modelo? Esta ação pode ser desfeita.</source>
+      <translation>¿Eliminar esta página del modelo? Esta acción se puede deshacer.</translation>
+    </message>
+    <message>
+      <source>A exportação de modelos com frente e verso ainda está em implementação.</source>
+      <translation>La exportación de modelos de dos páginas aún está en desarrollo.</translation>
+    </message>
+    <message>
+      <source>A variável só pode conter letras, números e subtraços (_). Remova espaços ou símbolos.</source>
+      <translation>La variable solo puede contener letras, números y guiones bajos (_). Elimine espacios o símbolos.</translation>
+    </message>
+    <message>
+      <source>Campos removidos</source>
+      <translation>Campos eliminados</translation>
+    </message>
+    <message>
+      <source>Estes campos não são mais usados pelo modelo:\n\n{campos}\n\nDeseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
+      <translation>Estos campos ya no se utilizan en el modelo:\n\n{campos}\n\n¿Desea descartar los datos de estas columnas? Elija No para conservarlos durante esta sesión.</translation>
+    </message>
+    <message>
+      <source>Campo inativo: não será usado na geração.</source>
+      <translation>Campo inactivo: no se utilizará durante la generación.</translation>
+    </message>
+    <message>
+      <source>A imposição de modelos com frente e verso ainda está em implementação. Selecione a definição do modelo para exportar as duas páginas diretamente.</source>
+      <translation>La imposición de modelos de dos páginas aún está en desarrollo. Seleccione la definición del modelo para exportar ambas páginas directamente.</translation>
+    </message>
+    <message>
+      <source>🚀 Processando {itens} itens em {threads} threads…</source>
+      <translation>🚀 Procesando {itens} elementos en {threads} hilos…</translation>
+    </message>
+    <message>
+      <source>=== Processo interrompido por erro ===</source>
+      <translation>=== Proceso interrumpido por un error ===</translation>
+    </message>
+    <message>
+      <source>📚 Imposição: {itens} itens em {folhas} folhas físicas (capacidade: {capacidade} por folha).</source>
+      <translation>📚 Imposición: {itens} elementos en {folhas} hojas físicas (capacidad: {capacidade} por hoja).</translation>
+    </message>
+    <message>
+      <source>↔️ Frente e verso alinhados para folha vertical com virada lateral.</source>
+      <translation>↔️ Anverso y reverso alineados para hoja vertical con giro lateral.</translation>
+    </message>
+    <message>
+      <source>📄 PDF por folha: cada arquivo terá frente e verso.</source>
+      <translation>📄 PDF por hoja: cada archivo contendrá el anverso y el reverso.</translation>
+    </message>
+    <message>
+      <source>Não foi possível gravar {arquivo}.</source>
+      <translation>No se pudo guardar {arquivo}.</translation>
+    </message>
+    <message>
+      <source>🖨️ FOLHA {folha:02d} OK ({itens} itens)</source>
+      <translation>🖨️ HOJA {folha:02d} OK ({itens} elementos)</translation>
+    </message>
+    <message>
+      <source>Frente</source>
+      <translation>Anverso</translation>
+    </message>
+    <message>
+      <source>Verso</source>
+      <translation>Reverso</translation>
+    </message>
+    <message>
+      <source>Número da folha física</source>
+      <translation>Número de la hoja física</translation>
+    </message>
+    <message>
+      <source>Cada cópia é contada como um item</source>
+      <translation>Cada copia se cuenta como un elemento</translation>
+    </message>
+    <message>
+      <source>↔️ Frente e verso alinhados com rotação automática e virada lateral.</source>
+      <translation>↔️ Anverso y reverso alineados con rotación automática y giro lateral.</translation>
+    </message>
   </context>
 </TS>

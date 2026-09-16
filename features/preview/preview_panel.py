@@ -63,6 +63,7 @@ class ResizingLabel(QLabel):
 class PreviewPanel(QWidget):
     modeChanged = Signal(str)
     indexRequested = Signal(int)
+    pageChanged = Signal(int)
 
     def __init__(self):
         super().__init__()
@@ -78,6 +79,22 @@ class PreviewPanel(QWidget):
         self.cbo_models = QComboBox()
         self.cbo_models.setMinimumHeight(34)
         layout.addWidget(self.cbo_models)
+
+        self.page_selector = QWidget()
+        page_selector_layout = QHBoxLayout(self.page_selector)
+        page_selector_layout.setContentsMargins(0, 0, 0, 0)
+        page_selector_layout.setSpacing(5)
+        page_selector_layout.addStretch(1)
+        self.btn_front = QPushButton(tr("Frente"))
+        self.btn_back = QPushButton(tr("Verso"))
+        for index, button in enumerate((self.btn_front, self.btn_back)):
+            button.setObjectName("previewPageButton")
+            button.setCheckable(True)
+            button.setFixedSize(76, 24)
+            button.clicked.connect(lambda checked=False, value=index: self.pageChanged.emit(value))
+            page_selector_layout.addWidget(button)
+        page_selector_layout.addStretch(1)
+        layout.addWidget(self.page_selector)
 
         self.preview = ResizingLabel()
         self.preview.setText(tr("Nenhum modelo selecionado"))
@@ -159,6 +176,7 @@ class PreviewPanel(QWidget):
                 pass
         self.destroyed.connect(disconnect_navigation_icons)
         self.set_navigation("item", 0, 0, sheet_available=False)
+        self.set_page_navigation(1, 0)
 
     def _emit_mode(self):
         self.modeChanged.emit(self.cbo_preview_mode.currentData() or "item")
@@ -181,6 +199,10 @@ class PreviewPanel(QWidget):
             self.spin_navigation.setValue(index + 1)
         self.lbl_navigation_kind.setText(tr("Folha") if wanted == "sheet" else tr("Item"))
         self.lbl_navigation_total.setText(tr("de {total}").format(total=total))
+        self.spin_navigation.setToolTip(
+            tr("Número da folha física") if wanted == "sheet" else
+            tr("Cada cópia é contada como um item")
+        )
         enabled = total > 0
         self.spin_navigation.setEnabled(enabled)
         self.btn_previous.setEnabled(enabled and index > 0)
@@ -189,6 +211,15 @@ class PreviewPanel(QWidget):
             self.cbo_preview_mode.setToolTip(
                 tr("Visualize um item ou a folha final conforme a predefinição de impressão.")
             )
+
+    def set_page_navigation(self, page_count: int, current_page: int):
+        visible = page_count > 1
+        self.page_selector.setVisible(visible)
+        current_page = 1 if visible and current_page == 1 else 0
+        with QSignalBlocker(self.btn_front):
+            self.btn_front.setChecked(current_page == 0)
+        with QSignalBlocker(self.btn_back):
+            self.btn_back.setChecked(current_page == 1)
 
     def set_preview_text(self, text: str):
         self.preview.set_message(text)

@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--check', action='store_true')
     parser.add_argument('--screenshot', type=Path)
     args = parser.parse_args()
-    if args.model and not args.model.is_file():
+    if args.model and not args.model.exists():
         parser.error('Modelo não encontrado.')
     app = QApplication(sys.argv)
     app.setOrganizationName(SETTINGS_ORGANIZATION)

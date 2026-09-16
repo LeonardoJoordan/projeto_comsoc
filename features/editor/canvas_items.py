@@ -10,7 +10,7 @@ from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QImageReader, QPainterPath, QPainter,
                            QImageIOHandler)
 from core.html_utils import normalize_text_decoration
-from core.text_layout import line_reference_ink_bounds
+from core.text_layout import line_reference_ink_bounds, variables_in_html
 from core.text_state import TextState
 
 DPI = 300
@@ -1298,8 +1298,7 @@ class DesignerBox(QGraphicsRectItem):
         self.apply_state()
 
     def get_placeholders(self):
-        text = self.text_item.toPlainText()
-        return re.findall(r"\{([a-zA-Z0-9_]+)\}", text)
+        return variables_in_html(self.state.html_content)
     
 
     def apply_state(self):

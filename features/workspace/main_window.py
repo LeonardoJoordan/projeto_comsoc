@@ -18,7 +18,7 @@ from features.preview.sheet_preview_worker import SheetPreviewWorker
 from features.workspace.controls_panel import ControlsPanel
 from shared.log_panel import LogPanel
 from features.spreadsheet.table_panel import TablePanel
-from features.generator.renderer import NativeRenderer
+from features.generator.renderer import NativeRenderer, renderers_for_document
 from features.editor.editor_window import EditorWindow
 from features.generator.manager import RenderManager
 from features.generator.production_plan import build_imposition_plan
@@ -30,10 +30,22 @@ from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 from core.settings import get_app_settings
 from core.font_utils import format_font_list, missing_template_fonts
-from core.render_cache import ensure_background_proxy
+from core.render_cache import ensure_background_proxy, get_thumbnail_cache_path
 from core.resources import object_icon_path
 from core.output_folders import create_forge_output_dir
 from core.i18n import tr
+from core.model_document import (
+    V3_FILENAME,
+    V4_FILENAME,
+    adapt_model_page,
+    document_signatures,
+    install_model_directory,
+    iter_page_link_items,
+    load_model_document,
+    normalize_model_document,
+    resolve_model_file,
+    save_model_document,
+)
 from features.spreadsheet.headers import SIGNATURE_HEADER, quantity_header_label, is_quantity_header
 
 
@@ -79,6 +91,9 @@ class MainWindow(QMainWindow):
 
         self.preview_panel = PreviewPanel()
         self._preview_mode = "item"
+        self._preview_item_index = 0
+        self._preview_page_index = 0
+        self._selecting_preview_item = False
         self._preview_sheet_index = 0
         self._sheet_preview_revision = 0
         self._sheet_preview_worker = None
@@ -92,6 +107,7 @@ class MainWindow(QMainWindow):
         self._preview_refresh_timer.timeout.connect(self._refresh_preview_after_data_change)
         self.preview_panel.modeChanged.connect(self._on_preview_mode_changed)
         self.preview_panel.indexRequested.connect(self._on_preview_index_requested)
+        self.preview_panel.pageChanged.connect(self._on_preview_page_changed)
         self.controls_panel = ControlsPanel()
         self.controls_panel.setFixedWidth(110) # Trava a largura da sidebar
         self.log_panel = LogPanel()
@@ -242,7 +258,10 @@ class MainWindow(QMainWindow):
         self.splitter.setCollapsible(0, False)
 
         self.cached_model_data = None
+        self.cached_model_document = None
+        self._inactive_table_fields = set()
         self.preview_renderer = None # Persistência do Renderer para o Live Preview
+        self._preview_renderers = []
         
         # Garante que um usuário novato não veja uma tela em branco
         self._ensure_starter_pack()
@@ -325,8 +344,7 @@ class MainWindow(QMainWindow):
                 }
             ]
         }
-        with open(example_dir / "template_v3.json", "w", encoding="utf-8") as f:
-            json.dump(example_data, f, indent=4, ensure_ascii=False)
+        save_model_document(normalize_model_document(example_data), example_dir)
 
     def _initialize_theme(self):
         from core.themes import theme_manager
@@ -356,14 +374,11 @@ class MainWindow(QMainWindow):
         found = []
         for folder in sorted(models_dir.iterdir()):
             if not folder.is_dir(): continue
-            json_path = folder / "template_v3.json"
-            if json_path.exists():
-                try:
-                    data = json.loads(json_path.read_text(encoding="utf-8"))
-                    name = data.get("name", folder.name)
-                    found.append(name)
-                except Exception:
-                    continue
+            try:
+                data = load_model_document(folder)
+                found.append(data.get("name", folder.name))
+            except Exception:
+                continue
 
         for name in found:
             self.preview_panel.cbo_models.addItem(name)
@@ -416,13 +431,9 @@ class MainWindow(QMainWindow):
         try:
             shutil.copytree(original_dir, new_dir)
             
-            json_path = new_dir / "template_v3.json"
-            if json_path.exists():
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                data["name"] = new_name
-                with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
+            data = load_model_document(new_dir)
+            data["name"] = new_name
+            save_model_document(data, new_dir)
 
             self.log_panel.append(tr("Modelo duplicado: '{nome}'").format(nome=new_name))
             self._reload_models_from_disk(select_name=new_name)
@@ -458,28 +469,28 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("Erro"), tr("Já existe um modelo com o identificador '{slug}'.").format(slug=new_slug))
             return
 
+        folder_renamed = False
         try:
             # 1. Renomeia a pasta apenas se o slug mudou
             if new_slug != old_slug:
                 old_dir.rename(new_dir)
+                folder_renamed = True
             
             # 2. Define o caminho correto do JSON para atualizar o nome visual
             actual_dir = new_dir if new_slug != old_slug else old_dir
-            json_path = actual_dir / "template_v3.json"
-
-            if json_path.exists():
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                
-                data["name"] = new_name # Salva com a capitalização nova
-                
-                with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
+            data = load_model_document(actual_dir)
+            data["name"] = new_name
+            save_model_document(data, actual_dir)
             
             self.log_panel.append(tr("Modelo renomeado: '{anterior}' → '{novo}'").format(anterior=old_name, novo=new_name))
             self._reload_models_from_disk(select_name=new_name)
 
         except Exception as e:
+            if folder_renamed and new_dir.exists() and not old_dir.exists():
+                try:
+                    new_dir.rename(old_dir)
+                except OSError:
+                    pass
             QMessageBox.critical(self, tr("Erro"), tr("Falha ao renomear: {erro}").format(erro=e))
 
     def _on_remove_model(self):
@@ -514,22 +525,24 @@ class MainWindow(QMainWindow):
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
                 # Descobre as pastas de modelo dentro do zip
                 top_level_folders = set(info.filename.split('/')[0] for info in zip_ref.infolist() if '/' in info.filename)
+                names = set(zip_ref.namelist())
                 
                 models_in_zip = {} # Mapeamento (Nome Legível do JSON -> Nome da Pasta no Zip)
                 missing_fonts_by_model = {}
                 
                 for zip_slug in sorted(top_level_folders):
-                    json_path = f"{zip_slug}/template_v3.json"
+                    json_path = next((f"{zip_slug}/{filename}" for filename in (V4_FILENAME, V3_FILENAME)
+                                      if f"{zip_slug}/{filename}" in names), None)
+                    if json_path is None:
+                        continue
                     try:
                         with zip_ref.open(json_path) as f:
-                            data = json.loads(f.read().decode('utf-8'))
-                            name = data.get("name", zip_slug)
+                            document = normalize_model_document(json.loads(f.read().decode('utf-8')))
+                            name = document.get("name", zip_slug)
                             models_in_zip[name] = zip_slug
-                            missing_fonts_by_model[name] = missing_template_fonts(data)
-                    except KeyError: 
-                        # Se o modelo não tiver um JSON válido, usamos o nome bruto da pasta
-                        models_in_zip[zip_slug] = zip_slug
-                        missing_fonts_by_model[zip_slug] = []
+                            missing_fonts_by_model[name] = missing_template_fonts(document)
+                    except (KeyError, ValueError, UnicodeError, json.JSONDecodeError):
+                        continue
                         
                 if not models_in_zip:
                     QMessageBox.warning(self, tr("Arquivo inválido"), tr("Este arquivo ZIP não contém modelos compatíveis com o FORNAX Forge."))
@@ -557,17 +570,20 @@ class MainWindow(QMainWindow):
                         source_dir = Path(temp_dir) / zip_slug
                         if not source_dir.exists():
                             continue
+
+                        # Valida e publica o documento completo antes de tocar na
+                        # biblioteca. Isso também promove pacotes v3 para v4 sem
+                        # descartar uma eventual página de verso.
+                        try:
+                            imported_document = load_model_document(source_dir)
+                        except Exception:
+                            continue
                             
                         target_slug = slugify_model_name(model_name)
                         target_name = model_name
                         
                         # Tratamento da Rota Escolhida
-                        if decision["action"] == "replace":
-                            target_dir = models_dir / target_slug
-                            if target_dir.exists():
-                                shutil.rmtree(target_dir) # Esmaga o modelo velho
-                                
-                        elif decision["action"] == "rename":
+                        if decision["action"] == "rename":
                             # Validação dupla: Se por acaso o usuário marcou "Novo Nome" mas o arquivo 
                             # não era conflito, ele mantém o original. Se for conflito, roda a lógica.
                             if (models_dir / target_slug).exists():
@@ -583,17 +599,14 @@ class MainWindow(QMainWindow):
                                     target_slug = slugify_model_name(target_name)
                             
                             # Entra no modelo temporário e atualiza o JSON dele silenciosamente
-                            json_file = source_dir / "template_v3.json"
-                            if json_file.exists():
-                                with open(json_file, 'r', encoding='utf-8') as f:
-                                    data = json.load(f)
-                                data['name'] = target_name
-                                with open(json_file, 'w', encoding='utf-8') as f:
-                                    json.dump(data, f, indent=4, ensure_ascii=False)
+                            imported_document['name'] = target_name
+
+                        save_model_document(imported_document, source_dir)
                         
-                        # Move a pasta tratada da área de segurança para a pasta oficial
+                        # Instala a pasta completa e restaura a versão anterior se
+                        # houver falha durante a troca.
                         target_dir = models_dir / target_slug
-                        shutil.move(str(source_dir), str(target_dir))
+                        install_model_directory(source_dir, target_dir)
                         imported_count += 1
             
             # Etapa 4: Finalização e Limpeza Automática do TempDir
@@ -669,10 +682,15 @@ class MainWindow(QMainWindow):
         self._preview_generation = getattr(self, "_preview_generation", 0) + 1
         generation = self._preview_generation
         self.preview_renderer = None
+        self._preview_renderers = []
         self.cached_model_data = None
+        self.cached_model_document = None
         self._preview_mode = "item"
+        self._preview_item_index = 0
+        self._preview_page_index = 0
         self._preview_sheet_index = 0
         self._invalidate_sheet_previews()
+        self.preview_panel.set_page_navigation(1, 0)
         self.preview_panel.set_preview_text(tr("Prévia do modelo selecionado:\n{nome}").format(nome=name))
         self.log_panel.append(tr("Modelo ativo: {nome}").format(nome=name))
         self.active_model_name = name
@@ -683,12 +701,17 @@ class MainWindow(QMainWindow):
             return
 
         slug = slugify_model_name(name)
-        json_path = get_models_dir() / slug / "template_v3.json"
+        model_dir = get_models_dir() / slug
+        try:
+            json_path = resolve_model_file(model_dir)
+        except FileNotFoundError:
+            self.log_panel.append(tr("ERRO: modelo '{nome}' não encontrado.").format(nome=name))
+            return
 
         if json_path.exists():
             try:
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
+                    document = load_model_document(model_dir)
+                    data = adapt_model_page(document, "front")
                     
                     self.current_filename_suffix = data.get("output_suffix", "")
 
@@ -718,15 +741,17 @@ class MainWindow(QMainWindow):
                     data["__model_dir"] = str(model_dir)
                     ensure_background_proxy(model_dir, data)
 
-                    placeholders = data.get("placeholders", [])
-                    signatures = data.get("signatures", [])
+                    placeholders = document.get("placeholders", [])
+                    signatures = document_signatures(document)
                     self._update_table_columns(placeholders, signatures)
                     
                     self.cached_model_data = data
+                    self.cached_model_document = document
+                    self.preview_panel.set_page_navigation(len(document["pages"]), 0)
                     self._refresh_imposition_presets()
                     self._refresh_preview_navigation()
 
-                    missing_fonts = missing_template_fonts(data)
+                    missing_fonts = missing_template_fonts(document)
                     if missing_fonts:
                         if len(missing_fonts) == 1:
                             msg = tr("Este modelo usa uma fonte não encontrada no sistema: {fontes}").format(fontes=format_font_list(missing_fonts))
@@ -736,12 +761,13 @@ class MainWindow(QMainWindow):
                     
                     try:
                         # Cria o "Chef" na memória (operação ultraleve, sem desenho)
-                        self.preview_renderer = NativeRenderer(data)
+                        self._preview_renderers = renderers_for_document(document)
+                        self.preview_renderer = self._preview_renderers[0]
                         
                         # Carregamento Instantâneo da Thumbnail de Performance ---
-                        thumb_path = model_dir / ".render_cache" / "thumbnail_raw.png"
+                        thumb_path = get_thumbnail_cache_path(model_dir, json_path, "front")
                         
-                        if thumb_path.exists():
+                        if thumb_path is not None:
                             self.preview_panel.set_preview_image(str(thumb_path))
                         else:
                             # --- LEGO: Worker de Preview Assíncrono ---
@@ -768,19 +794,20 @@ class MainWindow(QMainWindow):
                     self._start_sheet_preview_preload()
             except Exception as e:
                 self.log_panel.append(tr("Erro ao ler as colunas do modelo: {erro}").format(erro=e))
-        else:
-            self.log_panel.append(tr("Aviso: template_v3.json não encontrado."))
 
     # --- LEGO: Recebimento do Preview e Descarte Inteligente ---
     def _on_preview_ready(self, worker_model_name: str, thumb_path: str):
         """Atualiza a UI apenas se o usuário ainda estiver aguardando este modelo específico."""
-        if self.active_model_name == worker_model_name:
+        if (self.active_model_name == worker_model_name
+                and self._preview_page_index == 0
+                and self.table_panel.table.currentRow() < 0):
             self.preview_panel.set_preview_image(thumb_path)
         # Nota: Se os nomes forem diferentes, significa que o usuário já trocou de modelo. 
         # A UI ignora, mas a imagem já ficou salva no disco em background para a próxima vez.
     # --- FIM DO LEGO ---
 
     def _update_table_columns(self, placeholders, signatures=None):
+        self._inactive_table_fields = set()
         self.table_panel.table.clearContents()
         self.table_panel.table.setRowCount(0)
         self.table_panel.table.setColumnCount(0)
@@ -827,6 +854,20 @@ class MainWindow(QMainWindow):
     def _on_table_selection(self):
         if not self.cached_model_data: return
         if self._preview_mode == "sheet":
+            table_row = self.table_panel.table.currentRow()
+            rows_plain, rows_rich, source_rows = self._scrape_table_data(include_sources=True)
+            if table_row >= 0 and source_rows:
+                self._preview_item_index = next(
+                    (index for index, source in enumerate(source_rows) if source == table_row),
+                    self._preview_item_index,
+                )
+                plan = build_imposition_plan(
+                    list(zip(rows_plain, rows_rich)), self._preview_imposition_settings()
+                )
+                if plan.capacity and plan.sheets:
+                    self._preview_sheet_index = min(
+                        self._preview_item_index // plan.capacity, len(plan.sheets) - 1
+                    )
             self._render_current_sheet_preview()
             return
         row = self.table_panel.table.currentRow()
@@ -834,24 +875,51 @@ class MainWindow(QMainWindow):
         # --- LEGO: Fallback para a Thumbnail Estática se não houver linha selecionada ---
         if row < 0:
             slug = slugify_model_name(self.active_model_name)
-            thumb_path = get_models_dir() / slug / ".render_cache" / "thumbnail_raw.png"
-            if thumb_path.exists():
+            model_dir = get_models_dir() / slug
+            try:
+                source_path = resolve_model_file(model_dir)
+            except FileNotFoundError:
+                source_path = model_dir / V4_FILENAME
+            pages = (self.cached_model_document or {}).get("pages", [])
+            page_id = (
+                pages[min(self._preview_page_index, len(pages) - 1)]["page_id"]
+                if pages else "front"
+            )
+            thumb_path = get_thumbnail_cache_path(model_dir, source_path, page_id)
+            if thumb_path is not None:
                 self.preview_panel.set_preview_image(str(thumb_path))
+            elif self._preview_renderers:
+                renderer = self._preview_renderers[
+                    min(self._preview_page_index, len(self._preview_renderers) - 1)
+                ]
+                self.preview_panel.set_preview_pixmap(
+                    renderer.render_to_pixmap(row_rich=None, max_side=1600)
+                )
             return
         # --- FIM DO LEGO ---
 
         try:
             row_rich = self._get_row_data_rich(row)
-            # Reutiliza o renderer existente. O cache de QPixmaps estará pronto aqui.
-            if not self.preview_renderer:
-                self.preview_renderer = NativeRenderer(self.cached_model_data)
-            
+            if not self._preview_renderers:
+                source = self.cached_model_document or self.cached_model_data
+                self._preview_renderers = (
+                    renderers_for_document(source)
+                    if source.get("schema_version") == 4 else [NativeRenderer(source)]
+                )
+            self._preview_page_index = min(self._preview_page_index, len(self._preview_renderers) - 1)
+            self.preview_renderer = self._preview_renderers[self._preview_page_index]
             pix = self.preview_renderer.render_to_pixmap(row_rich=row_rich, max_side=1600)
             self.preview_panel.set_preview_pixmap(pix)
-            visible_rows = self._visible_preview_rows()
-            index = visible_rows.index(row) if row in visible_rows else 0
+            _, _, source_rows = self._scrape_table_data(include_sources=True)
+            if not self._selecting_preview_item:
+                self._preview_item_index = next(
+                    (index for index, source in enumerate(source_rows) if source == row), 0
+                )
+            self._preview_item_index = min(
+                max(0, self._preview_item_index), max(0, len(source_rows) - 1)
+            )
             self.preview_panel.set_navigation(
-                "item", index, len(visible_rows),
+                "item", self._preview_item_index, len(source_rows),
                 sheet_available=self._sheet_preview_available(),
             )
         except Exception as e:
@@ -864,14 +932,36 @@ class MainWindow(QMainWindow):
     def _sheet_preview_available(self):
         return bool(self.cached_model_data and self._resolve_imposition_settings().get("enabled"))
 
+    def _preview_imposition_settings(self):
+        settings = dict(self._resolve_imposition_settings())
+        settings["duplex"] = bool(
+            self.cached_model_document and len(self.cached_model_document.get("pages", [])) > 1
+        )
+        return settings
+
+    def _on_preview_page_changed(self, page_index):
+        page_count = len(self._preview_renderers) or 1
+        self._preview_page_index = min(max(0, page_index), page_count - 1)
+        self.preview_panel.set_page_navigation(page_count, self._preview_page_index)
+        if self._preview_mode == "sheet":
+            self._render_current_sheet_preview()
+        else:
+            self._on_table_selection()
+
     def _on_preview_mode_changed(self, mode):
         previous_mode = self._preview_mode
         self._preview_mode = mode if mode == "sheet" and self._sheet_preview_available() else "item"
         if self._preview_mode == "sheet":
             if previous_mode == "item":
-                self._preview_sheet_index = self._sheet_index_for_table_row(
-                    self.table_panel.table.currentRow()
+                rows_plain, rows_rich = self._scrape_table_data()
+                plan = build_imposition_plan(
+                    list(zip(rows_plain, rows_rich)), self._preview_imposition_settings()
                 )
+                if plan.capacity:
+                    self._preview_sheet_index = min(
+                        self._preview_item_index // plan.capacity,
+                        max(0, len(plan.sheets) - 1),
+                    )
             self._render_current_sheet_preview()
         else:
             if previous_mode == "sheet":
@@ -881,8 +971,8 @@ class MainWindow(QMainWindow):
 
     def _sheet_index_for_table_row(self, table_row):
         rows_plain, rows_rich, source_rows = self._scrape_table_data(include_sources=True)
-        plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
-        if not plan.pages or table_row < 0:
+        plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._preview_imposition_settings())
+        if not plan.sheets or table_row < 0:
             return 0
         try:
             production_index = source_rows.index(table_row)
@@ -893,50 +983,61 @@ class MainWindow(QMainWindow):
                 (index for index, source in enumerate(source_rows) if source > table_row),
                 max(0, len(source_rows) - 1),
             )
-        return min(production_index // plan.capacity, len(plan.pages) - 1)
+        return min(production_index // plan.capacity, len(plan.sheets) - 1)
 
     def _select_first_item_from_sheet(self, sheet_index):
         rows_plain, rows_rich, source_rows = self._scrape_table_data(include_sources=True)
-        plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
-        if not plan.pages or not source_rows:
+        plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._preview_imposition_settings())
+        if not plan.sheets or not source_rows:
             return
-        sheet_index = min(max(0, sheet_index), len(plan.pages) - 1)
+        sheet_index = min(max(0, sheet_index), len(plan.sheets) - 1)
         production_index = sheet_index * plan.capacity
+        self._preview_item_index = min(production_index, len(source_rows) - 1)
         table_row = source_rows[min(production_index, len(source_rows) - 1)]
         table = self.table_panel.table
         column = table.currentColumn()
         if column < 0 or column >= table.columnCount():
             column = 0
-        table.setCurrentCell(table_row, column)
+        self._selecting_preview_item = True
+        try:
+            table.setCurrentCell(table_row, column)
+        finally:
+            self._selecting_preview_item = False
 
     def _on_preview_index_requested(self, index):
         if self._preview_mode == "sheet":
             rows_plain, rows_rich = self._scrape_table_data()
-            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
-            if not plan.pages:
+            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._preview_imposition_settings())
+            if not plan.sheets:
                 self._render_current_sheet_preview()
                 return
-            self._preview_sheet_index = min(max(0, index), len(plan.pages) - 1)
+            self._preview_sheet_index = min(max(0, index), len(plan.sheets) - 1)
             self._render_current_sheet_preview(plan)
             return
 
-        rows = self._visible_preview_rows()
-        if not rows:
+        _, _, source_rows = self._scrape_table_data(include_sources=True)
+        if not source_rows:
             self._refresh_preview_navigation()
             return
-        index = min(max(0, index), len(rows) - 1)
+        index = min(max(0, index), len(source_rows) - 1)
+        self._preview_item_index = index
         table = self.table_panel.table
         column = table.currentColumn()
         if column < 0 or column >= table.columnCount():
             column = 0
-        table.setCurrentCell(rows[index], column)
+        self._selecting_preview_item = True
+        try:
+            table.setCurrentCell(source_rows[index], column)
+        finally:
+            self._selecting_preview_item = False
+        self._on_table_selection()
 
     def _refresh_preview_navigation(self):
         sheet_available = self._sheet_preview_available()
         if self._preview_mode == "sheet" and sheet_available:
             rows_plain, rows_rich = self._scrape_table_data()
-            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
-            total = len(plan.pages)
+            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._preview_imposition_settings())
+            total = len(plan.sheets)
             self._preview_sheet_index = min(self._preview_sheet_index, max(0, total - 1))
             self.preview_panel.set_navigation(
                 "sheet", self._preview_sheet_index, total, sheet_available=True
@@ -945,11 +1046,12 @@ class MainWindow(QMainWindow):
 
         if not sheet_available:
             self._preview_mode = "item"
-        rows = self._visible_preview_rows()
-        current = self.table_panel.table.currentRow()
-        index = rows.index(current) if current in rows else 0
+        _, _, source_rows = self._scrape_table_data(include_sources=True)
+        self._preview_item_index = min(
+            max(0, self._preview_item_index), max(0, len(source_rows) - 1)
+        )
         self.preview_panel.set_navigation(
-            "item", index, len(rows), sheet_available=sheet_available
+            "item", self._preview_item_index, len(source_rows), sheet_available=sheet_available
         )
 
     def _on_preview_data_changed(self, _item=None):
@@ -989,15 +1091,22 @@ class MainWindow(QMainWindow):
         if not self._sheet_preview_available():
             return
         if self._sheet_preview_worker and self._sheet_preview_worker.isRunning():
-            return
+            requested_page = self._preview_sheet_index if first_page is None else first_page
+            requested_key = (requested_page, self._preview_page_index)
+            if requested_key in self._sheet_preview_paths:
+                return
+            old_dir = self._sheet_preview_dir
+            self._stop_sheet_preview_worker()
+            if old_dir:
+                self._stale_sheet_preview_dirs.add(old_dir)
 
         if plan is None:
             rows_plain, rows_rich = self._scrape_table_data()
             rows = list(zip(rows_plain, rows_rich))
-            plan = build_imposition_plan(rows, self._resolve_imposition_settings())
+            plan = build_imposition_plan(rows, self._preview_imposition_settings())
         else:
             rows = [entry for page in plan.pages for entry in page]
-        if not plan.pages:
+        if not plan.sheets:
             return
 
         first_page = self._preview_sheet_index if first_page is None else first_page
@@ -1005,9 +1114,10 @@ class MainWindow(QMainWindow):
         self._sheet_preview_dir = output_dir
         generation = self._sheet_preview_revision
         worker = SheetPreviewWorker(
-            copy.deepcopy(self.cached_model_data), rows,
-            dict(self._resolve_imposition_settings()), output_dir,
-            generation, first_page=first_page, parent=self,
+            copy.deepcopy(self.cached_model_document or self.cached_model_data), rows,
+            self._preview_imposition_settings(), output_dir,
+            generation, first_page=first_page,
+            first_face=self._preview_page_index, cache_limit=12, parent=self,
         )
         self._sheet_preview_worker = worker
         self._sheet_preview_workers.add(worker)
@@ -1017,14 +1127,21 @@ class MainWindow(QMainWindow):
         worker.finished.connect(worker.deleteLater)
         worker.start(QThread.Priority.LowPriority)
 
-    def _on_sheet_preview_ready(self, page_index, path, generation):
+    def _on_sheet_preview_ready(self, page_index, face_index, path, generation):
         if generation != self._sheet_preview_revision:
             return
-        self._sheet_preview_paths[page_index] = path
-        if self._preview_mode == "sheet" and page_index == self._preview_sheet_index:
+        key = (page_index, face_index)
+        self._sheet_preview_paths[key] = path
+        while len(self._sheet_preview_paths) > 12:
+            old_key = next(iter(self._sheet_preview_paths))
+            old_path = self._sheet_preview_paths.pop(old_key)
+            Path(old_path).unlink(missing_ok=True)
+        if (self._preview_mode == "sheet"
+                and page_index == self._preview_sheet_index
+                and face_index == self._preview_page_index):
             self.preview_panel.set_preview_image(path)
 
-    def _on_sheet_preview_failed(self, _page_index, message, generation):
+    def _on_sheet_preview_failed(self, _page_index, _face_index, message, generation):
         if generation == self._sheet_preview_revision:
             self.log_panel.append(tr("Erro na prévia da folha: {erro}").format(erro=message))
 
@@ -1044,8 +1161,8 @@ class MainWindow(QMainWindow):
 
         if plan is None:
             rows_plain, rows_rich = self._scrape_table_data()
-            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._resolve_imposition_settings())
-        total = len(plan.pages)
+            plan = build_imposition_plan(list(zip(rows_plain, rows_rich)), self._preview_imposition_settings())
+        total = len(plan.sheets)
         if not total:
             self.preview_panel.set_preview_text(tr("Não há itens para montar a folha"))
             self.preview_panel.set_navigation("sheet", 0, 0, sheet_available=True)
@@ -1055,7 +1172,9 @@ class MainWindow(QMainWindow):
         self.preview_panel.set_navigation(
             "sheet", self._preview_sheet_index, total, sheet_available=True
         )
-        path = self._sheet_preview_paths.get(self._preview_sheet_index)
+        path = self._sheet_preview_paths.get(
+            (self._preview_sheet_index, self._preview_page_index)
+        )
         if path and Path(path).exists():
             self.preview_panel.set_preview_image(path)
             return
@@ -1071,23 +1190,22 @@ class MainWindow(QMainWindow):
         self.active_model_name = current_model_name
 
         slug = slugify_model_name(current_model_name)
-        json_path = get_models_dir() / slug / "template_v3.json"
-        if json_path.exists():
-            try:
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                missing_fonts = missing_template_fonts(data)
-            except Exception:
-                missing_fonts = []
+        model_dir = get_models_dir() / slug
+        try:
+            json_path = resolve_model_file(model_dir)
+            missing_fonts = missing_template_fonts(load_model_document(model_dir))
+        except Exception:
+            json_path = None
+            missing_fonts = []
 
-            if missing_fonts and not self._confirm_open_model_with_missing_fonts(missing_fonts):
-                return
+        if missing_fonts and not self._confirm_open_model_with_missing_fonts(missing_fonts):
+            return
 
         self.editor_window = EditorWindow(self)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
 
-        if json_path.exists():
-            self.editor_window.load_from_json(str(json_path))
+        if json_path is not None:
+            self.editor_window.load_from_json(str(model_dir))
         
         self.editor_window.show()
 
@@ -1117,6 +1235,10 @@ class MainWindow(QMainWindow):
         old_name = self.preview_panel.cbo_models.currentText()
         target_name = old_name if previous_name and old_name not in (previous_name, model_name) else model_name
         current_row = table.currentRow()
+        old_headers = [
+            table.horizontalHeaderItem(col).text()
+            for col in range(table.columnCount())
+        ]
         saved_rows = []
         if old_name == target_name or old_name == previous_name:
             for row in range(table.rowCount()):
@@ -1128,6 +1250,36 @@ class MainWindow(QMainWindow):
         self.log_panel.append(tr("Atualizando lista…"))
         self._reload_models_from_disk(select_name=target_name)
         if saved_rows and self.preview_panel.cbo_models.currentText() == target_name:
+            active_headers = {
+                table.horizontalHeaderItem(col).text()
+                for col in range(table.columnCount())
+            }
+            removed_fields = [
+                name for name in old_headers
+                if name not in active_headers
+                and not is_quantity_header(name)
+                and name != SIGNATURE_HEADER
+            ]
+            keep_inactive = False
+            if removed_fields:
+                listed = "\n".join(f"• {name}" for name in removed_fields)
+                answer = QMessageBox.question(
+                    self,
+                    tr("Campos removidos"),
+                    tr("Estes campos não são mais usados pelo modelo:\n\n{campos}\n\nDeseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.").format(campos=listed),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.No,
+                )
+                keep_inactive = answer != QMessageBox.StandardButton.Yes
+            if keep_inactive:
+                for name in removed_fields:
+                    column = table.columnCount()
+                    table.insertColumn(column)
+                    header = QTableWidgetItem(name)
+                    header.setForeground(QColor("#7f8797"))
+                    header.setToolTip(tr("Campo inativo: não será usado na geração."))
+                    table.setHorizontalHeaderItem(column, header)
+                self._inactive_table_fields = set(removed_fields)
             defaults = [table.item(0, col).clone() if table.item(0, col) else None for col in range(table.columnCount())]
             table.setRowCount(len(saved_rows))
             for row, values in enumerate(saved_rows):
@@ -1177,23 +1329,10 @@ class MainWindow(QMainWindow):
             new_imposition = dlg.get_imposition_settings() 
             self.current_filename_suffix = new_suffix
             
-            json_path = get_models_dir() / slug / "template_v3.json"
-            if json_path.exists():
-                try:
-                    with open(json_path, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    
-                    data["output_suffix"] = new_suffix
-                    data["imposition_settings"] = new_imposition 
-                    
-                    if self.cached_model_data:
-                        self.cached_model_data["output_suffix"] = new_suffix
-                        self.cached_model_data["imposition_settings"] = new_imposition
-
-                    with open(json_path, "w", encoding="utf-8") as f:
-                        json.dump(data, f, indent=4, ensure_ascii=False)
-                except Exception as e:
-                    print(f"Erro ao salvar config: {e}")
+            self._update_template_json({
+                "output_suffix": new_suffix,
+                "imposition_settings": new_imposition,
+            })
 
             msg_imp = tr(" [Imposição ativada]") if new_imposition["enabled"] else ""
             if self.current_filename_suffix:
@@ -1221,22 +1360,22 @@ class MainWindow(QMainWindow):
             self.settings.setValue("last_output_dir", folder)
 
     def _update_template_json(self, new_data: dict):
-        """Método auxiliar para atualizar metadados no template_v3.json."""
+        """Atualiza metadados comuns e publica o documento v4 atomicamente."""
         if not self.active_model_name:
             return
         slug = slugify_model_name(self.active_model_name)
-        json_path = get_models_dir() / slug / "template_v3.json"
-        if json_path.exists():
-            try:
-                if self.cached_model_data:
-                    self.cached_model_data.update(new_data)
-                with open(json_path, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                data.update(new_data)
-                with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(data, f, indent=4, ensure_ascii=False)
-            except Exception as e:
-                print(f"Erro ao atualizar JSON do modelo: {e}")
+        model_dir = get_models_dir() / slug
+        try:
+            document = self.cached_model_document or load_model_document(model_dir)
+            document.update(copy.deepcopy(new_data))
+            saved_path = save_model_document(document, model_dir)
+            document["__model_dir"] = str(model_dir.resolve())
+            document["__model_file"] = str(saved_path.resolve())
+            self.cached_model_document = document
+            if self.cached_model_data:
+                self.cached_model_data.update(copy.deepcopy(new_data))
+        except Exception as e:
+            print(f"Erro ao atualizar JSON do modelo: {e}")
 
     def _current_export_mode(self):
         mode = self.cbo_export_format.currentData()
@@ -1275,6 +1414,9 @@ class MainWindow(QMainWindow):
             for c in range(cols):
                 key = headers[c]
                 item = table.item(r, c)
+
+                if key in getattr(self, "_inactive_table_fields", set()):
+                    continue
                 
                 # 1. Trata a nova coluna de Quantidade
                 if is_quantity_header(key):
@@ -1324,6 +1466,9 @@ class MainWindow(QMainWindow):
         for c in range(cols):
             key = headers[c]
             item = table.item(row_idx, c)
+
+            if key in getattr(self, "_inactive_table_fields", set()):
+                continue
             
             # Ignora a coluna de quantidade no preview técnico do cartão
             if is_quantity_header(key):
@@ -1382,7 +1527,7 @@ class MainWindow(QMainWindow):
         }
 
     def _generate_cards_async(self):
-        rows_plain, rows_rich = self._scrape_table_data()
+        rows_plain, rows_rich, source_rows = self._scrape_table_data(include_sources=True)
         if not rows_plain:
             self.log_panel.append(tr("AVISO: a tabela está vazia. Nada a gerar."))
             return
@@ -1393,9 +1538,10 @@ class MainWindow(QMainWindow):
             return
         
         _, export_format, _ = self._current_export_mode()
-        has_any_link = False
-        if self.cached_model_data:
-            has_any_link = any(box.get("has_link") for box in (self.cached_model_data.get("boxes", []) + self.cached_model_data.get("images", []) + self.cached_model_data.get("shapes", [])))
+        has_any_link = bool(
+            self.cached_model_document
+            and next(iter_page_link_items(self.cached_model_document), None)
+        )
 
         if export_format == "PNG" and has_any_link:
             resp = QMessageBox.question(
@@ -1410,24 +1556,19 @@ class MainWindow(QMainWindow):
                 return
             
         slug = slugify_model_name(current_name)
-        template_path = get_models_dir() / slug / "template_v3.json"
-
-        if not template_path.exists():
+        model_dir = get_models_dir() / slug
+        try:
+            document = load_model_document(model_dir)
+        except (FileNotFoundError, ValueError):
             self.log_panel.append(tr("ERRO: modelo '{nome}' não encontrado.").format(nome=self.active_model_name))
             return
 
-        with open(template_path, "r", encoding="utf-8") as f:
-            tpl_data = json.load(f)
-            model_dir = template_path.parent
-            if tpl_data.get("background_path") and not Path(tpl_data["background_path"]).is_absolute():
-                tpl_data["background_path"] = str(model_dir / tpl_data["background_path"])
-            for sig in tpl_data.get("signatures", []):
-                if not Path(sig["path"]).is_absolute():
-                    sig["path"] = str(model_dir / sig["path"])
-            tpl_data["__model_dir"] = str(model_dir)
-            ensure_background_proxy(model_dir, tpl_data)
+        imposition_cfg = self._resolve_imposition_settings()
+        for page in document["pages"]:
+            page_data = adapt_model_page(document, page["page_id"])
+            ensure_background_proxy(model_dir, page_data)
 
-        renderer = NativeRenderer(tpl_data)
+        renderers = renderers_for_document(document)
 
         custom_path = self.txt_output_path.text().strip()
         if not custom_path:
@@ -1457,12 +1598,11 @@ class MainWindow(QMainWindow):
         # Se estiver vazio, usamos {modelo} como fallback padrão.
         full_pattern = self.current_filename_suffix if self.current_filename_suffix else "{modelo}"
 
-        imposition_cfg = self._resolve_imposition_settings()
         model_w_mm, model_h_mm = self._get_model_base_print_size_mm()
         _, export_format, is_single_pdf = self._current_export_mode()
 
         self.manager = RenderManager(
-            renderer, 
+            renderers,
             rows_plain, 
             rows_rich, 
             output_dir, 
@@ -1471,16 +1611,21 @@ class MainWindow(QMainWindow):
             export_format=export_format,
             single_pdf=is_single_pdf,
             target_w_mm=model_w_mm,
-            target_h_mm=model_h_mm
+            target_h_mm=model_h_mm,
+            source_rows=source_rows,
         )
-        
+        self._generation_failed = False
         self.manager.progress_updated.connect(self.progress_bar.setValue)
         self.manager.log_updated.connect(self.log_panel.append)
-        self.manager.error_occurred.connect(lambda msg: self.log_panel.append(tr("[ERRO] {erro}").format(erro=msg)))
+        self.manager.error_occurred.connect(self._on_generation_error)
         self.manager.finished_process.connect(self._on_generation_finished)
         
         self.start_time = time.time()
         self.manager.start()
+
+    def _on_generation_error(self, message):
+        self._generation_failed = True
+        self.log_panel.append(tr("[ERRO] {erro}").format(erro=message))
 
     def _on_generation_finished(self):
         self.btn_generate_cards.setEnabled(True)
@@ -1495,6 +1640,10 @@ class MainWindow(QMainWindow):
             seconds = int(duration % 60)
             time_str = tr("{minutos} min {segundos}s").format(minutos=minutes, segundos=seconds)
 
+        if getattr(self, "_generation_failed", False):
+            self.log_panel.append(tr("=== Processo interrompido por erro ==="))
+            self.log_panel.append(tr("⏱️ Tempo total: {tempo}").format(tempo=time_str))
+            return
         self.log_panel.append(tr("=== Processo finalizado ==="))
         self.log_panel.append(tr("⏱️ Tempo total: {tempo}").format(tempo=time_str))
         
