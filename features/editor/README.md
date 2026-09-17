@@ -60,6 +60,14 @@ controles funcionais do editor. A janela não monta nem oculta uma interface
 anterior antes de criar o layout atual. Nenhum processamento periódico foi
 adicionado ao canvas.
 
+As responsabilidades de apoio ficam separadas em três fronteiras:
+
+- `controls.py` cria a cena e os controles funcionais, sem decidir o layout;
+- `document_session.py` coordena página ativa, seleção por página e histórico;
+- `model_adapter.py` contém somente os padrões que a cena exige ao receber uma
+  página antiga. A normalização e validação v3/v4 continuam centralizadas em
+  `core/model_document.py`.
+
 Validação inicial: abertura offscreen, captura visual, criação de texto, seleção,
 alteração de largura, bloqueio dos campos sem seleção e execução de desfazer/refazer.
 A fluidez no computador do operador ainda precisa ser avaliada presencialmente.

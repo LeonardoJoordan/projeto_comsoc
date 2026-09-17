@@ -12,7 +12,7 @@ from core.dynamic_images import resolve_dynamic_image
 
 
 def renderers_for_document(document: dict, dynamic_image_dir=None) -> list["NativeRenderer"]:
-    """Cria o mesmo renderizador legado para cada prancheta do documento."""
+    """Cria o mesmo renderizador de prancheta para cada página do documento."""
     normalized = normalize_model_document(document)
     renderers = [
         NativeRenderer(adapt_model_page(normalized, page["page_id"]))

@@ -298,7 +298,7 @@ def page_ids(document: dict) -> tuple[str, ...]:
 
 
 def adapt_model_page(document: dict, page_id: str = "front") -> dict:
-    """Cria a visão v3 de uma página para renderer/editor, sem compartilhar mutações."""
+    """Cria uma visão plana da página para cena e renderer, sem compartilhar mutações."""
     normalized = normalize_model_document(document)
     page = next((value for value in normalized["pages"] if value["page_id"] == page_id), None)
     if page is None:

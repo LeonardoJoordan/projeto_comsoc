@@ -54,7 +54,7 @@ Este documento orienta a sequência de trabalho até a conclusão das funcionali
 
 ### 5. Organização interna e isolamento da compatibilidade
 
-**Status:** pendente.
+**Status:** concluída e verificada em 17/09/2026.
 
 **Direção:** reavaliar os controladores grandes e separar responsabilidades onde houver benefício concreto. Isolar a leitura e conversão de estruturas antigas.
 
@@ -139,3 +139,12 @@ Ao encerrar uma etapa ou sessão, registrar brevemente:
 - **Verificação executada:** 109 testes e 10 subtestes da suíte principal; 60 testes do editor; compilação, auditoria de objetos Qt e captura visual offscreen do editor.
 - **Pendências ou decisões em aberto:** a separação dos painéis funcionais em controladores menores pertence à etapa 5; não há container legado sustentando a interface atual.
 - **Próximo ponto de retomada:** iniciar a etapa 5 reavaliando responsabilidades do `EditorWindow`, dos painéis de propriedades e da compatibilidade de modelos antes de definir os cortes internos.
+
+### Registro — etapa 5
+
+- **Etapa e estado:** organização interna e isolamento da compatibilidade concluídos.
+- **Responsabilidades separadas:** `controls.py` passou a criar cena e controles funcionais; `document_session.py` concentra página ativa, seleção por página, operações frente/verso e estado de histórico; `EditorWindow` permanece como coordenador dos fluxos de edição.
+- **Compatibilidade:** `core/model_document.py` continua como única autoridade para leitura, validação e normalização v3/v4. A tolerância adicional exigida pela cena foi isolada em `model_adapter.py`, que trabalha sobre uma cópia e não modifica os dados recebidos. Nenhum suporte a modelos antigos, backups ou recuperação foi removido.
+- **Clareza do renderer:** a visão entregue a editor e renderer passou a ser descrita como visão plana de página; o caminho realmente legado do renderer permanece explicitamente isolado apenas para modelos sem a estrutura moderna de camadas.
+- **Verificação executada:** 111 testes e 10 subtestes da suíte principal; 60 testes do editor; testes específicos de adaptação sem mutação; compilação dos módulos reorganizados e auditoria de ciclo de vida Qt.
+- **Próximo ponto de retomada:** iniciar a etapa 6 revisando temas, ícones, fontes, textos, traduções, documentação e recursos efetivamente incluídos na distribuição.

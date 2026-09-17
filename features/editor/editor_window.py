@@ -4,26 +4,28 @@ import copy
 import shutil
 import math
 from pathlib import Path
-from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidget,
+from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QWidget,
                                QHBoxLayout, QFrame, QLabel, QPushButton,
-                               QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
+                               QMessageBox, QInputDialog,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
                                QFileDialog, QGraphicsOpacityEffect, QApplication,
                                QSizePolicy)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
                            QFont, QFontDatabase, QFontInfo, QTextDocument)
-from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF, QTimer
+from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF
 from shiboken6 import isValid
 
 from .canvas_items import (DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, RectangleItem,
                            ImageItem, BackgroundItem, SelectionTransformFrame,
                            _reader_logical_size, _set_resize_handles_visible)
-from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
+from .properties import CaixaDeTextoPanel
+from .document_session import DocumentSessionMixin
+from .model_adapter import prepare_scene_page
+from .controls import initialize_editor_controls
 from core.template_manager import slugify_model_name
 from core.history_manager import HistoryManager
 from core.paths import get_models_dir
-from core.custom_widgets import MathDoubleSpinBox
 from core.render_cache import ensure_background_proxy, publish_thumbnail_cache
 from core.resources import action_icon_path, app_icon_path, state_icon_path, navigation_icon_path
 from core.theme_icons import themed_svg_icon
@@ -31,15 +33,12 @@ from core.themes import theme_color
 from core.i18n import tr
 from core.ui_font import DOCUMENT_FONT_FAMILY
 from core.model_document import (
-    add_blank_back_page,
     adapt_model_page,
-    clear_model_page as clear_document_page,
     iter_page_asset_paths,
     load_model_document,
     load_recovery_documents,
     normalize_model_document,
     replace_model_page,
-    remove_model_page as remove_document_page,
     save_model_document,
 )
 
@@ -186,7 +185,7 @@ class ElidedLayerLabel(QLabel):
 
 
 
-class EditorWindow(QMainWindow):
+class EditorWindow(DocumentSessionMixin, QMainWindow):
     modelSaved = Signal(str, list, str)
 
     @staticmethod
@@ -231,7 +230,7 @@ class EditorWindow(QMainWindow):
         self.setWindowIcon(QIcon(str(app_icon_path())))
         self.resize(1200, 800)
 
-        self._initialize_editor_controls()
+        initialize_editor_controls(self)
 
         self.scene.selectionChanged.connect(self.on_selection_changed)
         self.scene.changed.connect(self.update_position_ui)
@@ -323,160 +322,6 @@ class EditorWindow(QMainWindow):
         self.canvas_edit = CanvasEdit(self)
         self.refresh_layer_list()
 
-    def _initialize_editor_controls(self):
-        """Cria somente os controles consumidos pela interface atual."""
-        self.btn_toggle_guides = QPushButton(self)
-        self.btn_toggle_guides.setCheckable(True)
-        self.btn_toggle_guides.setChecked(True)
-        self.btn_toggle_guides.toggled.connect(self.toggle_guides_visibility)
-        self.op_eye = QGraphicsOpacityEffect(self.btn_toggle_guides)
-        self.btn_toggle_guides.setGraphicsEffect(self.op_eye)
-        self.op_eye.setOpacity(1.0)
-
-        self.btn_lock_guides = QPushButton(self)
-        self.btn_lock_guides.setCheckable(True)
-        self.btn_lock_guides.toggled.connect(self.toggle_guides_lock)
-        self.op_lock = QGraphicsOpacityEffect(self.btn_lock_guides)
-        self.btn_lock_guides.setGraphicsEffect(self.op_lock)
-        self.op_lock.setOpacity(0.2)
-
-        self.btn_add = QPushButton(self)
-        self.btn_add.clicked.connect(self.add_new_box)
-        self.btn_add_img = QPushButton(self)
-        self.btn_add_img.clicked.connect(self._on_click_add_image)
-        self.btn_add_sig = QPushButton(self)
-        self.btn_add_sig.clicked.connect(self._on_click_add_signature)
-
-        self.btn_undo = QPushButton(self)
-        self.btn_undo.setEnabled(False)
-        self.btn_undo.clicked.connect(self.undo)
-        self.btn_redo = QPushButton(self)
-        self.btn_redo.setEnabled(False)
-        self.btn_redo.clicked.connect(self.redo)
-        self.btn_ren_layer = QPushButton(self)
-        self.btn_ren_layer.setEnabled(False)
-        self.btn_ren_layer.clicked.connect(lambda: self.rename_layer())
-        self.btn_dup_layer = QPushButton(self)
-        self.btn_dup_layer.clicked.connect(self.duplicate_selected)
-        self.btn_group_layer = QPushButton(self)
-        self.btn_group_layer.setEnabled(False)
-        self.btn_group_layer.clicked.connect(self.toggle_selected_group)
-        self.btn_del_layer = QPushButton(self)
-        self.btn_del_layer.clicked.connect(self.delete_selected_items)
-
-        self.layer_list = QListWidget(self)
-        self.layer_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        self.layer_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.layer_list.itemSelectionChanged.connect(self._on_layer_selection_changed)
-        self.layer_list.itemChanged.connect(self._on_layer_item_changed)
-        self.layer_list.itemDoubleClicked.connect(self.rename_layer)
-        self.layer_list.model().rowsMoved.connect(self._on_layer_reordered)
-
-        self.scene = QGraphicsScene(0, 0, 1000, 1000, self)
-        self._document_rect = QRectF(0, 0, 1000, 1000)
-        self.scene._document_rect = QRectF(self._document_rect)
-        self.view = QGraphicsView(self.scene, self)
-        self.view.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
-        self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.view.setBackgroundBrush(QBrush(QColor('#e0e0e0')))
-        self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        self.view.setRubberBandSelectionMode(Qt.ItemSelectionMode.ContainsItemShape)
-        self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        self.view.installEventFilter(self)
-        self.view.viewport().installEventFilter(self)
-
-        self._selection_frame = SelectionTransformFrame(self)
-        self.scene.addItem(self._selection_frame)
-        self.scene._multi_selection_active = False
-        self._selection_frame_timer = QTimer(self)
-        self._selection_frame_timer.setSingleShot(True)
-        self._selection_frame_timer.timeout.connect(self._refresh_selection_frame)
-
-        self.bg_item = None
-        self.background_path = None
-        self._space_pan_items = []
-        self.fallback_bg = self.scene.addRect(
-            0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white)
-        )
-        self.fallback_bg.setZValue(-200)
-        self.bg_item = BackgroundItem(None)
-        self.bg_item.resize_custom(mm_to_px(148.0), mm_to_px(105.0))
-        self.bg_item.setPos(0, 0)
-        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-        self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        self.scene.addItem(self.bg_item)
-
-        self.spin_pos_x = MathDoubleSpinBox(self)
-        self.spin_pos_y = MathDoubleSpinBox(self)
-        for control in (self.spin_pos_x, self.spin_pos_y):
-            control.setRange(-5000, 20000)
-            control.setDecimals(2)
-            control.setKeyboardTracking(False)
-            control.setEnabled(False)
-        self.spin_pos_x.valueChanged.connect(self.apply_position_x)
-        self.spin_pos_x.editingFinished.connect(self.save_snapshot)
-        self.spin_pos_y.valueChanged.connect(self.apply_position_y)
-        self.spin_pos_y.editingFinished.connect(self.save_snapshot)
-
-        self.spin_phys_w = MathDoubleSpinBox(self)
-        self.spin_phys_h = MathDoubleSpinBox(self)
-        for control, value in ((self.spin_phys_w, 148.0), (self.spin_phys_h, 105.0)):
-            control.setRange(10.0, 1000.0)
-            control.setDecimals(2)
-            control.setKeyboardTracking(False)
-            control.setValue(value)
-        self.spin_phys_w.valueChanged.connect(self._on_doc_w_changed)
-        self.spin_phys_h.valueChanged.connect(self._on_doc_h_changed)
-        self.spin_phys_w.editingFinished.connect(self.save_snapshot)
-        self.spin_phys_h.editingFinished.connect(self.save_snapshot)
-        self._doc_aspect_ratio = 148.0 / 105.0
-
-        self.chk_doc_proporcao = QPushButton(self)
-        self.chk_doc_proporcao.setCheckable(True)
-        self.chk_doc_proporcao.setChecked(True)
-        self.chk_doc_proporcao.toggled.connect(self._on_doc_proportion_toggled)
-        self.op_doc_proporcao = QGraphicsOpacityEffect(self.chk_doc_proporcao)
-        self.chk_doc_proporcao.setGraphicsEffect(self.op_doc_proporcao)
-        self.op_doc_proporcao.setOpacity(1.0)
-        self._refresh_doc_proportion_button()
-
-        self.caixa_texto_panel = CaixaDeTextoPanel()
-        self.caixa_texto_panel.setParent(self)
-        self.caixa_texto_panel.hide()
-        self.caixa_texto_panel.setEnabled(False)
-        self.caixa_texto_panel.widthChanged.connect(self.update_width)
-        self.caixa_texto_panel.heightChanged.connect(self.update_height)
-        self.caixa_texto_panel.rotationChanged.connect(self.update_rotation)
-        self.caixa_texto_panel.proportionToggled.connect(self.update_proportion_lock)
-        self.caixa_texto_panel.linkToggled.connect(self.update_link_state)
-        self.caixa_texto_panel.restoreRequested.connect(self.restore_item_state)
-        self.caixa_texto_panel.opacityChanged.connect(self.update_opacity)
-        self.caixa_texto_panel.snapshotRequested.connect(self.save_snapshot)
-
-        self.lst_placeholders = QListWidget(self)
-        self.lst_placeholders.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        self.lst_placeholders.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self.lst_placeholders.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.lst_placeholders.model().rowsMoved.connect(lambda: self.save_snapshot())
-
-        self.editor_texto_panel = EditorDeTextoPanel()
-        self.editor_texto_panel.setParent(self)
-        self.editor_texto_panel.hide()
-        self.editor_texto_panel.setEnabled(False)
-        self.editor_texto_panel.htmlChanged.connect(self.update_text_html)
-        self.editor_texto_panel.htmlChanged.connect(self._on_content_updated)
-        self.editor_texto_panel.fontFamilyChanged.connect(self.update_font_family)
-        self.editor_texto_panel.fontSizeChanged.connect(self.update_font_size)
-        self.editor_texto_panel.fontColorChanged.connect(self.update_font_color)
-        self.editor_texto_panel.alignChanged.connect(self.update_align)
-        self.editor_texto_panel.verticalAlignChanged.connect(self.update_vertical_align)
-        self.editor_texto_panel.indentChanged.connect(self.update_indent)
-        self.editor_texto_panel.lineHeightChanged.connect(self.update_line_height)
-        self.editor_texto_panel.snapshotRequested.connect(self.save_snapshot)
-
-        self.btn_save = QPushButton(self)
-        self.btn_save.clicked.connect(self.export_to_json)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -828,232 +673,16 @@ class EditorWindow(QMainWindow):
         
         return super().eventFilter(source, event)
     
-    def _migrate_model_data(self, data: dict) -> dict:
-        """Corrige apenas campos que causam quebra em modelos antigos.
-        Não preenche campos que o apply_scene_state já trata com .get()."""
 
-        # Garante layer_id em bg_props (acesso direto sem padrão)
-        if "bg_props" in data:
-            data["bg_props"].setdefault("layer_id", None)
-            data["bg_props"].setdefault("custom_name", "")
 
-        # Garante layer_id e html nas caixas (html é lido com b["html"] sem .get())
-        for box in data.get("boxes", []):
-            box.setdefault("layer_id", None)
-            if "html" not in box:
-                texto = box.get("id", "Placeholder")
-                box["html"] = f"<p>{texto}</p>"
 
-        # Garante layer_id em assinaturas e imagens
-        for sig in data.get("signatures", []):
-            sig.setdefault("layer_id", None)
 
-        for img in data.get("images", []):
-            img.setdefault("layer_id", None)
 
-        return data
 
-    def _selection_keys(self) -> set[tuple[str, int]]:
-        keys = set()
-        for item in self.scene.selectedItems():
-            layer_id = getattr(item, "layer_id", None)
-            if layer_id is None:
-                continue
-            if isinstance(item, DesignerBox):
-                kind = "text"
-            elif isinstance(item, SignatureItem):
-                kind = "signature"
-            elif isinstance(item, RectangleItem):
-                kind = "shape"
-            elif isinstance(item, ImageItem):
-                kind = "image"
-            else:
-                continue
-            keys.add((kind, layer_id))
-        return keys
 
-    def _restore_page_selection(self):
-        wanted = self._page_selection.get(self._active_page_id, set())
-        if not wanted:
-            return
-        for item in self.scene.items():
-            layer_id = getattr(item, "layer_id", None)
-            kind = (
-                "text" if isinstance(item, DesignerBox) else
-                "signature" if isinstance(item, SignatureItem) else
-                "shape" if isinstance(item, RectangleItem) else
-                "image" if isinstance(item, ImageItem) else None
-            )
-            if (kind, layer_id) in wanted:
-                item.setSelected(True)
 
-    def _synchronize_document_backgrounds(self, document: dict) -> dict:
-        canvas = document["canvas_size"]
-        for page in document["pages"]:
-            for shape in page.get("shapes", []):
-                if not shape.get("is_document_background"):
-                    continue
-                shape.update({
-                    "x": 0.0, "y": 0.0,
-                    "width": float(canvas["w"]), "height": float(canvas["h"]),
-                    "rotation": 0.0, "z_value": -100.0,
-                    "locked": True, "keep_proportion": False,
-                    "outline_position": "inside",
-                })
-        return document
 
-    def _capture_document_history_state(self) -> dict:
-        page_data = self.get_current_scene_state()
-        previous_canvas = (
-            copy.deepcopy(self._model_document.get("canvas_size"))
-            if self._model_document is not None else None
-        )
-        if self._model_document is None:
-            document = normalize_model_document(page_data)
-        elif (
-            self._active_scene_baseline is None
-            or self._normalize_state_for_compare(page_data)
-            != self._normalize_state_for_compare(self._active_scene_baseline)
-        ):
-            document = replace_model_page(self._model_document, page_data, self._active_page_id)
-        else:
-            document = self._model_document
-        current_canvas = document.get("canvas_size")
-        dimensions_changed = previous_canvas is not None and (
-            float(previous_canvas.get("w", 0)) != float(current_canvas.get("w", 0))
-            or float(previous_canvas.get("h", 0)) != float(current_canvas.get("h", 0))
-        )
-        # A página inativa deve permanecer literalmente intacta durante uma
-        # edição comum. Os fundos das duas páginas só precisam ser sincronizados
-        # quando a dimensão compartilhada do documento realmente muda.
-        self._model_document = (
-            self._synchronize_document_backgrounds(document)
-            if dimensions_changed else document
-        )
-        self._active_scene_baseline = copy.deepcopy(page_data)
-        return {
-            "__document_history__": True,
-            "__active_page_id": self._active_page_id,
-            "__action_page_id": getattr(self, "_pending_history_page_id", self._active_page_id),
-            "document": copy.deepcopy(self._model_document),
-        }
 
-    def _refresh_page_controls(self):
-        refresh = getattr(self, "_update_page_controls", None)
-        if refresh:
-            refresh()
-
-    def _finish_page_interaction(self):
-        if self._mask_edit_session:
-            self.finish_mask_edit(True)
-        if getattr(self, "canvas_edit", None):
-            self.canvas_edit.finish()
-        if getattr(self, "shape_drawing", None):
-            self.shape_drawing.cancel()
-
-    def switch_model_page(self, page_id: str):
-        if page_id == self._active_page_id:
-            return
-        if not self._model_document or page_id not in {
-            page["page_id"] for page in self._model_document["pages"]
-        }:
-            return
-        self._finish_page_interaction()
-        self.save_snapshot()
-        self._page_selection[self._active_page_id] = self._selection_keys()
-        self._active_page_id = page_id
-        self._switching_page = True
-        try:
-            data = self._migrate_model_data(adapt_model_page(self._model_document, page_id))
-            self.apply_scene_state(data, is_undo_redo=False)
-        finally:
-            self._switching_page = False
-        self._active_scene_baseline = self.get_current_scene_state()
-        self._restore_page_selection()
-        self.save_snapshot()
-        self._refresh_page_controls()
-
-    def add_model_page(self):
-        self._finish_page_interaction()
-        self.save_snapshot()
-        self._page_selection[self._active_page_id] = self._selection_keys()
-        self._model_document = add_blank_back_page(self._model_document)
-        self._active_page_id = "back"
-        self._page_selection["back"] = set()
-        self._switching_page = True
-        try:
-            self.apply_scene_state(
-                self._migrate_model_data(adapt_model_page(self._model_document, "back")),
-                is_undo_redo=False,
-            )
-        finally:
-            self._switching_page = False
-        self._active_scene_baseline = self.get_current_scene_state()
-        self._pending_history_page_id = "back"
-        self.save_snapshot()
-        self._refresh_page_controls()
-
-    def clear_model_page(self, page_id: str):
-        answer = QMessageBox.question(
-            self, tr("Limpar página"),
-            tr("Remover todo o conteúdo desta página e deixá-la em branco?"),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        self._finish_page_interaction()
-        self.save_snapshot()
-        self._model_document = clear_document_page(self._model_document, page_id)
-        self._page_selection[page_id] = set()
-        if page_id == self._active_page_id:
-            self._switching_page = True
-            try:
-                self.apply_scene_state(
-                    self._migrate_model_data(adapt_model_page(self._model_document, page_id)),
-                    is_undo_redo=False,
-                )
-            finally:
-                self._switching_page = False
-            self._active_scene_baseline = self.get_current_scene_state()
-        self._pending_history_page_id = page_id
-        self.save_snapshot()
-        self._refresh_page_controls()
-
-    def remove_model_page(self, page_id: str):
-        if not self._model_document or len(self._model_document["pages"]) < 2:
-            return
-        answer = QMessageBox.question(
-            self, tr("Remover página"),
-            tr("Remover esta página do modelo? Esta ação pode ser desfeita."),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        self._finish_page_interaction()
-        self.save_snapshot()
-        self._page_selection[self._active_page_id] = self._selection_keys()
-        old_back_selection = self._page_selection.get("back", set())
-        self._model_document = remove_document_page(self._model_document, page_id)
-        self._active_page_id = "front"
-        self._page_selection = {
-            "front": old_back_selection if page_id == "front" else self._page_selection.get("front", set()),
-            "back": set(),
-        }
-        self._switching_page = True
-        try:
-            self.apply_scene_state(
-                self._migrate_model_data(adapt_model_page(self._model_document, "front")),
-                is_undo_redo=False,
-            )
-        finally:
-            self._switching_page = False
-        self._active_scene_baseline = self.get_current_scene_state()
-        self._restore_page_selection()
-        self._pending_history_page_id = page_id
-        self.save_snapshot()
-        self._refresh_page_controls()
     
     def load_from_json(self, file_path):
         path = Path(file_path)
@@ -1063,7 +692,7 @@ class EditorWindow(QMainWindow):
         except FileNotFoundError:
             return
         data = adapt_model_page(document, "front")
-        data = self._migrate_model_data(data)
+        data = prepare_scene_page(data)
         self._current_model_name = data.get("name", "")
         self._current_model_dir = model_dir
         self._model_document = document
@@ -3639,7 +3268,7 @@ class EditorWindow(QMainWindow):
                 self._switching_page = True
                 try:
                     page = adapt_model_page(self._model_document, self._active_page_id)
-                    self.apply_scene_state(self._migrate_model_data(page), is_undo_redo=True)
+                    self.apply_scene_state(prepare_scene_page(page), is_undo_redo=True)
                 finally:
                     self._switching_page = False
                 self._active_scene_baseline = self.get_current_scene_state()
