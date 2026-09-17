@@ -154,26 +154,9 @@ def install_frontend(window):
     layout.setSpacing(0)
 
     window.preview_panel.setObjectName('previewPanel')
-    window.controls_panel.setObjectName('modelActions')
     window.table_panel.setObjectName('dataPanel')
     window.splitter.setHandleWidth(1)
 
-    buttons = window.controls_panel
-    button_labels = (
-        (buttons.btn_add_model, tr('Novo modelo'), tr('Criar um modelo em branco')),
-        (buttons.btn_duplicate_model, tr('Duplicar'), tr('Duplicar o modelo selecionado')),
-        (buttons.btn_remove_model, tr('Remover'), tr('Excluir o modelo selecionado')),
-        (buttons.btn_rename_model, tr('Renomear'), tr('Renomear o modelo selecionado')),
-        (buttons.btn_config_model, tr('Editar modelo'), tr('Abrir o modelo selecionado no editor')),
-        (buttons.btn_import_models, tr('Importar'), tr('Importar modelos de um pacote ZIP')),
-        (buttons.btn_export_models, tr('Exportar'), tr('Exportar modelos para um pacote ZIP')),
-    )
-    for button, label, tooltip in button_labels:
-        button.setText(label)
-        button.setToolTip(tooltip)
-        button.setMinimumHeight(38)
-    buttons.btn_add_model.setObjectName('primary')
-    buttons.btn_remove_model.setObjectName('danger')
     window.btn_generate_cards.setObjectName('primary')
     window.btn_generate_cards.setMinimumHeight(42)
     themed_style(window.progress_bar, '')
@@ -195,16 +178,6 @@ def install_frontend(window):
         combo.setMaxVisibleItems(12)
         combo.setView(popup)
 
-    # Retira a antiga coluna de botões e coloca a prévia diretamente no divisor.
-    old_left = window.splitter.replaceWidget(0, window.preview_panel)
-    if old_left:
-        old_left.hide()
-    window.splitter.setSizes([590, 850])
-    preview_layout = window.preview_panel.layout()
-    for label in window.preview_panel.findChildren(QLabel, options=Qt.FindChildOption.FindDirectChildrenOnly):
-        if label is not window.preview_panel.preview and label.objectName() != 'previewNavigationLabel':
-            label.hide()
-
     # Barra permanente do modelo.
     model_bar = QFrame()
     model_bar.setObjectName('modelBar')
@@ -217,7 +190,10 @@ def install_frontend(window):
     window.preview_panel.cbo_models.setMinimumWidth(100)
     window.preview_panel.cbo_models.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
     model_row.addWidget(window.preview_panel.cbo_models, 1)
-    model_row.addWidget(buttons.btn_config_model)
+    window.btn_config_model = QPushButton(tr('Editar modelo'))
+    window.btn_config_model.setToolTip(tr('Abrir o modelo selecionado no editor'))
+    window.btn_config_model.clicked.connect(window._open_model_dialog)
+    model_row.addWidget(window.btn_config_model)
     more = QToolButton()
     more.setObjectName('moreActions')
     more.setText('')
@@ -228,10 +204,10 @@ def install_frontend(window):
     more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     model_actions = QMenu(more)
     delete_action = None
-    for action_id, label, button in (
-        ('duplicate', tr('Duplicar modelo'), buttons.btn_duplicate_model),
-        ('rename', tr('Renomear modelo'), buttons.btn_rename_model),
-        ('delete', tr('Excluir modelo'), buttons.btn_remove_model),
+    for action_id, label, callback in (
+        ('duplicate', tr('Duplicar modelo'), window._on_duplicate_model),
+        ('rename', tr('Renomear modelo'), window._on_rename_model),
+        ('delete', tr('Excluir modelo'), window._on_remove_model),
     ):
         if action_id == 'delete':
             model_actions.addAction(
@@ -239,7 +215,7 @@ def install_frontend(window):
             )
             model_actions.addSeparator()
         action = model_actions.addAction(label)
-        action.triggered.connect(button.click)
+        action.triggered.connect(callback)
         if action_id == 'delete':
             delete_action = action
     def style_model_action_hover(action):
@@ -250,7 +226,7 @@ def install_frontend(window):
     model_actions.hovered.connect(style_model_action_hover)
     more.setMenu(model_actions)
     model_row.addWidget(more)
-    for control in (window.preview_panel.cbo_models, buttons.btn_config_model, more):
+    for control in (window.preview_panel.cbo_models, window.btn_config_model, more):
         control.setFixedHeight(38)
 
     # As ações de saída ficam próximas, mesmo em uma tela ultrawide.
@@ -295,22 +271,12 @@ def install_frontend(window):
                     window.cbo_presets_main):
         control.setFixedHeight(34)
 
-    # Remove somente a estrutura visual antiga, já sem os controles reutilizados.
-    def clear_layout(old_layout):
-        while old_layout.count():
-            item = old_layout.takeAt(0)
-            if item.layout():
-                clear_layout(item.layout())
-            elif item.widget():
-                item.widget().hide()
-                item.widget().deleteLater()
-
-    footer_layout = window.footer_container.layout()
-    clear_layout(footer_layout)
+    window.footer_container = QWidget()
+    window.footer_container.setObjectName('outputPanel')
+    footer_layout = QHBoxLayout(window.footer_container)
     footer_layout.setContentsMargins(14, 12, 14, 12)
     footer_layout.setSpacing(0)
     footer_layout.addWidget(output_controls, 1)
-    footer_layout.addStretch(0)
 
     # O log fica oculto durante o trabalho normal e é acessado pelo menu Exibir.
     window.log_panel.setMaximumHeight(180)
@@ -394,17 +360,6 @@ def install_frontend(window):
     refresh_data_toggle_icon()
     theme_manager().changed.connect(refresh_data_toggle_icon)
 
-    # Recompõe a tela sem substituir os objetos responsáveis pela lógica.
-    while layout.count():
-        layout.takeAt(0)
-    shell = QWidget()
-    shell.setObjectName('workspaceRoot')
-    shell_layout = QVBoxLayout(shell)
-    shell_layout.setContentsMargins(0, 0, 0, 0)
-    shell_layout.setSpacing(0)
-    shell_layout.addWidget(window.splitter, 1)
-    layout.addWidget(shell)
-
     # Menus conhecidos de aplicativos de criação, reutilizando as ações existentes.
     menu = window.menuBar()
     menu.clear()
@@ -439,9 +394,9 @@ def install_frontend(window):
                 _restart_application(window)
         language_action.triggered.connect(choose_language)
     modelo = menu.addMenu(tr('Modelo'))
-    modelo.addAction(tr('Novo modelo'), buttons.btn_add_model.click)
-    modelo.addAction(tr('Importar modelos…'), buttons.btn_import_models.click)
-    modelo.addAction(tr('Exportar modelos…'), buttons.btn_export_models.click)
+    modelo.addAction(tr('Novo modelo'), window._on_add_model)
+    modelo.addAction(tr('Importar modelos…'), window._on_import_models)
+    modelo.addAction(tr('Exportar modelos…'), window._on_export_models)
     modelo.addSeparator()
     modelo.addAction(
         tr('Abrir pasta de modelos'),

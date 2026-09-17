@@ -71,14 +71,8 @@ class PreviewPanel(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
-        title = QLabel(tr("Selecione o modelo"))
-        title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        themed_style(title, "font-size: 16px; font-weight: 600;")
-        layout.addWidget(title)
-
         self.cbo_models = QComboBox()
         self.cbo_models.setMinimumHeight(34)
-        layout.addWidget(self.cbo_models)
 
         self.page_selector = QWidget()
         page_selector_layout = QHBoxLayout(self.page_selector)

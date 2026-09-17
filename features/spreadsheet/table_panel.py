@@ -407,56 +407,25 @@ class TablePanel(QWidget):
         super().__init__()
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        title = QLabel("Tabela de dados")
-        title.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        title.setStyleSheet("font-size: 16px; font-weight: 600;")
-        
-        # Habilita a captura de mouse nativa para Tooltips em QLabels
-        title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        title.setToolTip(
-            "<b>TABELA DE DADOS</b><br><br>"
-            "Área central de produção. Cada linha preenchida nesta grade resultará em um documento/cartão individual.<br>"
-            "• <b>Ocultação Inteligente:</b> Células deixadas em branco farão com que o respectivo elemento seja ocultado no arquivo final.<br>"
-            "• <b>Formatação Rápida:</b> Utilize atalhos como Ctrl+B, Ctrl+I ou Ctrl+U dentro das células para formatar textos específicos.<br><br>"
-            "<small style='color: #A0A0A0;'>Recomendação: Otimize seu tempo organizando os dados previamente no Excel ou planilhas externas. Selecione toda a grade original, copie, clique na primeira célula desta tabela e aperte Ctrl+V. Os dados serão preenchidos instantaneamente.</small>"
-        )
-        
-        layout.addWidget(title)
-
-        # --- Barra de Ferramentas da Tabela ---
-        toolbar_layout = QHBoxLayout()
-        toolbar_layout.setContentsMargins(0, 5, 0, 5)
-        
+        # Controles lógicos e visuais usados diretamente pelo frontend atual.
         self.spin_add_rows = QSpinBox()
-        self.spin_add_rows.setMinimum(1)
-        self.spin_add_rows.setMaximum(500)
-        self.spin_add_rows.setFixedWidth(50)
-        
-        self.btn_add_rows = QPushButton("➕ Adicionar Linha(s)")
-        self.btn_duplicate_row = QPushButton("📑 Duplicar Linha(s)")
-        self.btn_delete_rows = QPushButton("🗑️ Excluir Linha(s)")
-        self.btn_toggle_wrap = QPushButton("↕️ Expandir Células")
+        self.spin_add_rows.setRange(1, 500)
+        self.btn_add_rows = QPushButton()
+        self.btn_duplicate_row = QPushButton()
+        self.btn_delete_rows = QPushButton()
+        self.btn_toggle_wrap = QPushButton()
         self.btn_toggle_wrap.setCheckable(True)
-        
-        toolbar_layout.addWidget(self.spin_add_rows)
-        toolbar_layout.addWidget(self.btn_add_rows)
-        toolbar_layout.addWidget(self.btn_duplicate_row)
-        toolbar_layout.addWidget(self.btn_delete_rows)
-        toolbar_layout.addStretch()
-        toolbar_layout.addWidget(self.btn_toggle_wrap)
-        
-        layout.addLayout(toolbar_layout)
-
         self.table = RichTableWidget(0, 0)
-        self.table.setAlternatingRowColors(True)
         self.table.horizontalHeader().setSectionsMovable(True)
-        layout.addWidget(self.table, 1)
 
-        # --- Conexões da Barra de Ferramentas ---
-        self.btn_add_rows.clicked.connect(lambda: self.table._add_rows(self.spin_add_rows.value()))
+        self.btn_add_rows.clicked.connect(
+            lambda: self.table._add_rows(self.spin_add_rows.value())
+        )
         self.btn_duplicate_row.clicked.connect(self.table._duplicate_selected_rows)
         self.btn_delete_rows.clicked.connect(self.table._delete_selected_rows_action)
         self.btn_toggle_wrap.toggled.connect(self.table._toggle_word_wrap)
+
         from .frontend import install_frontend
         install_frontend(self)

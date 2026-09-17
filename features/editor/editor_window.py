@@ -808,7 +808,6 @@ class EditorWindow(QMainWindow):
             self.setWindowState(workspace.windowState() & ~Qt.WindowState.WindowMinimized)
             workspace.hide()
         self._zoom_to_fit()
-        self.container_sup.setFixedHeight(self.container_sup.sizeHint().height())
 
     def _release_workspace_window(self):
         workspace = self._workspace_window

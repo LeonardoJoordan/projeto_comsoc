@@ -16,7 +16,6 @@ from PySide6.QtGui import QPainter, QImage, QIcon, QPageLayout, QPalette, QColor
 
 from features.preview.preview_panel import PreviewPanel
 from features.preview.sheet_preview_worker import SheetPreviewWorker
-from features.workspace.controls_panel import ControlsPanel
 from shared.log_panel import LogPanel
 from features.spreadsheet.table_panel import TablePanel
 from features.generator.renderer import NativeRenderer, renderers_for_document
@@ -68,32 +67,49 @@ class MainWindow(QMainWindow):
         super().__init__()
         self.setWindowTitle(tr("FORNAX Forge — Geração de material personalizado em lote"))
         self.setMinimumSize(1024, 680)
-        self.resize(1280, 720)
+        self.resize(1440, 860)
 
         central = QWidget()
+        central.setObjectName("workspaceRoot")
         self.setCentralWidget(central)
-
-        root = QHBoxLayout(central)
-        root.setContentsMargins(10, 10, 10, 10)
-
+        root = QVBoxLayout(central)
+        root.setContentsMargins(0, 0, 0, 0)
+        root.setSpacing(0)
         self.splitter = QSplitter(Qt.Orientation.Horizontal)
-        root.addWidget(self.splitter)
+        self.splitter.setHandleWidth(1)
+        root.addWidget(self.splitter, 1)
 
-        self.current_filename_suffix = "" 
-        self.manager = None 
-
-        # --- Painel ESQUERDO ---
-        left = QWidget()
-        self.left_panel = left
-        left.setObjectName("workspaceLeft")
-        left.setMinimumWidth(500) # Ajustado para a nova largura mínima
-        self.splitter.addWidget(left)
-
-        left_stack = QVBoxLayout(left)
-        left_stack.setContentsMargins(0, 0, 0, 0)
-        left_stack.setSpacing(10)
-
+        self.current_filename_suffix = ""
+        self.manager = None
         self.preview_panel = PreviewPanel()
+        self.log_panel = LogPanel()
+        self.table_panel = TablePanel()
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setFixedHeight(8)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+
+        # Estes controles já nascem para o layout aprovado. Nenhuma interface
+        # intermediária é criada e posteriormente ocultada.
+        self.txt_output_path = QLineEdit()
+        self.btn_sel_out = QPushButton()
+        self.btn_sel_out.clicked.connect(self._select_output_folder)
+        self.cbo_export_format = QComboBox()
+        self.cbo_export_format.addItem("PNG", "png")
+        self.cbo_export_format.addItem(tr("PDF por item"), "pdf_item")
+        self.cbo_export_format.addItem(tr("PDF agrupado"), "pdf_grouped")
+        self._export_mode_tooltips = {
+            "png": tr("Uma imagem PNG para cada item."),
+            "pdf_item": tr("Um arquivo PDF separado para cada item."),
+            "pdf_grouped": tr("Todos os itens reunidos em um único arquivo PDF."),
+        }
+        self.cbo_presets_main = QComboBox()
+        self.cbo_presets_main.currentIndexChanged.connect(self._on_main_preset_changed)
+        self._presets_main_base_tooltip = tr("Selecionar uma predefinição de impressão")
+        self.btn_generate_cards = QPushButton(tr("Gerar material"))
+        self.btn_generate_cards.clicked.connect(self._generate_cards_async)
+
         self._preview_mode = "item"
         self._preview_item_index = 0
         self._preview_page_index = 0
@@ -102,6 +118,7 @@ class MainWindow(QMainWindow):
         self._sheet_preview_revision = 0
         self._sheet_preview_worker = None
         self._sheet_preview_workers = set()
+        self._preview_workers = set()
         self._sheet_preview_dir = None
         self._sheet_preview_paths = {}
         self._stale_sheet_preview_dirs = set()
@@ -112,208 +129,39 @@ class MainWindow(QMainWindow):
         self.preview_panel.modeChanged.connect(self._on_preview_mode_changed)
         self.preview_panel.indexRequested.connect(self._on_preview_index_requested)
         self.preview_panel.pageChanged.connect(self._on_preview_page_changed)
-        self.controls_panel = ControlsPanel()
-        self.controls_panel.setFixedWidth(110) # Trava a largura da sidebar
-        self.log_panel = LogPanel()
-
-        # Agrupa Preview e Controls lado a lado
-        preview_container = QWidget()
-        self.preview_container = preview_container
-        preview_layout = QHBoxLayout(preview_container)
-        preview_layout.setContentsMargins(0, 0, 0, 0)
-        preview_layout.setSpacing(10)
-        preview_layout.addWidget(self.controls_panel, 0)
-        preview_layout.addWidget(self.preview_panel, 1)
-
-        left_stack.addWidget(preview_container, 5)
-        left_stack.addWidget(self.log_panel, 3)
-
-        # --- BARRA DE PROGRESSO ---
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setFixedHeight(8)
-        self.progress_bar.setTextVisible(False)
-        self.progress_bar.setRange(0, 100)
-        self.progress_bar.setValue(0)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: none;
-                background-color: transparent; 
-                border-radius: 4px;
-            }
-            QProgressBar::chunk {
-                background-color: #27ae60;
-                border-radius: 4px;
-            }
-        """)
-        left_stack.addWidget(self.progress_bar, 0)
-
-        # --- CONTAINER DE CONTROLES DE SAÍDA (Rodapé em Duas Colunas) ---
-        footer_container = QWidget()
-        self.footer_container = footer_container
-        footer_container.setObjectName("outputPanel")
-        ly_footer = QHBoxLayout(footer_container)
-        ly_footer.setContentsMargins(0, 0, 0, 0)
-        ly_footer.setSpacing(15)
-
-        # --- Coluna Esquerda: Gatilho e Caminho ---
-        col_left_footer = QVBoxLayout()
-        
-        # Linha de Saída
-        row_out_path = QHBoxLayout()
-        row_out_path.addWidget(QLabel("Saída:"))
-        self.txt_output_path = QLineEdit()
-        self.txt_output_path.setPlaceholderText("Selecione a pasta onde os lotes serão gerados")
-        row_out_path.addWidget(self.txt_output_path)
-        
-        self.btn_sel_out = QPushButton("...")
-        self.btn_sel_out.setFixedWidth(40)
-        self._apply_tooltip(self.btn_sel_out, 
-            "<b>PASTA DE DESTINO</b><br><br>"
-            "Define em qual local do computador os arquivos gerados serão salvos.<br><br>"
-            "<small >Dica: O sistema criará automaticamente uma subpasta com a data e hora atual dentro do local escolhido para manter seus lotes organizados.</small>")
-        self.btn_sel_out.clicked.connect(self._select_output_folder)
-        row_out_path.addWidget(self.btn_sel_out)
-        col_left_footer.addLayout(row_out_path)
-
-        # Botão Gerar
-        self.btn_generate_cards = QPushButton(tr("Gerar material"))
-        self.btn_generate_cards.setMinimumHeight(40)
-        self.btn_generate_cards.setStyleSheet("font-weight: bold; font-size: 13px;")
-        self._apply_tooltip(self.btn_generate_cards, 
-            "<b>GERAR MATERIAL</b><br><br>"
-            "Inicia o processamento da tabela e a construção dos arquivos finais na pasta de saída.<br><br>"
-            "<small >Dica: Faça uma checagem rápida nas colunas de Quantidade e Assinatura antes de iniciar a geração de lotes muito grandes para evitar desperdícios.</small>")
-        self.btn_generate_cards.clicked.connect(self._generate_cards_async)
-        col_left_footer.addWidget(self.btn_generate_cards)
-        
-        ly_footer.addLayout(col_left_footer, 1) # Proporção 1
-
-        # --- Coluna Direita: Parâmetros de Saída e Presets ---
-        widget_right_footer = QWidget()
-        widget_right_footer.setFixedWidth(280) # O tamanho fixo vai no QWidget
-        col_right_footer = QVBoxLayout(widget_right_footer)
-        col_right_footer.setContentsMargins(0, 0, 0, 0)
-
-        # Linha de Formato e Configs
-        row_format_cfg = QHBoxLayout()
-        self.cbo_export_format = QComboBox()
-        self.cbo_export_format.addItem("PNG", "png")
-        self.cbo_export_format.addItem(tr("PDF por item"), "pdf_item")
-        self.cbo_export_format.addItem(tr("PDF agrupado"), "pdf_grouped")
-        self.cbo_export_format.setFixedWidth(150)
-        self._export_mode_tooltips = {
-            "png": "<b>PNG</b><br>Gera uma imagem PNG para cada item da tabela.",
-            "pdf_item": "<b>PDF por item</b><br>Gera um arquivo PDF separado para cada item da tabela.",
-            "pdf_grouped": "<b>PDF agrupado</b><br>Reúne todos os itens gerados em um único arquivo PDF com várias páginas.",
-        }
-        for index in range(self.cbo_export_format.count()):
-            mode = self.cbo_export_format.itemData(index)
-            self.cbo_export_format.setItemData(
-                index, self._export_mode_tooltips[mode], Qt.ItemDataRole.ToolTipRole
-            )
-        self._apply_tooltip(self.cbo_export_format, 
-            "<b>FORMATO DE SAÍDA</b><br><br>"
-            "Escolha o tipo de arquivo final:<br>"
-            "• <b>PNG:</b> uma imagem para cada item.<br>"
-            "• <b>PDF por item:</b> um PDF separado para cada item.<br>"
-            "• <b>PDF agrupado:</b> todos os itens em um único PDF.")
-        
-        self.btn_config_name = QPushButton("Exportação")
-        self.btn_config_name.clicked.connect(self._open_config_dialog)
-        self._apply_tooltip(self.btn_config_name, 
-            "<b>CONFIGURAÇÕES DE EXPORTAÇÃO</b><br><br>"
-            "Acesso aos ajustes de geração dos arquivos:<br>"
-            "• <b>Nomenclatura:</b> Define o padrão de nome dos arquivos gerados usando as variáveis da tabela.<br>"
-            "• <b>Impressão:</b> Configura o agrupamento de vários cartões em uma folha e ativa marcas de corte.<br><br>"
-            "<small >Dica: Na seção de Impressão, o sistema calcula automaticamente quantos cartões cabem na folha assim que você digita as dimensões.</small>")
-        
-        row_format_cfg.addWidget(self.cbo_export_format)
-        row_format_cfg.addWidget(self.btn_config_name)
-        col_right_footer.addLayout(row_format_cfg)
-
-        # Linha de Predefinição (O Atalho)
-        row_presets_main = QVBoxLayout()
-        self.cbo_presets_main = QComboBox()
-        self.cbo_presets_main.currentIndexChanged.connect(self._on_main_preset_changed)
-        lbl_layout = QLabel("<b>Predefinição de Impressão:</b>")
-        self._apply_tooltip(lbl_layout,
-            "<b>PREDEFINIÇÃO DE IMPRESSÃO</b><br><br>"
-            "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
-            "<small >Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>")
-        row_presets_main.addWidget(lbl_layout)
-        row_presets_main.addWidget(self.cbo_presets_main, 1)
-        self._presets_main_base_tooltip = (
-            "<b>PREDEFINIÇÃO DE IMPRESSÃO</b><br><br>"
-            "Atalho para aplicar rapidamente um conjunto de configurações de impressão salvas:<br><br>"
-            "<small >Dica: Para criar ou editar predefinições, acesse <b>Configurações &gt; Impressão</b>.</small>"
-        )
-        self._apply_tooltip(self.cbo_presets_main, self._presets_main_base_tooltip)
-        col_right_footer.addLayout(row_presets_main)
-
-        ly_footer.addWidget(widget_right_footer, 0) # Adiciona o Widget em vez do Layout isolado
-
-        left_stack.addWidget(footer_container, 0)
-
-        # --- Painel DIREITO ---
-        self.table_panel = TablePanel()
-        self.splitter.addWidget(self.table_panel)
-
-        self.splitter.setSizes([640, 640])
-        self.splitter.setCollapsible(0, False)
 
         self.cached_model_data = None
         self.cached_model_document = None
         self._inactive_table_fields = set()
-        self.preview_renderer = None # Persistência do Renderer para o Live Preview
+        self.preview_renderer = None
         self._preview_renderers = []
         self.settings = get_app_settings()
-        
-        # Garante que um usuário novato não veja uma tela em branco
+
+        self._initialize_theme()
+        from .frontend import install_frontend
+        install_frontend(self)
+
         self._ensure_starter_pack()
-
-        # O reload já se encarrega de setar o active_model_name e chamar o _on_model_changed
         self._reload_models_from_disk()
-
         self.preview_panel.cbo_models.currentTextChanged.connect(self._on_model_changed)
-
-        # Sincronização de preferências e visibilidade
         self.cbo_export_format.currentIndexChanged.connect(self._on_export_mode_changed)
-
         self.table_panel.table.itemSelectionChanged.connect(self._on_table_selection)
         self.table_panel.table.itemChanged.connect(self._on_preview_data_changed)
         self.table_panel.table.model().rowsInserted.connect(self._on_preview_rows_changed)
         self.table_panel.table.model().rowsRemoved.connect(self._on_preview_rows_changed)
-
-        # --- Conexões dos Botões de Controle ---
-        self.controls_panel.btn_add_model.clicked.connect(self._on_add_model)
-        self.controls_panel.btn_duplicate_model.clicked.connect(self._on_duplicate_model)
-        self.controls_panel.btn_remove_model.clicked.connect(self._on_remove_model)
-        self.controls_panel.btn_rename_model.clicked.connect(self._on_rename_model) 
-        self.controls_panel.btn_config_model.clicked.connect(self._open_model_dialog)
-        self.controls_panel.btn_import_models.clicked.connect(self._on_import_models)
-        self.controls_panel.btn_export_models.clicked.connect(self._on_export_models)
         self.table_panel.btn_dynamic_image_dir.clicked.connect(
             self._select_dynamic_image_directory
         )
 
-        # Restaura a geometria e o estado da janela (posição e tamanho)
         geometry = self.settings.value("geometry")
         if geometry:
             self.restoreGeometry(geometry)
-            
-        # Restaura o estado do divisor (largura das colunas interna)
         splitter_state = self.settings.value("splitterState")
         if splitter_state:
             self.splitter.restoreState(splitter_state)
-
         last_output = self.settings.value("last_output_dir", "")
         if last_output:
             self.txt_output_path.setText(str(last_output))
-
-        # Inicializa o tema visual salvo (padrão é escuro)
-        self._initialize_theme()
-        from .frontend import install_frontend
-        install_frontend(self)
 
     def _ensure_starter_pack(self):
         models_dir = get_models_dir()
@@ -350,7 +198,14 @@ class MainWindow(QMainWindow):
                 }
             ]
         }
-        save_model_document(normalize_model_document(example_data), example_dir)
+        example_document = normalize_model_document(example_data)
+        example_page = example_document["pages"][0]
+        example_page["layer_order"] = [
+            item["object_id"]
+            for collection in ("shapes", "images", "signatures", "boxes")
+            for item in example_page[collection]
+        ]
+        save_model_document(example_document, example_dir)
 
     def _initialize_theme(self):
         from core.themes import theme_manager
@@ -363,6 +218,9 @@ class MainWindow(QMainWindow):
         self._stop_sheet_preview_worker(wait=True)
         for worker in tuple(self._sheet_preview_workers):
             worker.stop()
+            worker.requestInterruption()
+            worker.wait()
+        for worker in tuple(self._preview_workers):
             worker.requestInterruption()
             worker.wait()
         for directory in ({self._sheet_preview_dir} | self._stale_sheet_preview_dirs):
@@ -801,11 +659,15 @@ class MainWindow(QMainWindow):
                             
                             worker = PreviewRenderWorker(name, data, model_dir)
                             # Anexa à janela para o Garbage Collector não matar a Thread no meio do processo
-                            worker.setParent(self) 
+                            worker.setParent(self)
+                            self._preview_workers.add(worker)
                             
                             worker.preview_ready.connect(lambda model, path, revision=generation: self._on_preview_ready(model, path) if revision == self._preview_generation else None)
                             worker.error_occurred.connect(lambda msg: self.log_panel.append(tr("Erro ao gerar a prévia em segundo plano: {erro}").format(erro=msg)))
-                            worker.finished.connect(worker.deleteLater) # Autolimpeza imediata ao terminar
+                            worker.finished.connect(
+                                lambda current=worker: self._preview_workers.discard(current)
+                            )
+                            worker.finished.connect(worker.deleteLater)
                         
                             worker.start()
                             # --- FIM DO LEGO ---

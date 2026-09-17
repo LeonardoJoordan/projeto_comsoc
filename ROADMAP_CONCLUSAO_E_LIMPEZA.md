@@ -121,3 +121,12 @@ Ao encerrar uma etapa ou sessão, registrar brevemente:
 - **Decisão de escopo:** não foi identificada outra funcionalidade indispensável antes da limpeza. O tutorial continua reservado para depois da refatoração.
 - **Limites registrados:** testes nativos de Windows e macOS, prova física de duplex e revisão visual dos pacotes finais permanecem para a auditoria da etapa 7.
 - **Próximo ponto de retomada:** iniciar a etapa 4 pelo workspace, mapeando e substituindo dependências dos containers legados antes de removê-los.
+
+### Registro — etapa 4, corte 1
+
+- **Etapa e estado:** em andamento; workspace e planilha concluídos, editor em migração.
+- **Concluído e verificado:** o workspace agora cria diretamente o divisor, a área de prévia, a barra do modelo, o rodapé de saída e a lateral de dados; a antiga coluna invisível de ações foi removida e as ações de menu chamam diretamente os controladores. A planilha também deixou de criar e desmontar sua barra protótipo. O `ControlsPanel` legado foi excluído.
+- **Correções encontradas durante o corte:** instalações limpas voltaram a criar um modelo de exemplo v4 válido com `layer_order`; workers de miniatura agora são rastreados e encerrados junto da janela.
+- **Editor:** o container antigo deixou de permanecer oculto durante toda a sessão; controles sem consumidor atual são destruídos. Ainda falta impedir sua construção transitória no início do editor, substituindo a inicialização antiga por uma fábrica direta dos controles usados pelo frontend atual.
+- **Verificação executada:** 109 testes e 10 subtestes da suíte principal; 59 testes do editor; smoke test e captura visual offscreen do workspace reconstruído.
+- **Próximo ponto de retomada:** separar a criação dos controles do editor de seus layouts antigos, remover o último `takeCentralWidget()` e então concluir a etapa 4.

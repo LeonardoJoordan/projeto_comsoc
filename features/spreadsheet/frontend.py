@@ -115,15 +115,6 @@ def sheet_icon(path):
 
 def install_frontend(panel):
     layout = panel.layout()
-    while layout.count():
-        entry = layout.takeAt(0)
-        if entry.widget():
-            entry.widget().hide()
-        if entry.layout():
-            old = entry.layout()
-            while old.count():
-                old.takeAt(0)
-            old.deleteLater()
     layout.setSpacing(0)
     layout.setContentsMargins(0, 0, 0, 0)
 

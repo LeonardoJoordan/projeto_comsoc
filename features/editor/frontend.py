@@ -320,11 +320,9 @@ class Section(QWidget):
 
 
 def install_frontend(w):
-    # Keep old containers alive: existing handlers still reference their controls.
+    # Os controles usados pela interface atual são reparentados abaixo. O
+    # container anterior é descartado ao final, em vez de permanecer oculto.
     old = w.takeCentralWidget()
-    old.setParent(w)
-    old.hide()
-    w._original_ui = old
     for child in old.findChildren(QWidget):
         themed_style(child, '')
     themed_style(w, STYLE.replace('__ICONS__', (Path(__file__).parent / 'icons').as_posix()))
@@ -1501,8 +1499,6 @@ def install_frontend(w):
     w.lst_placeholders.setFixedHeight(180)
     w.lst_placeholders.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
     dl.addWidget(w.lst_placeholders)
-    w.btn_fit_bg.hide()
-    w.btn_add_bg.hide()
     document_section = Section(tr('Documento'), doc, True)
     il.insertWidget(0, document_section)
     il.addStretch()
@@ -1635,10 +1631,11 @@ def install_frontend(w):
 
     def sync_enabled():
         from shiboken6 import isValid
-        if not isValid(w.scene) or not isValid(p):
+        if not all(isValid(obj) for obj in (w.scene, p, props, t, text_body)):
             return
         for control in moved:
-            control.setEnabled(p.isEnabled())
+            if isValid(control):
+                control.setEnabled(p.isEnabled())
         props.setEnabled(p.isEnabled())
         text_available = t.isEnabled()
         properties_available = p.isEnabled()
@@ -1850,3 +1847,7 @@ def install_frontend(w):
         )
 
     w._restore_inspector_state = restore_inspector_state
+    for obsolete_name in ('btn_fit_bg', 'btn_add_bg', 'container_sup'):
+        if hasattr(w, obsolete_name):
+            delattr(w, obsolete_name)
+    old.deleteLater()
