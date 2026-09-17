@@ -132,7 +132,6 @@ class MainWindow(QMainWindow):
 
         self.cached_model_data = None
         self.cached_model_document = None
-        self._inactive_table_fields = set()
         self.preview_renderer = None
         self._preview_renderers = []
         self.settings = get_app_settings()
@@ -691,7 +690,6 @@ class MainWindow(QMainWindow):
     # --- FIM DO LEGO ---
 
     def _update_table_columns(self, placeholders, signatures=None):
-        self._inactive_table_fields = set()
         self.table_panel.table.clearContents()
         self.table_panel.table.setRowCount(0)
         self.table_panel.table.setColumnCount(0)
@@ -1116,10 +1114,6 @@ class MainWindow(QMainWindow):
         old_name = self.preview_panel.cbo_models.currentText()
         target_name = old_name if previous_name and old_name not in (previous_name, model_name) else model_name
         current_row = table.currentRow()
-        old_headers = [
-            table.horizontalHeaderItem(col).text()
-            for col in range(table.columnCount())
-        ]
         saved_rows = []
         if old_name == target_name or old_name == previous_name:
             for row in range(table.rowCount()):
@@ -1131,36 +1125,6 @@ class MainWindow(QMainWindow):
         self.log_panel.append(tr("Atualizando lista…"))
         self._reload_models_from_disk(select_name=target_name)
         if saved_rows and self.preview_panel.cbo_models.currentText() == target_name:
-            active_headers = {
-                table.horizontalHeaderItem(col).text()
-                for col in range(table.columnCount())
-            }
-            removed_fields = [
-                name for name in old_headers
-                if name not in active_headers
-                and not is_quantity_header(name)
-                and name != SIGNATURE_HEADER
-            ]
-            keep_inactive = False
-            if removed_fields:
-                listed = "\n".join(f"• {name}" for name in removed_fields)
-                answer = QMessageBox.question(
-                    self,
-                    tr("Campos removidos"),
-                    tr("Estes campos não são mais usados pelo modelo:\n\n{campos}\n\nDeseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.").format(campos=listed),
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                    QMessageBox.StandardButton.No,
-                )
-                keep_inactive = answer != QMessageBox.StandardButton.Yes
-            if keep_inactive:
-                for name in removed_fields:
-                    column = table.columnCount()
-                    table.insertColumn(column)
-                    header = QTableWidgetItem(name)
-                    header.setForeground(QColor("#7f8797"))
-                    header.setToolTip(tr("Campo inativo: não será usado na geração."))
-                    table.setHorizontalHeaderItem(column, header)
-                self._inactive_table_fields = set(removed_fields)
             defaults = [table.item(0, col).clone() if table.item(0, col) else None for col in range(table.columnCount())]
             table.setRowCount(len(saved_rows))
             for row, values in enumerate(saved_rows):
@@ -1296,9 +1260,6 @@ class MainWindow(QMainWindow):
                 key = headers[c]
                 item = table.item(r, c)
 
-                if key in getattr(self, "_inactive_table_fields", set()):
-                    continue
-                
                 # 1. Trata a nova coluna de Quantidade
                 if is_quantity_header(key):
                     try:
@@ -1348,9 +1309,6 @@ class MainWindow(QMainWindow):
             key = headers[c]
             item = table.item(row_idx, c)
 
-            if key in getattr(self, "_inactive_table_fields", set()):
-                continue
-            
             # Ignora a coluna de quantidade no preview técnico do cartão
             if is_quantity_header(key):
                 continue

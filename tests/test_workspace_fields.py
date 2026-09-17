@@ -50,17 +50,40 @@ def test_copies_expand_whole_document_rows_and_zero_skips_them():
     assert plain[-1]["__use_signature__"] is False
 
 
-def test_inactive_fields_keep_cell_data_but_do_not_feed_generation():
-    harness = workspace_harness(
-        [quantity_header_label(), "Ativo", "Removido"],
-        [[1, "valor atual", "valor preservado"]],
+def test_editor_save_discards_columns_removed_from_the_model_without_prompt():
+    table = workspace_harness(
+        [quantity_header_label(), "Nome", "Link"],
+        [[1, "Ada", "https://example.test"]],
+    ).table_panel.table
+    combo = QComboBox()
+    combo.addItem("Modelo de teste")
+    log = []
+
+    def reload_models(*, select_name):
+        assert select_name == "Modelo de teste"
+        table.setColumnCount(2)
+        table.setHorizontalHeaderLabels([quantity_header_label(), "Nome"])
+        table.setRowCount(1)
+        table.setItem(0, 0, QTableWidgetItem("1"))
+        combo.setCurrentText(select_name)
+
+    harness = SimpleNamespace(
+        table_panel=SimpleNamespace(table=table),
+        preview_panel=SimpleNamespace(cbo_models=combo),
+        log_panel=SimpleNamespace(append=log.append),
+        _reload_models_from_disk=reload_models,
+        _on_table_selection=lambda: None,
     )
-    harness._inactive_table_fields = {"Removido"}
 
-    plain, rich = MainWindow._scrape_table_data(harness)
+    MainWindow._on_editor_saved(
+        harness, "Modelo de teste", ["Nome"], "/tmp/template_v4.json"
+    )
 
-    assert plain == [{"modelo": "modelo_de_teste", "Ativo": "valor atual"}]
-    assert rich == plain
+    assert table.columnCount() == 2
+    assert [table.horizontalHeaderItem(column).text() for column in range(2)] == [
+        quantity_header_label(), "Nome",
+    ]
+    assert table.item(0, 1).text() == "Ada"
 
 
 def test_model_reload_restores_last_selected_model(tmp_path, monkeypatch):
