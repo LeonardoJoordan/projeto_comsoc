@@ -1672,7 +1672,6 @@ class EditorWindow(QMainWindow):
     def toggle_guides_lock(self, locked):
         self.btn_lock_guides.setText("")
         self.op_lock.setOpacity(1.0 if locked else 0.2)
-        self.btn_clear_guides.setEnabled(not locked)
         for item in self.scene.items():
             if isinstance(item, Guideline):
                 item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, not locked)

@@ -1847,7 +1847,20 @@ def install_frontend(w):
         )
 
     w._restore_inspector_state = restore_inspector_state
-    for obsolete_name in ('btn_fit_bg', 'btn_add_bg', 'container_sup'):
+    # Estes dois widgets ainda concentram sinais e métodos do editor, embora
+    # seus controles visuais tenham sido movidos para o frontend atual. Eles
+    # precisam de um proprietário independente antes da destruição da árvore
+    # antiga; na etapa seguinte serão convertidos em controladores diretos.
+    for controller in (p, t):
+        controller.setParent(w)
+        controller.hide()
+    for obsolete_name in (
+        'btn_fit_bg',
+        'btn_add_bg',
+        'btn_clear_guides',
+        'container_sup',
+        'layer_toolbar',
+    ):
         if hasattr(w, obsolete_name):
             delattr(w, obsolete_name)
     old.deleteLater()

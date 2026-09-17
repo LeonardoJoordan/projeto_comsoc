@@ -1,8 +1,9 @@
 import unittest
 from unittest.mock import patch
 
-from PySide6.QtCore import Qt, QPoint
+from PySide6.QtCore import Qt, QPoint, QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton
+from shiboken6 import isValid
 
 from .editor_window import EditorWindow
 
@@ -73,6 +74,27 @@ class EditorWindowLifecycleTest(unittest.TestCase):
         alignment.sidebar.parentWidget().setSizes([230, 700, 500])
         self.app.processEvents()
         self.assertLessEqual(abs(center_x(editor.btn_save) - center_x(alignment.sidebar)), 1)
+
+        editor._last_saved_state = editor.get_current_scene_state()
+        editor.close()
+
+    def test_current_frontend_survives_deferred_legacy_layout_deletion(self):
+        editor = EditorWindow()
+
+        # O layout anterior era descartado com deleteLater(). O erro original
+        # só aparecia depois que o event loop efetivava essa exclusão.
+        QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+        self.app.processEvents()
+
+        self.assertTrue(isValid(editor.caixa_texto_panel))
+        self.assertTrue(isValid(editor.editor_texto_panel))
+        self.assertFalse(hasattr(editor, 'btn_clear_guides'))
+        self.assertFalse(hasattr(editor, 'layer_toolbar'))
+
+        editor.add_new_box()
+        editor.update_position_ui()
+        editor.toggle_guides_lock(True)
+        editor.toggle_guides_lock(False)
 
         editor._last_saved_state = editor.get_current_scene_state()
         editor.close()
