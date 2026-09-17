@@ -34,7 +34,7 @@ Este documento orienta a sequência de trabalho até a conclusão das funcionali
 
 ### 3. Estabilização e fechamento do escopo funcional
 
-**Status:** pendente.
+**Status:** concluída e verificada em 16/09/2026.
 
 **Direção:** revisar os fluxos completos após as duas funcionalidades e resolver regressões antes da limpeza ampla. Confirmar se ainda existe alguma função indispensável à versão pretendida.
 
@@ -111,3 +111,13 @@ Ao encerrar uma etapa ou sessão, registrar brevemente:
 - **Verificação executada:** 56 testes do editor, incluindo moldura coletiva, seleção por contenção integral, escala proporcional, tipografia rica, máscaras e histórico; 107 testes e 10 subtestes da suíte principal; compilação dos módulos e verificação de whitespace.
 - **Pendências ou decisões em aberto:** a avaliação visual com composições reais e grupos grandes fica reunida na etapa 3 de estabilização.
 - **Próximo ponto de retomada:** iniciar a etapa 3 revisando os fluxos completos e definindo uma matriz curta de regressões e desempenho antes de qualquer limpeza estrutural.
+
+### Registro — etapa 3
+
+- **Etapa e estado:** estabilização e fechamento do escopo funcional concluídos.
+- **Concluído e verificado:** foi criada a referência [VALIDACAO_ETAPA_3.md](VALIDACAO_ETAPA_3.md), cobrindo modelos v3/v4, editor e histórico, duas páginas, cópia, máscaras, grupos, fontes, dados em lote, imagens dinâmicas, geração, links, imposição e duplex; workspace e editor também passaram pelo ciclo básico de abertura e fechamento.
+- **Desempenho de referência:** colagem de 500 × 5 células em aproximadamente 40 ms; 200 renderizações do modelo A4 `teste2` em 3,833 s com cache estático; os três modelos reais versionados foram normalizados e renderizados sem erro.
+- **Verificação executada:** 107 testes e 10 subtestes da suíte principal; 59 testes do editor; compilação e smoke test das janelas em modo offscreen.
+- **Decisão de escopo:** não foi identificada outra funcionalidade indispensável antes da limpeza. O tutorial continua reservado para depois da refatoração.
+- **Limites registrados:** testes nativos de Windows e macOS, prova física de duplex e revisão visual dos pacotes finais permanecem para a auditoria da etapa 7.
+- **Próximo ponto de retomada:** iniciar a etapa 4 pelo workspace, mapeando e substituindo dependências dos containers legados antes de removê-los.
