@@ -2,39 +2,31 @@
 
 Este documento reúne as decisões e os materiais necessários para manter a identidade visual do programa no Linux, Windows e macOS. Ele não altera o comportamento atual da interface.
 
-## 1. Tarefas e decisões do responsável pelo projeto
+## 1. Decisões implementadas
 
 ### 1.1 Fonte da interface
 
-- [ ] Escolher uma família tipográfica livre para toda a interface.
-- [ ] Definir os pesos que serão usados: Regular 400, Medium 500, Semibold 600 e Bold 700.
-- [ ] Colocar os arquivos da fonte em `assets/fonts/ui/`.
-- [ ] Colocar junto a licença original da fonte, com o nome `LICENSE.txt`.
+- [x] Inter é a família oficial da interface e de novas caixas de texto.
+- [x] As variantes estáticas 18 pt são registradas antes da criação das janelas.
+- [x] Regular, Medium, SemiBold, Bold e ExtraBold estão disponíveis como desenhos reais.
+- [x] A licença original está preservada em `assets/fonts/ui/OFL.txt`.
 
-Sugestão técnica: **Inter**, distribuída sob SIL Open Font License. Ela possui boa leitura em tamanhos pequenos, muitos pesos e ampla cobertura de caracteres. A escolha deve ser confirmada antes da integração.
+Inter é distribuída sob a SIL Open Font License. Arquivos de outros tamanhos ópticos e variantes variáveis não usados foram retirados do pacote.
 
-Arquivos esperados caso a escolha seja Inter:
-
-- `assets/fonts/ui/Inter-Regular.ttf`
-- `assets/fonts/ui/Inter-Medium.ttf`
-- `assets/fonts/ui/Inter-SemiBold.ttf`
-- `assets/fonts/ui/Inter-Bold.ttf`
-- `assets/fonts/ui/LICENSE.txt`
-
-Essa fonte será exclusiva da interface. As fontes usadas na arte dos modelos precisam de uma política separada para que documentos tenham o mesmo resultado em todos os sistemas.
+As demais fontes escolhidas pelo usuário continuam pertencendo ao documento. O painel de informações do modelo lista as famílias usadas e destaca as ausentes sem interromper o trabalho.
 
 ### 1.2 Fontes dos modelos
 
 - [ ] Decidir se o programa fornecerá um pequeno conjunto de fontes livres para os modelos.
 - [ ] Decidir se um modelo importado poderá incorporar suas próprias fontes.
 - [ ] Definir o comportamento quando uma fonte estiver ausente: impedir a geração, pedir substituição ou permitir substituição automática com aviso.
-- [ ] Confirmar se a fonte padrão de novas caixas de texto continuará sendo Arial ou será uma fonte livre distribuída com o programa.
+- [x] Novas caixas de texto usam a Inter incorporada.
 
 Recomendação: usar uma fonte livre fornecida pelo programa como padrão e nunca substituir silenciosamente uma fonte ausente na geração final.
 
 ### 1.3 Ícones SVG
 
-- [ ] Obter os SVGs indicados em `assets/icons/ui/README.md`.
+- [x] Os SVGs funcionais ativos estão centralizados em `assets/icons/ui/` e possuem teste de carregamento.
 - [ ] Preservar a licença e a atribuição exigidas pelo conjunto escolhido.
 - [ ] Usar preferencialmente um único conjunto de ícones para manter espessura e desenho coerentes.
 - [ ] Confirmar se os SVGs podem ser redistribuídos em software livre e em versões instaláveis do programa.
@@ -67,20 +59,29 @@ Recomendação: manter arquivos e pastas nativos; criar componentes próprios so
 - [ ] Manter a referência Linux atual.
 - [ ] Registrar capturas da tela inicial, tabela, editor, propriedades, temas e diálogos em cada sistema.
 
-## 2. Trabalho posterior no código
+## 2. Trabalho concluído no código
 
-- [ ] Fixar uma versão exata do PySide6 em todos os pacotes e ambientes.
-- [ ] Registrar a fonte da interface com `QFontDatabase` antes de criar as janelas.
-- [ ] Aplicar a mesma família e os mesmos pesos globalmente.
-- [ ] Substituir símbolos Unicode funcionais pelos SVGs aprovados.
-- [ ] Remover emojis dos identificadores internos da tabela. Quantidade e assinatura não devem ser reconhecidas pelo texto visível do cabeçalho.
+- [x] PySide6 possui versão exata nos requisitos e no manifesto Flatpak.
+- [x] A fonte da interface é registrada com `QFontDatabase` antes das janelas.
+- [x] A mesma família é aplicada globalmente, com variantes estáticas para os pesos usados.
+- [x] Ícones funcionais foram centralizados em SVG; símbolos restantes são mensagens de log ou avisos textuais.
+- [x] A coluna de quantidade usa um identificador centralizado e traduzível.
 - [ ] Auditar controles com largura ou altura fixa usando a nova fonte.
 - [ ] Auditar o comportamento de DPI e arredondamento em todas as escalas suportadas.
 - [ ] Definir o comportamento do menu no macOS.
 - [ ] Padronizar apenas os diálogos escolhidos na seção 1.5.
-- [ ] Fixar a versão do Qt/PySide6 nos scripts Nuitka e Flatpak.
+- [x] A versão do Qt/PySide6 é fixada pelo ambiente de requisitos usado pelo Nuitka e pelo manifesto Flatpak.
 - [ ] Criar testes de captura visual por plataforma e escala.
 
-## 3. Critério de conclusão
+## 3. Validações ainda externas
+
+- conferir Windows em 100%, 125% e 150%;
+- conferir macOS em tela Retina e o comportamento do menu global;
+- revisar visualmente diálogos nativos de arquivos, pastas, impressão e cores;
+- registrar capturas da tela inicial, tabela, editor, propriedades e temas;
+- executar uma prova física duplex com o pacote candidato;
+- confirmar a licença e atribuição do conjunto de ícones antes da publicação.
+
+## 4. Critério de conclusão multiplataforma
 
 A portabilidade visual estará aprovada quando nenhuma tela apresentar texto cortado, sobreposição, botão deslocado, ícone dependente de emoji ou alteração estrutural inesperada nas combinações de sistema e escala definidas acima. Diferenças na moldura externa da janela e nos diálogos nativos aprovados serão consideradas comportamento normal do sistema.

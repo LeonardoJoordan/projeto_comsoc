@@ -6,7 +6,6 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtGui import QIcon, QPixmap, QPainter, QFont, QTextCharFormat, QTextCursor
 from shiboken6 import isValid
-from pathlib import Path
 from features.editor.frontend import icon
 from core.resources import action_icon_path, align_icon_path
 from core.theme_icons import themed_svg_icon

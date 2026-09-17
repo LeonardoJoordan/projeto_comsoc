@@ -2472,5 +2472,10 @@ Enter a name to save this preset:</translation>
     <message><source>o arquivo não foi encontrado</source><translation>the file was not found</translation></message>
     <message><source>Imagens não resolvidas</source><translation>Unresolved images</translation></message>
     <message><source>{quantidade} referência(s) de imagem precisam ser corrigidas. A primeira está na linha {linha}, campo '{campo}': '{valor}' ({motivo}).</source><translation>{quantidade} image reference(s) need correction. The first is on row {linha}, field '{campo}': '{valor}' ({motivo}).</translation></message>
+    <message>
+      <location filename="../../features/spreadsheet/table_panel.py" line="43" />
+      <source>Limpar Formatação</source>
+      <translation>Clear Formatting</translation>
+    </message>
   </context>
 </TS>

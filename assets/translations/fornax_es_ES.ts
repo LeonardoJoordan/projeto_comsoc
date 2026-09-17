@@ -2472,5 +2472,10 @@ Asigne un nombre para guardar este preajuste:</translation>
     <message><source>o arquivo não foi encontrado</source><translation>no se encontró el archivo</translation></message>
     <message><source>Imagens não resolvidas</source><translation>Imágenes sin resolver</translation></message>
     <message><source>{quantidade} referência(s) de imagem precisam ser corrigidas. A primeira está na linha {linha}, campo '{campo}': '{valor}' ({motivo}).</source><translation>{quantidade} referencia(s) de imagen deben corregirse. La primera está en la fila {linha}, campo '{campo}': '{valor}' ({motivo}).</translation></message>
+    <message>
+      <location filename="../../features/spreadsheet/table_panel.py" line="43" />
+      <source>Limpar Formatação</source>
+      <translation>Limpiar formato</translation>
+    </message>
   </context>
 </TS>

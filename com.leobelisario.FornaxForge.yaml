@@ -19,7 +19,7 @@ modules:
   - name: dependencias
     buildsystem: simple
     build-commands:
-      - pip3 install --prefix=/app PySide6 pypdf==6.14.2
+      - pip3 install --prefix=/app PySide6==6.11.0 pypdf==6.14.2
     
   - name: fornax-forge
     buildsystem: simple

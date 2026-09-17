@@ -74,7 +74,7 @@ Este documento orienta a sequência de trabalho até a conclusão das funcionali
 
 ### 7. Auditoria final da limpeza
 
-**Status:** pendente.
+**Status:** concluída no ambiente Linux em 17/09/2026; validações externas de distribuição registradas.
 
 **Direção:** comparar o programa com a referência da etapa 3 e revisar novamente as dívidas identificadas, considerando a estrutura que existir neste momento.
 
@@ -158,3 +158,13 @@ Ao encerrar uma etapa ou sessão, registrar brevemente:
 - **Textos e traduções:** mensagens obsoletas da antiga proteção de campos removidos foram retiradas dos catálogos em inglês e espanhol, e os arquivos compilados foram regenerados.
 - **Verificação executada:** 111 testes e 10 subtestes da suíte principal; 60 testes do editor; compilação dos módulos alterados; validação dos SVGs e auditoria das referências estáticas de recursos.
 - **Próximo ponto de retomada:** iniciar a etapa 7 comparando os fluxos completos com a referência funcional e registrando separadamente as validações que exigem Windows, macOS ou impressão física.
+
+### Registro — etapa 7
+
+- **Etapa e estado:** auditoria de código e regressão concluída no ambiente disponível.
+- **Comparação com a referência:** os fluxos automatizados permaneceram aprovados e as medições de colagem e renderização ficaram equivalentes ou ligeiramente melhores que as da etapa 3. Os detalhes estão em [VALIDACAO_ETAPA_7.md](VALIDACAO_ETAPA_7.md).
+- **Limpeza final:** fontes sem consumidor, marcadores de diretório desnecessários, uma duplicação na colagem e um import órfão foram removidos. Textos restantes do menu contextual da tabela foram integrados aos idiomas existentes. PySide6 foi fixado na versão validada para os ambientes de requisitos e Flatpak.
+- **Compatibilidade preservada:** leitura v3, migração de dados antigos, recuperação e renderização histórica permanecem isoladas e testadas porque ainda atendem modelos reais.
+- **Verificação executada:** 111 testes e 10 subtestes da suíte principal; 60 testes do editor; três modelos reais renderizados; benchmark de 500 × 5 células e 200 renderizações; compilação Python, smoke test offscreen, scripts e referências de recursos.
+- **Pendências externas:** inspeção nativa em Windows e macOS, prova física duplex, construção dos pacotes candidatos e fechamento das licenças. Esses pontos não foram declarados aprovados pelo teste Linux.
+- **Próximo ponto de retomada:** preparar o tutorial e a distribuição somente após definir as licenças e executar a matriz nativa registrada em `PORTABILIDADE_VISUAL.md`.

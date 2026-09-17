@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QTimer
 from .clipboard import parse_clipboard_html_table, parse_tsv, parse_clipboard_html_fragment
 from .delegates import HTMLDelegate
 from .headers import SIGNATURE_HEADER, is_quantity_header
+from core.i18n import tr
 
 class RichTableWidget(QTableWidget):
     RICH_ROLE = Qt.ItemDataRole.UserRole
@@ -33,13 +34,13 @@ class RichTableWidget(QTableWidget):
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
-        act_bold = QAction("Negrito (Ctrl+B)", self)
+        act_bold = QAction(tr("Negrito (Ctrl+B)"), self)
         act_bold.triggered.connect(lambda: self._toggle_format("b"))
-        act_italic = QAction("Itálico (Ctrl+I)", self)
+        act_italic = QAction(tr("Itálico (Ctrl+I)"), self)
         act_italic.triggered.connect(lambda: self._toggle_format("i"))
-        act_underline = QAction("Sublinhado (Ctrl+U)", self)
+        act_underline = QAction(tr("Sublinhado (Ctrl+U)"), self)
         act_underline.triggered.connect(lambda: self._toggle_format("u"))
-        act_clear = QAction("Limpar Formatação", self)
+        act_clear = QAction(tr("Limpar Formatação"), self)
         act_clear.triggered.connect(self._clear_formatting)
 
         menu.addActions([act_bold, act_italic, act_underline])
@@ -290,8 +291,6 @@ class RichTableWidget(QTableWidget):
 
                 item.setText(cell_data.plain)
                 item.setData(self.RICH_ROLE, cell_data.rich_html)
-
-                affected_cols_logical.add(dest_col_logical)
 
                 affected_cols_logical.add(dest_col_logical)
 
