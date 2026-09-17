@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox, QComboBox, QMenu, QSizePolicy, QListView,
     QGridLayout, QButtonGroup,
 )
+from shiboken6 import isValid
 
 
 STYLE = """
@@ -106,6 +107,22 @@ def icon(path):
     return tool_icon(path)
 
 
+def _connect_theme_callback(owner, callback):
+    """Mantém callbacks locais ligados ao tema somente enquanto o widget existir."""
+    manager = theme_manager()
+    manager.changed.connect(callback)
+
+    def disconnect(*_):
+        if not isValid(manager):
+            return
+        try:
+            manager.changed.disconnect(callback)
+        except (RuntimeError, TypeError):
+            pass
+
+    owner.destroyed.connect(disconnect)
+
+
 def column():
     widget = QWidget()
     layout = QVBoxLayout(widget)
@@ -156,7 +173,7 @@ def compact(name, control, suffix='', width=100, accessible_name=None):
         def refresh_icon():
             label.setPixmap(themed_svg_icon(name).pixmap(14, 14))
         refresh_icon()
-        theme_manager().changed.connect(refresh_icon)
+        _connect_theme_callback(label, refresh_icon)
     else:
         label = QLabel(name)
     layout.addWidget(label)
@@ -183,6 +200,9 @@ class FooterSaveAlignment(QObject):
         self.button = button
         self.pages = pages
         self._update_pending = False
+        self._timer = QTimer(self)
+        self._timer.setSingleShot(True)
+        self._timer.timeout.connect(self.align)
         for watched in (window, sidebar, canvas, footer_bar, pages):
             watched.installEventFilter(self)
 
@@ -190,10 +210,15 @@ class FooterSaveAlignment(QObject):
         if self._update_pending:
             return
         self._update_pending = True
-        QTimer.singleShot(0, self.align)
+        self._timer.start(0)
 
     def align(self):
         self._update_pending = False
+        widgets = (
+            self.sidebar, self.canvas, self.footer_bar, self.button, self.pages,
+        )
+        if any(not isValid(widget) for widget in widgets):
+            return
         if not self.sidebar.isVisible() or self.footer_bar.width() <= 0:
             return
         sidebar_center_global = self.sidebar.mapToGlobal(
@@ -214,6 +239,10 @@ class FooterSaveAlignment(QObject):
         self.pages.raise_()
 
     def eventFilter(self, watched, event):
+        if event.type() == QEvent.Type.Destroy:
+            self._timer.stop()
+            self._update_pending = False
+            return False
         if event.type() in (QEvent.Type.Resize, QEvent.Type.Show):
             self.schedule()
         return False
@@ -226,6 +255,9 @@ class SectionReveal(QWidget):
         self.content = content
         self._content_hint = content.sizeHint()
         self._sync_pending = False
+        self._sync_timer = QTimer(self)
+        self._sync_timer.setSingleShot(True)
+        self._sync_timer.timeout.connect(self._sync_content_hint)
         content.setParent(self)
         self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         content.installEventFilter(self)
@@ -257,7 +289,7 @@ class SectionReveal(QWidget):
     def eventFilter(self, watched, event):
         if event.type() in (QEvent.Type.LayoutRequest, QEvent.Type.Show) and not self._sync_pending:
             self._sync_pending = True
-            QTimer.singleShot(0, self._sync_content_hint)
+            self._sync_timer.start(0)
         return False
 
 
@@ -519,7 +551,7 @@ def install_frontend(w):
                     themed_svg_icon(navigation_icon_path('chevron-down')).pixmap(16, 16)
                 )
             refresh_shape_arrow()
-            theme_manager().changed.connect(refresh_shape_arrow)
+            _connect_theme_callback(trailing_icon, refresh_shape_arrow)
         contents.addWidget(trailing_icon)
         button.setIcon(QIcon())
         button.setObjectName('add' + object_name)
@@ -564,13 +596,7 @@ def install_frontend(w):
             elif isinstance(item, ResizeHandle):
                 item.setBrush(QColor(theme_color('handle')))
         w.view.viewport().update()
-    theme_manager().changed.connect(update_canvas_theme)
-    manager = theme_manager()
-    def disconnect_theme():
-        from shiboken6 import isValid
-        if isValid(manager):
-            manager.changed.disconnect(update_canvas_theme)
-    w.destroyed.connect(disconnect_theme)
+    _connect_theme_callback(w, update_canvas_theme)
     update_canvas_theme()
     w.view.setFrameShape(QFrame.Shape.NoFrame)
     from .rulers import RulerWorkspace
@@ -734,7 +760,7 @@ def install_frontend(w):
         join_straight.setIconSize(QSize(18, 18))
         join_round.setIconSize(QSize(18, 18))
     refresh_outline_join_icons()
-    theme_manager().changed.connect(refresh_outline_join_icons)
+    _connect_theme_callback(outline_join, refresh_outline_join_icons)
     join_field = field(tr('Cantos do contorno'), outline_join)
     outline_details_layout.addWidget(join_field)
     rectangle_radius, rectangle_radius_layout = column()
@@ -792,7 +818,7 @@ def install_frontend(w):
     def refresh_corner_radius_icons():
         for label, asset_name in corner_icon_labels:
             label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(18, 18))
-    theme_manager().changed.connect(refresh_corner_radius_icons)
+    _connect_theme_callback(rectangle_radius, refresh_corner_radius_icons)
     corner_grid.setColumnStretch(0, 1)
     corner_grid.setColumnStretch(4, 1)
     corner_grid.addWidget(
@@ -1464,7 +1490,7 @@ def install_frontend(w):
             button.setIcon(themed_svg_icon(align_icon_path(asset_name)))
         for label, asset_name in alignment_value_icons:
             label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(20, 20))
-    theme_manager().changed.connect(refresh_alignment_icons)
+    _connect_theme_callback(text_body, refresh_alignment_icons)
     text_section = Section(tr('Texto'), text_body)
     il.addWidget(text_section)
     doc, dl = column()

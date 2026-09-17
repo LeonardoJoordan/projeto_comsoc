@@ -1,10 +1,12 @@
 import unittest
+import sys
 from unittest.mock import patch
 
 from PySide6.QtCore import Qt, QPoint, QCoreApplication, QEvent
 from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton
 from shiboken6 import isValid
 
+from core.themes import theme_manager
 from .editor_window import EditorWindow
 
 
@@ -98,6 +100,28 @@ class EditorWindowLifecycleTest(unittest.TestCase):
 
         editor._last_saved_state = editor.get_current_scene_state()
         editor.close()
+
+    def test_destroyed_editor_has_no_pending_ui_or_theme_callbacks(self):
+        manager = theme_manager()
+        original_theme = manager.theme_id
+        target_theme = 'light' if original_theme != 'light' else 'dark'
+        callback_errors = []
+        previous_hook = sys.excepthook
+        editor = EditorWindow()
+        editor._footer_save_alignment.schedule()
+        try:
+            sys.excepthook = lambda exc_type, exc, tb: callback_errors.append(exc)
+            editor.deleteLater()
+            QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+            self.app.processEvents()
+
+            self.assertFalse(isValid(editor))
+            manager.select(target_theme)
+            self.app.processEvents()
+            self.assertEqual(callback_errors, [])
+        finally:
+            sys.excepthook = previous_hook
+            manager.select(original_theme)
 
 
 if __name__ == '__main__':
