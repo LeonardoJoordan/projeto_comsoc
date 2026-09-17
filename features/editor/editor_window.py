@@ -1584,18 +1584,23 @@ class EditorWindow(QMainWindow):
                 for name in item.get_placeholders():
                     add(name)
                 if getattr(item.state, 'has_link', False):
-                    name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
-                    add(f"Link - {name}")
+                    add(self._link_key_for_item(item))
             elif isinstance(item, RectangleItem) and not getattr(item, 'is_document_background', False):
                 add(getattr(item, 'dynamic_image_field', ''))
                 if getattr(item, 'has_link', False):
-                    name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
-                    add(f"Link - {name}")
+                    add(self._link_key_for_item(item))
             elif isinstance(item, ImageItem) and not isinstance(item, BackgroundItem):
                 if getattr(item, 'has_link', False):
-                    name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
-                    add(f"Link - {name}")
+                    add(self._link_key_for_item(item))
         return placeholders
+
+    def _link_key_for_item(self, item):
+        owner = item.state if isinstance(item, DesignerBox) else item
+        key = str(getattr(owner, 'link_key', '') or '').strip()
+        if key:
+            return key
+        name = self._generate_layer_name(getattr(item, 'layer_id', 99), item)
+        return f"Link - {name}"
 
     def get_all_model_placeholders(self):
         current = self.get_current_page_placeholders()
@@ -2060,9 +2065,11 @@ class EditorWindow(QMainWindow):
                     for key, value in original.style_data().items():
                         setattr(new_item, key, value)
                     new_item.has_link = getattr(original, 'has_link', False)
+                    new_item.link_key = getattr(original, 'link_key', '')
                 elif isinstance(original, ImageItem):
                     new_item = ImageItem(getattr(original, '_original_path', ''))
                     new_item.has_link = getattr(original, 'has_link', False)
+                    new_item.link_key = getattr(original, 'link_key', '')
                 else:
                     new_item = SignatureItem(getattr(original, '_original_path', ''))
                 
@@ -2427,7 +2434,9 @@ class EditorWindow(QMainWindow):
             item.keep_proportion = locked
 
     def update_link_state(self, has_link):
-        items = self._get_selected_items()
+        session = self._mask_edit_session
+        inspector_item = session.get('inspector_item') if session else None
+        items = [inspector_item] if inspector_item is not None else self._get_selected_items()
         if items:
             for item in items:
                 if isinstance(item, DesignerBox):
@@ -2950,6 +2959,10 @@ class EditorWindow(QMainWindow):
         if getattr(shape, 'mask_group_id', None) is None:
             shape.mask_group_id = self._next_group_id()
         shape_center = shape.rect().center()
+        # O link pertence à forma que delimita a máscara. Um segundo link na
+        # imagem interna criaria regiões clicáveis concorrentes.
+        image.has_link = False
+        image.link_key = ''
         image.setParentItem(shape)
         image.mask_shape_id = f"shape:{shape.layer_id}"
         image.mask_order = len(shape.masked_images()) - 1
@@ -2959,6 +2972,7 @@ class EditorWindow(QMainWindow):
         )
         image.setZValue(image.mask_order + 1)
         shape.refresh_mask_structure()
+        self.sync_placeholders_list()
         self.refresh_layer_list()
         self.begin_mask_edit(image, before_state=before)
         return True
@@ -2969,6 +2983,9 @@ class EditorWindow(QMainWindow):
             return False
         if self._mask_edit_session:
             self.finish_mask_edit(True)
+        inspector_item = self._get_selected()
+        if inspector_item not in (image, shape):
+            inspector_item = image
         before_state = copy.deepcopy(before_state or self.get_current_scene_state())
         tracked = [shape, *shape.masked_images()]
         flags = {
@@ -2984,6 +3001,7 @@ class EditorWindow(QMainWindow):
             'shape': shape,
             'before': before_state,
             'flags': flags,
+            'inspector_item': inspector_item,
         }
         self._changing_mask_selection = True
         try:
@@ -3458,7 +3476,7 @@ class EditorWindow(QMainWindow):
                     "font_size": item.state.font_size,
                     "font_color": getattr(item.state, 'font_color', '#000000'),
                     "has_link": getattr(item.state, 'has_link', False),
-                    "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
+                    "link_key": self._link_key_for_item(item),
                     "align": item.state.align,
                     "vertical_align": item.state.vertical_align,
                     "indent_px": item.state.indent_px,
@@ -3506,8 +3524,14 @@ class EditorWindow(QMainWindow):
                     "height": round(float(pix_rect.height()), 2),
                     "longest_side": round(float(max(pix_rect.width(), pix_rect.height())), 2),
                     "rotation": round(float(item.rotation()), 2),
-                    "has_link": getattr(item, "has_link", False),
-                    "link_key": f"Link - {self._generate_layer_name(getattr(item, 'layer_id', 99), item)}",
+                    "has_link": (
+                        getattr(item, "has_link", False)
+                        if not isinstance(mask_parent, RectangleItem) else False
+                    ),
+                    "link_key": (
+                        self._link_key_for_item(item)
+                        if not isinstance(mask_parent, RectangleItem) else ''
+                    ),
                     "layer_id": getattr(item, 'layer_id', None),
                     "group_id": getattr(item, 'group_id', None),
                     "keep_proportion": getattr(item, 'keep_proportion', True),
@@ -3719,6 +3743,7 @@ class EditorWindow(QMainWindow):
                 img.keep_proportion = img_data.get("keep_proportion", True)
                 img.setZValue(img_data.get("z_value", 1))
                 img.has_link = img_data.get("has_link", False)
+                img.link_key = str(img_data.get("link_key") or "").strip()
                 img.mask_shape_id = img_data.get("mask_shape_id")
                 img.mask_order = int(img_data.get("mask_order", 0))
                 img.setVisible(img_data.get("visible", True))
@@ -3756,6 +3781,7 @@ class EditorWindow(QMainWindow):
             box.state.indent_px = b.get("indent_px", 0)
             box.state.line_height = b.get("line_height", 1.15)
             box.state.has_link = b.get("has_link", False)
+            box.state.link_key = str(b.get("link_key") or "").strip()
 
             box.setRotation(b.get("rotation", 0))
             box.apply_state()
@@ -3812,6 +3838,7 @@ class EditorWindow(QMainWindow):
                 if key in entry:
                     setattr(item, key, entry[key])
             item.has_link = entry.get('has_link', False)
+            item.link_key = str(entry.get('link_key') or '').strip()
             if 'corner_radii' not in entry:
                 radius = max(0.0, float(entry.get('corner_radius', 0)))
                 item.corner_radii = {key: radius for key in (
@@ -3849,6 +3876,8 @@ class EditorWindow(QMainWindow):
                 continue
             stored_pos = QPointF(image.pos())
             image.setParentItem(shape)
+            image.has_link = False
+            image.link_key = ''
             image.setPos(stored_pos)
             image.setZValue(image.mask_order + 1)
         for shape in shapes_by_id.values():

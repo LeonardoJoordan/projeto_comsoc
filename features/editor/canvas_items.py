@@ -1078,6 +1078,7 @@ class ImageItem(QGraphicsPixmapItem):
         
         self.keep_proportion = True
         self.has_link = False
+        self.link_key = ""
         self.mask_shape_id = None
         self.mask_order = 0
         _init_resize_handles(self)

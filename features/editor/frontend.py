@@ -18,7 +18,7 @@ from .canvas_items import RectangleItem, mm_to_px, px_to_mm
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QScrollArea,
     QSplitter, QFrame, QLineEdit, QAbstractSpinBox, QColorDialog,
-    QCheckBox, QDoubleSpinBox, QComboBox, QMenu, QRadioButton, QSizePolicy, QListView,
+    QDoubleSpinBox, QComboBox, QMenu, QSizePolicy, QListView,
     QGridLayout, QButtonGroup,
 )
 
@@ -588,6 +588,7 @@ def install_frontend(w):
     il.setSpacing(1)
     props, pl = column()
     def property_heading(layout, title, *, separated=False):
+        separator = None
         if separated:
             separator = QFrame()
             separator.setObjectName('propertySectionSeparator')
@@ -601,8 +602,37 @@ def install_frontend(w):
         heading.setObjectName('propertySectionHeading')
         heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
         themed_style(heading, 'color: @icon@; font-size: 11px; font-weight: 600;')
+        heading._section_separator = separator
         layout.addWidget(heading)
         return heading
+
+    def centered_toggle_button(layout, button):
+        """Mantém o botão em 65% da largura útil e centralizado."""
+        wrapper = QWidget()
+        wrapper_layout = QHBoxLayout(wrapper)
+        wrapper_layout.setContentsMargins(0, 0, 0, 0)
+        wrapper_layout.setSpacing(0)
+        wrapper.setFixedHeight(22)
+        themed_style(
+            button,
+            'QPushButton { padding: 0 10px; min-height: 0; max-height: 20px; }',
+        )
+        button.setFixedHeight(22)
+        button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        wrapper_layout.addStretch(175)
+        wrapper_layout.addWidget(button, 650)
+        wrapper_layout.addStretch(175)
+        layout.addWidget(wrapper)
+        return wrapper
+
+    def compact_sidebar_action(button):
+        content_height = 22 if button.objectName() == 'primary' else 20
+        themed_style(
+            button,
+            f'QPushButton {{ padding: 0 10px; min-height: {content_height}px; '
+            f'max-height: {content_height}px; }}',
+        )
+        button.setFixedHeight(22)
 
     shape_color = QLineEdit('#ffffff')
     shape_color.setMaxLength(7)
@@ -615,6 +645,7 @@ def install_frontend(w):
     shape_swatch.setObjectName('shapeFillSwatch')
     square_control(shape_swatch)
     shape_controls, shape_layout = column()
+    shape_controls.setObjectName('shapeControls')
     shape_layout.setContentsMargins(0, 0, 0, 0)
     fill_controls, fill_layout = column()
     fill_layout.setContentsMargins(0, 0, 0, 0)
@@ -644,8 +675,10 @@ def install_frontend(w):
     shape_swatch.clicked.connect(choose_shape_color)
     shape_color.editingFinished.connect(lambda: set_shape_color(shape_color.text()))
     fill_alpha.editingFinished.connect(lambda: set_shape_color(shape_color.text()))
-    outline_enabled = QCheckBox(tr('Contorno'))
+    outline_enabled = QPushButton(tr('Ativar contorno'))
     outline_enabled.setObjectName('shapeOutlineEnabled')
+    outline_enabled.setCheckable(True)
+    outline_toggle_container = centered_toggle_button(shape_layout, outline_enabled)
     outline_color = QLineEdit('#000000')
     outline_color.setMaxLength(7)
     outline_alpha = QDoubleSpinBox()
@@ -667,7 +700,6 @@ def install_frontend(w):
     for title, value in [(tr('Interno'), 'inside'), (tr('Centralizado'), 'center'), (tr('Externo'), 'outside')]:
         outline_position.addItem(title, value)
     outline_position.setToolTip(tr('Interno: para dentro. Externo: para fora. Centralizado: metade para cada lado.'))
-    shape_layout.addWidget(outline_enabled)
     outline_details, outline_details_layout = column()
     outline_details_layout.setContentsMargins(0, 0, 0, 0)
     outline_color_row = row(outline_details_layout, outline_swatch, outline_color, compact(
@@ -677,9 +709,38 @@ def install_frontend(w):
     outline_join, join_layout = column()
     join_layout.setContentsMargins(0, 0, 0, 0)
     outline_join.setObjectName('shapeOutlineJoin')
-    join_straight = QRadioButton(tr('Retos'))
-    join_round = QRadioButton(tr('Arredondados'))
-    row(join_layout, join_straight, join_round)
+    join_buttons = QWidget()
+    join_buttons_layout = QHBoxLayout(join_buttons)
+    join_buttons_layout.setContentsMargins(0, 0, 0, 0)
+    join_buttons_layout.setSpacing(6)
+    join_group = QButtonGroup(outline_join)
+    join_group.setExclusive(True)
+    join_straight = QPushButton()
+    join_straight.setObjectName('outlineJoinStraight')
+    join_straight.setCheckable(True)
+    join_straight.setToolTip(tr('Cantos retos'))
+    join_straight.setAccessibleName(tr('Cantos retos'))
+    square_control(join_straight)
+    join_round = QPushButton()
+    join_round.setObjectName('outlineJoinRound')
+    join_round.setCheckable(True)
+    join_round.setToolTip(tr('Cantos arredondados'))
+    join_round.setAccessibleName(tr('Cantos arredondados'))
+    square_control(join_round)
+    join_group.addButton(join_straight, 0)
+    join_group.addButton(join_round, 1)
+    join_buttons_layout.addStretch(1)
+    join_buttons_layout.addWidget(join_straight)
+    join_buttons_layout.addWidget(join_round)
+    join_buttons_layout.addStretch(1)
+    join_layout.addWidget(join_buttons)
+    def refresh_outline_join_icons():
+        join_straight.setIcon(themed_svg_icon(align_icon_path('straight_edge')))
+        join_round.setIcon(themed_svg_icon(align_icon_path('curved_edge')))
+        join_straight.setIconSize(QSize(18, 18))
+        join_round.setIconSize(QSize(18, 18))
+    refresh_outline_join_icons()
+    theme_manager().changed.connect(refresh_outline_join_icons)
     join_field = field(tr('Cantos do contorno'), outline_join)
     outline_details_layout.addWidget(join_field)
     rectangle_radius, rectangle_radius_layout = column()
@@ -700,13 +761,15 @@ def install_frontend(w):
     refresh_radius_sync_icon(sync_radii.isChecked())
     corner_grid = QGridLayout()
     corner_grid.setContentsMargins(0, 0, 0, 0)
-    corner_grid.setHorizontalSpacing(8)
+    corner_grid.setHorizontalSpacing(7)
     corner_grid.setVerticalSpacing(8)
     corner_spins = {}
-    corner_fields = {}
-    for index, (key, title) in enumerate((
-        ('top_left', tr('Sup. esquerdo')), ('top_right', tr('Sup. direito')),
-        ('bottom_left', tr('Inf. esquerdo')), ('bottom_right', tr('Inf. direito')),
+    corner_icon_labels = []
+    for index, (key, title, asset_name) in enumerate((
+        ('top_left', tr('Sup. esquerdo'), 'sup_esq'),
+        ('top_right', tr('Sup. direito'), 'sup_dir'),
+        ('bottom_left', tr('Inf. esquerdo'), 'inf_esq'),
+        ('bottom_right', tr('Inf. direito'), 'inf_dir'),
     )):
         spin = QDoubleSpinBox()
         spin.setObjectName('shapeCornerRadius_' + key)
@@ -714,30 +777,40 @@ def install_frontend(w):
         spin.setRange(0, 1000)
         spin.setSingleStep(0.1)
         spin.setKeyboardTracking(False)
-        control = field(title, compact('', spin, 'mm', None))
-        corner_grid.addWidget(control, index // 2, index % 2)
+        spin.setToolTip(title)
+        icon_label = QLabel()
+        icon_label.setObjectName('cornerRadiusIcon_' + key)
+        icon_label.setFixedSize(22, 30)
+        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        icon_label.setToolTip(title)
+        icon_label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(18, 18))
+        value_box = compact('', spin, 'mm', None)
+        row_index = index // 2
+        is_left = key.endswith('left')
+        if is_left:
+            corner_grid.addWidget(value_box, row_index, 0)
+            corner_grid.addWidget(icon_label, row_index, 1)
+        else:
+            corner_grid.addWidget(icon_label, row_index, 3)
+            corner_grid.addWidget(value_box, row_index, 4)
         corner_spins[key] = spin
-        corner_fields[key] = control
+        corner_icon_labels.append((icon_label, asset_name))
+    def refresh_corner_radius_icons():
+        for label, asset_name in corner_icon_labels:
+            label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(18, 18))
+    theme_manager().changed.connect(refresh_corner_radius_icons)
     corner_grid.setColumnStretch(0, 1)
-    corner_grid.setColumnStretch(1, 1)
-    sync_radii_slot = QWidget()
-    sync_radii_layout = QVBoxLayout(sync_radii_slot)
-    sync_radii_layout.setSpacing(0)
-    reference_layout = corner_fields['top_right'].layout()
-    reference_label = reference_layout.itemAt(0).widget()
-    label_offset = reference_label.sizeHint().height() + reference_layout.spacing()
-    sync_radii_layout.setContentsMargins(0, label_offset, 0, 0)
-    sync_radii_layout.addWidget(
-        sync_radii, 0, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight
+    corner_grid.setColumnStretch(4, 1)
+    corner_grid.addWidget(
+        sync_radii, 0, 2, 2, 1, Qt.AlignmentFlag.AlignCenter,
     )
-    corner_grid.addWidget(sync_radii_slot, 0, 2, 2, 1)
     rectangle_radius_layout.addLayout(corner_grid)
-    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), rectangle_radius)
+    shape_layout.insertWidget(shape_layout.indexOf(outline_toggle_container), rectangle_radius)
 
     outline_heading_container, outline_heading_layout = column()
     outline_heading_layout.setContentsMargins(0, 0, 0, 0)
     outline_heading = property_heading(outline_heading_layout, tr('CONTORNO'), separated=True)
-    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled), outline_heading_container)
+    shape_layout.insertWidget(shape_layout.indexOf(outline_toggle_container), outline_heading_container)
 
     radius = QDoubleSpinBox()
     radius.setObjectName('shapeCornerRadius')
@@ -787,10 +860,10 @@ def install_frontend(w):
         selected = w.scene.selectedItems()
         if len(selected) == 1 and getattr(selected[0], 'shape_type', '') == 'rectangle':
             selected[0].corner_radii_linked = checked
-            if checked:
-                apply_corner_radius('top_left')
-            else:
-                w.save_snapshot()
+            # Ativar o vínculo define apenas o comportamento das próximas
+            # edições. Os valores atuais permanecem intactos até que o
+            # operador altere explicitamente um dos cantos.
+            w.save_snapshot()
     sync_radii.toggled.connect(toggle_radius_sync)
     position_field = field(tr('Posição'), outline_position)
     thickness_row = row(outline_details_layout, field(tr('Espessura'), compact('', outline_width, 'mm')), position_field)
@@ -801,7 +874,7 @@ def install_frontend(w):
             outline_details_layout.takeAt(layout_index)
             break
     outline_details_layout.insertLayout(0, thickness_row)
-    shape_layout.insertWidget(shape_layout.indexOf(outline_enabled) + 1, outline_details)
+    shape_layout.insertWidget(shape_layout.indexOf(outline_toggle_container) + 1, outline_details)
     line_geometry, line_layout = column()
     line_layout.setContentsMargins(0, 0, 0, 0)
     line_length = QDoubleSpinBox()
@@ -883,23 +956,81 @@ def install_frontend(w):
     p.btn_restore.setMaximumSize(16777215, 16777215)
     p.chk_link.setText(tr('Habilitar link'))
     p.chk_link.setToolTip(tr('Adiciona ao objeto um link clicável nos arquivos PDF.'))
-    pl.addWidget(p.btn_restore)
+    restore_controls, restore_layout = column()
+    restore_controls.setObjectName('restoreControls')
+    restore_layout.setContentsMargins(0, 0, 0, 0)
+    restore_layout.setSpacing(6)
+    restore_heading = property_heading(restore_layout, tr('ARQUIVO ORIGINAL'))
+    restore_button_container = centered_toggle_button(restore_layout, p.btn_restore)
+    pl.addWidget(restore_controls)
 
     link_controls, link_layout = column()
     link_controls.setObjectName('linkControls')
     link_layout.setContentsMargins(0, 0, 0, 0)
     link_layout.setSpacing(6)
     link_heading = property_heading(link_layout, tr('LINK'), separated=True)
-    link_layout.addWidget(p.chk_link)
+    link_toggle_container = centered_toggle_button(link_layout, p.chk_link)
+    link_details, link_details_layout = column()
+    link_details.setObjectName('linkDetails')
+    link_details_layout.setContentsMargins(0, 0, 0, 0)
+    link_field = QLineEdit()
+    link_field.setObjectName('linkField')
+    link_field.setPlaceholderText(tr('Ex.: Link'))
+    link_details_layout.addWidget(field(tr('Campo da tabela'), link_field))
+    link_layout.addWidget(link_details)
+    updating_link = {'active': False}
+
+    def _selected_link_owner():
+        session = w._mask_edit_session
+        if session and session.get('inspector_item') is not None:
+            item = session['inspector_item']
+        else:
+            selected = w.scene.selectedItems()
+            if len(selected) != 1:
+                return None, None
+            item = selected[0]
+        owner = item.state if hasattr(item, 'state') else item
+        return item, owner
+
+    def _default_link_field():
+        existing = set(w.get_all_model_placeholders())
+        candidate = tr('Link')
+        suffix = 2
+        while candidate in existing:
+            candidate = tr('Link {numero}').format(numero=suffix)
+            suffix += 1
+        return candidate
+
+    def apply_link_field(save=False):
+        if updating_link['active']:
+            return
+        item, owner = _selected_link_owner()
+        if owner is None:
+            return
+        enabled = p.chk_link.isChecked()
+        value = link_field.text().strip()
+        if enabled and not value:
+            value = _default_link_field()
+            link_field.setText(value)
+        owner.link_key = value if enabled else ''
+        link_details.setVisible(enabled)
+        w.sync_placeholders_list()
+        w.refresh_layer_list()
+        if save:
+            w.save_snapshot()
+
+    p.chk_link.toggled.connect(lambda _checked: apply_link_field(False))
+    link_field.editingFinished.connect(lambda: apply_link_field(True))
 
     dynamic_controls, dynamic_layout = column()
     dynamic_controls.setObjectName('dynamicImageControls')
     dynamic_layout.setContentsMargins(0, 0, 0, 0)
     dynamic_layout.setSpacing(6)
     dynamic_heading = property_heading(dynamic_layout, tr('IMAGEM VARIÁVEL'), separated=True)
-    dynamic_enabled = QCheckBox(tr('Usar imagem indicada na tabela'))
+    dynamic_enabled = QPushButton(tr('Usar imagem variável'))
     dynamic_enabled.setObjectName('dynamicImageEnabled')
-    dynamic_layout.addWidget(dynamic_enabled)
+    dynamic_enabled.setCheckable(True)
+    dynamic_toggle_container = centered_toggle_button(dynamic_layout, dynamic_enabled)
     dynamic_details, dynamic_details_layout = column()
     dynamic_details_layout.setContentsMargins(0, 0, 0, 0)
     dynamic_field = QLineEdit()
@@ -960,9 +1091,10 @@ def install_frontend(w):
     mask_layout.setContentsMargins(0, 0, 0, 0)
     mask_layout.setSpacing(6)
     mask_heading = property_heading(mask_layout, tr('MÁSCARA'), separated=True)
-    mask_enabled = QCheckBox(tr('Usar máscara'))
+    mask_enabled = QPushButton(tr('Usar como máscara'))
     mask_enabled.setObjectName('maskEnabled')
-    mask_layout.addWidget(mask_enabled)
+    mask_enabled.setCheckable(True)
+    mask_toggle_container = centered_toggle_button(mask_layout, mask_enabled)
     mask_details, mask_details_layout = column()
     mask_details.setObjectName('maskDetails')
     mask_details_layout.setContentsMargins(0, 0, 0, 0)
@@ -971,12 +1103,21 @@ def install_frontend(w):
     mask_status.setObjectName('muted')
     mask_status.setWordWrap(True)
     mask_details_layout.addWidget(mask_status)
+    mask_add_image = QPushButton(tr('+ Imagem'))
+    mask_add_image.setObjectName('maskAddImage')
+    mask_add_image.setCheckable(True)
+    mask_add_image_container = centered_toggle_button(mask_details_layout, mask_add_image)
+    mask_insert_controls, mask_insert_layout = column()
+    mask_insert_controls.setObjectName('maskInsertControls')
+    mask_insert_layout.setContentsMargins(0, 0, 0, 0)
+    mask_insert_layout.setSpacing(6)
     mask_target = QComboBox()
     mask_target.setObjectName('maskTarget')
-    mask_details_layout.addWidget(mask_target)
+    mask_insert_layout.addWidget(mask_target)
     mask_create = QPushButton()
     mask_create.setObjectName('maskCreate')
-    mask_details_layout.addWidget(mask_create)
+    mask_create_container = centered_toggle_button(mask_insert_layout, mask_create)
+    mask_details_layout.addWidget(mask_insert_controls)
     mask_child = QComboBox()
     mask_child.setObjectName('maskChild')
     mask_details_layout.addWidget(mask_child)
@@ -988,10 +1129,12 @@ def install_frontend(w):
     mask_actions.addWidget(mask_edit, 1)
     mask_actions.addWidget(mask_remove, 1)
     mask_session_actions = row(mask_details_layout)
-    mask_cancel = QPushButton(tr('Cancelar mascaramento'))
-    mask_finish = QPushButton(tr('Concluir mascaramento'))
+    mask_cancel = QPushButton(tr('Cancelar'))
+    mask_finish = QPushButton(tr('Concluir'))
     mask_cancel.setObjectName('maskCancel')
     mask_finish.setObjectName('primary')
+    for button in (mask_edit, mask_remove, mask_cancel, mask_finish):
+        compact_sidebar_action(button)
     mask_session_actions.addWidget(mask_cancel, 1)
     mask_session_actions.addWidget(mask_finish, 1)
     mask_layout.addWidget(mask_details)
@@ -1018,7 +1161,15 @@ def install_frontend(w):
         session = w._mask_edit_session
         mask_controls.setVisible(bool(session) or item is not None)
         mask_enabled.setVisible(False)
+        mask_enabled.setToolTip('')
         mask_details.setVisible(False)
+        mask_add_image.setVisible(False)
+        mask_add_image_container.setVisible(False)
+        mask_add_image.blockSignals(True)
+        mask_add_image.setChecked(False)
+        mask_add_image.blockSignals(False)
+        mask_insert_controls.setVisible(False)
+        mask_create_container.setVisible(False)
         for control in (mask_target, mask_create, mask_child, mask_edit,
                         mask_remove, mask_cancel, mask_finish):
             control.setVisible(False)
@@ -1030,6 +1181,7 @@ def install_frontend(w):
                 shape=w._generate_layer_name(shape.layer_id, shape),
             ))
             mask_enabled.setVisible(True)
+            mask_enabled.setText(tr('Máscara ativa'))
             set_mask_checkbox(True, enabled=False)
             mask_details.setVisible(True)
             mask_cancel.setVisible(True)
@@ -1043,23 +1195,28 @@ def install_frontend(w):
             parent = item.parentItem()
             mask_enabled.setVisible(True)
             if isinstance(parent, RectangleItem):
-                set_mask_checkbox(True)
+                mask_enabled.setText(tr('Máscara ativa'))
+                set_mask_checkbox(True, enabled=False)
                 mask_details.setVisible(True)
                 mask_status.setText(tr('Imagem vinculada a {shape}').format(
                     shape=w._generate_layer_name(parent.layer_id, parent)))
                 mask_edit.setVisible(True)
                 mask_remove.setVisible(True)
             else:
-                set_mask_checkbox(False)
                 shapes = sorted(w._mask_shapes(), key=lambda value: value.custom_name.casefold())
+                mask_enabled.setText(tr('Aplicar máscara'))
+                set_mask_checkbox(False, enabled=bool(shapes))
                 if not shapes:
-                    mask_status.setText(tr('Crie uma forma fechada para utilizá-la como máscara.'))
+                    mask_enabled.setToolTip(tr('Crie uma forma fechada para utilizá-la como máscara.'))
                     return
+                mask_enabled.setToolTip('')
                 mask_target.clear()
                 for shape in shapes:
                     mask_target.addItem(w._generate_layer_name(shape.layer_id, shape), shape)
                 mask_target.setVisible(True)
-                mask_create.setText(tr('Mascarar com'))
+                mask_insert_controls.setVisible(True)
+                mask_create.setText(tr('Aplicar'))
+                mask_create_container.setVisible(True)
                 mask_create.setVisible(True)
             return
         if isinstance(item, RectangleItem):
@@ -1071,18 +1228,26 @@ def install_frontend(w):
             )
             mask_enabled.setVisible(True)
             if not mask_available:
+                mask_enabled.setText(tr('Usar como máscara'))
                 set_mask_checkbox(bool(children), enabled=False)
                 return
             free_images = sorted(w._free_mask_images(), key=lambda value: value.custom_name.casefold())
-            set_mask_checkbox(bool(children))
+            mask_enabled.setText(tr('Máscara ativa') if children else tr('Usar como máscara'))
+            set_mask_checkbox(bool(children), enabled=not children and bool(free_images))
             mask_details.setVisible(bool(children))
             if free_images:
                 mask_target.clear()
                 for image in free_images:
                     mask_target.addItem(w._generate_layer_name(image.layer_id, image), image)
                 mask_target.setVisible(True)
-                mask_create.setText(tr('Usar como máscara'))
+                mask_create.setText(tr('Inserir imagem'))
+                mask_create_container.setVisible(True)
                 mask_create.setVisible(True)
+                if children:
+                    mask_add_image_container.setVisible(True)
+                    mask_add_image.setVisible(True)
+                else:
+                    mask_insert_controls.setVisible(True)
             if children:
                 mask_child.clear()
                 for image in reversed(children):
@@ -1092,7 +1257,9 @@ def install_frontend(w):
                 mask_remove.setVisible(True)
                 mask_status.setText(tr('{count} imagem(ns) vinculada(s)').format(count=len(children)))
             elif not free_images:
-                mask_status.setText(tr('Não há imagens disponíveis para mascaramento.'))
+                mask_enabled.setToolTip(tr('Não há imagens disponíveis para mascaramento.'))
+            else:
+                mask_enabled.setToolTip('')
             return
         mask_controls.setVisible(False)
 
@@ -1102,15 +1269,6 @@ def install_frontend(w):
         selected = w.scene.selectedItems()
         item = selected[0] if len(selected) == 1 else None
         if item is None:
-            return
-        has_mask = (
-            w._is_mask_image(item) and isinstance(item.parentItem(), RectangleItem)
-        ) or (
-            isinstance(item, RectangleItem) and bool(item.masked_images())
-        )
-        if not checked and has_mask:
-            w.remove_mask(item)
-            refresh_mask_controls()
             return
         mask_details.setVisible(checked)
 
@@ -1140,6 +1298,7 @@ def install_frontend(w):
     mask_cancel.clicked.connect(lambda: w.finish_mask_edit(False))
     mask_finish.clicked.connect(lambda: w.finish_mask_edit(True))
     mask_enabled.toggled.connect(toggle_mask_panel)
+    mask_add_image.toggled.connect(mask_insert_controls.setVisible)
     w._refresh_mask_controls = refresh_mask_controls
 
     prop_section = Section(tr('Propriedades'), props)
@@ -1157,10 +1316,7 @@ def install_frontend(w):
     hint.setWordWrap(True)
     hint.setObjectName('muted')
     tl.addWidget(hint)
-    typography_heading = QLabel(tr('TIPOGRAFIA'))
-    typography_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    themed_style(typography_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
-    tl.addWidget(typography_heading)
+    typography_heading = property_heading(tl, tr('TIPOGRAFIA'))
     font_row = row(tl, field(tr('Fonte'), t.cbo_font), field(tr('Tamanho'), t.spin_size))
     font_row.setStretch(0, 3)
     font_row.setStretch(1, 1)
@@ -1205,10 +1361,7 @@ def install_frontend(w):
         t.color_hex.setProperty('lastColor', color.name())
         text_alpha.setValue(round(color.alphaF()*100))
     t.fontColorChanged.connect(color_changed)
-    alignment_heading = QLabel(tr('ALINHAMENTO'))
-    alignment_heading.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    themed_style(alignment_heading, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
-    tl.addWidget(alignment_heading)
+    alignment_heading = property_heading(tl, tr('ALINHAMENTO'), separated=True)
     for control in (t.spin_lh, t.spin_indent, t.spin_size):
         selector = 'QComboBox' if isinstance(control, QComboBox) else 'QAbstractSpinBox'
         themed_style(control, selector + ' { min-height: 18px; max-height: 18px; padding-top: 5px; padding-bottom: 5px; }')
@@ -1321,12 +1474,7 @@ def install_frontend(w):
     text_section = Section(tr('Texto'), text_body)
     il.addWidget(text_section)
     doc, dl = column()
-    def document_heading(title):
-        label = QLabel(title)
-        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        themed_style(label, 'color: @muted@; font-size: 10px; font-weight: 600; margin-top: 6px;')
-        dl.addWidget(label)
-    document_heading(tr('DIMENSÕES'))
+    dimensions_heading = property_heading(dl, tr('DIMENSÕES'))
     w.chk_doc_proporcao.setText('')
     w.chk_doc_proporcao.setToolTip(tr('Manter a proporção do documento'))
     w.chk_doc_proporcao.setFixedSize(30, 30)
@@ -1335,7 +1483,7 @@ def install_frontend(w):
                      compact('A', w.spin_phys_h, 'mm', None), w.chk_doc_proporcao)
     dimensions.setStretch(0, 1)
     dimensions.setStretch(1, 1)
-    document_heading(tr('CAMPOS DA TABELA'))
+    table_fields_heading = property_heading(dl, tr('CAMPOS DA TABELA'), separated=True)
     order_hint = QLabel(tr('Segure e arraste para ajustar a ordem'))
     order_hint.setWordWrap(True)
     themed_style(order_hint, 'color: @disabled@; font-size: 10px;')
@@ -1509,13 +1657,24 @@ def install_frontend(w):
                 text_section.header.setChecked(bool(text_available))
                 selection_state['kind'] = current_kind
         from .canvas_items import RectangleItem, ImageItem, BackgroundItem, SignatureItem
-        is_shape = len(selected) == 1 and isinstance(selected[0], RectangleItem)
-        background_selected = any(getattr(item, 'is_document_background', False) for item in selected)
-        restore_visible = len(selected) == 1 and (
-            isinstance(selected[0], SignatureItem)
+        mask_session = w._mask_edit_session
+        inspector_item = (
+            mask_session.get('inspector_item')
+            if mask_session else (selected[0] if len(selected) == 1 else None)
+        )
+        # Durante a edição de uma máscara a imagem precisa ser a seleção real
+        # do canvas. O inspetor, porém, conserva o objeto pelo qual o operador
+        # iniciou o fluxo para que a lateral não troque de estrutura.
+        is_shape = isinstance(inspector_item, RectangleItem)
+        background_selected = bool(
+            inspector_item is not None
+            and getattr(inspector_item, 'is_document_background', False)
+        )
+        restore_visible = (
+            isinstance(inspector_item, SignatureItem)
             or (
-                isinstance(selected[0], ImageItem)
-                and not isinstance(selected[0], (RectangleItem, BackgroundItem))
+                isinstance(inspector_item, ImageItem)
+                and not isinstance(inspector_item, (RectangleItem, BackgroundItem))
             )
         )
         if background_selected:
@@ -1524,11 +1683,28 @@ def install_frontend(w):
         w.btn_dup_layer.setEnabled(bool(selected) and not background_selected)
         w.btn_del_layer.setEnabled(bool(selected) and not background_selected)
         shape_controls.setVisible(is_shape)
+        restore_controls.setVisible(restore_visible)
         p.btn_restore.setVisible(restore_visible)
-        link_controls.setVisible(len(selected) == 1)
+        link_controls.setVisible(inspector_item is not None)
         dynamic_controls.setVisible(False)
+        # A seleção técnica da imagem durante o enquadramento não deve alterar
+        # nem apagar visualmente o inspetor que o operador já estava usando.
+        # Os próprios manipuladores ignoram ações incompatíveis com o item
+        # ativo, portanto os blocos podem conservar sua apresentação normal.
+        for controls in (shape_controls, restore_controls, link_controls, dynamic_controls):
+            controls.setEnabled(True)
+        masked_image_selected = bool(
+            isinstance(inspector_item, ImageItem)
+            and not isinstance(inspector_item, RectangleItem)
+            and isinstance(inspector_item.parentItem(), RectangleItem)
+        )
+        link_available = inspector_item is not None and not (
+            background_selected or masked_image_selected
+        )
+        link_controls.setEnabled(link_available)
+        p.set_link_available(link_available)
         if is_shape:
-            item = selected[0]
+            item = inspector_item
             is_line = item.shape_type == 'line'
             dynamic_available = (
                 not is_line
@@ -1603,12 +1779,41 @@ def install_frontend(w):
             for control in (outline_color, outline_swatch, outline_width, outline_position, outline_alpha, outline_join):
                 control.setEnabled(item.outline_enabled)
             background_outline_hint.setVisible(background_selected)
-            shape_color.setText(selected[0].fill_color)
-            themed_style(shape_swatch, f'background: {selected[0].fill_color};')
+            shape_color.setText(item.fill_color)
+            themed_style(shape_swatch, f'background: {item.fill_color};')
             p.btn_restore.setEnabled(False)
-            p.set_link_available(not background_selected)
+        link_item = inspector_item
+        link_owner = (
+            inspector_item.state
+            if inspector_item is not None and hasattr(inspector_item, 'state')
+            else inspector_item
+        )
+        updating_link['active'] = True
+        try:
+            link_enabled = bool(link_owner and getattr(link_owner, 'has_link', False))
+            if not link_available:
+                link_enabled = False
+            link_field.setText(
+                w._link_key_for_item(link_item) if link_enabled else ''
+            )
+            link_details.setVisible(link_enabled)
+        finally:
+            updating_link['active'] = False
         refresh_mask_controls()
-        selection.setText(tr('SELEÇÃO') + '\n' + (getattr(selected[0], 'layer_name', '') or tr('Objeto selecionado') if selected else tr('Nenhum objeto')))
+        if mask_session and not prop_section.header.isChecked():
+            prop_section.header.setChecked(True)
+        if mask_heading._section_separator is not None:
+            mask_heading._section_separator.setVisible(is_shape or restore_visible)
+        if link_heading._section_separator is not None:
+            link_heading._section_separator.setVisible(
+                is_shape or restore_visible or mask_controls.isVisible()
+            )
+        selection.setText(
+            tr('SELEÇÃO') + '\n' + (
+                getattr(inspector_item, 'layer_name', '') or tr('Objeto selecionado')
+                if inspector_item is not None else tr('Nenhum objeto')
+            )
+        )
         if t.isEnabled() and len(selected) == 1:
             color_changed(getattr(selected[0].state, 'font_color', '#000000'))
             if hasattr(w, 'canvas_edit'):

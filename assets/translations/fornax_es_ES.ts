@@ -2449,6 +2449,27 @@ Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta ses
     </message>
     <message><source>CONTORNO</source><translation>CONTORNO</translation></message>
     <message><source>LINK</source><translation>ENLACE</translation></message>
+    <message><source>Ativar contorno</source><translation>Activar contorno</translation></message>
+    <message><source>ARQUIVO ORIGINAL</source><translation>ARCHIVO ORIGINAL</translation></message>
+    <message><source>Link</source><translation>Enlace</translation></message>
+    <message><source>Link {numero}</source><translation>Enlace {numero}</translation></message>
+    <message><source>Ex.: Link</source><translation>Ej.: Enlace</translation></message>
+    <message><source>Cantos retos</source><translation>Esquinas rectas</translation></message>
+    <message><source>Cantos arredondados</source><translation>Esquinas redondeadas</translation></message>
+    <message><source>Concluir</source><translation>Finalizar</translation></message>
+    <message><source>Usar imagem variável</source><translation>Usar imagen variable</translation></message>
+    <message><source>Aplicar máscara</source><translation>Aplicar máscara</translation></message>
+    <message><source>Máscara ativa</source><translation>Máscara activa</translation></message>
+    <message><source>+ Imagem</source><translation>+ Imagen</translation></message>
+    <message><source>Usar como moldura…</source><translation>Usar como marco…</translation></message>
+    <message><source>Colocar em uma moldura…</source><translation>Colocar en un marco…</translation></message>
+    <message><source>Moldura ativa</source><translation>Marco activo</translation></message>
+    <message><source>Ajustar imagem</source><translation>Ajustar imagen</translation></message>
+    <message><source>Remover da moldura</source><translation>Quitar del marco</translation></message>
+    <message><source>Colocar na moldura</source><translation>Colocar en el marco</translation></message>
+    <message><source>Inserir imagem</source><translation>Insertar imagen</translation></message>
+    <message><source>Crie uma forma fechada para utilizá-la como moldura.</source><translation>Cree una forma cerrada para usarla como marco.</translation></message>
+    <message><source>Não há imagens disponíveis para usar na moldura.</source><translation>No hay imágenes disponibles para usar en el marco.</translation></message>
     <message><source>IMAGEM VARIÁVEL</source><translation>IMAGEN VARIABLE</translation></message>
     <message><source>Usar máscara</source><translation>Usar máscara</translation></message>
     <message><source>Usar imagem indicada na tabela</source><translation>Usar la imagen indicada en la tabla</translation></message>

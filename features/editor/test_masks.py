@@ -6,7 +6,7 @@ from PySide6.QtCore import QPointF, QRectF, Qt
 from PySide6.QtWidgets import QGraphicsItem
 from PySide6.QtGui import QColor, QImage, QPainter
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QComboBox, QGraphicsScene, QLineEdit,
+    QApplication, QComboBox, QGraphicsScene, QLineEdit,
     QPushButton, QWidget,
 )
 
@@ -59,8 +59,12 @@ class ImageMaskTest(unittest.TestCase):
             asset = self._asset(folder)
             window, shape, image = self._window_objects(asset)
             try:
+                image.has_link = True
+                image.link_key = 'Perfil'
                 history_index = window.history._current_index
                 self.assertTrue(window.create_mask(image, shape))
+                self.assertFalse(image.has_link)
+                self.assertEqual(image.link_key, '')
                 self.assertIs(image.parentItem(), shape)
                 self.assertEqual(image.rect().size(), QRectF(0, 0, 160, 60).size())
                 self.assertEqual(image.rotation(), 12)
@@ -83,6 +87,8 @@ class ImageMaskTest(unittest.TestCase):
 
                 state = window.get_current_scene_state()
                 saved = state['images'][0]
+                self.assertFalse(saved['has_link'])
+                self.assertEqual(saved['link_key'], '')
                 self.assertEqual(saved['mask_shape_id'], f'shape:{shape.layer_id}')
                 self.assertEqual(saved['mask_order'], 0)
                 saved_shape = next(entry for entry in state['shapes']
@@ -102,6 +108,12 @@ class ImageMaskTest(unittest.TestCase):
                 self.assertEqual(
                     restored_image.acceptedMouseButtons(), Qt.MouseButton.NoButton
                 )
+                window.scene.clearSelection()
+                restored_image.setSelected(True)
+                self.app.processEvents()
+                link_controls = window.findChild(QWidget, 'linkControls')
+                self.assertFalse(link_controls.isEnabled())
+                self.assertFalse(window.caixa_texto_panel.chk_link.isChecked())
 
                 rendered = NativeRenderer(state).render_preview_image(transparent=True)
                 self.assertFalse(rendered.isNull())
@@ -133,7 +145,7 @@ class ImageMaskTest(unittest.TestCase):
             try:
                 shape.setSelected(True)
                 self.app.processEvents()
-                enabled = window.findChild(QCheckBox, 'maskEnabled')
+                enabled = window.findChild(QPushButton, 'maskEnabled')
                 details = window.findChild(QWidget, 'maskDetails')
                 target = window.findChild(QComboBox, 'maskTarget')
                 create = window.findChild(QPushButton, 'maskCreate')
@@ -151,12 +163,54 @@ class ImageMaskTest(unittest.TestCase):
                 self.app.processEvents()
                 self.assertIs(image.parentItem(), shape)
                 self.assertIsNotNone(window._mask_edit_session)
+                shape_controls = window.findChild(QWidget, 'shapeControls')
+                self.assertFalse(shape_controls.isHidden())
+                self.assertTrue(shape_controls.isEnabled())
+                self.assertTrue(
+                    window._inspector_sections['properties'].header.isChecked()
+                )
+                cancel = window.findChild(QPushButton, 'maskCancel')
+                finish = details.findChild(QPushButton, 'primary')
+                link_height = window.caixa_texto_panel.chk_link.height()
+                self.assertEqual(cancel.height(), link_height)
+                self.assertEqual(finish.height(), link_height)
                 window.finish_mask_edit(True)
                 self.app.processEvents()
                 self.assertTrue(enabled.isChecked())
-                enabled.click()
+                self.assertFalse(enabled.isEnabled())
+                edit = window.findChild(QPushButton, 'maskEdit')
+                remove = window.findChild(QPushButton, 'maskRemove')
+                self.assertEqual(edit.height(), window.caixa_texto_panel.chk_link.height())
+                self.assertEqual(remove.height(), window.caixa_texto_panel.chk_link.height())
+                remove.click()
                 self.app.processEvents()
                 self.assertIsNone(image.parentItem())
+            finally:
+                self._close(window)
+
+    def test_existing_mask_reveals_new_image_picker_only_on_request(self):
+        with tempfile.TemporaryDirectory() as folder:
+            asset = self._asset(folder)
+            window, shape, image = self._window_objects(asset)
+            try:
+                window.create_mask(image, shape)
+                window.finish_mask_edit(True)
+                second = ImageItem(str(asset))
+                second.layer_id = window._get_next_layer_id()
+                second.custom_name = 'Foto 2'
+                window.scene.addItem(second)
+                window.refresh_layer_list()
+                window.scene.clearSelection()
+                shape.setSelected(True)
+                self.app.processEvents()
+
+                add_image = window.findChild(QPushButton, 'maskAddImage')
+                insert_controls = window.findChild(QWidget, 'maskInsertControls')
+                self.assertFalse(add_image.isHidden())
+                self.assertTrue(insert_controls.isHidden())
+                add_image.click()
+                self.app.processEvents()
+                self.assertFalse(insert_controls.isHidden())
             finally:
                 self._close(window)
 
@@ -167,7 +221,7 @@ class ImageMaskTest(unittest.TestCase):
             try:
                 shape.setSelected(True)
                 self.app.processEvents()
-                dynamic = window.findChild(QCheckBox, 'dynamicImageEnabled')
+                dynamic = window.findChild(QPushButton, 'dynamicImageEnabled')
                 field = window.findChild(QLineEdit, 'dynamicImageField')
                 dynamic.setChecked(True)
                 self.app.processEvents()

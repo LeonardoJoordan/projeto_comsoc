@@ -96,7 +96,11 @@ def _required_page_fields(page: dict) -> list[str]:
                 item.get("link_key")
                 for collection in ("boxes", "images", "shapes")
                 for item in page.get(collection, [])
-                if item.get("has_link") and item.get("link_key")
+                if (
+                    item.get("has_link")
+                    and item.get("link_key")
+                    and not (collection == "images" and item.get("mask_shape_id"))
+                )
             ),
             *(
                 shape.get("dynamic_image_field")
@@ -560,7 +564,11 @@ def iter_page_link_items(document: dict):
     for page in normalized["pages"]:
         for collection in ("boxes", "images", "shapes"):
             for item in page.get(collection, []):
-                if item.get("has_link") and item.get("link_key"):
+                if (
+                    item.get("has_link")
+                    and item.get("link_key")
+                    and not (collection == "images" and item.get("mask_shape_id"))
+                ):
                     yield page["page_id"], collection, item
 
 

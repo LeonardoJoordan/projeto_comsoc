@@ -71,7 +71,8 @@ def test_alignment_icons_are_valid_svg_icons():
     for name in (
         "bot-alignment", "center-align", "justify", "left-align", "line-space",
         "mid-alignment", "paragraph", "right-align", "top-alignment",
-        "bold", "italic", "underline",
+        "bold", "italic", "underline", "straight_edge", "curved_edge",
+        "sup_esq", "sup_dir", "inf_esq", "inf_dir",
     ):
         path = align_icon_path(name)
         assert path.is_file()

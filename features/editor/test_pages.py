@@ -222,6 +222,7 @@ class EditorPagesTest(unittest.TestCase):
                 box.setRotation(17)
                 box.setOpacity(0.65)
                 box.state.has_link = True
+                box.state.link_key = "Site do texto"
                 box.setZValue(8)
                 box.apply_state()
                 picture = ImageItem(str(asset))
@@ -231,6 +232,7 @@ class EditorPagesTest(unittest.TestCase):
                 picture.setRotation(-12)
                 picture.setOpacity(0.7)
                 picture.has_link = True
+                picture.link_key = "Site da imagem"
                 picture.setZValue(4)
                 window.scene.addItem(picture)
                 window.scene.clearSelection()
@@ -250,11 +252,13 @@ class EditorPagesTest(unittest.TestCase):
                 self.assertEqual(pasted_box.rotation(), 17)
                 self.assertAlmostEqual(pasted_box.opacity(), 0.65)
                 self.assertTrue(pasted_box.state.has_link)
+                self.assertEqual(pasted_box.state.link_key, "Site do texto")
                 self.assertEqual(Path(pasted_image._original_path), asset)
                 self.assertEqual((pasted_image.x(), pasted_image.y()), (80.0, 90.0))
                 self.assertEqual(pasted_image.rotation(), -12)
                 self.assertAlmostEqual(pasted_image.opacity(), 0.7)
                 self.assertTrue(pasted_image.has_link)
+                self.assertEqual(pasted_image.link_key, "Site da imagem")
                 self.assertLess(pasted_image.zValue(), pasted_box.zValue())
                 self.assertEqual(window.history._current_index, history_before + 1)
 
@@ -284,6 +288,7 @@ class EditorPagesTest(unittest.TestCase):
                 shape.outline_enabled = True
                 shape.outline_width = 3.5
                 shape.has_link = True
+                shape.link_key = "Site da forma"
                 shape.setPos(25, 35)
                 shape.setRotation(23)
                 shape.setZValue(3)
@@ -329,6 +334,7 @@ class EditorPagesTest(unittest.TestCase):
                 self.assertTrue(pasted_shape.outline_enabled)
                 self.assertEqual(pasted_shape.outline_width, 3.5)
                 self.assertTrue(pasted_shape.has_link)
+                self.assertEqual(pasted_shape.link_key, "Site da forma")
                 self.assertEqual((pasted_shape.x(), pasted_shape.y()), (25.0, 35.0))
                 self.assertEqual(pasted_shape.rotation(), 23)
                 self.assertEqual(Path(pasted_signature._original_path), asset)

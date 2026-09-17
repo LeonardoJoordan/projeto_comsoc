@@ -206,11 +206,6 @@ class NativeRenderer:
         for _, kind, item in entries:
             if kind == "shape" and item.get("dynamic_image_field"):
                 break
-            if kind == 'shape' and any(
-                child.get('has_link') and child.get('link_key')
-                for child in images_by_mask.get(item.get('object_id'), [])
-            ):
-                break
             if kind not in ("image", "shape") or (item.get("has_link") and item.get("link_key")):
                 break
             prefix += 1
@@ -359,12 +354,6 @@ class NativeRenderer:
                     iw, ih, image.get('rotation', 0),
                     float(image.get('opacity', 1.0)) * float(shape.get('opacity', 1.0)),
                 )
-                if image.get('has_link') and image.get('link_key') and out_links is not None:
-                    url = self._resolve_link_url(image['link_key'], row_rich, row_plain)
-                    if url:
-                        clipped_rect = image_rect.intersected(rect) if rect is not None else image_rect
-                        if not clipped_rect.isEmpty():
-                            out_links.append({'url': url, 'rect': clipped_rect})
         finally:
             painter.restore()
         if shape.get('outline_enabled'):

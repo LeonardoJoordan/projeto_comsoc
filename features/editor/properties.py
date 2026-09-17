@@ -2,7 +2,7 @@ from core.themes import themed_style, theme_color, theme_manager
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
                                QFormLayout, QGridLayout, QTextEdit, QFontComboBox,
                                QPushButton, QComboBox, QDoubleSpinBox, QColorDialog,
-                               QCheckBox, QGraphicsOpacityEffect, QMessageBox)
+                               QGraphicsOpacityEffect, QMessageBox, QSizePolicy)
 from PySide6.QtCore import Qt, Signal, QMimeData, QSize
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat, QIcon
 import re
@@ -282,10 +282,13 @@ class CaixaDeTextoPanel(QWidget):
         opac_line.addWidget(self.lbl_opacity)
         opac_line.addWidget(self.spin_opacity, 1)
 
-        self.chk_link = QCheckBox(tr("Habilitar link"))
-        self.chk_link.setIcon(QIcon(str(action_icon_path("link"))))
-        self.chk_link.setIconSize(QSize(18, 18))
-        self.chk_link.setFixedHeight(30)
+        self.chk_link = QPushButton(tr("Habilitar link"))
+        self.chk_link.setCheckable(True)
+        self.chk_link.setFixedHeight(22)
+        self.chk_link.setSizePolicy(
+            QSizePolicy.Policy.Expanding,
+            QSizePolicy.Policy.Fixed,
+        )
         self.chk_link.setToolTip(
             "<b>HABILITAR LINK (URL)</b><br><br>"
             "Cria uma área de interação (clicável) no PDF exportado:<br><br>"

@@ -17,3 +17,4 @@ class TextState:
     line_height: float = 1.15
     font_color: str = "#000000"
     has_link: bool = False
+    link_key: str = ""
