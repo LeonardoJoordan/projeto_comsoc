@@ -55,10 +55,10 @@ e centralizada ficam desabilitadas em Propriedades. Fundos salvos anteriormente
 com outro alinhamento passam a usar o contorno interno ao abrir.
 O seletor de cores é o diálogo Qt existente. Não há integração nova no workspace.
 
-`frontend.py` reorganiza os controles existentes preservando seus sinais. Os
-contêineres originais ficam ocultos para manter referências usadas pelo legado;
-a separação definitiva entre construção da interface e lógica pode ser feita
-após aprovação visual. Nenhum processamento periódico foi adicionado ao canvas.
+`frontend.py` compõe diretamente a interface aprovada a partir da cena e dos
+controles funcionais do editor. A janela não monta nem oculta uma interface
+anterior antes de criar o layout atual. Nenhum processamento periódico foi
+adicionado ao canvas.
 
 Validação inicial: abertura offscreen, captura visual, criação de texto, seleção,
 alteração de largura, bloqueio dos campos sem seleção e execução de desfazer/refazer.
@@ -69,7 +69,7 @@ A fluidez no computador do operador ainda precisa ser avaliada presencialmente.
 Barra compacta com identificadores X/Y/L/A dentro dos campos, cabeçalho com
 nome do modelo, ferramentas com subtítulos e ações de camada em ícones.
 Laterais inicialmente com 262 e 322 pixels, seguindo a referência QML.
-As medidas continuam em mm para preservar o contrato dos controles do legado.
+As medidas continuam em mm para preservar o contrato dos controles do editor.
 
 ## Edição no canvas
 

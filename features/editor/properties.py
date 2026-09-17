@@ -222,7 +222,6 @@ class CaixaDeTextoPanel(QWidget):
         rot_buttons.setSpacing(4)
 
         self.btn_rot_minus_90 = self._make_tool_button("", "Gira o objeto 90° anti-horário.")
-        self.btn_rot_zero = self._make_tool_button("⬆️", "Zera a rotação do objeto.")
         self.btn_rot_plus_90 = self._make_tool_button("", "Gira o objeto 90° horário.")
         for button, asset_name in (
             (self.btn_rot_minus_90, "rotate-left"),
@@ -236,20 +235,14 @@ class CaixaDeTextoPanel(QWidget):
         self.op_rot_minus = QGraphicsOpacityEffect(self.btn_rot_minus_90)
         self.btn_rot_minus_90.setGraphicsEffect(self.op_rot_minus)
         
-        self.op_rot_zero = QGraphicsOpacityEffect(self.btn_rot_zero)
-        self.btn_rot_zero.setGraphicsEffect(self.op_rot_zero)
-        
         self.op_rot_plus = QGraphicsOpacityEffect(self.btn_rot_plus_90)
         self.btn_rot_plus_90.setGraphicsEffect(self.op_rot_plus)
         
         self.btn_rot_minus_90.clicked.connect(lambda: self._apply_rotation_delta(-90))
-        self.btn_rot_zero.clicked.connect(lambda: self._set_rotation_value(0))
         self.btn_rot_plus_90.clicked.connect(lambda: self._apply_rotation_delta(90))
 
         rot_buttons.addStretch(1)
         rot_buttons.addWidget(self.btn_rot_minus_90)
-        rot_buttons.addStretch(1)
-        rot_buttons.addWidget(self.btn_rot_zero)
         rot_buttons.addStretch(1)
         rot_buttons.addWidget(self.btn_rot_plus_90)
         rot_buttons.addStretch(1)
@@ -362,10 +355,6 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_rot.setValue(self._normalize_rotation(self.spin_rot.value() + delta))
         self.snapshotRequested.emit()
 
-    def _set_rotation_value(self, value):
-        self.spin_rot.setValue(self._normalize_rotation(value))
-        self.snapshotRequested.emit()
-
     def _on_proportion_toggled(self, checked):
         # Altera visualmente a opacidade
         self._refresh_proportion_button(not self._group_mode and self.isEnabled())
@@ -418,7 +407,6 @@ class CaixaDeTextoPanel(QWidget):
                 self.lbl_rot,
                 self.spin_rot,
                 self.btn_rot_minus_90,
-                self.btn_rot_zero,
                 self.btn_rot_plus_90,
             ),
             available,

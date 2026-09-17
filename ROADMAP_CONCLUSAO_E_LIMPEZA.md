@@ -44,7 +44,7 @@ Este documento orienta a sequência de trabalho até a conclusão das funcionali
 
 ### 4. Construção direta da interface atual
 
-**Status:** pendente.
+**Status:** concluída e verificada em 17/09/2026.
 
 **Direção:** eliminar a montagem de interfaces antigas que depois são ocultadas ou desmontadas. Começar pelo workspace e avançar por editor e tabela em mudanças separadas.
 
@@ -130,3 +130,12 @@ Ao encerrar uma etapa ou sessão, registrar brevemente:
 - **Editor:** o container antigo deixou de permanecer oculto durante toda a sessão; controles sem consumidor atual são destruídos. Ainda falta impedir sua construção transitória no início do editor, substituindo a inicialização antiga por uma fábrica direta dos controles usados pelo frontend atual.
 - **Verificação executada:** 109 testes e 10 subtestes da suíte principal; 59 testes do editor; smoke test e captura visual offscreen do workspace reconstruído.
 - **Próximo ponto de retomada:** separar a criação dos controles do editor de seus layouts antigos, remover o último `takeCentralWidget()` e então concluir a etapa 4.
+
+### Registro — etapa 4, conclusão
+
+- **Etapa e estado:** construção direta da interface atual concluída.
+- **Concluído e verificado:** workspace, planilha e editor agora criam diretamente os layouts aprovados. O editor deixou de montar três colunas antigas antes do frontend atual; foram removidos `takeCentralWidget()`, a barra legada de camadas, os controles antigos de fundo e guias e o botão invisível de zerar rotação. Cena, controles funcionais e sinais são inicializados sem uma árvore visual descartável.
+- **Ciclo de vida:** os painéis funcionais de propriedades e texto têm propriedade Qt explícita e permanecem válidos após o processamento de exclusões adiadas. A auditoria dos atributos da janela não encontrou wrappers Qt destruídos.
+- **Verificação executada:** 109 testes e 10 subtestes da suíte principal; 60 testes do editor; compilação, auditoria de objetos Qt e captura visual offscreen do editor.
+- **Pendências ou decisões em aberto:** a separação dos painéis funcionais em controladores menores pertence à etapa 5; não há container legado sustentando a interface atual.
+- **Próximo ponto de retomada:** iniciar a etapa 5 reavaliando responsabilidades do `EditorWindow`, dos painéis de propriedades e da compatibilidade de modelos antes de definir os cortes internos.

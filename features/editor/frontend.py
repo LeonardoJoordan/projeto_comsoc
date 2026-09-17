@@ -1,5 +1,5 @@
 from core.themes import themed_style, theme_color, theme_manager
-"""Apresentação Widgets independente; reutiliza controles e sinais do legado."""
+"""Composição visual da interface Qt Widgets do editor."""
 from pathlib import Path
 from core.resources import (
     action_icon_path, align_icon_path, navigation_icon_path, object_icon_path,
@@ -320,11 +320,7 @@ class Section(QWidget):
 
 
 def install_frontend(w):
-    # Os controles usados pela interface atual são reparentados abaixo. O
-    # container anterior é descartado ao final, em vez de permanecer oculto.
-    old = w.takeCentralWidget()
-    for child in old.findChildren(QWidget):
-        themed_style(child, '')
+    # A janela fornece diretamente a cena e os controles funcionais usados aqui.
     themed_style(w, STYLE.replace('__ICONS__', (Path(__file__).parent / 'icons').as_posix()))
     w.resize(1500, 930)
     root, outer = column()
@@ -1816,7 +1812,7 @@ def install_frontend(w):
             if hasattr(w, 'canvas_edit'):
                 w.canvas_edit.sync_panel()
     w.scene.selectionChanged.connect(sync_enabled)
-    # O seletor legado bloqueia os sinais da cena enquanto seleciona pela lista.
+    # O seletor de camadas bloqueia os sinais da cena enquanto seleciona pela lista.
     # Atualizar depois dele também cobre o único acesso ao plano de fundo.
     w.layer_list.itemSelectionChanged.connect(sync_enabled)
     # O editor sempre começa no contexto geral do documento. As seções de
@@ -1847,20 +1843,3 @@ def install_frontend(w):
         )
 
     w._restore_inspector_state = restore_inspector_state
-    # Estes dois widgets ainda concentram sinais e métodos do editor, embora
-    # seus controles visuais tenham sido movidos para o frontend atual. Eles
-    # precisam de um proprietário independente antes da destruição da árvore
-    # antiga; na etapa seguinte serão convertidos em controladores diretos.
-    for controller in (p, t):
-        controller.setParent(w)
-        controller.hide()
-    for obsolete_name in (
-        'btn_fit_bg',
-        'btn_add_bg',
-        'btn_clear_guides',
-        'container_sup',
-        'layer_toolbar',
-    ):
-        if hasattr(w, obsolete_name):
-            delattr(w, obsolete_name)
-    old.deleteLater()

@@ -78,11 +78,11 @@ class EditorWindowLifecycleTest(unittest.TestCase):
         editor._last_saved_state = editor.get_current_scene_state()
         editor.close()
 
-    def test_current_frontend_survives_deferred_legacy_layout_deletion(self):
+    def test_current_frontend_controls_remain_valid_after_event_processing(self):
         editor = EditorWindow()
 
-        # O layout anterior era descartado com deleteLater(). O erro original
-        # só aparecia depois que o event loop efetivava essa exclusão.
+        # Regressão: os controles funcionais devem pertencer à árvore atual e
+        # continuar válidos depois do processamento de exclusões adiadas.
         QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
         self.app.processEvents()
 

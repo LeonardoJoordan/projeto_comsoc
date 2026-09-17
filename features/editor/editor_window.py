@@ -5,10 +5,10 @@ import shutil
 import math
 from pathlib import Path
 from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QGraphicsScene, QWidget,
-                               QHBoxLayout, QVBoxLayout, QFrame, QLabel, QPushButton,
+                               QHBoxLayout, QFrame, QLabel, QPushButton,
                                QMessageBox, QInputDialog, QListWidget, QAbstractItemView,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
-                               QFileDialog, QGraphicsOpacityEffect, QFormLayout, QGridLayout, QApplication,
+                               QFileDialog, QGraphicsOpacityEffect, QApplication,
                                QSizePolicy)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
@@ -231,483 +231,7 @@ class EditorWindow(QMainWindow):
         self.setWindowIcon(QIcon(str(app_icon_path())))
         self.resize(1200, 800)
 
-        central = QWidget()
-        self.setCentralWidget(central)
-        main_layout = QHBoxLayout(central)
-
-        left_container = QWidget()
-        left_container.setFixedWidth(220)
-        left_layout = QVBoxLayout(left_container)
-        
-        # --- Grupo: Linhas Guia ---
-        grp_guides = QFrame()
-        ly_guides = QVBoxLayout(grp_guides)
-        ly_guides.setContentsMargins(0, 0, 0, 10)
-        # --- Cabecalho das Linhas Guia com Botões de Controle ---
-        row_title_guides = QHBoxLayout()
-        row_title_guides.setContentsMargins(0, 10, 0, 0)
-        
-        lbl_guides = QLabel("LINHAS GUIA")
-        lbl_guides.setStyleSheet("font-weight: bold; font-size: 12px;")
-        self._apply_tooltip(lbl_guides, 
-            "<b>LINHAS GUIA</b><br><br>"
-            "Ferramentas de apoio visual projetadas para auxiliar no posicionamento e simetria dos elementos na prancheta.<br><br>"
-            "• <b>Apenas Referência:</b> São guias exclusivas do editor e <b>não aparecem na arte final</b> impressa.<br>"
-            "• <b>Atração (Snap):</b> Possuem magnetismo automático para o centro e para as bordas do canvas.<br>"
-            "• <b>Controle Total:</b> Podem ser ocultadas (👁️) ou bloqueadas (🔒) para não atrapalhar a edição de outros itens.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Selecione uma linha guia e digite o valor exato no painel 'POSIÇÃO (mm)' para obter um alinhamento milimétrico perfeito.</small>"
-        )
-        
-        # Estilo minimalista para os botões do título (sem borda, fundo transparente)
-        btn_icon_style = """
-            QPushButton { background-color: transparent; border: none; font-size: 14px; }
-            QPushButton:hover { background-color: #444444; border-radius: 4px; }
-            QPushButton:pressed { background-color: #222222; }
-        """
-        
-        self.btn_toggle_guides = QPushButton("👁️")
-        self.btn_toggle_guides.setFixedSize(26, 26)
-        self.btn_toggle_guides.setStyleSheet(btn_icon_style)
-        self.btn_toggle_guides.setCheckable(True)
-        self.btn_toggle_guides.setChecked(True)
-        self._apply_tooltip(self.btn_toggle_guides, 
-            "<b>MOSTRAR/OCULTAR GUIAS</b><br><br>"
-            "Alterna temporariamente a visibilidade de todas as linhas guia.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Desligue as guias rapidamente para ter uma visão limpa da arte e conferir o design sem poluição visual.</small>"
-        )
-        self.btn_toggle_guides.toggled.connect(self.toggle_guides_visibility)
-        # Efeito de opacidade para o olho
-        self.op_eye = QGraphicsOpacityEffect(self.btn_toggle_guides)
-        self.btn_toggle_guides.setGraphicsEffect(self.op_eye)
-        self.op_eye.setOpacity(1.0 if self.btn_toggle_guides.isChecked() else 0.2)
-        
-        self.btn_clear_guides = QPushButton()
-        self.btn_clear_guides.setIcon(QIcon(str(action_icon_path("delete"))))
-        self.btn_clear_guides.setIconSize(QSize(18, 18))
-        self.btn_clear_guides.setFixedSize(26, 26)
-        self.btn_clear_guides.setStyleSheet(btn_icon_style)
-        self._apply_tooltip(self.btn_clear_guides, 
-            "<b>LIMPAR TODAS AS GUIAS</b><br><br>"
-            "Remove permanentemente todas as linhas guia do modelo atual.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Excelente para fazer uma limpeza rápida quando você decide mudar o design completamente.</small>"
-        )
-        self.btn_clear_guides.clicked.connect(self.clear_all_guides)
-
-        self.btn_lock_guides = QPushButton("🔓")
-        self.btn_lock_guides.setFixedSize(26, 26)
-        self.btn_lock_guides.setStyleSheet(btn_icon_style)
-        self.btn_lock_guides.setCheckable(True)
-        self._apply_tooltip(self.btn_lock_guides, 
-            "<b>BLOQUEAR/DESBLOQUEAR GUIAS</b><br><br>"
-            "Impede que as linhas guia sejam movidas ou selecionadas acidentalmente.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Ative o cadeado após posicionar suas linhas para evitar esbarrões enquanto edita os textos e imagens.</small>"
-        )
-        self.btn_lock_guides.toggled.connect(self.toggle_guides_lock)
-        # Efeito de opacidade para o cadeado
-        self.op_lock = QGraphicsOpacityEffect(self.btn_lock_guides)
-        self.btn_lock_guides.setGraphicsEffect(self.op_lock)
-        self.op_lock.setOpacity(1.0 if self.btn_lock_guides.isChecked() else 0.2)
-
-        row_title_guides.addWidget(lbl_guides)
-        row_title_guides.addStretch()
-        row_title_guides.addWidget(self.btn_toggle_guides)
-        row_title_guides.addWidget(self.btn_lock_guides)
-        row_title_guides.addWidget(self.btn_clear_guides)
-        
-        ly_guides.addLayout(row_title_guides)
-
-        # --- Botões de Criação ---
-        lbl_add_info = QLabel("Adicionar linhas")
-        lbl_add_info.setStyleSheet("font-size: 10px; color: #888888; margin-top: 5px;")
-        lbl_add_info.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        ly_guides.addWidget(lbl_add_info)
-
-        row_guides = QHBoxLayout()
-        row_guides.setSpacing(10)
-        
-        btn_guide_v = QPushButton("Vertical")
-        btn_guide_v.setMinimumHeight(30)
-        self._apply_tooltip(btn_guide_v, "<b>ADICIONAR GUIA VERTICAL</b><br><br>Insere uma linha de alinhamento vertical no centro da prancheta.")
-        btn_guide_v.clicked.connect(lambda: self.add_guide(vertical=True))
-
-        btn_guide_h = QPushButton("Horizontal")
-        btn_guide_h.setMinimumHeight(30)
-        self._apply_tooltip(btn_guide_h, "<b>ADICIONAR GUIA HORIZONTAL</b><br><br>Insere uma linha de alinhamento horizontal no centro da prancheta.")
-        btn_guide_h.clicked.connect(lambda: self.add_guide(vertical=False))
-        
-        row_guides.addWidget(btn_guide_v)
-        row_guides.addWidget(btn_guide_h)
-        ly_guides.addLayout(row_guides)
-        left_layout.addWidget(grp_guides)
-        self._add_separator(left_layout)
-
-        # --- Grupo: Elementos ---
-        grp_boxes = QFrame()
-        ly_boxes = QVBoxLayout(grp_boxes)
-        ly_boxes.setContentsMargins(0, 0, 0, 10)
-        lbl_elements = QLabel("<b>ELEMENTOS</b>")
-        self._apply_tooltip(lbl_elements, 
-            "<b>CONSTRUTOR DE LAYOUT</b><br><br>"
-            "Conjunto de ferramentas essenciais para estruturar o design do seu modelo.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Todo elemento adicionado surge inicialmente centralizado na prancheta. Arraste-os para compor sua arte.</small>")
-        ly_boxes.addWidget(lbl_elements)
-        
-        self.btn_add_sig = QPushButton("✍️ Assinatura")
-        self.btn_add_sig.setMinimumHeight(35)
-        self.btn_add_sig.clicked.connect(self._on_click_add_signature)
-        self.btn_add_sig.setToolTip(
-            "<b>ASSINATURA DIGITAL</b><br><br>"
-            "Adiciona uma assinatura para documentos ou cartões destinados ao envio por mídias digitais:<br><br>"
-            "• <b>Recomendação:</b> Utilize arquivos .PNG com fundo transparente para garantir que a assinatura flutue naturalmente sobre o design do cartão.<br>"
-            "• <b>Tabela Inteligente:</b> Modelos com este elemento ganham uma coluna especial ('✍️ Ass.') na tabela de dados.<br>"
-            "• <b>Controle Seletivo:</b> Permite indicar, linha por linha, se o documento final receberá ou não a assinatura carimbada.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Utilize para carimbar mensagens manuscritas digitalizadas (com fundo transparente) em destinatários específicos. Isso permite que o Comandante/Chefe/Diretor inclua notas pessoais e exclusivas em meio a um lote padrão de cartões, sem precisar alterar o modelo original.</small>")
-        ly_boxes.addWidget(self.btn_add_sig)
-
-        self.btn_add = QPushButton("📝 Caixa de Texto")
-        self.btn_add.setMinimumHeight(35)
-        self.btn_add.clicked.connect(self.add_new_box)
-        self.btn_add.setToolTip(
-            "<b>TEXTO DINÂMICO</b><br><br>"
-            "Cria áreas que serão preenchidas automaticamente com os dados da sua tabela (ex: {Nome}):<br><br>"
-            "• <b>Delimitação:</b> A largura da caixa trava o alinhamento, mas o conteúdo pode expandir verticalmente caso o texto seja muito longo.<br>"
-            "• <b>Formatação:</b> Suporta estilos individuais de fontes, cores e recuos por caixa.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Configure o alinhamento vertical como 'Meio' para que nomes curtos ou longos fiquem sempre bem centralizados na moldura.</small>")
-        ly_boxes.addWidget(self.btn_add)
-
-        self.btn_add_img = QPushButton("📸 Imagem")
-        self.btn_add_img.setMinimumHeight(35)
-        self.btn_add_img.clicked.connect(self._on_click_add_image)
-        self.btn_add_img.setToolTip(
-            "<b>ELEMENTOS VISUAIS</b><br><br>"
-            "Insere ícones, fotos, selos ou mapas para personalização e identidade visual:<br><br>"
-            "• <b>Interatividade:</b> É possível ativar links clicáveis para criar cartões interativos no formato PDF.<br>"
-            "• <b>Versatilidade:</b> Ideal para incluir botões de ação, logotipos ou QR Codes estáticos.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Transforme logos de redes sociais em links diretos para criar cartões de visita digitais interativos.</small>")
-        ly_boxes.addWidget(self.btn_add_img)
-
-        self.btn_add_bg = QPushButton("🖼️ Fundo")
-        self.btn_add_bg.setMinimumHeight(35)
-        self.btn_add_bg.clicked.connect(self._on_click_load_bg)
-        self.btn_add_bg.setToolTip(
-            "<b>IMAGEM DE FUNDO</b><br><br>"
-            "Define a base gráfica e as dimensões estruturais (alma) do seu documento:<br><br>"
-            "• <b>Criação Externa:</b> Recomenda-se criar a base em programas especializados (Photoshop, Corel, Gimp ou Inkscape).<br>"
-            "• <b>Auto-ajuste:</b> As dimensões da imagem importada definem automaticamente o tamanho do documento (cartão, diploma, prisma ou etiquetas).<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Exporte seu fundo em 300 DPI para garantir que a impressão saia com nitidez máxima e cores fiéis ao design original.</small>")
-        ly_boxes.addWidget(self.btn_add_bg)
-        left_layout.addWidget(grp_boxes)
-        self._add_separator(left_layout)
-
-        lbl_layers = QLabel("<b>CAMADAS</b>")
-        self._apply_tooltip(lbl_layers, 
-            "<b>PAINEL DE CAMADAS</b><br><br>"
-            "Gerencia a sobreposição e o estado de todos os objetos do modelo:<br><br>"
-            "• <b>Hierarquia:</b> Itens no topo da lista cobrem visualmente os que estão abaixo.<br>"
-            "• <b>Categorias:</b> Assinaturas sempre sobrepõem Textos, que sobrepõem Imagens.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Você pode arrastar os itens na lista para reordená-los dentro da sua própria categoria.</small>")
-        left_layout.addWidget(lbl_layers)
-
-        # Barra de Ferramentas Auxiliar de Camadas (Undo, Redo, Dup, Del)
-        self.layer_toolbar = self._setup_layer_toolbar()
-        left_layout.addWidget(self.layer_toolbar)
-
-        self.layer_list = QListWidget()
-        self.layer_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        self.layer_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
-        self.layer_list.itemSelectionChanged.connect(self._on_layer_selection_changed)
-        self.layer_list.itemChanged.connect(self._on_layer_item_changed)
-        self.layer_list.itemDoubleClicked.connect(self.rename_layer)
-        self.layer_list.model().rowsMoved.connect(self._on_layer_reordered)
-        left_layout.addWidget(self.layer_list)
-        
-        main_layout.addWidget(left_container)
-
-        self.scene = QGraphicsScene(0, 0, 1000, 1000)
-        self._document_rect = QRectF(0, 0, 1000, 1000)
-        self.scene._document_rect = QRectF(self._document_rect)
-        self.view = QGraphicsView(self.scene)
-        self.view.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate) # <-- EXTIRPA OS FANTASMAS
-        self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.view.setBackgroundBrush(QBrush(QColor("#e0e0e0")))
-        self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        self.view.setRubberBandSelectionMode(Qt.ItemSelectionMode.ContainsItemShape)
-
-        self._selection_frame = SelectionTransformFrame(self)
-        self.scene.addItem(self._selection_frame)
-        self.scene._multi_selection_active = False
-        self._selection_frame_timer = QTimer(self)
-        self._selection_frame_timer.setSingleShot(True)
-        self._selection_frame_timer.timeout.connect(self._refresh_selection_frame)
-        
-        # Otimização de UX: Zoom segue o ponteiro do mouse
-        self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
-        
-        # Filtra a view e o viewport para impedir o vazamento do Scroll
-        self.view.installEventFilter(self)
-        self.view.viewport().installEventFilter(self)
-        
-        self.bg_item = None
-        self.background_path = None
-        self._space_pan_items = []
-        
-        self.fallback_bg = self.scene.addRect(0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white))
-        self.fallback_bg.setZValue(-200) # Afundado para -200 para ficar atrás do BackgroundItem (-100)
-        
-        # Inicializa o fundo vazio para garantir a existência da camada desde o início
-        self.bg_item = BackgroundItem(None)
-        self.bg_item.resize_custom(mm_to_px(148.0), mm_to_px(105.0))
-        self.bg_item.setPos(0, 0)
-        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
-        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
-        self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
-        self.scene.addItem(self.bg_item)
-
-        center_container = QWidget()
-        center_layout = QVBoxLayout(center_container)
-        center_layout.setContentsMargins(0, 0, 0, 0)
-        
-        center_layout.addWidget(self.view, 1)
-        
-        main_layout.addWidget(center_container, 1)
-
-        right_container = QWidget()
-        right_container.setFixedWidth(400)
-        right_layout = QVBoxLayout(right_container)
-
-        # --- Container Superior Misto (Dimensões e Posição) ---
-        container_sup = QWidget()
-        self.container_sup = container_sup
-        layout_sup = QHBoxLayout(container_sup)
-        layout_sup.setContentsMargins(0, 0, 0, 0)
-        layout_sup.setSpacing(10)
-
-        # Coluna 1: Posição do Item (Agora na esquerda)
-        col_pos = QWidget()
-        ly_pos = QVBoxLayout(col_pos)
-        ly_pos.setContentsMargins(0, 0, 0, 0)
-        ly_pos.setSpacing(5)
-        lbl_pos = QLabel("<b>POSIÇÃO (mm)</b>")
-        self._apply_tooltip(lbl_pos, 
-            "<b>COORDENADAS DO OBJETO</b><br><br>"
-            "Mostra e ajusta a posição exata do elemento selecionado no papel:<br><br>"
-            "• <b>Eixo X:</b> Distância horizontal a partir da borda esquerda.<br>"
-            "• <b>Eixo Y:</b> Distância vertical a partir do topo.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Utilize estes campos numéricos para fazer alinhamentos com precisão cirúrgica em vez de arrastar com o mouse.</small>")
-        ly_pos.addWidget(lbl_pos)
-        
-        form_pos = QFormLayout()
-        form_pos.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
-        
-        self.spin_pos_x = MathDoubleSpinBox()
-        self.spin_pos_x.setRange(-5000, 20000)
-        self.spin_pos_x.setDecimals(2)
-        self.spin_pos_x.setKeyboardTracking(False)
-        self.spin_pos_x.setEnabled(False)
-        
-        self.spin_pos_y = MathDoubleSpinBox()
-        self.spin_pos_y.setRange(-5000, 20000)
-        self.spin_pos_y.setDecimals(2)
-        self.spin_pos_y.setKeyboardTracking(False)
-        self.spin_pos_y.setEnabled(False)
-        
-        form_pos.addRow("X:", self.spin_pos_x)
-        form_pos.addRow("Y:", self.spin_pos_y)
-        ly_pos.addLayout(form_pos)
-        layout_sup.addWidget(col_pos, 1)
-
-        # Separador Vertical (VLine)
-        v_sep_sup = QFrame()
-        v_sep_sup.setFrameShape(QFrame.Shape.VLine)
-        v_sep_sup.setFrameShadow(QFrame.Shadow.Sunken)
-        v_sep_sup.setStyleSheet("color: #ccc;") 
-        layout_sup.addWidget(v_sep_sup)
-
-        # Coluna 2: Dimensões do Documento (Agora na direita)
-        col_dim = QWidget()
-        ly_dim = QVBoxLayout(col_dim)
-        ly_dim.setContentsMargins(0, 0, 0, 0)
-        ly_dim.setSpacing(5)
-        lbl_dim = QLabel("<b>DOCUMENTO (mm)</b>")
-        self._apply_tooltip(lbl_dim, 
-            "<b>DIMENSÕES DO DOCUMENTO</b><br><br>"
-            "Define o tamanho físico real da arte final impressa ou exportada:<br><br>"
-            "• <b>Fidelidade:</b> O sistema gera os cartões mantendo 300 DPI exatos nesta medida.<br>"
-            "• <b>Prancheta:</b> Ajusta automaticamente a área branca de trabalho no editor.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Ao carregar uma imagem de fundo (Background), o documento se ajustará sozinho às proporções dela.</small>")
-        ly_dim.addWidget(lbl_dim)
-        
-        doc_size_row = QHBoxLayout()
-        doc_size_row.setContentsMargins(0, 0, 0, 0)
-        doc_size_row.setSpacing(6)
-
-        doc_size_grid = QGridLayout()
-        doc_size_grid.setContentsMargins(0, 0, 0, 0)
-        doc_size_grid.setHorizontalSpacing(6)
-        doc_size_grid.setVerticalSpacing(4)
-
-        self.spin_phys_w = MathDoubleSpinBox()
-        self.spin_phys_w.setRange(10.0, 1000.0)
-        self.spin_phys_w.setDecimals(2)
-        self.spin_phys_w.setKeyboardTracking(False)
-        self.spin_phys_w.setValue(148.0)
-
-        self.spin_phys_h = MathDoubleSpinBox()
-        self.spin_phys_h.setRange(10.0, 1000.0)
-        self.spin_phys_h.setDecimals(2)
-        self.spin_phys_h.setKeyboardTracking(False)
-        self.spin_phys_h.setValue(105.0)
-
-        doc_size_grid.addWidget(QLabel("Larg:"), 0, 0, alignment=Qt.AlignmentFlag.AlignRight)
-        doc_size_grid.addWidget(self.spin_phys_w, 0, 1)
-        doc_size_grid.addWidget(QLabel("Alt:"), 1, 0, alignment=Qt.AlignmentFlag.AlignRight)
-        doc_size_grid.addWidget(self.spin_phys_h, 1, 1)
-        doc_size_grid.setColumnStretch(1, 1)
-
-        doc_size_buttons = QVBoxLayout()
-        doc_size_buttons.setContentsMargins(0, 0, 0, 0)
-        doc_size_buttons.setSpacing(4)
-
-        btn_icon_style = """
-            QPushButton { background-color: transparent; border: none; font-size: 16px; border-radius: 4px; }
-            QPushButton:hover { background-color: #444444; }
-            QPushButton:pressed { background-color: #222222; }
-            QPushButton:disabled { color: #555555; }
-        """
-
-        self.chk_doc_proporcao = QPushButton()
-        self.chk_doc_proporcao.setFixedSize(26, 26)
-        self.chk_doc_proporcao.setCheckable(True)
-        self.chk_doc_proporcao.setChecked(True)
-        self.chk_doc_proporcao.setStyleSheet(btn_icon_style)
-        self._apply_tooltip(self.chk_doc_proporcao, "<b>MANTER PROPORÇÃO</b><br><br>Preserva a relação entre largura e altura do documento.")
-        
-        self.op_doc_proporcao = QGraphicsOpacityEffect(self.chk_doc_proporcao)
-        self.chk_doc_proporcao.setGraphicsEffect(self.op_doc_proporcao)
-        self.op_doc_proporcao.setOpacity(1.0)
-        self.chk_doc_proporcao.toggled.connect(self._on_doc_proportion_toggled)
-        self._refresh_doc_proportion_button()
-
-        self.btn_fit_bg = QPushButton("🖼️")
-        self.btn_fit_bg.setFixedSize(26, 26)
-        self.btn_fit_bg.setStyleSheet(btn_icon_style)
-        self._apply_tooltip(self.btn_fit_bg, "<b>PREENCHER COM FUNDO</b><br><br>Redimensiona o fundo atual para cobrir todo o documento, centralizando o corte.")
-        self.btn_fit_bg.clicked.connect(self._fit_background_to_doc)
-
-        doc_size_buttons.addWidget(self.chk_doc_proporcao)
-        doc_size_buttons.addWidget(self.btn_fit_bg)
-        doc_size_buttons.addStretch()
-
-        doc_size_row.addLayout(doc_size_grid, 1)
-        doc_size_row.addLayout(doc_size_buttons)
-        ly_dim.addLayout(doc_size_row)
-
-        self._doc_aspect_ratio = 148.0 / 105.0
-        layout_sup.addWidget(col_dim, 1)
-
-        container_sup.setSizePolicy(
-            container_sup.sizePolicy().horizontalPolicy(),
-            __import__('PySide6.QtWidgets', fromlist=['QSizePolicy']).QSizePolicy.Policy.Fixed
-        )
-        container_sup.setFixedHeight(container_sup.sizeHint().height())
-        right_layout.addWidget(container_sup)
-
-        # Conexões de Sinais
-        self.spin_phys_w.valueChanged.connect(self._on_doc_w_changed)
-        self.spin_phys_h.valueChanged.connect(self._on_doc_h_changed)
-        self.spin_phys_w.editingFinished.connect(self.save_snapshot)
-        self.spin_phys_h.editingFinished.connect(self.save_snapshot)
-        
-        self.spin_pos_x.valueChanged.connect(self.apply_position_x)
-        self.spin_pos_x.editingFinished.connect(self.save_snapshot)
-        self.spin_pos_y.valueChanged.connect(self.apply_position_y)
-        self.spin_pos_y.editingFinished.connect(self.save_snapshot)
-        self._add_separator(right_layout)
-
-        container_misto = QWidget()
-        layout_misto = QHBoxLayout(container_misto)
-        layout_misto.setContentsMargins(0, 0, 0, 0)
-        layout_misto.setSpacing(10)
-
-        self.caixa_texto_panel = CaixaDeTextoPanel()
-        self.caixa_texto_panel.setEnabled(False)
-        self.caixa_texto_panel.widthChanged.connect(self.update_width)
-        self.caixa_texto_panel.heightChanged.connect(self.update_height)
-        self.caixa_texto_panel.rotationChanged.connect(self.update_rotation)
-        self.caixa_texto_panel.proportionToggled.connect(self.update_proportion_lock)
-        self.caixa_texto_panel.linkToggled.connect(self.update_link_state)
-        self.caixa_texto_panel.restoreRequested.connect(self.restore_item_state)
-        self.caixa_texto_panel.opacityChanged.connect(self.update_opacity)
-        self.caixa_texto_panel.snapshotRequested.connect(self.save_snapshot)
-        layout_misto.addWidget(self.caixa_texto_panel, 1)
-
-        v_sep = QFrame()
-        v_sep.setFrameShape(QFrame.Shape.VLine)
-        v_sep.setFrameShadow(QFrame.Shadow.Sunken)
-        v_sep.setStyleSheet("color: #ccc;") 
-        layout_misto.addWidget(v_sep)
-
-        grp_cols_compact = QWidget()
-        ly_cols_compact = QVBoxLayout(grp_cols_compact)
-        ly_cols_compact.setContentsMargins(0, 0, 0, 0)
-        
-        # Ajuste de espaçamento (12px) para alinhar o topo da lista com o primeiro campo (Larg mm)
-        ly_cols_compact.setSpacing(12) 
-        
-        lbl_cols = QLabel("<b>ORDEM NA TABELA</b>")
-        self._apply_tooltip(lbl_cols, 
-            "<b>ESTRUTURA DA PLANILHA</b><br><br>"
-            "Define a sequência visual das colunas na tela principal de geração:<br><br>"
-            "• <b>Mapeamento:</b> Lê as variáveis criadas nas caixas de texto e gera a lista.<br>"
-            "• <b>Reordenação:</b> Arraste os itens aqui para mudar a ordem de digitação depois.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Coloque as informações mais importantes (como Nome e Cargo) no topo da lista para acelerar o preenchimento.</small>")
-        ly_cols_compact.addWidget(lbl_cols)
-
-        self.lst_placeholders = QListWidget()
-        self.lst_placeholders.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
-        self.lst_placeholders.setDefaultDropAction(Qt.DropAction.MoveAction)
-        self.lst_placeholders.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.lst_placeholders.setFixedHeight(170) 
-        ly_cols_compact.addWidget(self.lst_placeholders)
-        self.lst_placeholders.model().rowsMoved.connect(lambda: self.save_snapshot())
-        
-        # Adiciona uma "mola" no final para empurrar tudo para cima
-        ly_cols_compact.addStretch() 
-        
-        layout_misto.addWidget(grp_cols_compact, 1)
-
-        right_layout.addWidget(container_misto)
-        self._add_separator(right_layout)
-
-        self.editor_texto_panel = EditorDeTextoPanel()
-        self.editor_texto_panel.setEnabled(False)
-
-        self.editor_texto_panel.htmlChanged.connect(self.update_text_html)
-        self.editor_texto_panel.htmlChanged.connect(self._on_content_updated)
-        self.editor_texto_panel.fontFamilyChanged.connect(self.update_font_family)
-        self.editor_texto_panel.fontSizeChanged.connect(self.update_font_size)
-        self.editor_texto_panel.fontColorChanged.connect(self.update_font_color)
-        self.editor_texto_panel.alignChanged.connect(self.update_align)
-        self.editor_texto_panel.verticalAlignChanged.connect(self.update_vertical_align)
-        self.editor_texto_panel.indentChanged.connect(self.update_indent)
-        self.editor_texto_panel.lineHeightChanged.connect(self.update_line_height)
-        self.editor_texto_panel.snapshotRequested.connect(self.save_snapshot)
-        right_layout.addWidget(self.editor_texto_panel)
-
-        self._add_separator(right_layout)
-
-        right_layout.addStretch()
-        self.btn_save = QPushButton("Salvar Modelo")
-        self.btn_save.setMinimumHeight(50)
-        self.btn_save.setStyleSheet("background-color: #27ae60; color: white; font-weight: bold; font-size: 14px;")
-        self.btn_save.clicked.connect(self.export_to_json)
-
-        save_row = QHBoxLayout()
-        save_row.setSpacing(6)
-        save_row.addWidget(self.btn_save)
-        right_layout.addLayout(save_row)
-
-        main_layout.addWidget(right_container)
+        self._initialize_editor_controls()
 
         self.scene.selectionChanged.connect(self.on_selection_changed)
         self.scene.changed.connect(self.update_position_ui)
@@ -798,6 +322,161 @@ class EditorWindow(QMainWindow):
         from .canvas_edit import CanvasEdit
         self.canvas_edit = CanvasEdit(self)
         self.refresh_layer_list()
+
+    def _initialize_editor_controls(self):
+        """Cria somente os controles consumidos pela interface atual."""
+        self.btn_toggle_guides = QPushButton(self)
+        self.btn_toggle_guides.setCheckable(True)
+        self.btn_toggle_guides.setChecked(True)
+        self.btn_toggle_guides.toggled.connect(self.toggle_guides_visibility)
+        self.op_eye = QGraphicsOpacityEffect(self.btn_toggle_guides)
+        self.btn_toggle_guides.setGraphicsEffect(self.op_eye)
+        self.op_eye.setOpacity(1.0)
+
+        self.btn_lock_guides = QPushButton(self)
+        self.btn_lock_guides.setCheckable(True)
+        self.btn_lock_guides.toggled.connect(self.toggle_guides_lock)
+        self.op_lock = QGraphicsOpacityEffect(self.btn_lock_guides)
+        self.btn_lock_guides.setGraphicsEffect(self.op_lock)
+        self.op_lock.setOpacity(0.2)
+
+        self.btn_add = QPushButton(self)
+        self.btn_add.clicked.connect(self.add_new_box)
+        self.btn_add_img = QPushButton(self)
+        self.btn_add_img.clicked.connect(self._on_click_add_image)
+        self.btn_add_sig = QPushButton(self)
+        self.btn_add_sig.clicked.connect(self._on_click_add_signature)
+
+        self.btn_undo = QPushButton(self)
+        self.btn_undo.setEnabled(False)
+        self.btn_undo.clicked.connect(self.undo)
+        self.btn_redo = QPushButton(self)
+        self.btn_redo.setEnabled(False)
+        self.btn_redo.clicked.connect(self.redo)
+        self.btn_ren_layer = QPushButton(self)
+        self.btn_ren_layer.setEnabled(False)
+        self.btn_ren_layer.clicked.connect(lambda: self.rename_layer())
+        self.btn_dup_layer = QPushButton(self)
+        self.btn_dup_layer.clicked.connect(self.duplicate_selected)
+        self.btn_group_layer = QPushButton(self)
+        self.btn_group_layer.setEnabled(False)
+        self.btn_group_layer.clicked.connect(self.toggle_selected_group)
+        self.btn_del_layer = QPushButton(self)
+        self.btn_del_layer.clicked.connect(self.delete_selected_items)
+
+        self.layer_list = QListWidget(self)
+        self.layer_list.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.layer_list.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.layer_list.itemSelectionChanged.connect(self._on_layer_selection_changed)
+        self.layer_list.itemChanged.connect(self._on_layer_item_changed)
+        self.layer_list.itemDoubleClicked.connect(self.rename_layer)
+        self.layer_list.model().rowsMoved.connect(self._on_layer_reordered)
+
+        self.scene = QGraphicsScene(0, 0, 1000, 1000, self)
+        self._document_rect = QRectF(0, 0, 1000, 1000)
+        self.scene._document_rect = QRectF(self._document_rect)
+        self.view = QGraphicsView(self.scene, self)
+        self.view.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
+        self.view.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.view.setBackgroundBrush(QBrush(QColor('#e0e0e0')))
+        self.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        self.view.setRubberBandSelectionMode(Qt.ItemSelectionMode.ContainsItemShape)
+        self.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.view.installEventFilter(self)
+        self.view.viewport().installEventFilter(self)
+
+        self._selection_frame = SelectionTransformFrame(self)
+        self.scene.addItem(self._selection_frame)
+        self.scene._multi_selection_active = False
+        self._selection_frame_timer = QTimer(self)
+        self._selection_frame_timer.setSingleShot(True)
+        self._selection_frame_timer.timeout.connect(self._refresh_selection_frame)
+
+        self.bg_item = None
+        self.background_path = None
+        self._space_pan_items = []
+        self.fallback_bg = self.scene.addRect(
+            0, 0, 1000, 1000, QPen(Qt.PenStyle.NoPen), QBrush(Qt.GlobalColor.white)
+        )
+        self.fallback_bg.setZValue(-200)
+        self.bg_item = BackgroundItem(None)
+        self.bg_item.resize_custom(mm_to_px(148.0), mm_to_px(105.0))
+        self.bg_item.setPos(0, 0)
+        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.bg_item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.bg_item.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
+        self.scene.addItem(self.bg_item)
+
+        self.spin_pos_x = MathDoubleSpinBox(self)
+        self.spin_pos_y = MathDoubleSpinBox(self)
+        for control in (self.spin_pos_x, self.spin_pos_y):
+            control.setRange(-5000, 20000)
+            control.setDecimals(2)
+            control.setKeyboardTracking(False)
+            control.setEnabled(False)
+        self.spin_pos_x.valueChanged.connect(self.apply_position_x)
+        self.spin_pos_x.editingFinished.connect(self.save_snapshot)
+        self.spin_pos_y.valueChanged.connect(self.apply_position_y)
+        self.spin_pos_y.editingFinished.connect(self.save_snapshot)
+
+        self.spin_phys_w = MathDoubleSpinBox(self)
+        self.spin_phys_h = MathDoubleSpinBox(self)
+        for control, value in ((self.spin_phys_w, 148.0), (self.spin_phys_h, 105.0)):
+            control.setRange(10.0, 1000.0)
+            control.setDecimals(2)
+            control.setKeyboardTracking(False)
+            control.setValue(value)
+        self.spin_phys_w.valueChanged.connect(self._on_doc_w_changed)
+        self.spin_phys_h.valueChanged.connect(self._on_doc_h_changed)
+        self.spin_phys_w.editingFinished.connect(self.save_snapshot)
+        self.spin_phys_h.editingFinished.connect(self.save_snapshot)
+        self._doc_aspect_ratio = 148.0 / 105.0
+
+        self.chk_doc_proporcao = QPushButton(self)
+        self.chk_doc_proporcao.setCheckable(True)
+        self.chk_doc_proporcao.setChecked(True)
+        self.chk_doc_proporcao.toggled.connect(self._on_doc_proportion_toggled)
+        self.op_doc_proporcao = QGraphicsOpacityEffect(self.chk_doc_proporcao)
+        self.chk_doc_proporcao.setGraphicsEffect(self.op_doc_proporcao)
+        self.op_doc_proporcao.setOpacity(1.0)
+        self._refresh_doc_proportion_button()
+
+        self.caixa_texto_panel = CaixaDeTextoPanel()
+        self.caixa_texto_panel.setParent(self)
+        self.caixa_texto_panel.hide()
+        self.caixa_texto_panel.setEnabled(False)
+        self.caixa_texto_panel.widthChanged.connect(self.update_width)
+        self.caixa_texto_panel.heightChanged.connect(self.update_height)
+        self.caixa_texto_panel.rotationChanged.connect(self.update_rotation)
+        self.caixa_texto_panel.proportionToggled.connect(self.update_proportion_lock)
+        self.caixa_texto_panel.linkToggled.connect(self.update_link_state)
+        self.caixa_texto_panel.restoreRequested.connect(self.restore_item_state)
+        self.caixa_texto_panel.opacityChanged.connect(self.update_opacity)
+        self.caixa_texto_panel.snapshotRequested.connect(self.save_snapshot)
+
+        self.lst_placeholders = QListWidget(self)
+        self.lst_placeholders.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
+        self.lst_placeholders.setDefaultDropAction(Qt.DropAction.MoveAction)
+        self.lst_placeholders.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.lst_placeholders.model().rowsMoved.connect(lambda: self.save_snapshot())
+
+        self.editor_texto_panel = EditorDeTextoPanel()
+        self.editor_texto_panel.setParent(self)
+        self.editor_texto_panel.hide()
+        self.editor_texto_panel.setEnabled(False)
+        self.editor_texto_panel.htmlChanged.connect(self.update_text_html)
+        self.editor_texto_panel.htmlChanged.connect(self._on_content_updated)
+        self.editor_texto_panel.fontFamilyChanged.connect(self.update_font_family)
+        self.editor_texto_panel.fontSizeChanged.connect(self.update_font_size)
+        self.editor_texto_panel.fontColorChanged.connect(self.update_font_color)
+        self.editor_texto_panel.alignChanged.connect(self.update_align)
+        self.editor_texto_panel.verticalAlignChanged.connect(self.update_vertical_align)
+        self.editor_texto_panel.indentChanged.connect(self.update_indent)
+        self.editor_texto_panel.lineHeightChanged.connect(self.update_line_height)
+        self.editor_texto_panel.snapshotRequested.connect(self.save_snapshot)
+
+        self.btn_save = QPushButton(self)
+        self.btn_save.clicked.connect(self.export_to_json)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -3974,109 +3653,6 @@ class EditorWindow(QMainWindow):
         if restore_inspector:
             restore_inspector(inspector_state)
 
-    def _setup_layer_toolbar(self) -> QWidget:
-        """Cria a barra de ferramentas compacta acima da lista de camadas."""
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 2, 0, 5)
-        layout.setSpacing(4)
-
-        # Estilo comum para os botões da toolbar
-        btn_style = """
-            QPushButton { 
-                background-color: #333333; 
-                border: 1px solid #555555; 
-                border-radius: 4px; 
-                font-size: 14px;
-            }
-            QPushButton:hover { background-color: #444444; border-color: #777777; }
-            QPushButton:pressed { background-color: #222222; }
-            QPushButton:disabled { background-color: #222222; color: #555555; border-color: #333333; }
-        """
-
-        self.btn_undo = QPushButton()
-        self.btn_undo.setIcon(QIcon(str(action_icon_path("undo"))))
-        self.btn_undo.setIconSize(QSize(18, 18))
-        self._apply_tooltip(self.btn_undo, 
-            "<b>DESFAZER</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Ctrl + Z</small>"
-            "<br><br>"
-            "Reverte a última alteração realizada no seu modelo.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: O sistema armazena as últimas 30 ações, permitindo que você explore ideias sem medo de errar.</small>")
-        self.btn_undo.setFixedSize(32, 30)
-        self.btn_undo.setStyleSheet(btn_style)
-        self.btn_undo.setEnabled(False)
-        self.btn_undo.clicked.connect(self.undo)
-
-        self.btn_redo = QPushButton()
-        self.btn_redo.setIcon(QIcon(str(action_icon_path("redo"))))
-        self.btn_redo.setIconSize(QSize(18, 18))
-        self._apply_tooltip(self.btn_redo, 
-            "<b>REFAZER</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Ctrl + Y</small>"
-            "<br><br>"
-            "Reaplica a última ação que foi desfeita anteriormente.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Útil para comparar rapidamente o 'antes e depois' de um ajuste fino no layout.</small>")
-        self.btn_redo.setFixedSize(32, 30)
-        self.btn_redo.setStyleSheet(btn_style)
-        self.btn_redo.setEnabled(False)
-        self.btn_redo.clicked.connect(self.redo)
-
-        self.btn_ren_layer = QPushButton("✏️")
-        self._apply_tooltip(self.btn_ren_layer, 
-            "<b>RENOMEAR CAMADA</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: F2</small>"
-            "<br><br>"
-            "Altera o nome de identificação do objeto selecionado na lista de camadas.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Use nomes descritivos (ex: 'Logo Fundo') para organizar melhor projetos que possuem muitos elementos sobrepostos.</small>")
-        self.btn_ren_layer.setFixedSize(32, 30)
-        self.btn_ren_layer.setStyleSheet(btn_style)
-        self.btn_ren_layer.setEnabled(False) # <--- Começa desativado
-        self.btn_ren_layer.clicked.connect(lambda: self.rename_layer())
-
-        self.btn_dup_layer = QPushButton("📑")
-        self._apply_tooltip(self.btn_dup_layer, 
-            "<b>DUPLICAR CAMADA</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Ctrl + D</small>"
-            "<br><br>"
-            "Cria uma cópia exata do elemento selecionado, preservando todas as cores, fontes e tamanhos.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: A cópia é criada com um pequeno deslocamento. Ótimo para criar padrões repetitivos ou variações de uma mesma base.</small>")
-        self.btn_dup_layer.setFixedSize(32, 30)
-        self.btn_dup_layer.setStyleSheet(btn_style)
-        self.btn_dup_layer.clicked.connect(self.duplicate_selected)
-
-        self.btn_group_layer = QPushButton()
-        self.btn_group_layer.setIcon(themed_svg_icon(action_icon_path("unlock ratio")))
-        self.btn_group_layer.setIconSize(QSize(18, 18))
-        self.btn_group_layer.setFixedSize(32, 30)
-        self.btn_group_layer.setStyleSheet(btn_style)
-        self.btn_group_layer.setEnabled(False)
-        self.btn_group_layer.setToolTip(tr('Agrupar objetos selecionados (Ctrl+G)'))
-        self.btn_group_layer.clicked.connect(self.toggle_selected_group)
-
-        self.btn_del_layer = QPushButton()
-        self.btn_del_layer.setIcon(QIcon(str(action_icon_path("delete"))))
-        self.btn_del_layer.setIconSize(QSize(18, 18))
-        self._apply_tooltip(self.btn_del_layer, 
-            "<b>EXCLUIR CAMADA</b><br>"
-            "<small style='color: #A0A0A0;'>Atalho: Delete</small>"
-            "<br><br>"
-            "Remove permanentemente o objeto selecionado do seu modelo.<br><br>"
-            "<small style='color: #A0A0A0;'>Dica: Se apagar algo por engano, utilize o botão DESFAZER ou Ctrl+Z imediatamente para recuperar o item.</small>")
-        self.btn_del_layer.setFixedSize(32, 30)
-        self.btn_del_layer.setStyleSheet(btn_style)
-        self.btn_del_layer.clicked.connect(self.delete_selected_items)
-
-        layout.addWidget(self.btn_undo)
-        layout.addWidget(self.btn_redo)
-        layout.addStretch() # Empurra os próximos botões para a direita
-        layout.addWidget(self.btn_ren_layer) # <- NOVO BOTÃO AQUI
-        layout.addWidget(self.btn_dup_layer)
-        layout.addWidget(self.btn_group_layer)
-        layout.addWidget(self.btn_del_layer)
-
-        return container
-
     def _get_selected(self):
         valid_items = self._get_selected_items()
         return valid_items[0] if valid_items else None
@@ -4272,9 +3848,3 @@ class EditorWindow(QMainWindow):
         if hasattr(item, 'custom_name'):
             item.custom_name = name
         return name
-    
-    def _add_separator(self, layout):
-        sep = QFrame()
-        sep.setFrameShape(QFrame.Shape.HLine)
-        sep.setFrameShadow(QFrame.Shadow.Sunken)
-        layout.addWidget(sep)
