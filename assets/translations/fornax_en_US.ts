@@ -2153,18 +2153,6 @@ Enter a name to save this preset:</translation>
       <translation>The variable may contain only letters, numbers, and underscores (_). Remove spaces or symbols.</translation>
     </message>
     <message>
-      <source>Campos removidos</source>
-      <translation>Removed fields</translation>
-    </message>
-    <message>
-      <source>Estes campos não são mais usados pelo modelo:\n\n{campos}\n\nDeseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
-      <translation>These fields are no longer used by the template:\n\n{campos}\n\nDo you want to discard the data in these columns? Choose No to keep it for this session.</translation>
-    </message>
-    <message>
-      <source>Campo inativo: não será usado na geração.</source>
-      <translation>Inactive field: it will not be used during generation.</translation>
-    </message>
-    <message>
       <source>A imposição de modelos com frente e verso ainda está em implementação. Selecione a definição do modelo para exportar as duas páginas diretamente.</source>
       <translation>Imposition for two-page templates is still being implemented. Select the template definition to export both pages directly.</translation>
     </message>
@@ -2227,18 +2215,6 @@ Enter a name to save this preset:</translation>
     <message>
       <source>Adicionar o verso ao modelo</source>
       <translation>Add a back page to the template</translation>
-    </message>
-    <message>
-      <source>Estes campos não são mais usados pelo modelo:
-
-{campos}
-
-Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
-      <translation>These fields are no longer used by the template:
-
-{campos}
-
-Do you want to discard the data in these columns? Choose No to keep them for this session.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" />

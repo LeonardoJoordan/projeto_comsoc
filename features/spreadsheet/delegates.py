@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QStyleOptionViewItem
 from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont, QPen, QColor,
                            QTextOption)
 from PySide6.QtCore import Qt, QEvent, QRectF
+from core.themes import theme_color
 
 
 RICH_TEXT_STYLESHEET = "b, strong { font-weight: 800; }"
@@ -195,7 +196,7 @@ class HTMLDelegate(QStyledItemDelegate):
     def _paint_current(self, painter, option, index):
         if option.widget and option.widget.currentIndex() == index:
             painter.save()
-            painter.setPen(QPen(QColor('#8774df'), 2))
+            painter.setPen(QPen(QColor(theme_color('accent')), 2))
             painter.setBrush(Qt.BrushStyle.NoBrush)
             painter.drawRect(option.rect.adjusted(1, 1, -1, -1))
             painter.restore()

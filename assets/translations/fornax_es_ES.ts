@@ -2153,18 +2153,6 @@ Asigne un nombre para guardar este preajuste:</translation>
       <translation>La variable solo puede contener letras, números y guiones bajos (_). Elimine espacios o símbolos.</translation>
     </message>
     <message>
-      <source>Campos removidos</source>
-      <translation>Campos eliminados</translation>
-    </message>
-    <message>
-      <source>Estes campos não são mais usados pelo modelo:\n\n{campos}\n\nDeseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
-      <translation>Estos campos ya no se utilizan en el modelo:\n\n{campos}\n\n¿Desea descartar los datos de estas columnas? Elija No para conservarlos durante esta sesión.</translation>
-    </message>
-    <message>
-      <source>Campo inativo: não será usado na geração.</source>
-      <translation>Campo inactivo: no se utilizará durante la generación.</translation>
-    </message>
-    <message>
       <source>A imposição de modelos com frente e verso ainda está em implementação. Selecione a definição do modelo para exportar as duas páginas diretamente.</source>
       <translation>La imposición de modelos de dos páginas aún está en desarrollo. Seleccione la definición del modelo para exportar ambas páginas directamente.</translation>
     </message>
@@ -2227,18 +2215,6 @@ Asigne un nombre para guardar este preajuste:</translation>
     <message>
       <source>Adicionar o verso ao modelo</source>
       <translation>Añadir el reverso al modelo</translation>
-    </message>
-    <message>
-      <source>Estes campos não são mais usados pelo modelo:
-
-{campos}
-
-Deseja descartar os dados dessas colunas? Escolha Não para mantê-los nesta sessão.</source>
-      <translation>Estos campos ya no se utilizan en el modelo:
-
-{campos}
-
-¿Desea descartar los datos de estas columnas? Elija No para conservarlos durante esta sesión.</translation>
     </message>
     <message>
       <location filename="../../features/editor/frontend.py" />

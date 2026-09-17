@@ -21,6 +21,14 @@ Coloque os SVGs usando exatamente os nomes abaixo. Um único conjunto visual dev
 | `chevron-right.svg` | `›` | Próximo item/folha e expansão lateral |
 | `chevron-down.svg` | `⌄` | Cabeçalhos recolhíveis e comboboxes |
 | `chevron-up.svg` | símbolo de recolhimento | Cabeçalhos quando necessário |
+| `double-chevron-left.svg` | controle textual | Recolher a tabela de dados |
+| `double-chevron-right.svg` | controle textual | Expandir a tabela de dados |
+| `left-arrow.svg` | `‹` | Item ou folha anterior |
+| `right-arrow.svg` | `›` | Próximo item ou folha |
+| `layer-child.svg` | indicador desenhado | Vínculo entre máscara e imagem |
+| `spin-up.svg` | seta nativa | Incrementar campos numéricos |
+| `spin-down.svg` | seta nativa | Decrementar campos numéricos |
+| `combo-down.svg` | seta nativa | Abrir caixas de seleção |
 
 ## `actions/`
 

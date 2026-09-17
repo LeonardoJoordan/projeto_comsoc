@@ -29,7 +29,7 @@ from core.paths import get_models_dir
 from core.render_cache import ensure_background_proxy, publish_thumbnail_cache
 from core.resources import action_icon_path, app_icon_path, state_icon_path, navigation_icon_path
 from core.theme_icons import themed_svg_icon
-from core.themes import theme_color
+from core.themes import themed_style, theme_color
 from core.i18n import tr
 from core.ui_font import DOCUMENT_FONT_FAMILY
 from core.model_document import (
@@ -1950,7 +1950,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             "lock ratio" if checked else "unlock ratio"
         ))))
         self.chk_doc_proporcao.setIconSize(QSize(20, 20))
-        self.chk_doc_proporcao.setStyleSheet(self._doc_proportion_button_style(checked))
+        themed_style(self.chk_doc_proporcao, self._doc_proportion_button_style(checked))
         self.op_doc_proporcao.setOpacity(1.0 if checked else 0.2)
 
     def _on_doc_proportion_toggled(self, checked):
@@ -2016,10 +2016,10 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         if self.fallback_bg:
             self.fallback_bg.setRect(rect)
             tile = QPixmap(16, 16)
-            tile.fill(QColor('#36383e'))
+            tile.fill(QColor(theme_color('canvas')))
             painter = QPainter(tile)
-            painter.fillRect(0, 0, 8, 8, QColor('#454750'))
-            painter.fillRect(8, 8, 8, 8, QColor('#454750'))
+            painter.fillRect(0, 0, 8, 8, QColor(theme_color('alternate')))
+            painter.fillRect(8, 8, 8, 8, QColor(theme_color('alternate')))
             painter.end()
             self.fallback_bg.setBrush(QBrush(tile))
             self.fallback_bg.show() # Garante que o papel branco esteja visível como base
@@ -2606,15 +2606,15 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             # Aplica opacidade 1.0 (trancado) ou 0.15 (destrancado)
             effect.setOpacity(1.0 if new_locked else 0.15)
             button.setIcon(QIcon(str(state_icon_path("lock" if new_locked else "unlock"))))
-            label.setStyleSheet("color: #888888; font-style: italic;" if new_locked else "")
+            themed_style(label, "color: @disabled@; font-style: italic;" if new_locked else "")
             self.save_snapshot()
 
         def add_header(title):
             header = QListWidgetItem(f"--- {title} ---")
             header.setFlags(Qt.ItemFlag.NoItemFlags)
             header.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            header.setBackground(QBrush(QColor("#15161b")))
-            header.setForeground(QBrush(QColor("#a8abb5")))
+            header.setBackground(QBrush(QColor(theme_color('panel'))))
+            header.setForeground(QBrush(QColor(theme_color('muted'))))
             self.layer_list.addItem(header)
 
         def add_items(item_list):
@@ -2666,7 +2666,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 lbl = ElidedLayerLabel(display_name)
                 is_locked = not bool(item.flags() & QGraphicsItem.GraphicsItemFlag.ItemIsMovable)
                 if is_locked:
-                    lbl.setStyleSheet("color: #888888; font-style: italic;")
+                    themed_style(lbl, "color: @disabled@; font-style: italic;")
                 ly.addWidget(lbl, 1) # Toma todo o espaço restante
 
                 def add_group_badge(number, tooltip, callback):

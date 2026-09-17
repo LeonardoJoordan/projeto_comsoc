@@ -3,6 +3,7 @@ import math
 from PySide6.QtCore import QObject, QEvent, Qt, QRectF, QPointF
 from PySide6.QtGui import QPainterPath, QPen, QColor
 from PySide6.QtWidgets import QGraphicsPathItem
+from core.themes import theme_color
 from .canvas_items import RectangleItem, mm_to_px
 
 
@@ -59,7 +60,7 @@ class ShapeDrawing(QObject):
         if event.type() == QEvent.MouseButtonPress and event.button() == Qt.LeftButton:
             self.start = self.w.view.mapToScene(event.position().toPoint())
             self.preview = QGraphicsPathItem()
-            pen = QPen(QColor('#9087ff'), 1)
+            pen = QPen(QColor(theme_color('accent')), 1)
             pen.setCosmetic(True)
             self.preview.setPen(pen)
             self.preview.setZValue(1e6)

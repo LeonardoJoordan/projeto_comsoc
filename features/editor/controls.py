@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
 )
 
 from core.custom_widgets import MathDoubleSpinBox
+from core.themes import theme_color
 
 from .canvas_items import BackgroundItem, SelectionTransformFrame, mm_to_px
 from .properties import CaixaDeTextoPanel, EditorDeTextoPanel
@@ -68,7 +69,7 @@ def initialize_editor_controls(window):
     window.view = QGraphicsView(window.scene, window)
     window.view.setViewportUpdateMode(QGraphicsView.ViewportUpdateMode.FullViewportUpdate)
     window.view.setRenderHint(QPainter.RenderHint.Antialiasing)
-    window.view.setBackgroundBrush(QBrush(QColor('#e0e0e0')))
+    window.view.setBackgroundBrush(QBrush(QColor(theme_color('canvas'))))
     window.view.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
     window.view.setRubberBandSelectionMode(Qt.ItemSelectionMode.ContainsItemShape)
     window.view.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)

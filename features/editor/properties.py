@@ -321,9 +321,9 @@ class CaixaDeTextoPanel(QWidget):
                 border-radius: 4px; 
                 font-size: 16px; 
             }
-            QPushButton:hover { background-color: #444444; }
-            QPushButton:pressed { background-color: #222222; }
-            QPushButton:disabled { color: #555555; }
+            QPushButton:hover { background-color: @hover@; }
+            QPushButton:pressed { background-color: @selection@; }
+            QPushButton:disabled { color: @disabled@; }
         """
 
     @staticmethod
@@ -332,12 +332,12 @@ class CaixaDeTextoPanel(QWidget):
             QPushButton {
                 padding: 0; min-width: 28px; max-width: 28px;
                 min-height: 28px; max-height: 28px;
-                background-color: #22232b; border: 1px solid #30323b;
+                background-color: @button@; border: 1px solid @border@;
                 border-radius: 6px;
             }
-            QPushButton:hover { background-color: #2a2c35; border-color: #454854; }
-            QPushButton:checked { background-color: #343159; border-color: #7c73f2; }
-            QPushButton:disabled { background-color: #1a1b21; color: #777b87; }
+            QPushButton:hover { background-color: @hover@; border-color: @border_strong@; }
+            QPushButton:checked { background-color: @selection@; border-color: @accent@; }
+            QPushButton:disabled { background-color: @surface@; color: @disabled@; }
         """
 
     def _make_tool_button(self, text, tooltip="", checkable=False):
@@ -544,7 +544,7 @@ class EditorDeTextoPanel(QWidget):
         layout.setSpacing(10)
         
         lbl = QLabel("EDITOR DE TEXTO")
-        themed_style(lbl, "font-weight: bold; font-size: 12px; border-bottom: 1px solid #ccc;")
+        themed_style(lbl, "font-weight: bold; font-size: 12px; border-bottom: 1px solid @border@;")
         lbl.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
         
         tooltip_editor = (
@@ -659,7 +659,7 @@ class EditorDeTextoPanel(QWidget):
             "<b>COR DO TEXTO</b><br><br>"
             "Abre a paleta de cores para personalizar o texto ou a seleção atual.<br><br>"
             "<small >Dica: Procure manter um alto contraste com o fundo para garantir a legibilidade após a impressão.</small>")
-        themed_style(self.btn_color, "background-color: #000000; border: 1px solid #aaa; border-radius: 3px;")
+        themed_style(self.btn_color, "background-color: #000000; border: 1px solid @border_strong@; border-radius: 3px;")
         self.btn_color.clicked.connect(self._choose_color)
 
         row_style.addWidget(self.btn_bold)
@@ -767,7 +767,7 @@ class EditorDeTextoPanel(QWidget):
         self.spin_size.setValue(state.font_size)
         
         color_hex = getattr(state, 'font_color', '#000000')
-        themed_style(self.btn_color, f"background-color: {color_hex}; border: 1px solid #aaa; border-radius: 3px;")
+        themed_style(self.btn_color, f"background-color: {color_hex}; border: 1px solid @border_strong@; border-radius: 3px;")
         
         self.update_buttons_state()
 
@@ -850,7 +850,7 @@ class EditorDeTextoPanel(QWidget):
             if alpha_control:
                 color.setAlphaF(alpha_control.value()/100)
                 hex_color = color.name(color.NameFormat.HexArgb)
-            themed_style(self.btn_color, f"background-color: {hex_color}; border: 1px solid #aaa; border-radius: 3px;")
+            themed_style(self.btn_color, f"background-color: {hex_color}; border: 1px solid @border_strong@; border-radius: 3px;")
             self.fontColorChanged.emit(hex_color)
             self.snapshotRequested.emit()
             self.txt_content.setFocus()

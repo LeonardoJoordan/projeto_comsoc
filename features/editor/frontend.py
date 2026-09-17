@@ -321,7 +321,7 @@ class Section(QWidget):
 
 def install_frontend(w):
     # A janela fornece diretamente a cena e os controles funcionais usados aqui.
-    themed_style(w, STYLE.replace('__ICONS__', (Path(__file__).parent / 'icons').as_posix()))
+    themed_style(w, STYLE)
     w.resize(1500, 930)
     root, outer = column()
     root.setObjectName('root')

@@ -443,5 +443,4 @@ def install_frontend(window):
         fixed_data.setChecked(True)
     elif window.settings.value('workspaceDataPanelCollapsed', False, type=bool):
         set_data_panel_collapsed(True)
-    combo_arrow = (Path(__file__).resolve().parent / 'icons' / 'combo-down.svg').as_posix()
     themed_style(window, STYLE)

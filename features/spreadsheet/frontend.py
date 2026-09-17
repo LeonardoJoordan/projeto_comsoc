@@ -383,7 +383,7 @@ def install_frontend(panel):
         QTableWidget#dataGrid::item { padding: 6px 10px; }
         QHeaderView::section { background: @header@; color: @icon@; font-weight: 600; border: none; border-right: 1px solid @border@; border-bottom: 1px solid @border@; padding: 6px 10px; }
         QTableCornerButton::section { background: @header@; border: none; }
-    '''.replace('__ICONS__', (Path(__file__).resolve().parents[1] / 'editor' / 'icons').as_posix()) + '''
+    ''' + '''
         QWidget#dataPanel { background: @field@; border: none; border-radius: 0; padding: 0; }
         QFrame#sheetHeading { background: @panel@; border: none; }
         QLabel#sheetTitle { color: @text@; font-size: 18px; font-weight: 600; }

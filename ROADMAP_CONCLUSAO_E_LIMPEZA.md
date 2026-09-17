@@ -64,7 +64,7 @@ Este documento orienta a sequência de trabalho até a conclusão das funcionali
 
 ### 6. Consistência visual, recursos e organização do projeto
 
-**Status:** pendente.
+**Status:** concluída e verificada em 17/09/2026.
 
 **Direção:** concluir a centralização das cores de interface; revisar ícones, fontes, textos, traduções, documentação, testes e arquivos incluídos nos pacotes.
 
@@ -148,3 +148,13 @@ Ao encerrar uma etapa ou sessão, registrar brevemente:
 - **Clareza do renderer:** a visão entregue a editor e renderer passou a ser descrita como visão plana de página; o caminho realmente legado do renderer permanece explicitamente isolado apenas para modelos sem a estrutura moderna de camadas.
 - **Verificação executada:** 111 testes e 10 subtestes da suíte principal; 60 testes do editor; testes específicos de adaptação sem mutação; compilação dos módulos reorganizados e auditoria de ciclo de vida Qt.
 - **Próximo ponto de retomada:** iniciar a etapa 6 revisando temas, ícones, fontes, textos, traduções, documentação e recursos efetivamente incluídos na distribuição.
+
+### Registro — etapa 6
+
+- **Etapa e estado:** consistência visual, recursos e organização concluídos.
+- **Temas:** cores visíveis da interface que ainda estavam presas ao tema escuro passaram a usar papéis semânticos do tema. As cores dos documentos, textos, formas e demais elementos da arte permaneceram independentes.
+- **Recursos:** setas de campos numéricos e caixas de seleção foram movidas das pastas internas das funcionalidades para `assets/icons/ui/navigation`. O carregamento, os testes e o inventário de ícones agora usam a API central de recursos.
+- **Distribuição:** o pacote Nuitka passou a incluir esses controles pelo diretório único `assets`, sem regras extras para pastas internas do editor e do workspace.
+- **Textos e traduções:** mensagens obsoletas da antiga proteção de campos removidos foram retiradas dos catálogos em inglês e espanhol, e os arquivos compilados foram regenerados.
+- **Verificação executada:** 111 testes e 10 subtestes da suíte principal; 60 testes do editor; compilação dos módulos alterados; validação dos SVGs e auditoria das referências estáticas de recursos.
+- **Próximo ponto de retomada:** iniciar a etapa 7 comparando os fluxos completos com a referência funcional e registrando separadamente as validações que exigem Windows, macOS ou impressão física.

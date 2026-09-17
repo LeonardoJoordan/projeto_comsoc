@@ -28,8 +28,6 @@ def build_app():
         "--include-package=shared",
         "--include-package=pypdf",
         "--include-data-dir=assets=assets",
-        "--include-data-dir=features/editor/icons=features/editor/icons",
-        "--include-data-dir=features/workspace/icons=features/workspace/icons",
         "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
         "--lto=no",                     
         f"--jobs={max(1, int(os.environ.get('FORNAX_BUILD_JOBS', min(4, os.cpu_count() or 1))))}",

@@ -85,6 +85,7 @@ def test_navigation_icons_are_valid_svg_icons():
     for name in (
         "chevron-down", "chevron-up", "double-chevron-left",
         "double-chevron-right", "left-arrow", "right-arrow", "layer-child",
+        "spin-up", "spin-down", "combo-down",
     ):
         path = navigation_icon_path(name)
         assert path.is_file()

@@ -12,7 +12,7 @@ from PySide6.QtWidgets import QApplication
 from shiboken6 import isValid
 
 from core.paths import get_app_data_dir
-from core.resources import PROJECT_ROOT
+from core.resources import PROJECT_ROOT, navigation_icon_path
 
 TOKEN = re.compile(r"@([a-z][a-z0-9_]*)@")
 
@@ -57,13 +57,13 @@ class ThemeManager(QObject):
         self._prepare_icons()
 
     def _prepare_icons(self):
-        for name, path in [('spin_up', 'features/editor/icons/spin-up.svg'),
-                           ('spin_down', 'features/editor/icons/spin-down.svg'),
-                           ('combo_arrow', 'features/workspace/icons/combo-down.svg')]:
+        for name, icon_name in [('spin_up', 'spin-up'),
+                                ('spin_down', 'spin-down'),
+                                ('combo_arrow', 'combo-down')]:
             color = self.color('icon')
             target = Path(self._icon_directory.name) / (name + color[1:] + '.svg')
             if not target.exists():
-                svg = (PROJECT_ROOT / path).read_text(encoding='utf-8')
+                svg = navigation_icon_path(icon_name).read_text(encoding='utf-8')
                 svg = re.sub(r'#[0-9a-fA-F]{6}', color, svg)
                 target.write_text(svg, encoding='utf-8')
             self._icon_paths[name] = target.as_posix()
