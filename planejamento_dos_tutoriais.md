@@ -21,10 +21,10 @@ O tutorial só avançará quando detectar a ação e confirmar seu resultado. In
 
 ### Destaque e posição do cartão
 
-- Escurecer o restante da janela sem esconder o contexto.
+- Manter toda a interface visível, sem escurecer nem bloquear os demais controles.
 - Manter o alvo totalmente visível.
 - Aplicar um contorno pulsante discreto somente no alvo da ação.
-- Posicionar o cartão próximo ao alvo, usando o lado com maior espaço livre.
+- Posicionar o cartão próximo ao alvo, com uma folga confortável e usando o lado com maior espaço livre.
 - Não cobrir o alvo nem o resultado explicado.
 - Recalcular a posição quando a janela, o painel ou o alvo mudar de tamanho ou posição.
 - Quando uma ação abrir um menu, transferir o destaque para a opção dentro dele.
@@ -35,21 +35,20 @@ O tutorial só avançará quando detectar a ação e confirmar seu resultado. In
 
 O cartão deve apresentar:
 
-- progresso, como `ETAPA 8 DE 35`;
+- progresso, como `ETAPA 8 DE 37`;
 - título curto;
 - orientação objetiva;
 - somente as ações de navegação adequadas à etapa.
 
-O texto deve explicar primeiro o objetivo e depois a ação. Explicações longas devem ser divididas em mais de uma etapa.
+Nas etapas práticas, o texto deve apresentar primeiro a ação em destaque e depois a explicação. Nas etapas informativas, deve destacar a informação principal. Explicações longas devem ser divididas em mais de uma etapa.
 
 ### Botões
 
 Os botões devem seguir o padrão dos diálogos do FORNAX Forge:
 
-- todos os botões do mesmo conjunto com dimensões idênticas;
-- largura mínima de 96 px e altura mínima de 30 px;
-- tamanho calculado pelo maior texto traduzido do conjunto;
-- sem ícones decorativos;
+- **Voltar** e **Pular tutorial** com a mesma dimensão secundária e altura de 24 px;
+- **Continuar** centralizado, com altura de 30 px e maior destaque;
+- ícone de retorno à esquerda em **Voltar** e avanço à direita em **Pular tutorial**;
 - texto centralizado;
 - **Começar**, **Continuar** e **Concluir** como ações afirmativas, usando a cor de destaque do tema;
 - **Pular tutorial** como ação de cancelar: fundo neutro e vermelho somente no hover ou ao pressionar;
@@ -562,5 +561,7 @@ Ao concluir, manter a tela principal, o modelo, as dez linhas e os arquivos exat
 ## Decisões aplicadas na implementação
 
 - Manter **Meu primeiro modelo** como sugestão, sem obrigar o usuário a adotar esse nome.
-- Usar o formato de exportação já selecionado, deixando a explicação de `PNG`, `PDF por item` e `PDF agrupado` para o tutorial de exportação.
-- Ensinar a seleção das dez linhas pelo cabeçalho: clicar na primeira e usar `Shift` ao clicar na última antes de acionar `Excluir`.
+- Explicar `PNG`, `PDF por item` e `PDF agrupado` em três partes antes da geração, permitindo que o usuário escolha qualquer formato.
+- Ensinar a seleção das dez linhas por `Ctrl+A` a partir de uma célula antes de acionar `Excluir`.
+- Destacar a explicação de placeholders e trechos opcionais em um cartão central de atenção, com borda amarela.
+- Exibir o tempo real da geração e informar o nome e o caminho exatos da pasta criada.

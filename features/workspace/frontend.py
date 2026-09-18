@@ -424,20 +424,10 @@ def install_frontend(window):
     fixed_data.toggled.connect(set_data_panel_fixed)
     ajuda = menu.addMenu(tr('Sobre'))
     tutorial = ajuda.addMenu(tr('Tutorial interativo'))
-    tutorial_actions = []
-    for tutorial_id, label in (
-        ('complete', tr('Tutorial completo')),
-        ('first_steps', tr('Primeiros passos')),
-        ('personalization', tr('Personalização')),
-        ('editor', tr('Editor')),
-        ('advanced', tr('Recursos avançados')),
-        ('export', tr('Exportação')),
-    ):
-        action = tutorial.addAction(label)
-        action.setEnabled(tutorial_id == 'first_steps')
-        if tutorial_id == 'first_steps':
-            action.triggered.connect(lambda: start_first_steps_tutorial(window))
-        tutorial_actions.append(action)
+    first_steps_tutorial_action = tutorial.addAction(tr('Primeiros passos'))
+    first_steps_tutorial_action.triggered.connect(
+        lambda: start_first_steps_tutorial(window)
+    )
     ajuda.addSeparator()
     ajuda.addAction(tr('Sobre o FORNAX Forge'), lambda: QMessageBox.about(
         window, tr('Sobre o FORNAX Forge'),
@@ -455,7 +445,8 @@ def install_frontend(window):
         model_actions,
     )
     window._tutorial_menu = tutorial
-    window._tutorial_actions = tuple(tutorial_actions)
+    window._tutorial_actions = (first_steps_tutorial_action,)
+    window._first_steps_tutorial_action = first_steps_tutorial_action
     window._model_menu = modelo
     window._new_model_action = new_model_action
     window._view_menu = exibir

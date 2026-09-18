@@ -1631,6 +1631,7 @@ class MainWindow(QMainWindow):
         self.btn_generate_cards.setText(tr("Gerar material"))
         end_time = time.time()
         duration = end_time - getattr(self, 'start_time', end_time)
+        self._last_generation_duration = duration
         
         if duration < 60:
             time_str = tr("{tempo:.1f} segundos").format(tempo=duration)

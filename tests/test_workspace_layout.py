@@ -85,19 +85,9 @@ def test_about_menu_exposes_first_steps_tutorial(tmp_path):
     try:
         assert window._tutorial_menu.title() == "Tutorial interativo"
         assert [action.text() for action in window._tutorial_actions] == [
-            "Tutorial completo",
             "Primeiros passos",
-            "Personalização",
-            "Editor",
-            "Recursos avançados",
-            "Exportação",
         ]
-        assert window._tutorial_actions[1].isEnabled()
-        assert all(
-            not action.isEnabled()
-            for index, action in enumerate(window._tutorial_actions)
-            if index != 1
-        )
+        assert window._first_steps_tutorial_action.isEnabled()
         assert window._tutorial_menu.isEnabled()
     finally:
         _close(window)
@@ -108,12 +98,16 @@ def test_first_steps_tutorial_opens_editor_and_waits_for_real_text_action(tmp_pa
     editor = None
     try:
         window.show()
-        window._tutorial_actions[1].trigger()
+        window._first_steps_tutorial_action.trigger()
         APP.processEvents()
 
         tutorial = window._active_tutorial
         assert tutorial.step == 1
         assert tutorial.coach.card.title.text() == "Primeiros passos"
+        card = tutorial.coach.card
+        assert abs(card.next.geometry().center().x() - card.rect().center().x()) <= 1
+        assert card.next.height() == 30
+        assert card.back.height() == card.skip.height() == 24
 
         tutorial.next()
         APP.processEvents()
@@ -121,6 +115,10 @@ def test_first_steps_tutorial_opens_editor_and_waits_for_real_text_action(tmp_pa
         window._model_menu.aboutToShow.emit()
         APP.processEvents()
         assert tutorial.step == 3
+        assert tutorial._menu_spotlight is not None
+        assert tutorial._menu_spotlight._target_rect == window._model_menu.actionGeometry(
+            window._new_model_action
+        ).adjusted(2, 1, -2, -1)
         window._new_model_action.trigger()
         APP.processEvents()
         editor = tutorial.editor
@@ -163,13 +161,26 @@ def test_first_steps_tutorial_opens_editor_and_waits_for_real_text_action(tmp_pa
         APP.processEvents()
         assert tutorial.step == 13
         tutorial.next()
+        assert tutorial.step == 14
+        editor.editor_texto_panel.spin_size.setValue(45)
+        APP.processEvents()
+        assert tutorial.step == 15
         tutorial.text_box.state.html_content = (
             "Este cartão foi feito de forma muito rápida e eficiente para "
             "{nome}| com a ajuda de {programa}|!"
         )
-        editor.sync_placeholders_list()
         tutorial._poll_current_step()
         assert tutorial.step == 15
+        assert tutorial._phase == 1
+        box_rect = tutorial.text_box.rect()
+        tutorial.text_box.setRect(
+            box_rect.x(), box_rect.y(), box_rect.width() + 40, box_rect.height()
+        )
+        tutorial._poll_current_step()
+        assert tutorial.step == 15
+        assert tutorial._phase == 1
+        tutorial.next()
+        assert tutorial.step == 16
         assert {
             editor.lst_placeholders.item(index).text()
             for index in range(editor.lst_placeholders.count())
@@ -190,7 +201,7 @@ def test_first_steps_tutorial_validates_bulk_table_exercises(tmp_path):
     window, _models = _workspace(tmp_path)
     try:
         window.show()
-        window._tutorial_actions[1].trigger()
+        window._first_steps_tutorial_action.trigger()
         APP.processEvents()
         tutorial = window._active_tutorial
         table = window.table_panel.table
@@ -198,7 +209,7 @@ def test_first_steps_tutorial_validates_bulk_table_exercises(tmp_path):
         table.setHorizontalHeaderLabels(["Cópias", "nome", "programa"])
         table.setRowCount(1)
 
-        tutorial.step = 20
+        tutorial.step = 21
         tutorial._show_step()
         for row, name in enumerate((
             "Ana Silva", "Bruno Costa", "Carla Souza", "Daniel Lima", "Elisa Rocha",
@@ -208,26 +219,27 @@ def test_first_steps_tutorial_validates_bulk_table_exercises(tmp_path):
                 table.insertRow(row)
             table.setItem(row, 1, QTableWidgetItem(name))
         tutorial._poll_current_step()
-        assert tutorial.step == 21
+        assert tutorial.step == 22
 
         tutorial.next()
         tutorial.next()
         for row in range(10):
             table.setItem(row, 2, QTableWidgetItem("FORNAX Forge"))
         tutorial._poll_current_step()
-        assert tutorial.step == 23
+        assert tutorial.step == 24
 
         tutorial.next()
         table.setCurrentCell(5, 1)
+        table.setCurrentCell(6, 1)
         QTest.qWait(220)
-        assert tutorial.step == 23
+        assert tutorial.step == 24
         assert tutorial._phase == 2
         tutorial.next()
-        assert tutorial.step == 24
+        assert tutorial.step == 25
         table.selectAll()
         window.table_panel.btn_delete_rows.click()
         APP.processEvents()
-        assert tutorial.step == 25
+        assert tutorial.step == 26
 
         for row, name in enumerate((
             "Ana Silva", "Bruno Costa", "Carla Souza", "Daniel Lima", "Elisa Rocha",
@@ -238,15 +250,15 @@ def test_first_steps_tutorial_validates_bulk_table_exercises(tmp_path):
             table.setItem(row, 1, QTableWidgetItem(name))
             table.setItem(row, 2, QTableWidgetItem("FORNAX Forge"))
         tutorial._poll_current_step()
-        assert tutorial.step == 26
+        assert tutorial.step == 27
         tutorial.next()
         table.setCurrentCell(0, 1)
         table.setCurrentCell(1, 1)
         QTest.qWait(220)
-        assert tutorial.step == 26
+        assert tutorial.step == 27
         assert tutorial._phase == 2
         tutorial.next()
-        assert tutorial.step == 27
+        assert tutorial.step == 28
     finally:
         if getattr(window, "_active_tutorial", None):
             window._active_tutorial.finish()

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import math
+from html import escape
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPainterPath, QPen, QRegion
+from PySide6.QtCore import QEvent, QObject, QPoint, QRect, Qt, QTimer, QUrl, Signal
+from PySide6.QtGui import QColor, QPainter, QPen, QRegion
 from PySide6.QtWidgets import (
     QFrame,
-    QHBoxLayout,
+    QGridLayout,
     QLabel,
     QPushButton,
     QVBoxLayout,
@@ -17,11 +18,13 @@ from PySide6.QtWidgets import (
 
 from core.i18n import tr
 from core.themes import theme_color, themed_style
-from core.dialog_buttons import ACCEPT_STYLE, CANCEL_STYLE
+from core.dialog_buttons import ACCEPT_STYLE
+from core.resources import navigation_icon_path
+from core.theme_icons import themed_svg_icon
 
 
 class Spotlight(QWidget):
-    """Escurece a janela e mantém um alvo visualmente destacado."""
+    """Desenha somente um pulso ao redor do controle orientado."""
 
     def __init__(self, host: QWidget):
         super().__init__(host)
@@ -38,13 +41,13 @@ class Spotlight(QWidget):
     def set_target_rect(self, rect: QRect):
         self._target_rect = QRect(rect)
         if self._target_rect.isValid():
-            # O recorte físico garante que o controle destacado receba o
-            # mouse diretamente, inclusive em backends onde uma camada
-            # transparente ainda pode capturar o evento.
-            hole = self._target_rect.adjusted(-3, -3, 3, 3)
-            self.setMask(QRegion(self.rect()).subtracted(QRegion(hole)))
+            # A máscara cobre o alvo e seu contorno. A camada continua
+            # transparente para o mouse, portanto o controle real permanece
+            # diretamente clicável durante a orientação.
+            outer = QRegion(self._target_rect.adjusted(-7, -7, 7, 7))
+            self.setMask(outer)
         else:
-            self.clearMask()
+            self.setMask(QRegion())
         self.update()
 
     def start(self):
@@ -65,20 +68,14 @@ class Spotlight(QWidget):
     def paintEvent(self, _event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        full = QPainterPath()
-        full.addRect(self.rect())
-        if self._target_rect.isValid():
-            hole = QPainterPath()
-            hole.addRoundedRect(self._target_rect, 8, 8)
-            full = full.subtracted(hole)
-        painter.fillPath(full, QColor(0, 0, 0, 158))
-
         if self._target_rect.isValid():
             pulse = (math.sin(self._phase) + 1.0) / 2.0
             color = QColor(theme_color("accent"))
-            color.setAlpha(150 + int(105 * pulse))
-            painter.setPen(QPen(color, 2.0 + pulse))
-            painter.setBrush(Qt.BrushStyle.NoBrush)
+            fill = QColor(color)
+            fill.setAlpha(38 + int(55 * pulse))
+            painter.setBrush(fill)
+            color.setAlpha(175 + int(80 * pulse))
+            painter.setPen(QPen(color, 3.0 + pulse * 2.0))
             painter.drawRoundedRect(self._target_rect, 8, 8)
 
 
@@ -93,27 +90,46 @@ class TutorialCard(QFrame):
         self._drag_offset = None
         self._manually_positioned = False
         self.setObjectName("tutorialCard")
-        self.setMinimumWidth(330)
-        self.setMaximumWidth(410)
+        self.setMinimumSize(540, 215)
+        self.setMaximumWidth(680)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 16, 18, 14)
+        layout.setContentsMargins(18, 18, 18, 18)
         layout.setSpacing(9)
         self.progress = QLabel()
         self.progress.setObjectName("tutorialProgress")
+        self.progress.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         self.title = QLabel()
         self.title.setObjectName("tutorialTitle")
+        self.title.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
+        self.action = QLabel()
+        self.action.setObjectName("tutorialAction")
+        self.action.setWordWrap(True)
+        self.action.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.body = QLabel()
         self.body.setObjectName("tutorialBody")
         self.body.setWordWrap(True)
-        for label in (self.progress, self.title, self.body):
+        self.body.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.link = QLabel()
+        self.link.setObjectName("tutorialLink")
+        self.link.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.link.setOpenExternalLinks(True)
+        self.link.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        for label in (self.progress, self.title, self.action, self.body):
             label.installEventFilter(self)
         layout.addWidget(self.progress)
         layout.addWidget(self.title)
+        layout.addStretch(1)
+        layout.addWidget(self.action)
         layout.addWidget(self.body)
+        layout.addWidget(self.link)
+        layout.addStretch(1)
 
-        buttons = QHBoxLayout()
-        buttons.setSpacing(8)
+        buttons = QGridLayout()
+        buttons.setContentsMargins(0, 0, 0, 0)
+        buttons.setHorizontalSpacing(8)
+        buttons.setColumnStretch(1, 1)
+        buttons.setColumnStretch(3, 1)
         self.skip = QPushButton(tr("Pular tutorial"))
         self.back = QPushButton(tr("Voltar"))
         self.next = QPushButton(tr("Continuar"))
@@ -121,10 +137,17 @@ class TutorialCard(QFrame):
         self.skip.clicked.connect(self.skipRequested)
         self.back.clicked.connect(self.backRequested)
         self.next.clicked.connect(self.nextRequested)
-        buttons.addWidget(self.skip)
-        buttons.addStretch(1)
-        buttons.addWidget(self.back)
-        buttons.addWidget(self.next)
+
+        # O espaço dos três controles permanece estável mesmo quando uma
+        # ação é ocultada. Assim o botão principal nunca sai do centro.
+        for button in (self.back, self.next, self.skip):
+            policy = button.sizePolicy()
+            policy.setRetainSizeWhenHidden(True)
+            button.setSizePolicy(policy)
+
+        buttons.addWidget(self.back, 0, 0, Qt.AlignmentFlag.AlignLeft)
+        buttons.addWidget(self.next, 0, 2, Qt.AlignmentFlag.AlignHCenter)
+        buttons.addWidget(self.skip, 0, 4, Qt.AlignmentFlag.AlignRight)
         layout.addLayout(buttons)
 
         themed_style(self, """
@@ -134,20 +157,28 @@ class TutorialCard(QFrame):
             }
             QLabel#tutorialProgress { color: @accent@; font-size: 10px; font-weight: 600; }
             QLabel#tutorialTitle { color: @text@; font-size: 15px; font-weight: 700; }
-            QLabel#tutorialBody { color: @muted@; font-size: 12px; }
+            QLabel#tutorialAction { color: @accent@; font-size: 13px; font-weight: 700; }
+            QLabel#tutorialBody { color: @text@; font-size: 12px; }
+            QLabel#tutorialLink { color: @accent@; font-size: 12px; }
         """)
         themed_style(self.next, ACCEPT_STYLE)
-        themed_style(self.skip, CANCEL_STYLE)
-        themed_style(self.back, """
+        secondary_style = """
             QPushButton {
                 background: @button@; color: @text@; border: 1px solid @border@;
-                border-radius: 5px; padding: 0 14px; text-align: center;
-                font-weight: 600;
+                border-radius: 5px; padding: 0 8px; text-align: center;
+                font-size: 10px; font-weight: 400;
             }
             QPushButton:hover { background: @hover@; border-color: @border_strong@; }
             QPushButton:pressed { background: @selection@; border-color: @accent@; }
-        """)
-        self.equalize_buttons()
+        """
+        themed_style(self.skip, secondary_style)
+        themed_style(self.back, secondary_style)
+        self.back.setIcon(themed_svg_icon(navigation_icon_path('chevron-back')))
+        self.skip.setIcon(themed_svg_icon(navigation_icon_path('double-chevron-right')))
+        self.back.setIconSize(QRect(0, 0, 12, 12).size())
+        self.skip.setIconSize(QRect(0, 0, 12, 12).size())
+        self.skip.setLayoutDirection(Qt.LayoutDirection.RightToLeft)
+        self.size_buttons()
 
     def reset_manual_position(self):
         self._manually_positioned = False
@@ -196,7 +227,7 @@ class TutorialCard(QFrame):
         super().mouseReleaseEvent(event)
 
     def eventFilter(self, watched, event):
-        if watched in (self.progress, self.title, self.body):
+        if watched in (self.progress, self.title, self.action, self.body):
             if event.type() == QEvent.Type.MouseButtonPress and self._begin_drag(event):
                 return True
             if event.type() == QEvent.Type.MouseMove and self._drag(event):
@@ -205,12 +236,32 @@ class TutorialCard(QFrame):
                 return True
         return super().eventFilter(watched, event)
 
-    def equalize_buttons(self):
-        buttons = (self.skip, self.back, self.next)
-        width = max(96, *(button.sizeHint().width() for button in buttons))
-        height = max(30, *(button.sizeHint().height() for button in buttons))
-        for button in buttons:
-            button.setFixedSize(width, height)
+    def size_buttons(self):
+        secondary_width = max(88, self.skip.sizeHint().width(), self.back.sizeHint().width())
+        for button in (self.skip, self.back):
+            button.setFixedSize(secondary_width, 24)
+        self.next.setFixedSize(max(110, self.next.sizeHint().width()), 30)
+
+    def set_important(self, important):
+        border = "@warning@" if important else "@accent@"
+        if important:
+            self.setMinimumSize(720, 560)
+            self.setMaximumWidth(820)
+            self.body.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        else:
+            self.setMinimumSize(540, 215)
+            self.setMaximumWidth(680)
+            self.body.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        themed_style(self, f"""
+            QFrame#tutorialCard {{
+                background: @panel@; border: 2px solid {border}; border-radius: 10px;
+            }}
+            QLabel#tutorialProgress {{ color: {border}; font-size: 10px; font-weight: 600; }}
+            QLabel#tutorialTitle {{ color: @text@; font-size: {'20px' if important else '17px'}; font-weight: 700; }}
+            QLabel#tutorialAction {{ color: {border}; font-size: {'16px' if important else '13px'}; font-weight: 700; }}
+            QLabel#tutorialBody {{ color: @text@; font-size: {'15px' if important else '12px'}; }}
+            QLabel#tutorialLink {{ color: {border}; font-size: {'14px' if important else '12px'}; }}
+        """)
 
 
 class CoachMark(QObject):
@@ -232,12 +283,17 @@ class CoachMark(QObject):
         target: QWidget | None,
         title: str,
         body: str,
+        action_text: str = "",
         current: int,
         total: int,
         can_go_back: bool,
         next_text: str,
         wait_for_action: bool = False,
         target_rect_provider=None,
+        important: bool = False,
+        preserve_card_position: bool = False,
+        link_text: str = "",
+        link_url: str = "",
     ):
         if self.target is not None:
             self.target.removeEventFilter(self)
@@ -247,12 +303,26 @@ class CoachMark(QObject):
             target.installEventFilter(self)
         self.card.progress.setText(tr("ETAPA {atual} DE {total}").format(atual=current, total=total))
         self.card.title.setText(title)
+        self.card.action.setText(action_text)
+        self.card.action.setVisible(bool(action_text))
         self.card.body.setText(body)
+        self.card.link.setVisible(bool(link_text and link_url))
+        if link_text and link_url:
+            self.card.link.setText(
+                f'<a style="color:{theme_color("accent")}" href="{escape(link_url, quote=True)}">'
+                f'{escape(link_text)}</a>'
+            )
         self.card.back.setVisible(can_go_back)
         self.card.next.setVisible(not wait_for_action)
         self.card.next.setText(next_text)
-        self.card.equalize_buttons()
-        self.card.reset_manual_position()
+        self.card.set_important(important)
+        # A reaplicação do tema pode recalcular métricas nativas; fixe as
+        # dimensões somente depois dela.
+        self.card.size_buttons()
+        if preserve_card_position and self.card.isVisible():
+            self.card._manually_positioned = True
+        else:
+            self.card.reset_manual_position()
         self.spotlight.start()
         self.card.adjustSize()
         self.card.show()
@@ -281,12 +351,15 @@ class CoachMark(QObject):
             return
 
         margin = 18
-        card_size = self.card.sizeHint()
+        target_gap = 30
+        # O tamanho real inclui os mínimos do cartão; sizeHint() pode ser
+        # menor e posicioná-lo sobre o próprio alvo em telas mais apertadas.
+        card_size = self.card.size()
         if target_rect.isValid():
-            right_x = target_rect.right() + 18
-            left_x = target_rect.left() - card_size.width() - 18
-            bottom_y = target_rect.bottom() + 18
-            top_y = target_rect.top() - card_size.height() - 18
+            right_x = target_rect.right() + target_gap
+            left_x = target_rect.left() - card_size.width() - target_gap
+            bottom_y = target_rect.bottom() + target_gap
+            top_y = target_rect.top() - card_size.height() - target_gap
             if right_x + card_size.width() <= self.host.width() - margin:
                 x, y = right_x, target_rect.center().y() - card_size.height() // 2
             elif left_x >= margin:

@@ -87,6 +87,21 @@ QPushButton:disabled {
 }
 """
 
+NEUTRAL_STYLE = """
+QPushButton {
+    background: @button@;
+    color: @text@;
+    border: 1px solid @border@;
+    border-radius: 5px;
+    padding: 0 14px;
+    text-align: center;
+    font-weight: 600;
+}
+QPushButton:hover { background: @hover@; border-color: @border_strong@; }
+QPushButton:pressed { background: @selection@; border-color: @accent@; }
+QPushButton:disabled { background: @surface@; color: @disabled@; border-color: @border@; }
+"""
+
 
 def style_action_pair(accept_buttons, cancel_buttons):
     """Remove ícones e iguala todos os botões do conjunto."""

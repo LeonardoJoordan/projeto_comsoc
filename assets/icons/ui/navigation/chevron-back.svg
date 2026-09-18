@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   id="Layer_2_00000000936639704568071650000011837044676275768452_"
+   enable-background="new 0 0 512 512"
+   height="512"
+   viewBox="0 0 512 512"
+   width="512"
+   version="1.1"
+   sodipodi:docname="chevron-back.svg"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.5664062"
+     inkscape:cx="256.31921"
+     inkscape:cy="256.00001"
+     inkscape:window-width="2560"
+     inkscape:window-height="1008"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="Layer_2_00000000936639704568071650000011837044676275768452_" />
+  <g
+     id="Icon"
+     transform="matrix(0,-1,-1,0,512,512)">
+    <g
+       id="_123">
+      <path
+         d="M 358.5,178.2 256,280.7 153.5,178.2 c -9.8,-9.8 -25.6,-9.8 -35.4,0 -9.8,9.8 -9.8,25.6 0,35.4 l 120.2,120.2 c 9.8,9.8 25.6,9.8 35.4,0 L 393.9,213.6 c 9.8,-9.8 9.8,-25.6 0,-35.4 -9.8,-9.7 -25.6,-9.7 -35.4,0 z"
+         fill="#64b5f6"
+         id="path1" />
+    </g>
+  </g>
+</svg>

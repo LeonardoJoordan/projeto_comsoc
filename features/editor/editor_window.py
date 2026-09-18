@@ -31,7 +31,7 @@ from core.resources import action_icon_path, app_icon_path, state_icon_path, nav
 from core.theme_icons import themed_svg_icon
 from core.themes import themed_style, theme_color
 from core.i18n import tr
-from core.dialog_buttons import get_text as dialog_get_text, style_message_box
+from core.dialog_buttons import get_text as dialog_get_text, style_message_box, NEUTRAL_STYLE
 from core.ui_font import DOCUMENT_FONT_FAMILY
 from core.model_document import (
     adapt_model_page,
@@ -804,12 +804,16 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         msg_box = QMessageBox(self)
         msg_box.setWindowTitle(tr("Sucesso"))
         msg_box.setIcon(QMessageBox.Icon.Information)
-        msg_box.setText(tr("<b>Seu modelo foi salvo com sucesso!</b><br><br>Deseja sair do editor?"))
+        msg_box.setText(tr("Deseja sair do editor?"))
         
         btn_exit = msg_box.addButton(tr("Encerrar edição"), QMessageBox.ButtonRole.AcceptRole)
-        btn_stay = msg_box.addButton(tr("Continuar editando"), QMessageBox.ButtonRole.RejectRole)
+        btn_stay = msg_box.addButton(tr("Continuar editando"), QMessageBox.ButtonRole.ActionRole)
         msg_box.setDefaultButton(btn_stay)
         style_message_box(msg_box)
+        themed_style(btn_stay, NEUTRAL_STYLE)
+        button_width = max(96, btn_exit.sizeHint().width(), btn_stay.sizeHint().width())
+        for button in (btn_exit, btn_stay):
+            button.setFixedSize(button_width, 30)
         msg_box.exec()
 
         if msg_box.clickedButton() == btn_exit:
