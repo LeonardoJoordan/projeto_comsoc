@@ -86,7 +86,8 @@ class FirstStepsTutorial(QObject):
 
     def _show(self, host, *, target=None, provider=None, title, body,
               action="", wait=False, next_text=None, back=True,
-              important=False, preserve=False, link_text="", link_url=""):
+              important=False, preserve=False, link_text="", link_url="",
+              highlight=True):
         self._ensure_coach(host)
         self.coach.show_step(
             target=target,
@@ -103,6 +104,7 @@ class FirstStepsTutorial(QObject):
             preserve_card_position=preserve,
             link_text=link_text,
             link_url=link_url,
+            highlight_target=highlight,
         )
 
     def _advance(self, expected=None):
@@ -357,6 +359,7 @@ class FirstStepsTutorial(QObject):
             menu, action = w._model_menu, w._new_model_action
             menu.setActiveAction(action)
             self._show(w, provider=self._menu_action_rect(menu, action), wait=True,
+                       highlight=False,
                        action=tr("Clique em Novo modelo"),
                        title=tr("Crie um modelo"), body=tr(
                 "Clique em Novo modelo para abrir um documento vazio no editor."))
@@ -471,6 +474,7 @@ class FirstStepsTutorial(QObject):
             menu.setActiveAction(action)
             already_visible = action.isChecked()
             self._show(w, provider=self._menu_action_rect(menu, action),
+                       highlight=False,
                        action=tr("Clique em Log de processamento") if not already_visible else "",
                        wait=not already_visible, title=tr("Mostre o log"), body=(
                 tr("O log já está visível. Continue para conhecê-lo.") if already_visible

@@ -119,6 +119,7 @@ def test_first_steps_tutorial_opens_editor_and_waits_for_real_text_action(tmp_pa
         assert tutorial._menu_spotlight._target_rect == window._model_menu.actionGeometry(
             window._new_model_action
         ).adjusted(2, 1, -2, -1)
+        assert not tutorial.coach.spotlight._target_rect.isValid()
         window._new_model_action.trigger()
         APP.processEvents()
         editor = tutorial.editor

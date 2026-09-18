@@ -272,6 +272,7 @@ class CoachMark(QObject):
         self.host = host
         self.target = None
         self.target_rect_provider = None
+        self.highlight_target = True
         self.spotlight = Spotlight(host)
         self.card = TutorialCard(host)
         self.card.hide()
@@ -294,11 +295,13 @@ class CoachMark(QObject):
         preserve_card_position: bool = False,
         link_text: str = "",
         link_url: str = "",
+        highlight_target: bool = True,
     ):
         if self.target is not None:
             self.target.removeEventFilter(self)
         self.target = target
         self.target_rect_provider = target_rect_provider
+        self.highlight_target = highlight_target
         if target is not None:
             target.installEventFilter(self)
         self.card.progress.setText(tr("ETAPA {atual} DE {total}").format(atual=current, total=total))
@@ -342,7 +345,7 @@ class CoachMark(QObject):
         elif self.target is not None and self.target.isVisible():
             top_left = self.target.mapTo(self.host, QPoint(0, 0))
             target_rect = QRect(top_left, self.target.size()).adjusted(-7, -7, 7, 7)
-        self.spotlight.set_target_rect(target_rect)
+        self.spotlight.set_target_rect(target_rect if self.highlight_target else QRect())
 
         if self.card._manually_positioned:
             x = max(8, min(self.card.x(), self.host.width() - self.card.width() - 8))
