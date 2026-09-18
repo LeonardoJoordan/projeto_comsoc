@@ -5,6 +5,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 from core.themes import theme_manager, load_theme
 from core.paths import get_app_data_dir
+from core.dialog_buttons import style_dialog_button_box
 from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -71,6 +72,7 @@ class CustomThemeDialog(QDialog):
         buttons.rejected.connect(self.reject)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText(tr('Salvar perfil'))
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(tr('Cancelar'))
+        style_dialog_button_box(buttons)
         layout.addWidget(buttons)
 
     def refresh_swatches(self):
@@ -147,6 +149,7 @@ class ThemeDialog(QDialog):
         buttons.rejected.connect(self.reject)
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText(tr('Aplicar'))
         buttons.button(QDialogButtonBox.StandardButton.Cancel).setText(tr('Cancelar'))
+        style_dialog_button_box(buttons)
         footer.addWidget(buttons)
         layout.addLayout(footer)
         self.buttons = buttons

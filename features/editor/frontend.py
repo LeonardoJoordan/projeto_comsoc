@@ -1390,6 +1390,7 @@ def install_frontend(w):
     t.cbo_align.hide()
     t.cbo_valign.hide()
     alignment_widget = QWidget()
+    t.alignment_widget = alignment_widget
     alignment_layout = QHBoxLayout(alignment_widget)
     alignment_layout.setContentsMargins(0, 0, 0, 0)
     alignment_layout.setSpacing(0)
@@ -1492,6 +1493,7 @@ def install_frontend(w):
             label.setPixmap(themed_svg_icon(align_icon_path(asset_name)).pixmap(20, 20))
     _connect_theme_callback(text_body, refresh_alignment_icons)
     text_section = Section(tr('Texto'), text_body)
+    w._text_section = text_section
     il.addWidget(text_section)
     doc, dl = column()
     dimensions_heading = property_heading(dl, tr('DIMENSÕES'))

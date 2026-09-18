@@ -2,8 +2,8 @@ import re
 from PySide6.QtWidgets import (QStyledItemDelegate, QStyle, QStyleOptionViewItem,
                                QApplication, QTextEdit, QToolTip, QAbstractItemDelegate)
 from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont, QPen, QColor,
-                           QTextOption)
-from PySide6.QtCore import Qt, QEvent, QRectF
+                           QTextOption, QPainter)
+from PySide6.QtCore import Qt, QEvent, QRectF, QRect, QPointF
 from core.themes import theme_color
 
 
@@ -85,6 +85,21 @@ class RichTextEditor(QTextEdit):
         self.mergeCurrentCharFormat(fmt)
 
 class HTMLDelegate(QStyledItemDelegate):
+    @staticmethod
+    def _is_checked(value):
+        numeric = value.value if hasattr(value, 'value') else int(value)
+        return numeric == Qt.CheckState.Checked.value
+
+    @staticmethod
+    def _check_rect(option):
+        size = 14
+        return QRect(
+            option.rect.center().x() - size // 2,
+            option.rect.center().y() - size // 2,
+            size,
+            size,
+        )
+
     def eventFilter(self, editor, event):
         if isinstance(editor, RichTextEditor) and event.type() == QEvent.Type.KeyPress:
             if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -97,6 +112,12 @@ class HTMLDelegate(QStyledItemDelegate):
         return super().eventFilter(editor, event)
 
     def helpEvent(self, event, view, option, index):
+        if index.data(Qt.ItemDataRole.CheckStateRole) is not None:
+            tooltip = str(index.data(Qt.ItemDataRole.ToolTipRole) or '')
+            if tooltip:
+                QToolTip.showText(event.globalPos(), tooltip, view, option.rect)
+                return True
+            return False
         text = str(index.data(Qt.ItemDataRole.DisplayRole) or '')
         available = max(0, option.rect.width() - 20)
         clipped = '\n' in text or option.fontMetrics.horizontalAdvance(text) > available
@@ -110,6 +131,11 @@ class HTMLDelegate(QStyledItemDelegate):
         options = option
         self.initStyleOption(options, index)
         style = options.widget.style() if options.widget else QApplication.style()
+
+        check_state = index.data(Qt.ItemDataRole.CheckStateRole)
+        if check_state is not None:
+            self._paint_centered_check(painter, options, index, check_state, style)
+            return
 
         rich_text = index.data(Qt.ItemDataRole.UserRole)
 
@@ -152,6 +178,70 @@ class HTMLDelegate(QStyledItemDelegate):
         doc.drawContents(painter)
         painter.restore()
         self._paint_current(painter, options, index)
+
+    def _paint_centered_check(self, painter, options, index, check_state, style):
+        style.drawPrimitive(
+            QStyle.PrimitiveElement.PE_PanelItemViewItem,
+            options,
+            painter,
+            options.widget,
+        )
+        rect = self._check_rect(options)
+        checked = self._is_checked(check_state)
+        enabled = bool(index.flags() & Qt.ItemFlag.ItemIsEnabled)
+        border = theme_color('accent') if checked else theme_color('border_strong')
+        fill = theme_color('accent') if checked else theme_color('field')
+        if not enabled:
+            border = fill = theme_color('disabled')
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        painter.setPen(QPen(QColor(border), 1))
+        painter.setBrush(QColor(fill))
+        painter.drawRoundedRect(QRectF(rect), 3, 3)
+        if checked:
+            painter.setPen(QPen(
+                QColor(theme_color('on_accent')),
+                2,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+                Qt.PenJoinStyle.RoundJoin,
+            ))
+            painter.drawPolyline([
+                QPointF(rect.left() + 3, rect.top() + 7),
+                QPointF(rect.left() + 6, rect.top() + 10),
+                QPointF(rect.left() + 11, rect.top() + 4),
+            ])
+        painter.restore()
+        self._paint_current(painter, options, index)
+
+    def editorEvent(self, event, model, option, index):
+        check_state = index.data(Qt.ItemDataRole.CheckStateRole)
+        if check_state is None:
+            return super().editorEvent(event, model, option, index)
+        if not (index.flags() & Qt.ItemFlag.ItemIsEnabled
+                and index.flags() & Qt.ItemFlag.ItemIsUserCheckable):
+            return False
+
+        activate = False
+        if event.type() == QEvent.Type.MouseButtonRelease:
+            activate = (
+                event.button() == Qt.MouseButton.LeftButton
+                and self._check_rect(option).adjusted(-4, -4, 4, 4).contains(
+                    event.position().toPoint()
+                )
+            )
+        elif event.type() == QEvent.Type.KeyPress:
+            activate = event.key() in (Qt.Key.Key_Space, Qt.Key.Key_Select)
+        if not activate:
+            return False
+
+        state = (
+            Qt.CheckState.Unchecked
+            if self._is_checked(check_state)
+            else Qt.CheckState.Checked
+        )
+        return model.setData(index, state, Qt.ItemDataRole.CheckStateRole)
 
     def _paint_compact_rich_text(self, painter, options, index, rich_text, style):
         style.drawPrimitive(
@@ -202,6 +292,8 @@ class HTMLDelegate(QStyledItemDelegate):
             painter.restore()
 
     def createEditor(self, parent, option, index):
+        if index.data(Qt.ItemDataRole.CheckStateRole) is not None:
+            return None
         editor = RichTextEditor(parent)
         # Se for a coluna 0 (Cópias), força o alinhamento central no editor
         if index.column() == 0:

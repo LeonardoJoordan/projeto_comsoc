@@ -2457,6 +2457,18 @@ Enter a name to save this preset:</translation>
     <message><source>A pasta das imagens é escolhida na tela principal.</source><translation>The image folder is selected on the main screen.</translation></message>
     <message><source>Imagem</source><translation>Image</translation></message>
     <message><source>Imagem {numero}</source><translation>Image {numero}</translation></message>
+    <message><source>Marque para incluir esta assinatura neste item.</source><translation>Check to include this signature in this item.</translation></message>
+    <message><source>{nome}
+Clique no ícone para marcar ou desmarcar toda a coluna.</source><translation>{nome}
+Click the icon to check or uncheck the entire column.</translation></message>
+    <message><source>Tutorial interativo</source><translation>Interactive tutorial</translation></message>
+    <message><source>Tutorial completo</source><translation>Complete tutorial</translation></message>
+    <message><source>Primeiros passos</source><translation>Getting started</translation></message>
+    <message><source>Personalização</source><translation>Personalization</translation></message>
+    <message><source>Editor</source><translation>Editor</translation></message>
+    <message><source>Recursos avançados</source><translation>Advanced features</translation></message>
+    <message><source>Exportação</source><translation>Export</translation></message>
+    <message><source>Assinatura {numero}</source><translation>Signature {numero}</translation></message>
     <message><source>IMAGENS VARIÁVEIS</source><translation>VARIABLE IMAGES</translation></message>
     <message><source>Selecione a pasta que contém as imagens</source><translation>Select the folder containing the images</translation></message>
     <message><source>Pasta usada para localizar os arquivos indicados na tabela</source><translation>Folder used to locate the files specified in the table</translation></message>
@@ -2477,5 +2489,110 @@ Enter a name to save this preset:</translation>
       <source>Limpar Formatação</source>
       <translation>Clear Formatting</translation>
     </message>
+    <message><source>Pular tutorial</source><translation>Skip tutorial</translation></message>
+    <message><source>Voltar</source><translation>Back</translation></message>
+    <message><source>Continuar</source><translation>Continue</translation></message>
+    <message><source>ETAPA {atual} DE {total}</source><translation>STEP {atual} OF {total}</translation></message>
+    <message><source>Começar</source><translation>Start</translation></message>
+    <message><source>Vamos criar a estrutura básica de um modelo. O tutorial abrirá um editor vazio, mas só salvará algo se você escolher salvar ao final.</source><translation>Let’s create the basic structure of a template. The tutorial will open an empty editor, but it will only save something if you choose to save at the end.</translation></message>
+    <message><source>Adicione um campo de texto</source><translation>Add a text field</translation></message>
+    <message><source>Clique em Texto. O programa criará uma caixa no documento e abrirá suas propriedades.</source><translation>Click Text. The program will create a box in the document and open its properties.</translation></message>
+    <message><source>Conteúdo personalizado</source><translation>Personalized content</translation></message>
+    <message><source>A caixa começa com {campo}. Um nome entre chaves é um placeholder: cada linha da tabela poderá substituir esse trecho por um conteúdo diferente.</source><translation>The box starts with {campo}. A name in braces is a placeholder: each table row can replace this section with different content.</translation></message>
+    <message><source>Campos da tabela</source><translation>Table fields</translation></message>
+    <message><source>Todo placeholder usado no modelo aparece aqui. Ao salvar, ele se transforma em uma coluna da tabela da tela principal.</source><translation>Every placeholder used in the template appears here. When you save, it becomes a column in the table on the main screen.</translation></message>
+    <message><source>Salve o modelo</source><translation>Save the template</translation></message>
+    <message><source>Quando o modelo estiver pronto, use Salvar modelo. Você poderá escolher o nome e voltar à tela principal para preencher os dados.</source><translation>When the template is ready, use Save template. You can choose its name and return to the main screen to fill in the data.</translation></message>
+    <message><source>Primeiros passos concluídos</source><translation>Getting started completed</translation></message>
+    <message><source>Você já conhece o fluxo básico: adicionar conteúdo, criar placeholders e salvar. O editor permanecerá aberto para você continuar praticando.</source><translation>You now know the basic workflow: add content, create placeholders, and save. The editor will remain open so you can keep practicing.</translation></message>
+    <message><source>Você criará um modelo, preencherá dez itens e gerará o primeiro trabalho. O tutorial acompanhará suas ações diretamente nos controles do programa.</source><translation>You will create a template, fill ten items, and generate your first job. The tutorial will follow your actions directly in the program controls.</translation></message>
+    <message><source>Área do documento</source><translation>Document area</translation></message>
+    <message><source>Tudo que permanecer dentro da página fará parte do material gerado. A área externa pode ser usada para organizar objetos.</source><translation>Everything inside the page will be part of the generated material. The outside area can be used to organize objects.</translation></message>
+    <message><source>Digite um nome para reconhecer este modelo. Você pode usar “Meu primeiro modelo”.</source><translation>Enter a name to identify this template. You can use “My first template”.</translation></message>
+    <message><source>Abra o menu Modelo</source><translation>Open the Template menu</translation></message>
+    <message><source>Os modelos definem o visual e os campos personalizados. Clique em Modelo.</source><translation>Templates define the appearance and custom fields. Click Template.</translation></message>
+    <message><source>Adicione texto</source><translation>Add text</translation></message>
+    <message><source>Clique em Texto para adicionar o primeiro conteúdo personalizado.</source><translation>Click Text to add the first personalized content.</translation></message>
+    <message><source>Meu primeiro modelo</source><translation>My first template</translation></message>
+    <message><source>Escolha Encerrar edição para continuar o tutorial na tela principal.</source><translation>Choose End editing to continue the tutorial on the main screen.</translation></message>
+    <message><source>Crie um modelo</source><translation>Create a template</translation></message>
+    <message><source>Clique em Novo modelo para abrir um documento vazio no editor.</source><translation>Click New template to open an empty document in the editor.</translation></message>
+    <message><source>Texto adicionado</source><translation>Text added</translation></message>
+    <message><source>A caixa está selecionada. Os marcadores ao redor dela permitem mudar seu tamanho.</source><translation>The box is selected. The handles around it let you change its size.</translation></message>
+    <message><source>Modelo salvo</source><translation>Template saved</translation></message>
+    <message><source>O novo modelo está selecionado. Os placeholders criaram as colunas nome e programa.</source><translation>The new template is selected. The placeholders created the name and program columns.</translation></message>
+    <message><source>Redimensione a caixa</source><translation>Resize the box</translation></message>
+    <message><source>Arraste um marcador para deixar a caixa mais larga. O texto se adapta ao novo espaço.</source><translation>Drag a handle to make the box wider. The text adapts to the new space.</translation></message>
+    <message><source>Cole dez nomes</source><translation>Paste ten names</translation></message>
+    <message><source>Dez nomes foram copiados. Clique na primeira célula de nome e pressione Ctrl+V.</source><translation>Ten names were copied. Click the first cell in the name column and press Ctrl+V.</translation></message>
+    <message><source>Novo tamanho</source><translation>New size</translation></message>
+    <message><source>A caixa agora possui mais espaço. Textos e outros objetos podem ser redimensionados dessa forma.</source><translation>The box now has more space. Text and other objects can be resized this way.</translation></message>
+    <message><source>Dez linhas de uma vez</source><translation>Ten rows at once</translation></message>
+    <message><source>Uma única colagem preencheu dez linhas. O FORNAX preserva a estrutura copiada de uma planilha.</source><translation>A single paste filled ten rows. FORNAX preserves the structure copied from a spreadsheet.</translation></message>
+    <message><source>Propriedades do texto</source><translation>Text properties</translation></message>
+    <message><source>Aqui você ajusta fonte, tamanho, cor, estilo, alinhamento, entrelinha e recuo.</source><translation>Here you can adjust font, size, color, style, alignment, line spacing, and indentation.</translation></message>
+    <message><source>Complete a segunda coluna</source><translation>Complete the second column</translation></message>
+    <message><source>FORNAX Forge foi copiado dez vezes. Clique na primeira célula de programa e pressione Ctrl+V.</source><translation>FORNAX Forge was copied ten times. Click the first cell in the program column and press Ctrl+V.</translation></message>
+    <message><source>Centralize horizontalmente</source><translation>Center horizontally</translation></message>
+    <message><source>Clique em Centralizar para alinhar as linhas no centro da caixa.</source><translation>Click Center to align the lines in the center of the box.</translation></message>
+    <message><source>Confira o preview</source><translation>Check the preview</translation></message>
+    <message><source>As duas colunas estão preenchidas. Selecione uma linha diferente para ver o preview acompanhar o item.</source><translation>Both columns are filled. Select a different row to see the preview follow the item.</translation></message>
+    <message><source>Alinhamento horizontal</source><translation>Horizontal alignment</translation></message>
+    <message><source>O conteúdo agora está centralizado entre as laterais da caixa.</source><translation>The content is now centered between the sides of the box.</translation></message>
+    <message><source>Exclua as linhas</source><translation>Delete the rows</translation></message>
+    <message><source>Clique no cabeçalho da primeira linha e, com Shift, clique no da última. Depois clique em Excluir.</source><translation>Click the first row header, then Shift-click the last one. Then click Delete.</translation></message>
+    <message><source>Centralize verticalmente</source><translation>Center vertically</translation></message>
+    <message><source>Clique em Meio para posicionar o texto no centro vertical da caixa.</source><translation>Click Middle to place the text in the vertical center of the box.</translation></message>
+    <message><source>Cole duas colunas</source><translation>Paste two columns</translation></message>
+    <message><source>Os nomes e o programa foram copiados juntos. Clique na primeira célula de nome e pressione Ctrl+V.</source><translation>The names and program were copied together. Click the first cell in the name column and press Ctrl+V.</translation></message>
+    <message><source>Centralizado nos dois sentidos</source><translation>Centered both ways</translation></message>
+    <message><source>Os alinhamentos horizontal e vertical são independentes e agora estão centralizados.</source><translation>Horizontal and vertical alignment are independent and are now both centered.</translation></message>
+    <message><source>Use seus dados existentes</source><translation>Use your existing data</translation></message>
+    <message><source>Você pode copiar várias linhas e colunas do Excel, Google Sheets ou LibreOffice. Selecione dois itens diferentes para conferir o preview.</source><translation>You can copy multiple rows and columns from Excel, Google Sheets, or LibreOffice. Select two different items to check the preview.</translation></message>
+    <message><source>Cole o conteúdo do exercício</source><translation>Paste the exercise content</translation></message>
+    <message><source>O texto foi copiado. Dê dois cliques na caixa, pressione Ctrl+A e depois Ctrl+V.</source><translation>The text was copied. Double-click the box, press Ctrl+A, and then Ctrl+V.</translation></message>
+    <message><source>Escolha o destino</source><translation>Choose the destination</translation></message>
+    <message><source>Clique nos três pontos e escolha a pasta onde os trabalhos serão armazenados.</source><translation>Click the three dots and choose the folder where jobs will be stored.</translation></message>
+    <message><source>Placeholders e trecho opcional</source><translation>Placeholders and optional section</translation></message>
+    <message><source>nome e programa viraram campos da tabela. O trecho entre barras verticais só aparece quando programa possui conteúdo; um placeholder obrigatório vazio oculta a caixa inteira.</source><translation>name and program became table fields. The section between vertical bars appears only when program has content; an empty required placeholder hides the entire box.</translation></message>
+    <message><source>Pasta principal</source><translation>Main folder</translation></message>
+    <message><source>Cada geração será guardada dentro desta pasta em uma pasta exclusiva.</source><translation>Each generation will be stored inside this folder in its own folder.</translation></message>
+    <message><source>Clique em Salvar modelo para adicioná-lo à biblioteca.</source><translation>Click Save template to add it to the library.</translation></message>
+    <message><source>Abra o menu Exibir</source><translation>Open the View menu</translation></message>
+    <message><source>Antes de gerar, vamos abrir o log. Clique em Exibir.</source><translation>Before generating, let’s open the log. Click View.</translation></message>
+    <message><source>Mostre o log</source><translation>Show the log</translation></message>
+    <message><source>O log já está visível. Continue para conhecê-lo.</source><translation>The log is already visible. Continue to learn about it.</translation></message>
+    <message><source>Clique em Log de processamento para exibi-lo.</source><translation>Click Processing log to display it.</translation></message>
+    <message><source>O log mostra andamento, avisos e resultados. Ele ajuda a acompanhar trabalhos maiores e identificar dados que precisam de atenção.</source><translation>The log shows progress, warnings, and results. It helps monitor larger jobs and identify data that needs attention.</translation></message>
+    <message><source>Gere o material</source><translation>Generate the material</translation></message>
+    <message><source>Clique em Gerar material. As dez linhas produzirão dez cartões personalizados.</source><translation>Click Generate material. The ten rows will produce ten personalized cards.</translation></message>
+    <message><source>Acompanhe a velocidade</source><translation>Watch the speed</translation></message>
+    <message><source>Acompanhe o tempo real no log. Um trabalho que exigiria editar dez cartões individualmente é concluído automaticamente em poucos segundos.</source><translation>Watch the actual time in the log. A job that would require editing ten cards individually is completed automatically in seconds.</translation></message>
+    <message><source>Geração concluída</source><translation>Generation complete</translation></message>
+    <message><source>Os dez itens foram gerados. O log é opcional: mantenha-o visível para acompanhar detalhes ou oculte-o para ampliar a área de trabalho.</source><translation>The ten items were generated. The log is optional: keep it visible to follow details or hide it to enlarge the workspace.</translation></message>
+    <message><source>a nova pasta da Forja</source><translation>the new Forge folder</translation></message>
+    <message><source>Trabalho organizado</source><translation>Job organized</translation></message>
+    <message><source>Os arquivos foram reunidos em {pasta}. Cada geração cria uma nova Forja numerada, evitando misturar arquivos de trabalhos diferentes.</source><translation>The files were collected in {pasta}. Each generation creates a new numbered Forge, preventing files from different jobs from being mixed.</translation></message>
+    <message><source>As dez linhas agora possuem nome e programa.</source><translation>The ten rows now contain name and program.</translation></message>
+    <message><source>Campos criados</source><translation>Fields created</translation></message>
+    <message><source>Dados conferidos</source><translation>Data checked</translation></message>
+    <message><source>Duas colunas preenchidas</source><translation>Two columns filled</translation></message>
+    <message><source>Navegue pelos itens</source><translation>Browse the items</translation></message>
+    <message><source>O novo modelo está selecionado na biblioteca.</source><translation>The new template is selected in the library.</translation></message>
+    <message><source>O preview acompanhou os itens escolhidos. Agora o trabalho está pronto para ser gerado.</source><translation>The preview followed the selected items. The job is now ready to be generated.</translation></message>
+    <message><source>O preview mostra o conteúdo da linha selecionada antes da geração.</source><translation>The preview shows the content of the selected row before generation.</translation></message>
+    <message><source>Os dois campos aparecem aqui. O trecho entre barras verticais só aparece quando programa possui conteúdo; um placeholder obrigatório vazio oculta a caixa inteira.</source><translation>Both fields appear here. The section between vertical bars appears only when program has content; an empty required placeholder hides the entire box.</translation></message>
+    <message><source>Os placeholders criaram as colunas nome e programa. Um placeholder obrigatório vazio oculta a caixa; um trecho opcional pode desaparecer sem ocultar o restante.</source><translation>The placeholders created the name and program columns. An empty required placeholder hides the box; an optional section can disappear without hiding the rest.</translation></message>
+    <message><source>Placeholders</source><translation>Placeholders</translation></message>
+    <message><source>Preview atualizado</source><translation>Preview updated</translation></message>
+    <message><source>Selecione dois itens diferentes para conferir a atualização do preview.</source><translation>Select two different items to check the preview update.</translation></message>
+    <message><source>Selecione uma linha diferente para ver o preview acompanhar o item.</source><translation>Select a different row to see the preview follow the item.</translation></message>
+    <message><source>Trecho opcional</source><translation>Optional section</translation></message>
+    <message><source>Você pode copiar várias linhas e colunas do Excel, Google Sheets ou LibreOffice, evitando redigitação.</source><translation>You can copy multiple rows and columns from Excel, Google Sheets, or LibreOffice, avoiding retyping.</translation></message>
+    <message><source>nome e programa são placeholders. Cada linha da tabela poderá fornecer conteúdos diferentes para eles.</source><translation>name and program are placeholders. Each table row can provide different content for them.</translation></message>
+    <message><source>Trecho opcional em ação</source><translation>Optional section in action</translation></message>
+    <message><source>O preview já mostra os nomes porque programa está dentro de um trecho opcional. Esse trecho permanece oculto até a segunda coluna ser preenchida.</source><translation>The preview already shows the names because program is inside an optional section. That section remains hidden until the second column is filled.</translation></message>
+    <message><source>Menu Texto</source><translation>Text menu</translation></message>
+    <message><source>Este é o menu Texto da barra lateral direita. Nele você ajusta fonte, tamanho, cor, estilo, alinhamento, entrelinha e recuo.</source><translation>This is the Text menu in the right sidebar. Here you adjust font, size, color, style, alignment, line spacing, and indentation.</translation></message>
   </context>
 </TS>

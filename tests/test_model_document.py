@@ -56,10 +56,12 @@ def two_page_document():
     back["field_ids"] = ["Nome", "Verso"]
     back["boxes"][0]["html"] = "<p>{Verso}</p>"
     back["shapes"][0]["fill_color"] = "#223344"
+    for signature in back.get("signatures", []):
+        signature.pop("signature_id", None)
     document["pages"].append(back)
     document["placeholders"] = ["Nome", "Cargo", "Site", "Verso"]
     document.pop("__source_schema_version", None)
-    return document
+    return normalize_model_document(document)
 
 
 def test_v3_normalizes_in_memory_without_mutating_or_duplicating_background():
@@ -155,6 +157,8 @@ def test_identical_front_and_back_render_pixel_identically():
     document = normalize_model_document(legacy_fixture())
     back = copy.deepcopy(document["pages"][0])
     back["page_id"] = "back"
+    for signature in back.get("signatures", []):
+        signature.pop("signature_id", None)
     document["pages"].append(back)
     document.pop("__source_schema_version", None)
     row = {
@@ -396,6 +400,36 @@ def test_signatures_are_collected_from_front_and_back():
 
     assert len(signatures) == 2
     assert [signature["visible"] for signature in signatures] == [True, False]
+
+
+def test_signatures_receive_stable_document_wide_ids_independent_from_names():
+    source = legacy_fixture()
+    source["signatures"].append(copy.deepcopy(source["signatures"][0]))
+    source["signatures"][0]["custom_name"] = "Diretor"
+    source["signatures"][1]["custom_name"] = "Diretor"
+    source["signatures"][1]["layer_id"] = 999
+
+    first = normalize_model_document(source)
+    second = normalize_model_document(source)
+    first_signatures = first["pages"][0]["signatures"]
+    second_signatures = second["pages"][0]["signatures"]
+
+    assert len({item["signature_id"] for item in first_signatures}) == 2
+    assert [item["signature_id"] for item in first_signatures] == [
+        item["signature_id"] for item in second_signatures
+    ]
+    original_id = first_signatures[0]["signature_id"]
+    first_signatures[0]["custom_name"] = "Reitor"
+    assert first_signatures[0]["signature_id"] == original_id
+
+
+def test_duplicate_signature_ids_are_rejected_across_pages():
+    document = two_page_document()
+    duplicated = document["pages"][0]["signatures"][0]["signature_id"]
+    document["pages"][1]["signatures"][0]["signature_id"] = duplicated
+
+    with pytest.raises(ModelValidationError, match="signature_id repetido"):
+        normalize_model_document(document)
 
 
 def test_font_inventory_includes_plain_and_rich_fonts_from_back():

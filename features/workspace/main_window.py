@@ -10,7 +10,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
-                                  QInputDialog, QComboBox, QTableWidgetItem)
+                                  QComboBox, QTableWidgetItem)
 from PySide6.QtCore import Qt, QSignalBlocker, QTimer, QThread
 from PySide6.QtGui import QPainter, QImage, QIcon, QPageLayout, QPalette, QColor, QBrush
 
@@ -35,6 +35,7 @@ from core.output_folders import create_forge_output_dir
 from core.dynamic_images import dynamic_image_fields, resolve_dynamic_image
 from core.themes import themed_style, theme_color
 from core.i18n import tr
+from core.dialog_buttons import get_text as dialog_get_text
 from core.model_document import (
     V3_FILENAME,
     V4_FILENAME,
@@ -49,7 +50,14 @@ from core.model_document import (
 )
 from core.model_info import build_model_snapshot, current_model_snapshot, ensure_origin_info
 from features.workspace.model_info_dialog import ModelInfoDialog
-from features.spreadsheet.headers import SIGNATURE_HEADER, quantity_header_label, is_quantity_header
+from features.spreadsheet.headers import (
+    SIGNATURE_ID_ROLE,
+    is_quantity_header,
+    is_signature_header,
+    quantity_header_label,
+    signature_id_from_header,
+    table_column_key,
+)
 
 
 
@@ -146,6 +154,9 @@ class MainWindow(QMainWindow):
         self.cbo_export_format.currentIndexChanged.connect(self._on_export_mode_changed)
         self.table_panel.table.itemSelectionChanged.connect(self._on_table_selection)
         self.table_panel.table.itemChanged.connect(self._on_preview_data_changed)
+        self.table_panel.table.signatureColumnToggled.connect(
+            lambda *_: self._on_preview_data_changed()
+        )
         self.table_panel.table.model().rowsInserted.connect(self._on_preview_rows_changed)
         self.table_panel.table.model().rowsRemoved.connect(self._on_preview_rows_changed)
         self.table_panel.btn_dynamic_image_dir.clicked.connect(
@@ -321,7 +332,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo para renomear."))
             return
 
-        new_name, ok = QInputDialog.getText(self, tr("Renomear modelo"), tr("Novo nome:"), text=old_name)
+        new_name, ok = dialog_get_text(
+            self, tr("Renomear modelo"), tr("Novo nome:"), text=old_name
+        )
         if not ok or not new_name.strip():
             return
         
@@ -694,23 +707,28 @@ class MainWindow(QMainWindow):
         self.table_panel.table.setRowCount(0)
         self.table_panel.table.setColumnCount(0)
         
-        headers = [quantity_header_label()] # Coluna 0
-        has_sig = bool(signatures)
-        
-        if has_sig:
-            headers.append(SIGNATURE_HEADER) # Coluna 1
-        
-        headers.extend(placeholders)
-            
-        self.table_panel.table.setColumnCount(len(headers))
-        self.table_panel.table.setHorizontalHeaderLabels(headers)
-        if has_sig:
-            self.table_panel.table.horizontalHeaderItem(1).setIcon(QIcon(str(object_icon_path("signature"))))
+        signatures = list(signatures or [])
+        column_count = 1 + len(signatures) + len(placeholders)
+        self.table_panel.table.setColumnCount(column_count)
+        self.table_panel.table.setHorizontalHeaderItem(0, QTableWidgetItem(quantity_header_label()))
+        for offset, signature in enumerate(signatures, start=1):
+            label = str(signature.get("custom_name") or "").strip() or tr("Assinatura {numero}").format(numero=offset)
+            header = QTableWidgetItem(label)
+            header.setData(SIGNATURE_ID_ROLE, signature["signature_id"])
+            header.setIcon(QIcon(str(object_icon_path("signature"))))
+            header.setToolTip(
+                tr("{nome}\nClique no ícone para marcar ou desmarcar toda a coluna.").format(
+                    nome=label
+                )
+            )
+            self.table_panel.table.setHorizontalHeaderItem(offset, header)
+        for offset, placeholder in enumerate(placeholders, start=1 + len(signatures)):
+            self.table_panel.table.setHorizontalHeaderItem(offset, QTableWidgetItem(placeholder))
         
         # Ajuste de larguras iniciais
         self.table_panel.table.setColumnWidth(0, 70) # Cópias
-        if has_sig:
-            self.table_panel.table.setColumnWidth(1, 50) # Assinatura
+        for column in range(1, 1 + len(signatures)):
+            self.table_panel.table.setColumnWidth(column, 110)
 
         self.table_panel.table.setRowCount(1)
         
@@ -719,19 +737,11 @@ class MainWindow(QMainWindow):
         qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
         self.table_panel.table.setItem(0, 0, qty_item)
         
-        # 2. Configura a célula de Assinatura (Index 1), se existir
-        if has_sig:
-            default_state = True
-            for sig in signatures:
-                if not sig.get("visible", True):
-                    default_state = False
-                    break
-            
-            chk_item = QTableWidgetItem("")
-            chk_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-            chk_item.setCheckState(Qt.CheckState.Checked if default_state else Qt.CheckState.Unchecked)
-            chk_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.table_panel.table.setItem(0, 1, chk_item)
+        for column, signature in enumerate(signatures, start=1):
+            state = Qt.CheckState.Checked if signature.get("visible", True) else Qt.CheckState.Unchecked
+            self.table_panel.table.setItem(
+                0, column, self.table_panel.table._signature_item(state)
+            )
 
     def _on_table_selection(self):
         if not self.cached_model_data: return
@@ -1117,7 +1127,7 @@ class MainWindow(QMainWindow):
         saved_rows = []
         if old_name == target_name or old_name == previous_name:
             for row in range(table.rowCount()):
-                saved_rows.append({table.horizontalHeaderItem(col).text(): table.item(row, col).clone()
+                saved_rows.append({table_column_key(table.horizontalHeaderItem(col)): table.item(row, col).clone()
                                    for col in range(table.columnCount()) if table.item(row, col)})
         blocker = QSignalBlocker(table)
         # Formata o log conforme o seu novo padrão
@@ -1129,7 +1139,7 @@ class MainWindow(QMainWindow):
             table.setRowCount(len(saved_rows))
             for row, values in enumerate(saved_rows):
                 for col in range(table.columnCount()):
-                    name = table.horizontalHeaderItem(col).text()
+                    name = table_column_key(table.horizontalHeaderItem(col))
                     item = values.get(name, defaults[col])
                     if item:
                         table.setItem(row, col, item.clone())
@@ -1147,7 +1157,11 @@ class MainWindow(QMainWindow):
         self.active_model_name = current_model_name
         cols = self.table_panel.table.columnCount()
         # Adiciona 'modelo' explicitamente como uma variável disponível no diálogo
-        vars_available = ["modelo"] + [self.table_panel.table.horizontalHeaderItem(c).text() for c in range(cols)]
+        vars_available = ["modelo"] + [
+            self.table_panel.table.horizontalHeaderItem(c).text()
+            for c in range(cols)
+            if not is_signature_header(self.table_panel.table.horizontalHeaderItem(c))
+        ]
         slug = slugify_model_name(self.active_model_name)
         
         current_imposition = None
@@ -1244,7 +1258,6 @@ class MainWindow(QMainWindow):
         table = self.table_panel.table
         rows = table.rowCount()
         cols = table.columnCount()
-        headers = [table.horizontalHeaderItem(c).text() for c in range(cols)]
         data_plain, data_rich, source_rows = [], [], []
 
         for r in range(rows):
@@ -1257,7 +1270,8 @@ class MainWindow(QMainWindow):
             has_content = False
             
             for c in range(cols):
-                key = headers[c]
+                header = table.horizontalHeaderItem(c)
+                key = header.text()
                 item = table.item(r, c)
 
                 # 1. Trata a nova coluna de Quantidade
@@ -1270,10 +1284,15 @@ class MainWindow(QMainWindow):
                     continue
 
                 # 2. Trata a coluna de Assinatura
-                if key == SIGNATURE_HEADER:
+                if is_signature_header(header):
                     use_sig = (item.checkState() == Qt.CheckState.Checked) if item else True
-                    row_p["__use_signature__"] = use_sig
-                    row_r["__use_signature__"] = use_sig
+                    signature_id = signature_id_from_header(header)
+                    if signature_id:
+                        row_p.setdefault("__signature_visibility__", {})[signature_id] = use_sig
+                        row_r.setdefault("__signature_visibility__", {})[signature_id] = use_sig
+                    else:
+                        row_p["__use_signature__"] = use_sig
+                        row_r["__use_signature__"] = use_sig
                     continue
 
                 # 3. Trata placeholders comuns
@@ -1302,19 +1321,23 @@ class MainWindow(QMainWindow):
     def _get_row_data_rich(self, row_idx):
         table = self.table_panel.table
         cols = table.columnCount()
-        headers = [table.horizontalHeaderItem(c).text() for c in range(cols)]
-        
         row_data = {}
         for c in range(cols):
-            key = headers[c]
+            header = table.horizontalHeaderItem(c)
+            key = header.text()
             item = table.item(row_idx, c)
 
             # Ignora a coluna de quantidade no preview técnico do cartão
             if is_quantity_header(key):
                 continue
                 
-            if key == SIGNATURE_HEADER:
-                row_data["__use_signature__"] = (item.checkState() == Qt.CheckState.Checked) if item else True
+            if is_signature_header(header):
+                use_sig = (item.checkState() == Qt.CheckState.Checked) if item else True
+                signature_id = signature_id_from_header(header)
+                if signature_id:
+                    row_data.setdefault("__signature_visibility__", {})[signature_id] = use_sig
+                else:
+                    row_data["__use_signature__"] = use_sig
                 continue
                 
             val = ""
@@ -1432,6 +1455,7 @@ class MainWindow(QMainWindow):
             table.horizontalHeaderItem(column).text(): column
             for column in range(table.columnCount())
             if table.horizontalHeaderItem(column)
+            and not is_signature_header(table.horizontalHeaderItem(column))
         }
         counts = {"not_found": 0, "ambiguous": 0, "invalid": 0}
         old_blocked = table.blockSignals(True)
@@ -1557,6 +1581,7 @@ class MainWindow(QMainWindow):
         self.settings.setValue("last_output_dir", custom_path)
 
         output_dir, _forge_number = create_forge_output_dir(base_dir, self.settings)
+        self._last_forge_output_dir = output_dir
         folder_name = output_dir.name
         
         self.log_panel.append(tr("📂 Salvando em: {pasta}").format(pasta=folder_name))

@@ -3,7 +3,7 @@ import sys
 from unittest.mock import patch
 
 from PySide6.QtCore import Qt, QPoint, QCoreApplication, QEvent
-from PySide6.QtWidgets import QApplication, QMainWindow, QPushButton
+from PySide6.QtWidgets import QApplication, QLabel, QMainWindow, QPushButton
 from shiboken6 import isValid
 
 from core.themes import theme_manager
@@ -97,6 +97,32 @@ class EditorWindowLifecycleTest(unittest.TestCase):
         editor.update_position_ui()
         editor.toggle_guides_lock(True)
         editor.toggle_guides_lock(False)
+
+        editor._last_saved_state = editor.get_current_scene_state()
+        editor.close()
+
+    def test_hidden_control_panels_do_not_build_legacy_layouts(self):
+        editor = EditorWindow()
+
+        self.assertIsNone(editor.caixa_texto_panel.layout())
+        self.assertIsNone(editor.editor_texto_panel.layout())
+        self.assertEqual(editor.caixa_texto_panel.findChildren(QLabel), [])
+        self.assertEqual(editor.editor_texto_panel.findChildren(QLabel), [])
+
+        # Os controles consumidos pela interface atual continuam vivos e
+        # pertencem à árvore visual definitiva depois da montagem.
+        for control in (
+            editor.caixa_texto_panel.spin_w,
+            editor.caixa_texto_panel.spin_h,
+            editor.caixa_texto_panel.spin_rot,
+            editor.caixa_texto_panel.spin_opacity,
+            editor.editor_texto_panel.cbo_font,
+            editor.editor_texto_panel.spin_size,
+            editor.editor_texto_panel.spin_indent,
+            editor.editor_texto_panel.spin_lh,
+        ):
+            self.assertTrue(isValid(control))
+            self.assertIsNotNone(control.parentWidget())
 
         editor._last_saved_state = editor.get_current_scene_state()
         editor.close()

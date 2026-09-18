@@ -11,7 +11,13 @@ from PySide6.QtWidgets import (
 )
 
 from features.generator.renderer import NativeRenderer
-from .canvas_items import Guideline, ImageItem, RectangleItem, _snap_position_to_guides
+from .canvas_items import (
+    Guideline,
+    ImageItem,
+    RectangleItem,
+    _item_pos_for_local_scene_point,
+    _snap_position_to_guides,
+)
 from .editor_window import EditorWindow
 
 
@@ -135,6 +141,35 @@ class ImageMaskTest(unittest.TestCase):
                 }
                 self.assertEqual(selected_rows, {restored_shape, restored_image})
                 self.assertEqual(window.scene.selectedItems(), [restored_shape])
+            finally:
+                self._close(window)
+
+    def test_first_mask_resize_keeps_the_handle_anchor_in_place(self):
+        with tempfile.TemporaryDirectory() as folder:
+            asset = self._asset(folder)
+            window, shape, image = self._window_objects(asset)
+            try:
+                self.assertTrue(window.create_mask(image, shape))
+                self.assertEqual(image.pos(), QPointF(-30, 10))
+
+                # O canto superior esquerdo é o ponto fixo ao arrastar a alça
+                # inferior direita. Ele deve permanecer na mesma coordenada
+                # de cena mesmo com forma-pai deslocada e imagem rotacionada.
+                fixed_local = QPointF(0, 0)
+                fixed_scene = image.mapToScene(fixed_local)
+                image.resize_from_handle(220, 82.5)
+                image.setPos(_item_pos_for_local_scene_point(
+                    image, fixed_local, fixed_scene
+                ))
+
+                actual = image.mapToScene(fixed_local)
+                self.assertAlmostEqual(actual.x(), fixed_scene.x(), places=6)
+                self.assertAlmostEqual(actual.y(), fixed_scene.y(), places=6)
+                # A coordenada local continua relacionada à forma; não recebe
+                # novamente o deslocamento (40, 30) da máscara.
+                self.assertLess(abs(image.pos().x()), 60)
+                self.assertLess(abs(image.pos().y()), 60)
+                window.finish_mask_edit(True)
             finally:
                 self._close(window)
 

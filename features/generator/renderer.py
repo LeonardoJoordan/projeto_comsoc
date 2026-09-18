@@ -11,6 +11,27 @@ from core.text_layout import PLACEHOLDER_PATTERN, build_document, text_geometry,
 from core.dynamic_images import resolve_dynamic_image
 
 
+def signature_is_visible(signature: dict, row_data: dict | None) -> bool:
+    """Resolve a visibilidade sem misturar as assinaturas de uma linha.
+
+    O mapa por ``signature_id`` é o formato atual. O campo booleano antigo
+    continua aceito somente quando esse mapa não existe, preservando modelos e
+    chamadas de geração anteriores à separação das colunas.
+    """
+    values = row_data or {}
+    visibility = values.get("__signature_visibility__")
+    if isinstance(visibility, dict):
+        signature_id = signature.get("signature_id")
+        if signature_id in visibility:
+            return bool(visibility[signature_id])
+        return bool(signature.get("visible", True))
+
+    legacy_visibility = values.get("__use_signature__")
+    if legacy_visibility is not None:
+        return bool(legacy_visibility)
+    return bool(signature.get("visible", True))
+
+
 def renderers_for_document(document: dict, dynamic_image_dir=None) -> list["NativeRenderer"]:
     """Cria o mesmo renderizador de prancheta para cada página do documento."""
     normalized = normalize_model_document(document)
@@ -536,13 +557,9 @@ class NativeRenderer:
                 continue
 
         for sig in self.tpl.get("signatures", []):
-            # A decisão da tabela sobrepõe a do JSON. Se não houver info na tabela, usa o JSON.
-            show_sig = row_rich.get("__use_signature__")
-            
-            if show_sig is None:
-                show_sig = sig.get("visible", True)
-                
-            if not show_sig:
+            # Assinaturas dependem da linha e nunca podem ser incorporadas à
+            # base estática, pois cada coluna pode ligá-las separadamente.
+            if static_only or not signature_is_visible(sig, row_rich):
                 continue
 
             raw_sig = sig["path"]

@@ -295,6 +295,7 @@ class EditorPagesTest(unittest.TestCase):
                 window.scene.addItem(shape)
 
                 signature = SignatureItem(str(asset))
+                original_signature_id = signature.signature_id
                 signature.layer_id = window._get_next_layer_id()
                 signature.custom_name = "Assinatura"
                 signature.resize_custom(90, 36)
@@ -341,6 +342,7 @@ class EditorPagesTest(unittest.TestCase):
                 self.assertEqual((pasted_signature.x(), pasted_signature.y()), (100.0, 120.0))
                 self.assertEqual(pasted_signature.rotation(), -8)
                 self.assertAlmostEqual(pasted_signature.opacity(), 0.55)
+                self.assertNotEqual(pasted_signature.signature_id, original_signature_id)
                 self.assertLess(pasted_shape.zValue(), pasted_signature.zValue())
                 self.assertLess(pasted_signature.zValue(), pasted_text.zValue())
                 self.assertEqual(window.history._current_index, history_before + 1)

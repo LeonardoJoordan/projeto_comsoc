@@ -10,6 +10,7 @@ from pathlib import Path
 import shutil
 import tempfile
 from typing import Any
+from uuid import NAMESPACE_URL, uuid4, uuid5
 
 
 SCHEMA_VERSION = 4
@@ -29,6 +30,38 @@ PAGE_KEYS = {
     "editable_background_initialized",
 }
 DOCUMENT_ONLY_KEYS = {"schema_version", "__source_schema_version", "pages"}
+
+
+def new_signature_id() -> str:
+    """Cria a identidade persistente de uma assinatura nova."""
+    return f"sig-{uuid4().hex}"
+
+
+def _ensure_signature_ids(document: dict) -> None:
+    """Adapta modelos anteriores sem vincular a identidade ao nome da camada."""
+    reserved = {
+        signature_id
+        for page in document.get("pages", [])
+        for signature in page.get("signatures", [])
+        if isinstance((signature_id := signature.get("signature_id")), str)
+        and signature_id.strip()
+    }
+    generated = set()
+    for page in document.get("pages", []):
+        page_id = page.get("page_id", "page")
+        for index, signature in enumerate(page.get("signatures", [])):
+            current = signature.get("signature_id")
+            if isinstance(current, str) and current.strip():
+                continue
+            object_id = signature.get("object_id") or f"signature-{index}"
+            seed = f"fornax-forge:{page_id}:{object_id}"
+            candidate = f"sig-{uuid5(NAMESPACE_URL, seed).hex}"
+            suffix = 2
+            while candidate in reserved or candidate in generated:
+                candidate = f"sig-{uuid5(NAMESPACE_URL, f'{seed}:{suffix}').hex}"
+                suffix += 1
+            signature["signature_id"] = candidate
+            generated.add(candidate)
 
 
 class ModelDocumentError(ValueError):
@@ -271,8 +304,18 @@ def validate_model_document(document: dict) -> None:
     if not isinstance(pages, list) or not 1 <= len(pages) <= 2:
         raise ModelValidationError("O modelo deve possuir uma ou duas páginas.")
     legacy_source = document.get("__source_schema_version") == LEGACY_SCHEMA_VERSION
+    signature_ids = []
     for index, page in enumerate(pages):
         _validate_page(page, PAGE_IDS[index], legacy_source=legacy_source)
+        for signature in page.get("signatures", []):
+            signature_id = signature.get("signature_id")
+            if not isinstance(signature_id, str) or not signature_id.strip():
+                raise ModelValidationError(
+                    f"Assinatura sem identidade persistente na página {PAGE_IDS[index]}."
+                )
+            signature_ids.append(signature_id)
+    if len(signature_ids) != len(set(signature_ids)):
+        raise ModelValidationError("Há signature_id repetido no documento.")
 
 
 def normalize_model_document(source: dict) -> dict:
@@ -286,6 +329,7 @@ def normalize_model_document(source: dict) -> dict:
         document = deepcopy(source)
     else:
         raise UnsupportedSchemaError(f"Versão de modelo não suportada: {version!r}.")
+    _ensure_signature_ids(document)
     validate_model_document(document)
     _reconcile_document_fields(document, document.get("placeholders", []))
     validate_model_document(document)

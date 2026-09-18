@@ -1,13 +1,12 @@
-from core.themes import themed_style, theme_color, theme_manager
-from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSpinBox,
-                               QFormLayout, QGridLayout, QTextEdit, QFontComboBox,
+from core.themes import themed_style
+from PySide6.QtWidgets import (QWidget, QSpinBox, QTextEdit, QFontComboBox,
                                QPushButton, QComboBox, QDoubleSpinBox, QColorDialog,
-                               QGraphicsOpacityEffect, QMessageBox, QSizePolicy)
+                               QGraphicsOpacityEffect, QMessageBox)
 from PySide6.QtCore import Qt, Signal, QMimeData, QSize
 from PySide6.QtGui import QFont, QTextCursor, QTextBlockFormat, QTextCharFormat, QIcon
 import re
 
-from .canvas_items import DesignerBox, SignatureItem, ImageItem, BackgroundItem, px_to_mm
+from .canvas_items import DesignerBox, ImageItem, BackgroundItem, px_to_mm
 from core.custom_widgets import MathDoubleSpinBox
 from core.html_utils import normalize_text_decoration
 from core.text_layout import PLACEHOLDER_PATTERN
@@ -63,163 +62,51 @@ class CaixaDeTextoPanel(QWidget):
 
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        
-        self.lbl_title = QLabel("<b>PROPRIEDADES DO OBJETO</b>")
-        self.lbl_title.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        tooltip_propriedades = (
-            "<b>PROPRIEDADES DO OBJETO</b><br><br>"
-            "Gestão técnica de dimensões, orientação e comportamento do elemento selecionado.<br><br>"
-            "• <b>Largura e Altura:</b> Define as dimensões físicas horizontais e verticais em milímetros (mm).<br>"
-            "• <b>Manter proporção:</b> Trava a relação entre os eixos para evitar distorções no redimensionamento.<br>"
-            "• <b>Rotação:</b> Gira o objeto selecionado em graus (°) ao redor do seu ponto central.<br>"
-            "• <b>Opacidade:</b> Controla o nível de transparência do elemento (0% a 100%).<br>"
-            "• <b>Restaurar original:</b> Reseta a escala e rotação para os valores nativos do arquivo.<br>"
-            "• <b>Habilitar link:</b> Cria uma área de interação para redirecionamento em arquivos PDF.<br><br>"
-            "<small >Dica: Utilize a função 'Restaurar original' para recuperar instantaneamente a proporção e nitidez nativa de imagens que foram deformadas.</small>"
-        )
-        self.lbl_title.setToolTip(tooltip_propriedades)
-        layout.addWidget(self.lbl_title)
+        # Este widget conserva o estado e os sinais dos controles. A interface
+        # atual é montada exclusivamente em frontend.py, que assume a
+        # propriedade visual dos controles abaixo.
         self._aspect_ratio = 1.0
         self._group_mode = False
         self._restore_available = False
         self._link_available = False
-        
-                # --- Layout compacto das propriedades ---
-        props_layout = QVBoxLayout()
-        props_layout.setContentsMargins(0, 0, 0, 0)
-        props_layout.setSpacing(6)
 
-        # =========================
-        # Bloco superior: Largura / Altura + botões laterais
-        # =========================
-        size_row = QHBoxLayout()
-        size_row.setContentsMargins(0, 0, 0, 0)
-        size_row.setSpacing(6)
-
-        size_grid = QGridLayout()
-        size_grid.setContentsMargins(0, 0, 0, 0)
-        size_grid.setHorizontalSpacing(6)
-        size_grid.setVerticalSpacing(4)
-
-        self.spin_w = MathDoubleSpinBox()
+        self.spin_w = MathDoubleSpinBox(self)
         self.spin_w.setRange(1.0, 5000.0)
         self.spin_w.setDecimals(2)
         self.spin_w.setKeyboardTracking(False)
-        self.spin_w.valueChanged.connect(self.widthChanged.emit)
+        self.spin_w.valueChanged.connect(self._on_w_changed)
 
-        self.lbl_w = QLabel("Larg (mm):")
-        self.lbl_w.setToolTip(
-            "<b>LARGURA</b><br><br>"
-            "Define a dimensão física horizontal exata do objeto.<br><br>"
-            "<small >Dica: Valores inseridos aqui refletem o tamanho real (em milímetros) na impressão final.</small>"
-        )
-
-        self.spin_h = MathDoubleSpinBox()
+        self.spin_h = MathDoubleSpinBox(self)
         self.spin_h.setRange(1.0, 5000.0)
         self.spin_h.setDecimals(2)
         self.spin_h.setKeyboardTracking(False)
-        self.spin_h.valueChanged.connect(self.heightChanged.emit)
-
-        self.lbl_h = QLabel("Alt (mm):")
-        self.lbl_h.setToolTip(
-            "<b>ALTURA</b><br><br>"
-            "Define a dimensão física vertical exata do objeto.<br><br>"
-            "<small >Dica: Se a opção 'Manter proporção' estiver ativa, a largura será ajustada automaticamente.</small>"
-        )
-
-        size_grid.addWidget(self.lbl_w, 0, 0)
-        size_grid.addWidget(self.spin_w, 0, 1)
-        size_grid.addWidget(self.lbl_h, 1, 0)
-        size_grid.addWidget(self.spin_h, 1, 1)
-        size_grid.setColumnStretch(1, 1)
-
-        size_buttons = QVBoxLayout()
-        size_buttons.setContentsMargins(0, 0, 0, 0)
-        size_buttons.setSpacing(4) # Espaço entre os emojis
+        self.spin_h.valueChanged.connect(self._on_h_changed)
 
         self.chk_proporcao = self._make_tool_button(
             "",
-            "<b>MANTER PROPORÇÃO</b><br><br>"
-            "Preserva a relação entre largura e altura durante o redimensionamento:<br>"
-            "• <b>Vínculo:</b> Ao alterar um valor, o outro é ajustado automaticamente.<br>"
-            "• <b>Integridade:</b> Evita que imagens e textos fiquem esticados ou deformados.<br><br>"
-            "<small >Dica: Desative apenas se precisar forçar uma dimensão específica ignorando o aspeto original.</small>",
-            checkable=True
+            "<b>MANTER PROPORÇÃO</b><br><br>Preserva a relação entre largura e altura durante o redimensionamento.",
+            checkable=True,
         )
         self.chk_proporcao.setChecked(True)
-        # --- Efeito visual de Opacidade ---
         self.op_proporcao = QGraphicsOpacityEffect(self.chk_proporcao)
         self.chk_proporcao.setGraphicsEffect(self.op_proporcao)
-        self.op_proporcao.setOpacity(1.0) # Começa ligado (100%)
-
-        # Mudamos a conexão para a nossa nova função que gerencia UI + Sinal
+        self.op_proporcao.setOpacity(1.0)
         self.chk_proporcao.toggled.connect(self._on_proportion_toggled)
 
         self.btn_restore = self._make_tool_button(
             "🔄",
-            "<b>RESTAURAR ORIGINAL</b><br><br>"
-            "Reverte o objeto ao seu estado inicial de importação:<br><br>"
-            "• <b>Reset:</b> Redefine o tamanho nativo e remove qualquer rotação aplicada.<br><br>"
-            "<small >Dica: A forma mais rápida de corrigir uma imagem que foi redimensionada incorretamente ou perdeu qualidade.</small>"
+            "<b>RESTAURAR ORIGINAL</b><br><br>Restaura tamanho e rotação nativos do arquivo.",
         )
-        # --- Efeito visual de Opacidade ---
         self.op_restore = QGraphicsOpacityEffect(self.btn_restore)
         self.btn_restore.setGraphicsEffect(self.op_restore)
-        self.op_restore.setOpacity(1.0) # Começa ligado
-
+        self.op_restore.setOpacity(1.0)
         self.btn_restore.clicked.connect(self.restoreRequested.emit)
 
-        size_buttons.addWidget(self.chk_proporcao)
-        size_buttons.addWidget(self.btn_restore)
-        size_buttons.addStretch()
-
-        size_row.addLayout(size_grid, 1)
-        size_row.addLayout(size_buttons)
-        props_layout.addLayout(size_row)
-
-        # Intercepta os sinais para calcular a proporção antes de emitir para a cena
-        self.spin_w.valueChanged.disconnect(self.widthChanged.emit)
-        self.spin_h.valueChanged.disconnect(self.heightChanged.emit)
-        self.spin_w.valueChanged.connect(self._on_w_changed)
-        self.spin_h.valueChanged.connect(self._on_h_changed)
-
-        # =========================
-        # Bloco inferior: Rotação à esquerda / Opacidade + Link à direita
-        # =========================
-        bottom_row = QHBoxLayout()
-        bottom_row.setContentsMargins(0, 0, 0, 0)
-        bottom_row.setSpacing(8)
-
-        # --- Rotação ---
-        rot_box = QVBoxLayout()
-        rot_box.setContentsMargins(0, 0, 0, 0)
-        rot_box.setSpacing(4)
-
-        rot_line = QHBoxLayout()
-        rot_line.setContentsMargins(0, 0, 0, 0)
-        rot_line.setSpacing(6)
-
-        self.spin_rot = MathDoubleSpinBox()
+        self.spin_rot = MathDoubleSpinBox(self)
         self.spin_rot.setRange(0.0, 359.9)
         self.spin_rot.setDecimals(1)
         self.spin_rot.setWrapping(True)
         self.spin_rot.valueChanged.connect(self.rotationChanged.emit)
-
-        self.lbl_rot = QLabel("Rot (°):")
-        self.lbl_rot.setToolTip(
-            "<b>ROTAÇÃO</b><br><br>"
-            "Gira o objeto selecionado em graus (°) ao redor do seu ponto central.<br><br>"
-            "<small >Dica: Use valores positivos para girar no sentido horário ou negativos para o sentido anti-horário.</small>"
-        )
-
-        rot_line.addWidget(self.lbl_rot)
-        rot_line.addWidget(self.spin_rot, 1)
-
-        rot_buttons = QHBoxLayout()
-        rot_buttons.setContentsMargins(0, 0, 0, 0)
-        rot_buttons.setSpacing(4)
 
         self.btn_rot_minus_90 = self._make_tool_button("", "Gira o objeto 90° anti-horário.")
         self.btn_rot_plus_90 = self._make_tool_button("", "Gira o objeto 90° horário.")
@@ -227,80 +114,31 @@ class CaixaDeTextoPanel(QWidget):
             (self.btn_rot_minus_90, "rotate-left"),
             (self.btn_rot_plus_90, "rotate-right"),
         ):
-            button.setText("")
             button.setIcon(QIcon(str(action_icon_path(asset_name))))
             button.setIconSize(QSize(18, 18))
-
-        # --- Efeitos visuais de Opacidade para Rotação ---
         self.op_rot_minus = QGraphicsOpacityEffect(self.btn_rot_minus_90)
         self.btn_rot_minus_90.setGraphicsEffect(self.op_rot_minus)
-        
         self.op_rot_plus = QGraphicsOpacityEffect(self.btn_rot_plus_90)
         self.btn_rot_plus_90.setGraphicsEffect(self.op_rot_plus)
-        
         self.btn_rot_minus_90.clicked.connect(lambda: self._apply_rotation_delta(-90))
         self.btn_rot_plus_90.clicked.connect(lambda: self._apply_rotation_delta(90))
 
-        rot_buttons.addStretch(1)
-        rot_buttons.addWidget(self.btn_rot_minus_90)
-        rot_buttons.addStretch(1)
-        rot_buttons.addWidget(self.btn_rot_plus_90)
-        rot_buttons.addStretch(1)
-
-        rot_box.addLayout(rot_line)
-        rot_box.addLayout(rot_buttons)
-
-        # --- Opacidade + Link ---
-        opac_box = QVBoxLayout()
-        opac_box.setContentsMargins(0, 0, 0, 0)
-        opac_box.setSpacing(4)
-
-        opac_line = QHBoxLayout()
-        opac_line.setContentsMargins(0, 0, 0, 0)
-        opac_line.setSpacing(6)
-
-        self.spin_opacity = MathDoubleSpinBox()
+        self.spin_opacity = MathDoubleSpinBox(self)
         self.spin_opacity.setRange(0.0, 100.0)
         self.spin_opacity.setDecimals(0)
         self.spin_opacity.setValue(100.0)
         self.spin_opacity.valueChanged.connect(self._on_opacity_changed)
 
-        self.lbl_opacity = QLabel("Opac (%):")
-        self.lbl_opacity.setToolTip(
-            "<b>OPACIDADE</b><br><br>"
-            "Controla o nível de transparência do elemento (0% a 100%).<br><br>"
-            "<small >Dica: Valores baixos são excelentes para criar marcas d'água sutis que não interferem na leitura de outros dados.</small>"
-        )
-
-        opac_line.addWidget(self.lbl_opacity)
-        opac_line.addWidget(self.spin_opacity, 1)
-
-        self.chk_link = QPushButton(tr("Habilitar link"))
+        self.chk_link = QPushButton(tr("Habilitar link"), self)
         self.chk_link.setCheckable(True)
         self.chk_link.setFixedHeight(22)
-        self.chk_link.setSizePolicy(
-            QSizePolicy.Policy.Expanding,
-            QSizePolicy.Policy.Fixed,
-        )
         self.chk_link.setToolTip(
-            "<b>HABILITAR LINK (URL)</b><br><br>"
-            "Cria uma área de interação (clicável) no PDF exportado:<br><br>"
-            "• <b>Cartões interativos:</b> O PDF gerado terá um link clicável para redirecionar ao endereço configurado na tabela.<br>"
-            "• <b>Somente em PDF:</b> Esta funcionalidade só está disponível no formato PDF.<br><br>"
-            "<small >Dica: Use em logótipos ou rodapés para levar o utilizador diretamente ao seu site ou redes sociais.</small>"
+            "<b>HABILITAR LINK (URL)</b><br><br>Cria uma área clicável no PDF exportado."
         )
         self.chk_link.toggled.connect(self.linkToggled.emit)
         self.op_link = QGraphicsOpacityEffect(self.chk_link)
         self.chk_link.setGraphicsEffect(self.op_link)
         self.op_link.setOpacity(self.DISABLED_OPACITY)
-
-        opac_box.addLayout(opac_line)
-        opac_box.addWidget(self.chk_link)
-
-        bottom_row.addLayout(rot_box, 1)
-        bottom_row.addLayout(opac_box, 1)
-
-        props_layout.addLayout(bottom_row)
 
         self.spin_w.editingFinished.connect(self.snapshotRequested.emit)
         self.spin_h.editingFinished.connect(self.snapshotRequested.emit)
@@ -308,9 +146,6 @@ class CaixaDeTextoPanel(QWidget):
         self.spin_opacity.editingFinished.connect(self.snapshotRequested.emit)
         self.chk_proporcao.clicked.connect(self.snapshotRequested.emit)
         self.chk_link.clicked.connect(self.snapshotRequested.emit)
-
-        layout.addLayout(props_layout)
-        layout.addStretch()
         self.clear_selection_state()
 
     def _tool_button_style(self):
@@ -395,16 +230,12 @@ class CaixaDeTextoPanel(QWidget):
         self.op_proporcao.setOpacity(opacity)
 
     def _set_size_controls_available(self, available: bool):
-        self._set_widgets_available(
-            (self.lbl_w, self.spin_w, self.lbl_h, self.spin_h),
-            available,
-        )
+        self._set_widgets_available((self.spin_w, self.spin_h), available)
         self._refresh_proportion_button(available)
 
     def _set_rotation_controls_available(self, available: bool):
         self._set_widgets_available(
             (
-                self.lbl_rot,
                 self.spin_rot,
                 self.btn_rot_minus_90,
                 self.btn_rot_plus_90,
@@ -423,7 +254,7 @@ class CaixaDeTextoPanel(QWidget):
         self._set_link_available(available)
 
     def _set_opacity_controls_available(self, available: bool):
-        self._set_widgets_available((self.lbl_opacity, self.spin_opacity), available)
+        self._set_widget_available(self.spin_opacity, available)
 
     def _on_opacity_changed(self, val):
         clamped = max(0.0, min(100.0, val))
@@ -437,7 +268,6 @@ class CaixaDeTextoPanel(QWidget):
         self._group_mode = False
         self._restore_available = False
         self._link_available = False
-        self.lbl_title.setText("<b>PROPRIEDADES DO OBJETO</b>")
         self._set_size_controls_available(False)
         self._set_restore_available(False)
         self._set_rotation_controls_available(False)
@@ -446,8 +276,6 @@ class CaixaDeTextoPanel(QWidget):
 
     def set_group_mode(self, enabled: bool):
         self._group_mode = enabled
-        title = "PROPRIEDADES DO GRUPO" if enabled else "PROPRIEDADES DO OBJETO"
-        self.lbl_title.setText(f"<b>{title}</b>")
 
         item_controls_enabled = not enabled
         self._set_size_controls_available(item_controls_enabled)
@@ -540,192 +368,77 @@ class EditorDeTextoPanel(QWidget):
 
     def __init__(self):
         super().__init__()
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        
-        lbl = QLabel("EDITOR DE TEXTO")
-        themed_style(lbl, "font-weight: bold; font-size: 12px; border-bottom: 1px solid @border@;")
-        lbl.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        
-        tooltip_editor = (
-            "<b>EDITOR DE TEXTO</b><br><br>"
-            "Ferramentas de formatação tipográfica e espaçamento do bloco de texto selecionado.<br><br>"
-            "• <b>Texto:</b> Defina a redação e crie as chaves que o sistema substituirá automaticamente pelas informações da sua tabela.<br>"
-            "• <b>Fonte e Tamanho:</b> Define a família tipográfica e a escala da fonte.<br>"
-            "• <b>Estilos:</b> Aplica negrito (Ctrl+B), itálico (Ctrl+I) ou sublinhado (Ctrl+U).<br>"
-            "• <b>Cor:</b> Define a cor do texto para garantir bom contraste com a imagem de fundo.<br>"
-            "• <b>Alinhamento horizontal:</b> Posiciona o texto nas laterais (Esq/Dir), Centralizado ou Justificado.<br>"
-            "• <b>Alinhamento vertical:</b> Fixa o conteúdo no Topo, no Meio ou na Base da moldura.<br>"
-            "• <b>Recuo:</b> Define o recuo horizontal da primeira linha para organizar visualmente o início dos parágrafos.<br>"
-            "• <b>Entrelinha:</b> Controla a distância vertical entre as linhas, melhorando a legibilidade ou compactando o bloco.<br><br>"
-            "<small >Dica: Para caixas que receberão nomes curtos ou longos, ajuste o alinhamento vertical para 'Meio' para mantê-los sempre perfeitamente centralizados na altura.</small>"
-        )
-        lbl.setToolTip(tooltip_editor)
-        layout.addWidget(lbl)
-        
-        lbl_texto = QLabel("Texto:")
-        lbl_texto.setAttribute(Qt.WidgetAttribute.WA_AlwaysShowToolTips)
-        tooltip_texto = (
-            "<b>CONTEÚDO E VARIÁVEIS (PLACEHOLDERS)</b><br><br>"
-            "Área de digitação para textos fixos e criação do motor dinâmico do seu modelo.<br><br>"
-            "• <b>Como criar:</b> Envolva qualquer palavra com chaves (ex: <b>{Nome}</b>) para que o sistema crie automaticamente uma coluna na sua tabela de preenchimento.<br>"
-            "• <b>Caracteres Proibidos:</b> O sistema reconhece <b>apenas letras, números e subtraços (_)</b>. O uso de espaços, acentos ou símbolos quebra a variável, transformando-a em texto estático.<br>"
-            "• <b>Composição:</b> Você pode misturar texto estático e variáveis na mesma caixa (ex: <i>Certificamos que {Aluno} concluiu...</i>).<br>"
-            "• <b>Ocultação Automática:</b> Se uma variável solta estiver vazia na tabela, <b>toda a caixa de texto ficará invisível</b> naquele cartão, evitando lixo visual na impressão final, exceto se contiver <b>Trechos Opcionais</b>.<br>"
-            "• <b>Trechos Opcionais (Condicionais):</b> Use barras retas (<b>|</b>) para isolar partes do texto. Ex: <i>| CPF n° {CPF} |</i>. Se o dado estiver vazio, apenas o trecho entre as barras desaparece, salvando o restante da caixa.<br><br>"
-            "<small >Dica Smart: Agrupe rótulos e variáveis na mesma caixa (ex: \"WhatsApp: {Telefone}\"). Assim, se a pessoa não tiver telefone cadastrado, a palavra \"WhatsApp:\" some junto com a variável, mantendo o layout impecável.</small>"
-        )
-        lbl_texto.setToolTip(tooltip_texto)
-        layout.addWidget(lbl_texto)
-        
-        self.txt_content = CleanTextEdit()
+        # Controlador sem layout próprio. frontend.py monta e exibe estes
+        # controles na árvore visual definitiva do editor.
+        self.txt_content = CleanTextEdit(self)
         self.txt_content.setMinimumHeight(160)
-        themed_style(self.txt_content, "background-color: @field@; color: @text@; border: 1px solid @border@; font-family: 'Inter 18pt', sans-serif; font-size: 11pt;")
+        themed_style(
+            self.txt_content,
+            "background-color: @field@; color: @text@; border: 1px solid @border@; "
+            "font-family: 'Inter 18pt', sans-serif; font-size: 11pt;",
+        )
         self.txt_content.textChanged.connect(self._emit_clean_html)
-        
-        # INSERE A CAIXA NO LAYOUT PARA ELA APARECER
-        layout.addWidget(self.txt_content)
-        
-        row_font = QHBoxLayout()
-        
-        self.cbo_font = QFontComboBox()
-        self.cbo_font.setToolTip(
-            "<b>FAMÍLIA TIPOGRÁFICA</b><br><br>"
-            "Define a fonte (tipo de letra) do texto ou da seleção atual.<br><br>"
-            "<small >Dica: Dê preferência a fontes limpas (como Arial, Roboto ou Montserrat) para garantir máxima legibilidade em impressões menores.</small>"
-        )
+
+        self.cbo_font = QFontComboBox(self)
+        self.cbo_font.setToolTip("Selecionar a família tipográfica.")
         self.cbo_font.currentFontChanged.connect(self.set_font_family)
-        
-        self.spin_size = QSpinBox()
+
+        self.spin_size = QSpinBox(self)
         self.spin_size.setRange(1, 999)
-        self.spin_size.setToolTip(
-            "<b>TAMANHO DA FONTE</b><br><br>"
-            "Ajusta a escala do texto em pontos tipográficos (pt).<br><br>"
-            "<small >Dica: Nomes e títulos principais costumam ter grande destaque, enquanto cargos e prefixos usam tamanhos reduzidos.</small>"
-        )
+        self.spin_size.setToolTip("Alterar o tamanho da fonte.")
         self.spin_size.valueChanged.connect(self.set_font_size)
-        
-        row_font.addWidget(self.cbo_font, 2)
-        row_font.addWidget(self.spin_size, 1)
-        layout.addLayout(row_font)
 
-        row_style = QHBoxLayout()
-        
-        self.btn_bold = QPushButton()
-        self.btn_bold.setFixedWidth(30)
-        self.btn_bold.setIcon(themed_svg_icon(align_icon_path("bold")))
-        self.btn_bold.setIconSize(QSize(14, 14))
-        self.btn_bold.setCheckable(True)
-        self.btn_bold.setToolTip(
-            "<b>NEGRITO</b><br>"
-            "<small >Atalho: Ctrl + B</small>"
-            "<br><br>"
-            "Aumenta a espessura da fonte para dar destaque ao texto selecionado.<br><br>"
-            "<small >Dica: Ideal para chamar a atenção para nomes, cargos ou informações cruciais no documento.</small>"
-        )
+        self.btn_bold = QPushButton(self)
+        self.btn_italic = QPushButton(self)
+        self.btn_underline = QPushButton(self)
+        for button, asset_name, tooltip in (
+            (self.btn_bold, "bold", "Negrito (Ctrl+B)"),
+            (self.btn_italic, "italic", "Itálico (Ctrl+I)"),
+            (self.btn_underline, "underline", "Sublinhado (Ctrl+U)"),
+        ):
+            button.setFixedWidth(30)
+            button.setIcon(themed_svg_icon(align_icon_path(asset_name)))
+            button.setIconSize(QSize(14, 14))
+            button.setCheckable(True)
+            button.setToolTip(tooltip)
         self.btn_bold.clicked.connect(lambda: self.set_format_attribute("bold"))
-
-        self.btn_italic = QPushButton()
-        self.btn_italic.setFixedWidth(30)
-        self.btn_italic.setIcon(themed_svg_icon(align_icon_path("italic")))
-        self.btn_italic.setIconSize(QSize(14, 14))
-        self.btn_italic.setCheckable(True)
-        self.btn_italic.setToolTip(
-            "<b>ITÁLICO</b><br>"
-            "<small >Atalho: Ctrl + I</small>"
-            "<br><br>"
-            "Inclina o texto selecionado, alterando seu estilo visual sem mudar o peso.<br><br>"
-            "<small >Dica: Utilize para destacar citações, nomes científicos ou palavras de origem estrangeira.</small>"
-        )
         self.btn_italic.clicked.connect(lambda: self.set_format_attribute("italic"))
-
-        self.btn_underline = QPushButton()
-        self.btn_underline.setFixedWidth(30)
-        self.btn_underline.setIcon(themed_svg_icon(align_icon_path("underline")))
-        self.btn_underline.setIconSize(QSize(14, 14))
-        self.btn_underline.setCheckable(True)
-        self.btn_underline.setToolTip(
-            "<b>SUBLINHADO</b><br>"
-            "<small >Atalho: Ctrl + U</small>"
-            "<br><br>"
-            "Adiciona uma linha contínua sob o texto para ressaltar informações.<br><br>"
-            "<small >Dica: Evite usar em blocos de texto muito grandes para não sobrecarregar o design.</small>"
-        )
         self.btn_underline.clicked.connect(lambda: self.set_format_attribute("underline"))
 
-        self.btn_color = QPushButton("")
+        self.btn_color = QPushButton("", self)
         self.btn_color.setFixedWidth(30)
-        self.btn_color.setToolTip(
-            "<b>COR DO TEXTO</b><br><br>"
-            "Abre a paleta de cores para personalizar o texto ou a seleção atual.<br><br>"
-            "<small >Dica: Procure manter um alto contraste com o fundo para garantir a legibilidade após a impressão.</small>")
-        themed_style(self.btn_color, "background-color: #000000; border: 1px solid @border_strong@; border-radius: 3px;")
+        self.btn_color.setToolTip("Selecionar a cor do texto.")
+        themed_style(
+            self.btn_color,
+            "background-color: #000000; border: 1px solid @border_strong@; border-radius: 3px;",
+        )
         self.btn_color.clicked.connect(self._choose_color)
 
-        row_style.addWidget(self.btn_bold)
-        row_style.addWidget(self.btn_italic)
-        row_style.addWidget(self.btn_underline)
-        row_style.addWidget(self.btn_color)
-        
-        self.cbo_align = QComboBox()
+        # Os combos mantêm o estado e os sinais usados pelos botões de ícone
+        # da interface atual; não são elementos visuais do painel legado.
+        self.cbo_align = QComboBox(self)
         self.cbo_align.addItems([tr("Esquerda"), tr("Centro"), tr("Direita"), tr("Justificado")])
-        self.cbo_align.setToolTip(
-            "<b>ALINHAMENTO HORIZONTAL</b><br><br>"
-            "Define a posição do texto em relação às laterais da caixa:<br>"
-            "• <b>Justificado:</b> Distribui o texto para preencher toda a largura da moldura.<br><br>"
-            "<small >Dica: O alinhamento justificado cria margens retas e profissionais em blocos de texto mais densos.</small>")
         self._align_map = ["left", "center", "right", "justify"]
-        self.cbo_align.currentIndexChanged.connect(lambda idx: self.alignChanged.emit(self._align_map[idx]))
-
-        self.cbo_valign = QComboBox()
+        self.cbo_align.currentIndexChanged.connect(
+            lambda idx: self.alignChanged.emit(self._align_map[idx])
+        )
+        self.cbo_valign = QComboBox(self)
         self.cbo_valign.addItems([tr("Topo"), tr("Meio"), tr("Base")])
-        self.cbo_valign.setToolTip(
-            "<b>ALINHAMENTO VERTICAL</b><br><br>"
-            "Posiciona o conteúdo verticalmente dentro da moldura da caixa:<br>"
-            "• <b>Ancoragem:</b> Fixa o texto no Topo, no Meio ou na Base da caixa.<br><br>"
-            "<small >Dica: Combine o alinhamento 'Meio' com uma caixa alta para garantir que nomes e cargos fiquem sempre centralizados.</small>")
         self._valign_map = ["top", "center", "bottom"]
-        self.cbo_valign.currentIndexChanged.connect(lambda idx: self.verticalAlignChanged.emit(self._valign_map[idx]))
+        self.cbo_valign.currentIndexChanged.connect(
+            lambda idx: self.verticalAlignChanged.emit(self._valign_map[idx])
+        )
 
-        row_style.addWidget(self.cbo_align)
-        row_style.addWidget(self.cbo_valign)
-        layout.addLayout(row_style)
-
-        form_space = QFormLayout()
-        
-        # Recuo com label manual para tooltip
-        lbl_indent = QLabel("Recuo 1ª (px):")
-        lbl_indent.setToolTip(
-            "<b>RECUO DA PRIMEIRA LINHA</b><br><br>"
-            "Define o recuo horizontal inicial do bloco de texto.<br><br>"
-            "• <b>Estética:</b> Cria o efeito visual de parágrafo organizado.<br><br>"
-            "<small >Dica: Um valor entre 20 e 40px é o ideal para documentos formais.</small>")
-        
-        self.spin_indent = MathDoubleSpinBox()
+        self.spin_indent = MathDoubleSpinBox(self)
         self.spin_indent.setRange(0, 500)
         self.spin_indent.valueChanged.connect(self._on_indent_changed)
-        form_space.addRow(lbl_indent, self.spin_indent)
-        
-        # Entrelinha com label manual para tooltip
-        lbl_lh = QLabel("Entrelinha:")
-        lbl_lh.setToolTip(
-            "<b>ENTRELINHA</b><br><br>"
-            "Controla a distância vertical entre as linhas do parágrafo.<br><br>"
-            "• <b>Legibilidade:</b> Valores maiores tornam a leitura mais fluida.<br><br>"
-            "<small >Dica: 1.15 é o padrão de conforto; use 1.0 para compactar informações.</small>")
-
-        self.spin_lh = MathDoubleSpinBox()
+        self.spin_lh = MathDoubleSpinBox(self)
         self.spin_lh.setRange(0.5, 5.0)
         self.spin_lh.setSingleStep(0.05)
         self.spin_lh.setValue(1.15)
-        self.spin_lh.valueChanged.connect(lambda val: self.lineHeightChanged.emit(val))
-        form_space.addRow(lbl_lh, self.spin_lh)
-        
-        layout.addLayout(form_space)
-        layout.addStretch()
-        self.txt_content.cursorPositionChanged.connect(self.update_buttons_state)
+        self.spin_lh.valueChanged.connect(self.lineHeightChanged.emit)
 
-        # Gatilhos de Snapshot da UI
+        self.txt_content.cursorPositionChanged.connect(self.update_buttons_state)
         self.txt_content.editingFinished.connect(self.snapshotRequested.emit)
         self.cbo_font.activated.connect(lambda _: self.snapshotRequested.emit())
         self.spin_size.editingFinished.connect(self.snapshotRequested.emit)
@@ -920,35 +633,3 @@ class EditorDeTextoPanel(QWidget):
         cursor.insertText(f"|{selected_text}|")
         self.snapshotRequested.emit()
         self.txt_content.setFocus()
-
-class AssinaturaPanel(QWidget):
-    sideChanged = Signal(int)
-
-    def __init__(self):
-        super().__init__()
-        layout = QVBoxLayout(self)
-        
-        lbl = QLabel("PROPRIEDADES DA IMAGEM / ASSINATURA")
-        themed_style(lbl, "font-weight: bold; font-size: 12px; margin-bottom: 5px;")
-        layout.addWidget(lbl)
-        
-        form = QFormLayout()
-        self.spin_size = QSpinBox()
-        self.spin_size.setRange(10, 2000)
-        self.spin_size.setSuffix(" px")
-        self.spin_size.setToolTip(
-            "<b>DIMENSIONAMENTO PROPORCIONAL</b><br><br>"
-            "Ajusta o tamanho do objeto baseando-se no seu lado mais comprido:<br>"
-            "• <b>Automático:</b> A largura e altura são calculadas para evitar distorções na imagem.<br><br>"
-            "<small >Dica: Utilize este campo para garantir que todas as assinaturas do projeto mantenham uma escala uniforme.</small>")
-        self.spin_size.valueChanged.connect(self.sideChanged.emit)
-        
-        form.addRow("Lado Maior:", self.spin_size)
-        layout.addLayout(form)
-        layout.addStretch()
-
-    def load_from_item(self, item: SignatureItem):
-        self.blockSignals(True)
-        rect = item.rect() if hasattr(item, 'rect') else item.pixmap().rect()
-        self.spin_size.setValue(max(rect.width(), rect.height()))
-        self.blockSignals(False)

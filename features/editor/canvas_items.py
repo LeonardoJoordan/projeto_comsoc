@@ -1,5 +1,6 @@
 import math
 import re
+from uuid import uuid4
 from pathlib import Path
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem,
                                QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem,
@@ -99,12 +100,22 @@ def _unrotated_vector(point, angle):
 
 
 def _item_pos_for_local_scene_point(item, local_point, scene_point):
+    # ``setPos`` sempre recebe coordenadas do pai. Para itens de nível raiz,
+    # esse sistema coincide com a cena; imagens dentro de máscaras, porém,
+    # usam o sistema local da forma. Converter o ponto fixo antes do cálculo
+    # evita que a posição da forma seja somada novamente no primeiro resize.
+    parent = item.parentItem()
+    target_point = (
+        parent.mapFromScene(scene_point)
+        if parent is not None
+        else QPointF(scene_point)
+    )
     origin = item.transformOriginPoint()
     local_from_origin = QPointF(local_point.x() - origin.x(), local_point.y() - origin.y())
     rotated_from_origin = _rotated_vector(local_from_origin, item.rotation())
     return QPointF(
-        scene_point.x() - origin.x() - rotated_from_origin.x(),
-        scene_point.y() - origin.y() - rotated_from_origin.y(),
+        target_point.x() - origin.x() - rotated_from_origin.x(),
+        target_point.y() - origin.y() - rotated_from_origin.y(),
     )
 
 
@@ -1423,6 +1434,7 @@ class SignatureItem(QGraphicsPixmapItem):
         self._current_w = logical_w
         self._current_h = logical_h
         self._proxy_scale = proxy_scale
+        self.signature_id = f"sig-{uuid4().hex}"
         
         self.setFlags(
             QGraphicsItem.GraphicsItemFlag.ItemIsMovable |

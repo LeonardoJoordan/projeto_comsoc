@@ -6,7 +6,7 @@ import math
 from pathlib import Path
 from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QWidget,
                                QHBoxLayout, QFrame, QLabel, QPushButton,
-                               QMessageBox, QInputDialog,
+                               QMessageBox,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
                                QFileDialog, QGraphicsOpacityEffect, QApplication,
                                QSizePolicy)
@@ -31,6 +31,7 @@ from core.resources import action_icon_path, app_icon_path, state_icon_path, nav
 from core.theme_icons import themed_svg_icon
 from core.themes import themed_style, theme_color
 from core.i18n import tr
+from core.dialog_buttons import get_text as dialog_get_text, style_message_box
 from core.ui_font import DOCUMENT_FONT_FAMILY
 from core.model_document import (
     adapt_model_page,
@@ -38,6 +39,7 @@ from core.model_document import (
     load_model_document,
     load_recovery_documents,
     normalize_model_document,
+    new_signature_id,
     replace_model_page,
     save_model_document,
 )
@@ -402,7 +404,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 btn_discard = msg_box.addButton(tr("Sair sem salvar"), QMessageBox.ButtonRole.DestructiveRole)
                 btn_cancel = msg_box.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
                 msg_box.setDefaultButton(btn_save)
-                
+                style_message_box(msg_box)
                 msg_box.exec()
                 
                 if msg_box.clickedButton() == btn_save:
@@ -716,7 +718,9 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         data = self.get_current_scene_state()
         
         if not self._current_model_name:
-            novo_nome, ok = QInputDialog.getText(self, tr("Salvar modelo"), tr("Nome do modelo:"))
+            novo_nome, ok = dialog_get_text(
+                self, tr("Salvar modelo"), tr("Nome do modelo:")
+            )
             if not ok or not novo_nome.strip(): return
             self._current_model_name = novo_nome.strip()
             self.setWindowTitle(tr("Editor de modelos — {modelo}").format(modelo=self._current_model_name))
@@ -805,7 +809,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         btn_exit = msg_box.addButton(tr("Encerrar edição"), QMessageBox.ButtonRole.AcceptRole)
         btn_stay = msg_box.addButton(tr("Continuar editando"), QMessageBox.ButtonRole.RejectRole)
         msg_box.setDefaultButton(btn_stay)
-
+        style_message_box(msg_box)
         msg_box.exec()
 
         if msg_box.clickedButton() == btn_exit:
@@ -1560,6 +1564,8 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             used_object_ids.add(object_id)
             object_id_map[source.get('object_id')] = object_id
             entry["object_id"] = object_id
+            if kind == "signature":
+                entry["signature_id"] = new_signature_id()
             entry["custom_name"] = free_name(entry.get("custom_name"))
             entry["z_value"] = max_z + order * 0.01
             if entry.get('group_id') is not None:
@@ -2465,7 +2471,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         selected_id = getattr(item, 'layer_id', None)
 
         current_name = self._generate_layer_name(selected_id, item)
-        new_name, ok = QInputDialog.getText(
+        new_name, ok = dialog_get_text(
             self, tr("Renomear camada"),
             tr("Novo nome para a camada:"),
             text=current_name
@@ -2796,7 +2802,10 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             elif isinstance(item, SignatureItem):
                 pos = item.pos()
                 pix_rect = item.rect() if hasattr(item, 'rect') else item.pixmap().rect()
+                signature_id = getattr(item, "signature_id", None) or new_signature_id()
+                item.signature_id = signature_id
                 signatures_data.append({
+                    "signature_id": signature_id,
                     "custom_name": getattr(item, "custom_name", ""),
                     "path": getattr(item, "_original_path", ""), 
                     "visible": item.isVisible(),
@@ -3005,6 +3014,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
 
             if sig_path.exists():
                 sig = SignatureItem(str(sig_path))
+                sig.signature_id = sig_data.get("signature_id") or sig.signature_id
                 sig.custom_name = sig_data.get("custom_name", "")
                 sig.layer_id = sig_data.get("layer_id")
                 sig.group_id = sig_data.get("group_id")

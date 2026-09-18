@@ -14,6 +14,8 @@ from core.paths import get_models_dir
 from core.resources import action_icon_path, navigation_icon_path
 from core.theme_icons import themed_svg_icon
 from core.i18n import SUPPORTED_LANGUAGES, current_locale, set_preferred_locale, tr
+from core.dialog_buttons import style_message_box
+from features.tutorial.first_steps import start_first_steps_tutorial
 
 
 def _restart_application(window):
@@ -389,12 +391,13 @@ def install_frontend(window):
                 tr('Reiniciar depois'), QMessageBox.ButtonRole.RejectRole
             )
             prompt.setDefaultButton(restart_now)
+            style_message_box(prompt)
             prompt.exec()
             if prompt.clickedButton() is restart_now:
                 _restart_application(window)
         language_action.triggered.connect(choose_language)
     modelo = menu.addMenu(tr('Modelo'))
-    modelo.addAction(tr('Novo modelo'), window._on_add_model)
+    new_model_action = modelo.addAction(tr('Novo modelo'), window._on_add_model)
     modelo.addAction(tr('Importar modelos…'), window._on_import_models)
     modelo.addAction(tr('Exportar modelos…'), window._on_export_models)
     modelo.addSeparator()
@@ -420,6 +423,22 @@ def install_frontend(window):
         window.settings.setValue('workspaceDataPanelFixed', bool(fixed))
     fixed_data.toggled.connect(set_data_panel_fixed)
     ajuda = menu.addMenu(tr('Sobre'))
+    tutorial = ajuda.addMenu(tr('Tutorial interativo'))
+    tutorial_actions = []
+    for tutorial_id, label in (
+        ('complete', tr('Tutorial completo')),
+        ('first_steps', tr('Primeiros passos')),
+        ('personalization', tr('Personalização')),
+        ('editor', tr('Editor')),
+        ('advanced', tr('Recursos avançados')),
+        ('export', tr('Exportação')),
+    ):
+        action = tutorial.addAction(label)
+        action.setEnabled(tutorial_id == 'first_steps')
+        if tutorial_id == 'first_steps':
+            action.triggered.connect(lambda: start_first_steps_tutorial(window))
+        tutorial_actions.append(action)
+    ajuda.addSeparator()
     ajuda.addAction(tr('Sobre o FORNAX Forge'), lambda: QMessageBox.about(
         window, tr('Sobre o FORNAX Forge'),
         tr('<b>FORNAX Forge</b><br>Geração de material personalizado em lote.<br><br>'
@@ -432,8 +451,14 @@ def install_frontend(window):
     ))
     # Mantém wrappers Python vivos durante toda a janela (necessário no PySide).
     window._workspace_menus = (
-        programa, idioma, language_group, modelo, exibir, ajuda, model_actions,
+        programa, idioma, language_group, modelo, exibir, ajuda, tutorial,
+        model_actions,
     )
+    window._tutorial_menu = tutorial
+    window._tutorial_actions = tuple(tutorial_actions)
+    window._model_menu = modelo
+    window._new_model_action = new_model_action
+    window._view_menu = exibir
     window._workspace_log_toggle = show_log
     window._workspace_data_toggle = data_toggle
     window._workspace_data_fixed_action = fixed_data

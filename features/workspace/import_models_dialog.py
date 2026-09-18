@@ -4,6 +4,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QCheckBox,
 from PySide6.QtCore import Qt
 from core.template_manager import slugify_model_name
 from core.i18n import tr
+from core.dialog_buttons import style_dialog_button_box
 
 class ImportModelsDialog(QDialog):
     def __init__(self, parent, zip_models, existing_slugs):
@@ -56,6 +57,7 @@ class ImportModelsDialog(QDialog):
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
+        style_dialog_button_box(self.button_box)
         layout.addWidget(self.button_box)
 
     def get_decisions(self):

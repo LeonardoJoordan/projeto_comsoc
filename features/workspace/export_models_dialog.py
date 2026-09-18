@@ -2,6 +2,7 @@ from PySide6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox, QListWidget,
                                QListWidgetItem, QDialogButtonBox)
 from PySide6.QtCore import Qt
 from core.i18n import tr
+from core.dialog_buttons import style_dialog_button_box
 
 class ExportModelsDialog(QDialog):
     def __init__(self, parent=None, models=None):
@@ -30,6 +31,7 @@ class ExportModelsDialog(QDialog):
         self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.button_box.accepted.connect(self.accept)
         self.button_box.rejected.connect(self.reject)
+        style_dialog_button_box(self.button_box)
         layout.addWidget(self.button_box)
 
         self._updating = False

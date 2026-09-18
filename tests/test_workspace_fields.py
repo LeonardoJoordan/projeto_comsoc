@@ -4,9 +4,15 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QSettings, Qt
+from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QComboBox, QTableWidget, QTableWidgetItem
 
-from features.spreadsheet.headers import SIGNATURE_HEADER, quantity_header_label
+from features.spreadsheet.headers import (
+    SIGNATURE_HEADER,
+    SIGNATURE_ID_ROLE,
+    quantity_header_label,
+)
+from features.spreadsheet.table_panel import RichTableWidget
 from features.workspace.main_window import MainWindow
 
 
@@ -48,6 +54,133 @@ def test_copies_expand_whole_document_rows_and_zero_skips_them():
     assert [row["Nome"] for row in plain] == ["Ada", "Ada", "Ada", "Grace"]
     assert all(row["Campo do verso"] == "A" for row in plain[:3])
     assert plain[-1]["__use_signature__"] is False
+
+
+def test_each_signature_receives_its_own_stable_table_column():
+    table = RichTableWidget(0, 0)
+    harness = SimpleNamespace(table_panel=SimpleNamespace(table=table))
+    signatures = [
+        {"signature_id": "sig-reitor", "custom_name": "Reitor", "visible": True},
+        {"signature_id": "sig-diretor", "custom_name": "Diretor local", "visible": False},
+    ]
+
+    MainWindow._update_table_columns(harness, ["Nome"], signatures)
+
+    assert table.columnCount() == 4
+    assert [table.horizontalHeaderItem(column).text() for column in range(4)] == [
+        quantity_header_label(), "Reitor", "Diretor local", "Nome",
+    ]
+    assert table.horizontalHeaderItem(1).data(SIGNATURE_ID_ROLE) == "sig-reitor"
+    assert table.horizontalHeaderItem(2).data(SIGNATURE_ID_ROLE) == "sig-diretor"
+    assert table.item(0, 1).checkState() == Qt.CheckState.Checked
+    assert table.item(0, 2).checkState() == Qt.CheckState.Unchecked
+
+    table.item(0, 1).setCheckState(Qt.CheckState.Unchecked)
+    table.item(0, 2).setCheckState(Qt.CheckState.Checked)
+    table.setItem(0, 3, QTableWidgetItem("Ada"))
+    data = SimpleNamespace(
+        table_panel=SimpleNamespace(table=table),
+        active_model_name="Modelo de teste",
+    )
+    plain, rich = MainWindow._scrape_table_data(data)
+
+    expected = {"sig-reitor": False, "sig-diretor": True}
+    assert plain[0]["__signature_visibility__"] == expected
+    assert rich[0]["__signature_visibility__"] == expected
+    assert "__use_signature__" not in plain[0]
+
+
+def test_new_and_duplicated_rows_preserve_each_signature_default():
+    table = RichTableWidget(0, 0)
+    harness = SimpleNamespace(table_panel=SimpleNamespace(table=table))
+    MainWindow._update_table_columns(harness, [], [
+        {"signature_id": "sig-a", "custom_name": "A", "visible": True},
+        {"signature_id": "sig-b", "custom_name": "B", "visible": False},
+    ])
+
+    table._add_rows(1)
+    assert table.item(1, 1).checkState() == Qt.CheckState.Checked
+    assert table.item(1, 2).checkState() == Qt.CheckState.Unchecked
+
+    table.selectRow(1)
+    table._duplicate_selected_rows()
+    assert table.item(2, 1).checkState() == Qt.CheckState.Checked
+    assert table.item(2, 2).checkState() == Qt.CheckState.Unchecked
+
+
+def test_clicking_signature_header_icon_toggles_only_that_whole_column():
+    table = RichTableWidget(0, 0)
+    harness = SimpleNamespace(table_panel=SimpleNamespace(table=table))
+    MainWindow._update_table_columns(harness, [], [
+        {"signature_id": "sig-a", "custom_name": "Reitor", "visible": True},
+        {"signature_id": "sig-b", "custom_name": "Diretor", "visible": False},
+    ])
+    table._add_rows(2)
+    table.resize(360, 160)
+    table.show()
+    APP.processEvents()
+
+    changes = []
+    table.signatureColumnToggled.connect(
+        lambda column, checked: changes.append((column, checked))
+    )
+    header = table.horizontalHeader()
+    icon_rect = header.signature_icon_rect(1)
+    assert not icon_rect.isEmpty()
+
+    QTest.mouseClick(
+        header.viewport(), Qt.MouseButton.LeftButton, pos=icon_rect.center()
+    )
+    assert changes == [(1, False)]
+    assert all(
+        table.item(row, 1).checkState() == Qt.CheckState.Unchecked
+        for row in range(table.rowCount())
+    )
+    assert all(
+        table.item(row, 2).checkState() == Qt.CheckState.Unchecked
+        for row in range(table.rowCount())
+    )
+
+    QTest.mouseClick(
+        header.viewport(), Qt.MouseButton.LeftButton, pos=icon_rect.center()
+    )
+    assert changes[-1] == (1, True)
+    assert all(
+        table.item(row, 1).checkState() == Qt.CheckState.Checked
+        for row in range(table.rowCount())
+    )
+    assert all(
+        table.item(row, 2).checkState() == Qt.CheckState.Unchecked
+        for row in range(table.rowCount())
+    )
+    table.close()
+
+
+def test_signature_checkbox_is_centered_clickable_and_explained():
+    table = RichTableWidget(0, 0)
+    harness = SimpleNamespace(table_panel=SimpleNamespace(table=table))
+    MainWindow._update_table_columns(harness, [], [
+        {"signature_id": "sig-a", "custom_name": "Reitor", "visible": True},
+    ])
+    table.resize(240, 120)
+    table.show()
+    APP.processEvents()
+
+    item = table.item(0, 1)
+    cell_rect = table.visualItemRect(item)
+    assert item.textAlignment() & Qt.AlignmentFlag.AlignHCenter
+    assert "assinatura" in item.toolTip().lower()
+    assert "ícone" in table.horizontalHeaderItem(1).toolTip().lower()
+
+    QTest.mouseClick(
+        table.viewport(), Qt.MouseButton.LeftButton, pos=cell_rect.center()
+    )
+    assert item.checkState() == Qt.CheckState.Unchecked
+    QTest.mouseClick(
+        table.viewport(), Qt.MouseButton.LeftButton, pos=cell_rect.center()
+    )
+    assert item.checkState() == Qt.CheckState.Checked
+    table.close()
 
 
 def test_editor_save_discards_columns_removed_from_the_model_without_prompt():

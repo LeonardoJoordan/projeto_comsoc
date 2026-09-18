@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from core.font_utils import is_font_available, system_font_families
 from core.i18n import tr
+from core.dialog_buttons import style_dialog_button_box
 from core.themes import theme_color
 
 
@@ -48,6 +49,7 @@ class ModelInfoDialog(QDialog):
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         buttons.rejected.connect(self.reject)
+        style_dialog_button_box(buttons)
         layout.addWidget(buttons)
 
     def _snapshot_widget(self, snapshot: dict) -> QWidget:

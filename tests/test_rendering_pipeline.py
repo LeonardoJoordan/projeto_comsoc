@@ -12,7 +12,11 @@ from pypdf import PdfReader
 
 from features.generator.imposition import SheetAssembler
 from features.generator.manager import RenderManager
-from features.generator.renderer import NativeRenderer, renderers_for_document
+from features.generator.renderer import (
+    NativeRenderer,
+    renderers_for_document,
+    signature_is_visible,
+)
 from features.generator.workers import DirectRenderWorker, HybridAssemblerWorker
 from features.preview.sheet_preview_worker import SheetPreviewWorker
 from core.model_document import add_blank_back_page
@@ -84,6 +88,29 @@ class RenderingPipelineTest(unittest.TestCase):
     def tearDown(self):
         self.temp.cleanup()
 
+    def signature_asset(self, name, color):
+        path = self.base / name
+        image = QImage(12, 12, QImage.Format_ARGB32)
+        image.fill(QColor(color))
+        self.assertTrue(image.save(str(path), "PNG"))
+        return str(path)
+
+    @staticmethod
+    def signature(signature_id, path, x):
+        return {
+            "object_id": f"signature:{signature_id}",
+            "signature_id": signature_id,
+            "custom_name": signature_id,
+            "path": path,
+            "visible": True,
+            "opacity": 1.0,
+            "x": x,
+            "y": 10,
+            "width": 20,
+            "height": 20,
+            "rotation": 0,
+        }
+
     def produce(self, rows, *, fmt="PDF", single=False, template_data=None, imposition=None):
         output = self.base / f"output_{fmt}_{single}"
         output.mkdir()
@@ -128,6 +155,75 @@ class RenderingPipelineTest(unittest.TestCase):
         actual = renderer.render_to_qimage(values, values, cached_links)
         self.assertEqual(expected, actual)
         self.assertEqual(links, cached_links)
+
+    def test_each_signature_column_controls_only_its_own_signature(self):
+        red = self.signature_asset("red.png", "#ef3038")
+        blue = self.signature_asset("blue.png", "#2878e8")
+        first = self.signature("sig-red", red, 10)
+        second = self.signature("sig-blue", blue, 50)
+        source = {
+            "name": "Assinaturas independentes",
+            "canvas_size": {"w": 90, "h": 40},
+            "background_path": None,
+            "images": [], "boxes": [], "shapes": [],
+            "signatures": [first, second],
+            "layer_order": [first["object_id"], second["object_id"]],
+        }
+        values = {
+            "__signature_visibility__": {
+                "sig-red": False,
+                "sig-blue": True,
+            }
+        }
+        renderer = NativeRenderer(source)
+
+        image = renderer.render_to_qimage(values, values)
+        self.assertEqual(image.pixelColor(20, 20), QColor("#ffffff"))
+        self.assertEqual(image.pixelColor(60, 20), QColor("#2878e8"))
+
+        # A otimização usada na geração em lote não pode congelar uma
+        # assinatura na base estática e ignorar a decisão da tabela.
+        renderer.pre_render_static_base()
+        cached = renderer.render_to_qimage(values, values)
+        self.assertEqual(cached, image)
+
+    def test_signature_visibility_keeps_legacy_and_model_fallbacks(self):
+        signature = {"signature_id": "sig-a", "visible": False}
+        self.assertTrue(signature_is_visible(signature, {"__use_signature__": True}))
+        self.assertFalse(signature_is_visible(signature, {"__use_signature__": False}))
+        self.assertFalse(signature_is_visible(signature, {}))
+        self.assertTrue(signature_is_visible(
+            signature,
+            {"__signature_visibility__": {"sig-a": True}},
+        ))
+        # Um mapa atual incompleto não deixa o booleano legado controlar as
+        # demais assinaturas; para elas vale a configuração do modelo.
+        self.assertFalse(signature_is_visible(signature, {
+            "__signature_visibility__": {"outra": True},
+            "__use_signature__": True,
+        }))
+
+    def test_front_and_back_use_the_same_individual_signature_map(self):
+        red = self.signature_asset("front-signature.png", "#ef3038")
+        blue = self.signature_asset("back-signature.png", "#2878e8")
+        document = two_page_template()
+        document["pages"][0]["signatures"] = [self.signature("front-signature", red, 10)]
+        document["pages"][0]["layer_order"].append("signature:front-signature")
+        document["pages"][1]["signatures"] = [self.signature("back-signature", blue, 10)]
+        document["pages"][1]["layer_order"].append("signature:back-signature")
+        values = {
+            "__signature_visibility__": {
+                "front-signature": False,
+                "back-signature": True,
+            }
+        }
+
+        front, back = renderers_for_document(document)
+        front_image = front.render_to_qimage(values, values)
+        back_image = back.render_to_qimage(values, values)
+
+        self.assertNotEqual(front_image.pixelColor(20, 20), QColor("#ef3038"))
+        self.assertEqual(back_image.pixelColor(20, 20), QColor("#2878e8"))
 
     def test_pdf_per_item_and_grouped_keep_size_and_links(self):
         rows = [{"Site": "https://example.com/a"}, {"Site": "https://example.com/b"}]

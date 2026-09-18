@@ -43,12 +43,13 @@ Ainda há pontas soltas. A conclusão anterior de limpeza integral foi abrangent
 - **Impacto:** em sistemas de arquivos que ignoram caixa, dois resultados podem disputar o mesmo arquivo; nomes reservados podem falhar no Windows. A falha de normalização foi demonstrada no Linux; não foi executado teste nativo Windows.
 - **Solução:** normalizar nomes reservados, caracteres de controle e limites de comprimento; reservar nomes com comparação compatível com os sistemas suportados e testar colisões antes da geração.
 
-### 6. Construção de layouts antigos ainda existe nos painéis do editor — dívida técnica remanescente
+### 6. Construção de layouts antigos ainda existe nos painéis do editor — corrigido
 
 - **Local:** `features/editor/controls.py` e `features/editor/properties.py`.
 - **Evidência:** após construir a interface, `caixa_texto_panel` permanece oculto com cinco widgets e `editor_texto_panel` com trinta, incluindo títulos e labels antigos. Os construtores ainda montam layouts que o frontend reaproveita parcialmente.
 - **Impacto:** não é, por si só, um crash. Porém contradiz a conclusão de que toda montagem de interface antiga foi removida, mantém responsabilidades misturadas e torna o ciclo de vida mais difícil de revisar.
-- **Solução:** separar os controladores da construção visual e criar apenas os controles consumidos pela interface atual, preservando explicitamente a propriedade Qt e as conexões.
+- **Correção aplicada:** `CaixaDeTextoPanel` e `EditorDeTextoPanel` deixaram de construir títulos, labels e layouts legados. Eles conservam somente estado, sinais e controles consumidos pela montagem atual de `frontend.py`; cada controle nasce com propriedade Qt explícita e é reparentado ao entrar na interface definitiva.
+- **Regressão:** a inicialização do editor comprova que ambos os controladores não possuem layout nem labels descendentes, enquanto os controles atuais permanecem válidos e associados à árvore visual.
 
 ## Segurança e distribuição: pendências delimitadas
 

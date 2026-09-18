@@ -1,9 +1,10 @@
 from core.themes import themed_style, theme_color, theme_manager
+from core.dialog_buttons import get_text as dialog_get_text, style_dialog_button_box
 from PySide6.QtWidgets import (QDialog, QVBoxLayout, QLabel, QLineEdit, 
                                QPushButton, QHBoxLayout, QFrame, QGridLayout, 
                                QDialogButtonBox, QCheckBox, QGroupBox, QDoubleSpinBox,
                                QWidget, QScrollArea,
-                               QComboBox, QMessageBox, QInputDialog)
+                               QComboBox, QMessageBox)
 from PySide6.QtCore import Qt
 from .imposition import SheetAssembler
 from .preset_warnings import warning_display_name, warning_tooltip, with_model_ratio_snapshot
@@ -257,6 +258,7 @@ class ConfigDialog(QDialog):
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         self.buttonBox.accepted.connect(self._on_accept)
         self.buttonBox.rejected.connect(self.reject)
+        style_dialog_button_box(self.buttonBox)
         main_layout.addWidget(self.buttonBox)
 
         self._toggle_imposition_ui(self.chk_imposition.isChecked())
@@ -351,7 +353,7 @@ class ConfigDialog(QDialog):
         if self.active_preset_name == self.SYSTEM_PRESET_NAME:
             # Se ativou imposição no preset de sistema, assumimos que algo foi customizado
             if self.chk_imposition.isChecked():
-                name, ok = QInputDialog.getText(
+                name, ok = dialog_get_text(
                     self, tr("Configurações personalizadas"),
                     tr("Você alterou as configurações padrão.\nDê um nome para salvar esta predefinição:"),
                     QLineEdit.EchoMode.Normal, tr("Personalizada")
@@ -473,7 +475,10 @@ class ConfigDialog(QDialog):
         if isinstance(default_name, bool):
             default_name = ""
             
-        name, ok = QInputDialog.getText(self, tr("Nova predefinição"), tr("Nome da predefinição:"), QLineEdit.EchoMode.Normal, default_name)
+        name, ok = dialog_get_text(
+            self, tr("Nova predefinição"), tr("Nome da predefinição:"),
+            QLineEdit.EchoMode.Normal, default_name
+        )
         if ok and name.strip():
             name = name.strip()
             if name == self.SYSTEM_PRESET_NAME:
@@ -503,7 +508,10 @@ class ConfigDialog(QDialog):
     def _rename_preset(self):
         if not self.active_preset_name or self.active_preset_name == self.SYSTEM_PRESET_NAME: return
 
-        new_name, ok = QInputDialog.getText(self, tr("Renomear predefinição"), tr("Novo nome:"), QLineEdit.EchoMode.Normal, self.active_preset_name)
+        new_name, ok = dialog_get_text(
+            self, tr("Renomear predefinição"), tr("Novo nome:"),
+            QLineEdit.EchoMode.Normal, self.active_preset_name
+        )
         if ok and new_name.strip():
             new_name = new_name.strip()
             if new_name == self.active_preset_name: return

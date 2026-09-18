@@ -2457,6 +2457,18 @@ Asigne un nombre para guardar este preajuste:</translation>
     <message><source>A pasta das imagens é escolhida na tela principal.</source><translation>La carpeta de imágenes se selecciona en la pantalla principal.</translation></message>
     <message><source>Imagem</source><translation>Imagen</translation></message>
     <message><source>Imagem {numero}</source><translation>Imagen {numero}</translation></message>
+    <message><source>Marque para incluir esta assinatura neste item.</source><translation>Marque para incluir esta firma en este elemento.</translation></message>
+    <message><source>{nome}
+Clique no ícone para marcar ou desmarcar toda a coluna.</source><translation>{nome}
+Haga clic en el icono para marcar o desmarcar toda la columna.</translation></message>
+    <message><source>Tutorial interativo</source><translation>Tutorial interactivo</translation></message>
+    <message><source>Tutorial completo</source><translation>Tutorial completo</translation></message>
+    <message><source>Primeiros passos</source><translation>Primeros pasos</translation></message>
+    <message><source>Personalização</source><translation>Personalización</translation></message>
+    <message><source>Editor</source><translation>Editor</translation></message>
+    <message><source>Recursos avançados</source><translation>Funciones avanzadas</translation></message>
+    <message><source>Exportação</source><translation>Exportación</translation></message>
+    <message><source>Assinatura {numero}</source><translation>Firma {numero}</translation></message>
     <message><source>IMAGENS VARIÁVEIS</source><translation>IMÁGENES VARIABLES</translation></message>
     <message><source>Selecione a pasta que contém as imagens</source><translation>Seleccione la carpeta que contiene las imágenes</translation></message>
     <message><source>Pasta usada para localizar os arquivos indicados na tabela</source><translation>Carpeta usada para localizar los archivos indicados en la tabla</translation></message>
@@ -2477,5 +2489,110 @@ Asigne un nombre para guardar este preajuste:</translation>
       <source>Limpar Formatação</source>
       <translation>Limpiar formato</translation>
     </message>
+    <message><source>Pular tutorial</source><translation>Omitir tutorial</translation></message>
+    <message><source>Voltar</source><translation>Atrás</translation></message>
+    <message><source>Continuar</source><translation>Continuar</translation></message>
+    <message><source>ETAPA {atual} DE {total}</source><translation>PASO {atual} DE {total}</translation></message>
+    <message><source>Começar</source><translation>Comenzar</translation></message>
+    <message><source>Vamos criar a estrutura básica de um modelo. O tutorial abrirá um editor vazio, mas só salvará algo se você escolher salvar ao final.</source><translation>Vamos a crear la estructura básica de una plantilla. El tutorial abrirá un editor vacío, pero solo guardará algo si eliges guardar al final.</translation></message>
+    <message><source>Adicione um campo de texto</source><translation>Añade un campo de texto</translation></message>
+    <message><source>Clique em Texto. O programa criará uma caixa no documento e abrirá suas propriedades.</source><translation>Haz clic en Texto. El programa creará un cuadro en el documento y abrirá sus propiedades.</translation></message>
+    <message><source>Conteúdo personalizado</source><translation>Contenido personalizado</translation></message>
+    <message><source>A caixa começa com {campo}. Um nome entre chaves é um placeholder: cada linha da tabela poderá substituir esse trecho por um conteúdo diferente.</source><translation>El cuadro comienza con {campo}. Un nombre entre llaves es un marcador: cada fila de la tabla podrá sustituir este fragmento por un contenido diferente.</translation></message>
+    <message><source>Campos da tabela</source><translation>Campos de la tabla</translation></message>
+    <message><source>Todo placeholder usado no modelo aparece aqui. Ao salvar, ele se transforma em uma coluna da tabela da tela principal.</source><translation>Todos los marcadores usados en la plantilla aparecen aquí. Al guardar, se convierten en una columna de la tabla de la pantalla principal.</translation></message>
+    <message><source>Salve o modelo</source><translation>Guarda la plantilla</translation></message>
+    <message><source>Quando o modelo estiver pronto, use Salvar modelo. Você poderá escolher o nome e voltar à tela principal para preencher os dados.</source><translation>Cuando la plantilla esté lista, usa Guardar plantilla. Podrás elegir el nombre y volver a la pantalla principal para rellenar los datos.</translation></message>
+    <message><source>Primeiros passos concluídos</source><translation>Primeros pasos completados</translation></message>
+    <message><source>Você já conhece o fluxo básico: adicionar conteúdo, criar placeholders e salvar. O editor permanecerá aberto para você continuar praticando.</source><translation>Ya conoces el flujo básico: añadir contenido, crear marcadores y guardar. El editor permanecerá abierto para que sigas practicando.</translation></message>
+    <message><source>Você criará um modelo, preencherá dez itens e gerará o primeiro trabalho. O tutorial acompanhará suas ações diretamente nos controles do programa.</source><translation>Crearás una plantilla, completarás diez elementos y generarás el primer trabajo. El tutorial seguirá tus acciones directamente en los controles del programa.</translation></message>
+    <message><source>Área do documento</source><translation>Área del documento</translation></message>
+    <message><source>Tudo que permanecer dentro da página fará parte do material gerado. A área externa pode ser usada para organizar objetos.</source><translation>Todo lo que permanezca dentro de la página formará parte del material generado. El área exterior puede usarse para organizar objetos.</translation></message>
+    <message><source>Digite um nome para reconhecer este modelo. Você pode usar “Meu primeiro modelo”.</source><translation>Escribe un nombre para reconocer esta plantilla. Puedes usar “Mi primera plantilla”.</translation></message>
+    <message><source>Abra o menu Modelo</source><translation>Abre el menú Plantilla</translation></message>
+    <message><source>Os modelos definem o visual e os campos personalizados. Clique em Modelo.</source><translation>Las plantillas definen el aspecto y los campos personalizados. Haz clic en Plantilla.</translation></message>
+    <message><source>Adicione texto</source><translation>Añade texto</translation></message>
+    <message><source>Clique em Texto para adicionar o primeiro conteúdo personalizado.</source><translation>Haz clic en Texto para añadir el primer contenido personalizado.</translation></message>
+    <message><source>Meu primeiro modelo</source><translation>Mi primera plantilla</translation></message>
+    <message><source>Escolha Encerrar edição para continuar o tutorial na tela principal.</source><translation>Elige Finalizar edición para continuar el tutorial en la pantalla principal.</translation></message>
+    <message><source>Crie um modelo</source><translation>Crea una plantilla</translation></message>
+    <message><source>Clique em Novo modelo para abrir um documento vazio no editor.</source><translation>Haz clic en Nueva plantilla para abrir un documento vacío en el editor.</translation></message>
+    <message><source>Texto adicionado</source><translation>Texto añadido</translation></message>
+    <message><source>A caixa está selecionada. Os marcadores ao redor dela permitem mudar seu tamanho.</source><translation>El cuadro está seleccionado. Los tiradores que lo rodean permiten cambiar su tamaño.</translation></message>
+    <message><source>Modelo salvo</source><translation>Plantilla guardada</translation></message>
+    <message><source>O novo modelo está selecionado. Os placeholders criaram as colunas nome e programa.</source><translation>La nueva plantilla está seleccionada. Los marcadores crearon las columnas nombre y programa.</translation></message>
+    <message><source>Redimensione a caixa</source><translation>Cambia el tamaño del cuadro</translation></message>
+    <message><source>Arraste um marcador para deixar a caixa mais larga. O texto se adapta ao novo espaço.</source><translation>Arrastra un tirador para hacer el cuadro más ancho. El texto se adapta al nuevo espacio.</translation></message>
+    <message><source>Cole dez nomes</source><translation>Pega diez nombres</translation></message>
+    <message><source>Dez nomes foram copiados. Clique na primeira célula de nome e pressione Ctrl+V.</source><translation>Se copiaron diez nombres. Haz clic en la primera celda de nombre y pulsa Ctrl+V.</translation></message>
+    <message><source>Novo tamanho</source><translation>Nuevo tamaño</translation></message>
+    <message><source>A caixa agora possui mais espaço. Textos e outros objetos podem ser redimensionados dessa forma.</source><translation>El cuadro ahora tiene más espacio. Los textos y otros objetos pueden redimensionarse de esta forma.</translation></message>
+    <message><source>Dez linhas de uma vez</source><translation>Diez filas a la vez</translation></message>
+    <message><source>Uma única colagem preencheu dez linhas. O FORNAX preserva a estrutura copiada de uma planilha.</source><translation>Un solo pegado rellenó diez filas. FORNAX conserva la estructura copiada de una hoja de cálculo.</translation></message>
+    <message><source>Propriedades do texto</source><translation>Propiedades del texto</translation></message>
+    <message><source>Aqui você ajusta fonte, tamanho, cor, estilo, alinhamento, entrelinha e recuo.</source><translation>Aquí puedes ajustar fuente, tamaño, color, estilo, alineación, interlineado y sangría.</translation></message>
+    <message><source>Complete a segunda coluna</source><translation>Completa la segunda columna</translation></message>
+    <message><source>FORNAX Forge foi copiado dez vezes. Clique na primeira célula de programa e pressione Ctrl+V.</source><translation>FORNAX Forge se copió diez veces. Haz clic en la primera celda de programa y pulsa Ctrl+V.</translation></message>
+    <message><source>Centralize horizontalmente</source><translation>Centra horizontalmente</translation></message>
+    <message><source>Clique em Centralizar para alinhar as linhas no centro da caixa.</source><translation>Haz clic en Centrar para alinear las líneas en el centro del cuadro.</translation></message>
+    <message><source>Confira o preview</source><translation>Comprueba la vista previa</translation></message>
+    <message><source>As duas colunas estão preenchidas. Selecione uma linha diferente para ver o preview acompanhar o item.</source><translation>Las dos columnas están completas. Selecciona otra fila para ver cómo la vista previa sigue el elemento.</translation></message>
+    <message><source>Alinhamento horizontal</source><translation>Alineación horizontal</translation></message>
+    <message><source>O conteúdo agora está centralizado entre as laterais da caixa.</source><translation>El contenido ahora está centrado entre los lados del cuadro.</translation></message>
+    <message><source>Exclua as linhas</source><translation>Elimina las filas</translation></message>
+    <message><source>Clique no cabeçalho da primeira linha e, com Shift, clique no da última. Depois clique em Excluir.</source><translation>Haz clic en el encabezado de la primera fila y, con Mayús, en el de la última. Después haz clic en Eliminar.</translation></message>
+    <message><source>Centralize verticalmente</source><translation>Centra verticalmente</translation></message>
+    <message><source>Clique em Meio para posicionar o texto no centro vertical da caixa.</source><translation>Haz clic en Medio para colocar el texto en el centro vertical del cuadro.</translation></message>
+    <message><source>Cole duas colunas</source><translation>Pega dos columnas</translation></message>
+    <message><source>Os nomes e o programa foram copiados juntos. Clique na primeira célula de nome e pressione Ctrl+V.</source><translation>Los nombres y el programa se copiaron juntos. Haz clic en la primera celda de nombre y pulsa Ctrl+V.</translation></message>
+    <message><source>Centralizado nos dois sentidos</source><translation>Centrado en ambos sentidos</translation></message>
+    <message><source>Os alinhamentos horizontal e vertical são independentes e agora estão centralizados.</source><translation>Las alineaciones horizontal y vertical son independientes y ahora están centradas.</translation></message>
+    <message><source>Use seus dados existentes</source><translation>Usa tus datos existentes</translation></message>
+    <message><source>Você pode copiar várias linhas e colunas do Excel, Google Sheets ou LibreOffice. Selecione dois itens diferentes para conferir o preview.</source><translation>Puedes copiar varias filas y columnas de Excel, Google Sheets o LibreOffice. Selecciona dos elementos distintos para comprobar la vista previa.</translation></message>
+    <message><source>Cole o conteúdo do exercício</source><translation>Pega el contenido del ejercicio</translation></message>
+    <message><source>O texto foi copiado. Dê dois cliques na caixa, pressione Ctrl+A e depois Ctrl+V.</source><translation>El texto fue copiado. Haz doble clic en el cuadro, pulsa Ctrl+A y después Ctrl+V.</translation></message>
+    <message><source>Escolha o destino</source><translation>Elige el destino</translation></message>
+    <message><source>Clique nos três pontos e escolha a pasta onde os trabalhos serão armazenados.</source><translation>Haz clic en los tres puntos y elige la carpeta donde se guardarán los trabajos.</translation></message>
+    <message><source>Placeholders e trecho opcional</source><translation>Marcadores y sección opcional</translation></message>
+    <message><source>nome e programa viraram campos da tabela. O trecho entre barras verticais só aparece quando programa possui conteúdo; um placeholder obrigatório vazio oculta a caixa inteira.</source><translation>nombre y programa se convirtieron en campos de la tabla. La sección entre barras verticales solo aparece cuando programa tiene contenido; un marcador obligatorio vacío oculta todo el cuadro.</translation></message>
+    <message><source>Pasta principal</source><translation>Carpeta principal</translation></message>
+    <message><source>Cada geração será guardada dentro desta pasta em uma pasta exclusiva.</source><translation>Cada generación se guardará dentro de esta carpeta en una carpeta exclusiva.</translation></message>
+    <message><source>Clique em Salvar modelo para adicioná-lo à biblioteca.</source><translation>Haz clic en Guardar plantilla para añadirla a la biblioteca.</translation></message>
+    <message><source>Abra o menu Exibir</source><translation>Abre el menú Ver</translation></message>
+    <message><source>Antes de gerar, vamos abrir o log. Clique em Exibir.</source><translation>Antes de generar, abriremos el registro. Haz clic en Ver.</translation></message>
+    <message><source>Mostre o log</source><translation>Muestra el registro</translation></message>
+    <message><source>O log já está visível. Continue para conhecê-lo.</source><translation>El registro ya está visible. Continúa para conocerlo.</translation></message>
+    <message><source>Clique em Log de processamento para exibi-lo.</source><translation>Haz clic en Registro de procesamiento para mostrarlo.</translation></message>
+    <message><source>O log mostra andamento, avisos e resultados. Ele ajuda a acompanhar trabalhos maiores e identificar dados que precisam de atenção.</source><translation>El registro muestra el progreso, los avisos y los resultados. Ayuda a seguir trabajos grandes e identificar datos que requieren atención.</translation></message>
+    <message><source>Gere o material</source><translation>Genera el material</translation></message>
+    <message><source>Clique em Gerar material. As dez linhas produzirão dez cartões personalizados.</source><translation>Haz clic en Generar material. Las diez filas producirán diez tarjetas personalizadas.</translation></message>
+    <message><source>Acompanhe a velocidade</source><translation>Observa la velocidad</translation></message>
+    <message><source>Acompanhe o tempo real no log. Um trabalho que exigiria editar dez cartões individualmente é concluído automaticamente em poucos segundos.</source><translation>Observa el tiempo real en el registro. Un trabajo que exigiría editar diez tarjetas individualmente se completa automáticamente en segundos.</translation></message>
+    <message><source>Geração concluída</source><translation>Generación completada</translation></message>
+    <message><source>Os dez itens foram gerados. O log é opcional: mantenha-o visível para acompanhar detalhes ou oculte-o para ampliar a área de trabalho.</source><translation>Los diez elementos fueron generados. El registro es opcional: mantenlo visible para seguir detalles u ocúltalo para ampliar el área de trabajo.</translation></message>
+    <message><source>a nova pasta da Forja</source><translation>la nueva carpeta Forja</translation></message>
+    <message><source>Trabalho organizado</source><translation>Trabajo organizado</translation></message>
+    <message><source>Os arquivos foram reunidos em {pasta}. Cada geração cria uma nova Forja numerada, evitando misturar arquivos de trabalhos diferentes.</source><translation>Los archivos se reunieron en {pasta}. Cada generación crea una nueva Forja numerada, evitando mezclar archivos de trabajos diferentes.</translation></message>
+    <message><source>As dez linhas agora possuem nome e programa.</source><translation>Las diez filas ahora contienen nombre y programa.</translation></message>
+    <message><source>Campos criados</source><translation>Campos creados</translation></message>
+    <message><source>Dados conferidos</source><translation>Datos comprobados</translation></message>
+    <message><source>Duas colunas preenchidas</source><translation>Dos columnas completas</translation></message>
+    <message><source>Navegue pelos itens</source><translation>Navega por los elementos</translation></message>
+    <message><source>O novo modelo está selecionado na biblioteca.</source><translation>La nueva plantilla está seleccionada en la biblioteca.</translation></message>
+    <message><source>O preview acompanhou os itens escolhidos. Agora o trabalho está pronto para ser gerado.</source><translation>La vista previa siguió los elementos elegidos. El trabajo ya está listo para generarse.</translation></message>
+    <message><source>O preview mostra o conteúdo da linha selecionada antes da geração.</source><translation>La vista previa muestra el contenido de la fila seleccionada antes de la generación.</translation></message>
+    <message><source>Os dois campos aparecem aqui. O trecho entre barras verticais só aparece quando programa possui conteúdo; um placeholder obrigatório vazio oculta a caixa inteira.</source><translation>Los dos campos aparecen aquí. La sección entre barras verticales solo aparece cuando programa tiene contenido; un marcador obligatorio vacío oculta todo el cuadro.</translation></message>
+    <message><source>Os placeholders criaram as colunas nome e programa. Um placeholder obrigatório vazio oculta a caixa; um trecho opcional pode desaparecer sem ocultar o restante.</source><translation>Los marcadores crearon las columnas nombre y programa. Un marcador obligatorio vacío oculta el cuadro; una sección opcional puede desaparecer sin ocultar el resto.</translation></message>
+    <message><source>Placeholders</source><translation>Marcadores</translation></message>
+    <message><source>Preview atualizado</source><translation>Vista previa actualizada</translation></message>
+    <message><source>Selecione dois itens diferentes para conferir a atualização do preview.</source><translation>Selecciona dos elementos distintos para comprobar la actualización de la vista previa.</translation></message>
+    <message><source>Selecione uma linha diferente para ver o preview acompanhar o item.</source><translation>Selecciona otra fila para ver cómo la vista previa sigue el elemento.</translation></message>
+    <message><source>Trecho opcional</source><translation>Sección opcional</translation></message>
+    <message><source>Você pode copiar várias linhas e colunas do Excel, Google Sheets ou LibreOffice, evitando redigitação.</source><translation>Puedes copiar varias filas y columnas de Excel, Google Sheets o LibreOffice, evitando volver a escribir.</translation></message>
+    <message><source>nome e programa são placeholders. Cada linha da tabela poderá fornecer conteúdos diferentes para eles.</source><translation>nombre y programa son marcadores. Cada fila de la tabla puede proporcionar contenidos diferentes.</translation></message>
+    <message><source>Trecho opcional em ação</source><translation>Sección opcional en acción</translation></message>
+    <message><source>O preview já mostra os nomes porque programa está dentro de um trecho opcional. Esse trecho permanece oculto até a segunda coluna ser preenchida.</source><translation>La vista previa ya muestra los nombres porque programa está dentro de una sección opcional. Esa sección permanece oculta hasta completar la segunda columna.</translation></message>
+    <message><source>Menu Texto</source><translation>Menú Texto</translation></message>
+    <message><source>Este é o menu Texto da barra lateral direita. Nele você ajusta fonte, tamanho, cor, estilo, alinhamento, entrelinha e recuo.</source><translation>Este es el menú Texto de la barra lateral derecha. Aquí ajustas fuente, tamaño, color, estilo, alineación, interlineado y sangría.</translation></message>
   </context>
 </TS>

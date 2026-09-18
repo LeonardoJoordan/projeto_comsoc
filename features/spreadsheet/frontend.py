@@ -10,6 +10,7 @@ from features.editor.frontend import icon
 from core.resources import action_icon_path, align_icon_path
 from core.theme_icons import themed_svg_icon
 from core.i18n import tr
+from .headers import is_signature_header
 
 
 class CellContentEditor(QTextEdit):
@@ -309,6 +310,7 @@ def install_frontend(panel):
     table.itemSelectionChanged.connect(update_state)
     def load_cell_editor(row, column, *_):
         header = table.horizontalHeaderItem(column) if column >= 0 else None
+        signature_cell = is_signature_header(header)
         hint.setText(
             tr('Linha {row}  /  {column}    ·    Duplo clique para editar').format(
                 row=row + 1, column=header.text()
@@ -321,7 +323,9 @@ def install_frontend(panel):
                 cell_editor.set_rich_html(rich)
             else:
                 cell_editor.setPlainText(item.text() if item else '')
-        cell_editor.setEnabled(row >= 0 and column >= 0)
+        cell_editor.setEnabled(row >= 0 and column >= 0 and not signature_cell)
+        for button in format_buttons.values():
+            button.setEnabled(row >= 0 and column >= 0 and not signature_cell)
         cell_editor._emit_format_state()
 
     updating_from_formula = False

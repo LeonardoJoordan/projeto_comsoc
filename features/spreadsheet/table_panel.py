@@ -2,20 +2,133 @@ import re
 
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QTableWidget, 
                                QTableWidgetItem, QApplication, QMenu, QPushButton, QSpinBox,
-                               QAbstractItemView)
+                               QAbstractItemView, QHeaderView, QStyle,
+                               QStyleOptionHeader)
 from PySide6.QtGui import QKeySequence, QFontMetrics, QAction
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QRect, Signal, QSignalBlocker
 
 from .clipboard import parse_clipboard_html_table, parse_tsv, parse_clipboard_html_fragment
 from .delegates import HTMLDelegate
-from .headers import SIGNATURE_HEADER, is_quantity_header
+from .headers import is_quantity_header, is_signature_header
 from core.i18n import tr
+
+
+class DataHeaderView(QHeaderView):
+    """Cabeçalho que torna somente o ícone da assinatura acionável."""
+
+    signatureIconClicked = Signal(int)
+
+    def __init__(self, parent=None):
+        super().__init__(Qt.Orientation.Horizontal, parent)
+        self.setMouseTracking(True)
+        self._pressed_signature_column = -1
+
+    def signature_icon_rect(self, logical_index):
+        model = self.model()
+        if model is None or logical_index < 0:
+            return QRect()
+        header_item = self.parent().horizontalHeaderItem(logical_index)
+        if not is_signature_header(header_item) or header_item.icon().isNull():
+            return QRect()
+
+        left = self.sectionViewportPosition(logical_index)
+        width = self.sectionSize(logical_index)
+        height = self.height()
+        option = QStyleOptionHeader()
+        self.initStyleOptionForIndex(option, logical_index)
+        option.rect = QRect(left, 0, width, height)
+        label_rect = self.style().subElementRect(
+            QStyle.SubElement.SE_HeaderLabel, option, self
+        )
+        extent = self.style().pixelMetric(QStyle.PixelMetric.PM_SmallIconSize, None, self)
+        extent = max(12, min(extent, height - 8))
+        x = label_rect.left()
+        y = (height - extent) // 2
+        # O SVG possui respiro transparente próprio. A tolerância horizontal
+        # cobre esse espaço sem transformar o texto do título em botão.
+        return QRect(x, y - 3, extent + 14, extent + 6)
+
+    def mousePressEvent(self, event):
+        logical = self.logicalIndexAt(event.position().toPoint())
+        if (event.button() == Qt.MouseButton.LeftButton
+                and self.signature_icon_rect(logical).contains(event.position().toPoint())):
+            self._pressed_signature_column = logical
+            event.accept()
+            return
+        self._pressed_signature_column = -1
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        logical = self.logicalIndexAt(event.position().toPoint())
+        if (event.button() == Qt.MouseButton.LeftButton
+                and logical == self._pressed_signature_column
+                and self.signature_icon_rect(logical).contains(event.position().toPoint())):
+            self._pressed_signature_column = -1
+            self.signatureIconClicked.emit(logical)
+            event.accept()
+            return
+        self._pressed_signature_column = -1
+        super().mouseReleaseEvent(event)
+
+    def mouseMoveEvent(self, event):
+        logical = self.logicalIndexAt(event.position().toPoint())
+        cursor = (
+            Qt.CursorShape.PointingHandCursor
+            if self.signature_icon_rect(logical).contains(event.position().toPoint())
+            else Qt.CursorShape.ArrowCursor
+        )
+        self.viewport().setCursor(cursor)
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event):
+        self.viewport().unsetCursor()
+        super().leaveEvent(event)
+
 
 class RichTableWidget(QTableWidget):
     RICH_ROLE = Qt.ItemDataRole.UserRole
+    signatureColumnToggled = Signal(int, bool)
+
+    def _signature_columns(self):
+        return [
+            column for column in range(self.columnCount())
+            if is_signature_header(self.horizontalHeaderItem(column))
+        ]
+
+    @staticmethod
+    def _signature_item(state=Qt.CheckState.Checked):
+        item = QTableWidgetItem("")
+        item.setFlags(
+            Qt.ItemFlag.ItemIsUserCheckable
+            | Qt.ItemFlag.ItemIsEnabled
+            | Qt.ItemFlag.ItemIsSelectable
+        )
+        item.setCheckState(state)
+        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+        item.setToolTip(tr("Marque para incluir esta assinatura neste item."))
+        return item
+
+    def _initialize_functional_cells(self, row, signature_defaults=None):
+        if self.columnCount() and is_quantity_header(self.horizontalHeaderItem(0).text()):
+            if self.item(row, 0) is None:
+                qty_item = QTableWidgetItem("1")
+                qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.setItem(row, 0, qty_item)
+        for column in self._signature_columns():
+            if self.item(row, column) is not None:
+                continue
+            state = Qt.CheckState.Checked
+            if signature_defaults and column in signature_defaults:
+                state = signature_defaults[column]
+            elif row > 0 and self.item(0, column):
+                state = self.item(0, column).checkState()
+            self.setItem(row, column, self._signature_item(state))
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        header = DataHeaderView(self)
+        self.setHorizontalHeader(header)
+        header.signatureIconClicked.connect(self.toggle_signature_column)
         self.setItemDelegate(HTMLDelegate(self))
         self.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
         self.setVerticalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
@@ -31,6 +144,31 @@ class RichTableWidget(QTableWidget):
         self.model().rowsInserted.connect(
             lambda parent, first, last: self._queue_row_height_update(range(first, last + 1))
         )
+
+    def toggle_signature_column(self, column):
+        """Marca todas quando houver alguma desmarcada; senão, desmarca todas."""
+        if not (0 <= column < self.columnCount()):
+            return
+        if not is_signature_header(self.horizontalHeaderItem(column)):
+            return
+
+        self._initialize_functional_cells_for_all_rows()
+        items = [self.item(row, column) for row in range(self.rowCount())]
+        if not items:
+            return
+        checked = not all(
+            item.checkState() == Qt.CheckState.Checked for item in items
+        )
+        state = Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked
+        with QSignalBlocker(self):
+            for item in items:
+                item.setCheckState(state)
+        self.viewport().update()
+        self.signatureColumnToggled.emit(column, checked)
+
+    def _initialize_functional_cells_for_all_rows(self):
+        for row in range(self.rowCount()):
+            self._initialize_functional_cells(row)
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -72,30 +210,10 @@ class RichTableWidget(QTableWidget):
         super().keyPressEvent(event)
 
     def _add_rows(self, count: int):
-        # Detecta a presença das colunas funcionais pelos headers
-        has_qty_col = (self.columnCount() > 0 and is_quantity_header(self.horizontalHeaderItem(0).text()))
-        has_sig_col = (self.columnCount() > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
-        
         for _ in range(count):
             row_idx = self.rowCount()
             self.insertRow(row_idx)
-            
-            # 1. Coluna Cópias (sempre no índice 0)
-            if has_qty_col:
-                qty_item = QTableWidgetItem("1")
-                qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.setItem(row_idx, 0, qty_item)
-            
-            # 2. Coluna Assinatura (Sempre Index 1 se existir)
-            if has_sig_col:
-                default_chk = Qt.CheckState.Checked
-                if row_idx > 0 and self.item(0, 1):
-                    default_chk = self.item(0, 1).checkState()
-                sig_item = QTableWidgetItem("")
-                sig_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                sig_item.setCheckState(default_chk)
-                sig_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.setItem(row_idx, 1, sig_item)
+            self._initialize_functional_cells(row_idx)
 
     def _duplicate_selected_rows(self):
         indexes = self.selectionModel().selectedIndexes()
@@ -103,10 +221,6 @@ class RichTableWidget(QTableWidget):
         
         rows_to_dup = sorted(list(set(idx.row() for idx in indexes)), reverse=True)
         cols = self.columnCount()
-        
-        # Identifica os índices das colunas funcionais pelos headers atuais
-        has_qty_col = (cols > 0 and is_quantity_header(self.horizontalHeaderItem(0).text()))
-        has_sig_col = (cols > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
         
         for r in rows_to_dup:
             new_row = r + 1
@@ -119,8 +233,7 @@ class RichTableWidget(QTableWidget):
                 
                 new_item = QTableWidgetItem(old_item.text())
                 
-                # Caso especial: Coluna de Assinatura (Index 1)
-                if has_sig_col and c == 1:
+                if is_signature_header(self.horizontalHeaderItem(c)):
                     new_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
                     new_item.setCheckState(old_item.checkState())
                     new_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -149,12 +262,7 @@ class RichTableWidget(QTableWidget):
         # Se a tabela ficar vazia, recria a linha inicial padrão
         if self.rowCount() == 0:
             self.insertRow(0)
-            has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == SIGNATURE_HEADER)
-            if has_sig_col:
-                item = QTableWidgetItem("")
-                item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                item.setCheckState(Qt.CheckState.Checked)
-                self.setItem(0, 0, item)
+            self._initialize_functional_cells(0)
 
     def _handle_delete(self):
         sel_rows = self.selectionModel().selectedRows()
@@ -164,12 +272,7 @@ class RichTableWidget(QTableWidget):
                 self.removeRow(r)
             if self.rowCount() == 0:
                 self.insertRow(0)
-                has_sig_col = (self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == SIGNATURE_HEADER)
-                if has_sig_col:
-                    item = QTableWidgetItem("")
-                    item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                    item.setCheckState(Qt.CheckState.Checked)
-                    self.setItem(0, 0, item)
+                self._initialize_functional_cells(0)
         else:
             for item in self.selectedItems():
                 item.setText("")
@@ -192,7 +295,7 @@ class RichTableWidget(QTableWidget):
         if not grid_struct: return
 
         header = self.horizontalHeader()
-        has_sig_col = (header.count() > 0 and self.horizontalHeaderItem(0) and self.horizontalHeaderItem(0).text() == SIGNATURE_HEADER)
+        signature_columns = set(self._signature_columns())
 
         # --- LÓGICA DE PREENCHIMENTO EM MASSA (1 célula copiada -> Várias selecionadas) ---
         is_single_cell = (len(grid_struct) == 1 and len(grid_struct[0]) == 1)
@@ -208,7 +311,7 @@ class RichTableWidget(QTableWidget):
                 c_visual = idx.column()
                 c_logical = header.logicalIndex(c_visual)
                 
-                if has_sig_col and c_logical == 0:
+                if c_logical in signature_columns:
                     continue  # Protege a checkbox
                     
                 item = self.item(r, c_logical)
@@ -238,10 +341,12 @@ class RichTableWidget(QTableWidget):
 
         start_visual_col = header.visualIndex(start_col_logical)
         
-        # Desloca a colagem para o lado se o usuário tentou colar em cima da checkbox de assinatura
-        if has_sig_col and start_col_logical == 0:
-            start_col_logical = 1
-            start_visual_col = header.visualIndex(start_col_logical)
+        # Colunas funcionais de assinatura não recebem texto colado.
+        while start_col_logical in signature_columns:
+            start_visual_col += 1
+            if start_visual_col >= self.columnCount():
+                return
+            start_col_logical = header.logicalIndex(start_visual_col)
             
         required_rows = start_row + len(grid_struct)
         if required_rows > self.rowCount():
@@ -250,40 +355,17 @@ class RichTableWidget(QTableWidget):
         affected_cols_logical = set()
         row_end = start_row + len(grid_struct) - 1
 
-        # Identifica os índices das colunas funcionais
-        has_qty_col = (header.count() > 0 and is_quantity_header(self.horizontalHeaderItem(0).text()))
-        has_sig_col = (header.count() > 1 and self.horizontalHeaderItem(1).text() == SIGNATURE_HEADER)
-
         for r, row_data in enumerate(grid_struct):
             dest_row = start_row + r
-
-            # 1. Garante a inicialização da Coluna Qtd (Index 0)
-            if has_qty_col:
-                qty_item = self.item(dest_row, 0)
-                if qty_item is None:
-                    qty_item = QTableWidgetItem("1")
-                    qty_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    self.setItem(dest_row, 0, qty_item)
-
-            # 2. Garante a inicialização da Coluna Assinatura (Index 1)
-            if has_sig_col:
-                sig_item = self.item(dest_row, 1)
-                if sig_item is None:
-                    default_chk = Qt.CheckState.Checked
-                    if self.rowCount() > 0 and self.item(0, 1):
-                        default_chk = self.item(0, 1).checkState()
-                    
-                    sig_item = QTableWidgetItem("")
-                    sig_item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable)
-                    sig_item.setCheckState(default_chk)
-                    sig_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                    self.setItem(dest_row, 1, sig_item)
+            self._initialize_functional_cells(dest_row)
 
             for c, cell_data in enumerate(row_data):
                 target_visual_col = start_visual_col + c
                 if target_visual_col >= self.columnCount():
                     break
                 dest_col_logical = header.logicalIndex(target_visual_col)
+                if dest_col_logical in signature_columns:
+                    continue
                 item = self.item(dest_row, dest_col_logical)
                 if item is None:
                     item = QTableWidgetItem()

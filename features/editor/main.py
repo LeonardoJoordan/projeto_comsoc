@@ -14,6 +14,7 @@ from core.ui_font import install_ui_font
 from core.wheel_focus import install_wheel_focus_guard
 from core.i18n import initialize_i18n
 from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
+from core.dialog_buttons import install_dialog_button_style
 from features.editor.editor_window import EditorWindow
 
 
@@ -39,6 +40,7 @@ def main():
     settings = get_app_settings()
     initialize_i18n(app, settings)
     theme_manager().initialize(settings)
+    install_dialog_button_style(app)
     window = EditorWindow()
     if args.model:
         window.load_from_json(args.model)

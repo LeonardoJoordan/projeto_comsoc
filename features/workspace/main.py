@@ -19,6 +19,7 @@ from core.resources import app_icon_path
 from core.ui_font import install_ui_font
 from core.wheel_focus import install_wheel_focus_guard
 from core.i18n import initialize_i18n, tr
+from core.dialog_buttons import install_dialog_button_style
 from features.workspace.main_window import MainWindow
 
 
@@ -58,6 +59,7 @@ def main():
     settings = get_app_settings()
     initialize_i18n(app, settings)
     theme_manager().initialize(settings)
+    install_dialog_button_style(app)
     sys.excepthook = global_exception_handler
     CustomTooltipManager.install(delay_ms=1500)
     window = MainWindow()
