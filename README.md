@@ -87,6 +87,8 @@ Os testes offscreen verificam o comportamento funcional, mas não substituem a v
 
 O Nuitka usa até quatro tarefas de compilação por padrão, respeitando o número de CPUs. É possível ajustar com `FORNAX_BUILD_JOBS`. O AppImage exige a compilação standalone concluída e `appimagetool` na raiz.
 
+No Windows, depois de gerar `build/main.dist`, compile `instalador.iss` com Inno Setup 6. O script usa a versão `1.0.0`; atualize `AppVersion` a cada release sem alterar o `AppId`. Faça a compilação em ambiente virtual limpo para que as versões do binário coincidam com `requirements.txt` e complete o checklist de `docs/THIRD_PARTY_LICENSES.md` antes de publicar.
+
 Os ícones oficiais ficam em `assets/icons/`: PNGs dimensionados para a interface e Linux, além do ICO multirresolução para Windows. O PNG de 1024 px é usado como fonte do pacote macOS. Antes da publicação, o inventário e os textos integrais das licenças do pacote devem ser concluídos conforme [docs/THIRD_PARTY_LICENSES.md](docs/THIRD_PARTY_LICENSES.md).
 
 ## Tecnologias e licença

@@ -1,0 +1,5 @@
+O FORNAX Forge foi instalado com seus avisos de licença na pasta “licenses”.
+
+Antes de redistribuir este instalador, o distribuidor deve conferir o inventário do pacote final e executar novamente a compilação pelo script_nuitka.py. O uso de PySide6/Qt obtido pelo PyPI pressupõe cumprimento da modalidade comunitária LGPL/GPL; uma licença comercial Qt exige artefatos obtidos pelos canais comerciais correspondentes.
+
+Este texto é uma medida técnica de conformidade e não substitui aconselhamento jurídico para o modelo comercial concreto.
