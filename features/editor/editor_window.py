@@ -9,11 +9,11 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QWidget,
                                QMessageBox,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
                                QFileDialog, QGraphicsOpacityEffect, QApplication,
-                               QSizePolicy)
+                               QSizePolicy, QLineEdit)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
                            QFont, QFontDatabase, QFontInfo, QTextDocument)
-from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF
+from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF, QTimer
 from shiboken6 import isValid
 
 from .canvas_items import (DesignerBox, Guideline, px_to_mm, mm_to_px, SignatureItem, RectangleItem,
@@ -32,9 +32,16 @@ from core.theme_icons import themed_svg_icon
 from core.themes import themed_style, theme_color
 from core.i18n import tr
 from core.dialog_buttons import get_text as dialog_get_text, style_message_box, NEUTRAL_STYLE
+from core.fornax_container import (
+    FULL_MODE, PUBLIC_MODE, SIGNATURES_MODE, FornaxError,
+    open_public_fornax, password_bytes, save_protected_fornax,
+    save_public_fornax, unlock_fornax,
+)
+from core.fornax_session import FornaxExternalChangeError
 from core.ui_font import DOCUMENT_FONT_FAMILY
 from core.model_document import (
     adapt_model_page,
+    document_signatures,
     iter_page_asset_paths,
     load_model_document,
     load_recovery_documents,
@@ -188,6 +195,7 @@ class ElidedLayerLabel(QLabel):
 
 
 class EditorWindow(DocumentSessionMixin, QMainWindow):
+    closed = Signal()
     modelSaved = Signal(str, list, str)
 
     @staticmethod
@@ -216,6 +224,17 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         self._workspace_session_active = False
         self._current_model_name = None
         self._current_model_dir = None
+        self._fornax_path = None
+        self._fornax_mode = None
+        self._fornax_model_id = None
+        self._fornax_asset_provider = None
+        self._fornax_session_manager = getattr(parent, "_fornax_sessions", None)
+        self._fornax_save_as_required = False
+        self._recovery_source_path = None
+        self._recovered_unsaved = False
+        self._autosave_timer = QTimer(self)
+        self._autosave_timer.setInterval(60_000)
+        self._autosave_timer.timeout.connect(self._write_fornax_recovery)
         self._model_document = None
         self._active_page_id = "front"
         self._page_selection = {"front": set(), "back": set()}
@@ -394,7 +413,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             current_state = self.get_current_scene_state()
             saved_state = self._last_saved_state
         if hasattr(self, '_last_saved_state') and self._last_saved_state is not None:
-            if not self._states_equal_for_close(current_state, saved_state):
+            if self._recovered_unsaved or not self._states_equal_for_close(current_state, saved_state):
                 msg_box = QMessageBox(self)
                 msg_box.setWindowTitle(tr("Alterações não salvas"))
                 msg_box.setIcon(QMessageBox.Icon.Warning)
@@ -414,12 +433,41 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 elif msg_box.clickedButton() != btn_discard:
                     event.ignore()
                     return
+                else:
+                    self._remove_fornax_recovery()
+            else:
+                self._remove_fornax_recovery()
+        else:
+            self._remove_fornax_recovery()
+        self._autosave_timer.stop()
         self._cleanup_unused_assets_on_close()
         super().closeEvent(event)
         if event.isAccepted():
             self._release_workspace_window()
+            if self._fornax_mode in {FULL_MODE, SIGNATURES_MODE}:
+                self._discard_protected_editor_content()
+            self.closed.emit()
+
+    def _discard_protected_editor_content(self):
+        """Descarta referências de uma janela protegida que já foi encerrada."""
+        self.scene.blockSignals(True)
+        self.scene.clear()
+        self.history.clear()
+        self._object_clipboard.clear()
+        self._clipboard_source_page = None
+        self._fornax_asset_provider = None
+        self._model_document = None
+        self._active_scene_baseline = None
+        self._last_saved_state = None
+        self._last_saved_document_state = None
+        self._mask_edit_session = None
+        self._group_resize_session = None
+        # A janela encerrada não deve ser reutilizada com itens C++ destruídos.
+        self.deleteLater()
 
     def _current_model_directory(self) -> Path | None:
+        if self._fornax_path is not None:
+            return None
         if self._current_model_dir:
             return Path(self._current_model_dir)
         if self._current_model_name:
@@ -686,6 +734,103 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
 
 
     
+    def _authorized_asset_bytes(self, reference: str):
+        if self._fornax_asset_provider is None:
+            return None
+        try:
+            return bytes(self._fornax_asset_provider(str(reference)))
+        except Exception:
+            return None
+
+    def _save_asset_provider(self, reference: str) -> bytes:
+        protected = self._authorized_asset_bytes(reference)
+        if protected is not None:
+            return protected
+        path = Path(reference)
+        if not path.is_file():
+            raise FileNotFoundError(f"Asset não encontrado: {reference}")
+        return path.read_bytes()
+
+    def load_from_fornax(
+        self, document, *, path, mode, model_id, asset_provider,
+        session_manager, save_as_required=False, recovered=False,
+    ):
+        """Abre um snapshot autorizado sem extrair seus assets para o disco."""
+        self._fornax_path = Path(path).resolve()
+        self._fornax_mode = mode
+        self._fornax_model_id = model_id
+        self._fornax_asset_provider = self._detached_asset_provider(document, asset_provider)
+        self._fornax_session_manager = session_manager
+        self._fornax_save_as_required = bool(save_as_required)
+        self._recovery_source_path = self._fornax_path
+        self._recovered_unsaved = bool(recovered)
+        self._current_model_dir = None
+        self._load_document_into_scene(document)
+        self._autosave_timer.start()
+
+    @staticmethod
+    def _detached_asset_provider(document, provider):
+        assets = {
+            reference: bytes(provider(reference))
+            for _page, _kind, reference in iter_page_asset_paths(document)
+        }
+
+        def resolve(reference):
+            try:
+                return assets[str(reference)]
+            except KeyError as error:
+                raise FileNotFoundError(f"Asset não encontrado: {reference}") from error
+
+        return resolve
+
+    @staticmethod
+    def fornax_recovery_path(path):
+        source = Path(path)
+        return source.with_name(f".{source.name}.autosave.fornax")
+
+    def _remove_fornax_recovery(self):
+        source = self._recovery_source_path or self._fornax_path
+        if source is not None:
+            recovery = self.fornax_recovery_path(source)
+            recovery.unlink(missing_ok=True)
+            recovery.with_name(recovery.name + ".bak").unlink(missing_ok=True)
+
+    def _write_fornax_recovery(self):
+        if (
+            self._fornax_path is None or self._fornax_session_manager is None
+            or self._fornax_save_as_required
+        ):
+            return
+        current = self._capture_document_history_state()
+        if self._states_equal_for_close(current, self._last_saved_document_state):
+            return
+        self._finish_page_interaction()
+        data = self.get_current_scene_state()
+        document = replace_model_page(self._model_document, data, self._active_page_id)
+        document["name"] = self._current_model_name
+        try:
+            self._fornax_session_manager.write_recovery(
+                document, self.fornax_recovery_path(self._fornax_path),
+                path=self._fornax_path, asset_provider=self._save_asset_provider,
+            )
+        except Exception as error:
+            print(f"[WARN] Falha ao salvar recuperação protegida: {error}")
+
+    def _load_document_into_scene(self, document):
+        data = prepare_scene_page(adapt_model_page(document, "front"))
+        self._current_model_name = data.get("name", "")
+        self._model_document = document
+        self._active_page_id = "front"
+        self.setWindowTitle(tr("Editor de modelos — {modelo}").format(modelo=self._current_model_name))
+        self.apply_scene_state(data, is_undo_redo=False)
+        self._active_scene_baseline = self.get_current_scene_state()
+        self._zoom_to_fit()
+        self.history.clear()
+        self.save_snapshot()
+        self._last_saved_state = self.get_current_scene_state()
+        self._last_saved_document_state = self._capture_document_history_state()
+        self._refresh_page_controls()
+
     def load_from_json(self, file_path):
         path = Path(file_path)
         model_dir = path if path.is_dir() else path.parent
@@ -693,25 +838,8 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             document = load_model_document(model_dir)
         except FileNotFoundError:
             return
-        data = adapt_model_page(document, "front")
-        data = prepare_scene_page(data)
-        self._current_model_name = data.get("name", "")
         self._current_model_dir = model_dir
-        self._model_document = document
-        self._active_page_id = "front"
-        self.setWindowTitle(tr("Editor de modelos — {modelo}").format(modelo=self._current_model_name))
-        
-        # O apply_scene_state faz todo o trabalho duro de desenhar
-        self.apply_scene_state(data, is_undo_redo=False)
-        self._active_scene_baseline = self.get_current_scene_state()
-        self._zoom_to_fit()
-        
-        # Limpa o histórico e salva o Estado #0
-        self.history.clear()
-        self.save_snapshot()
-        self._last_saved_state = self.get_current_scene_state()
-        self._last_saved_document_state = self._capture_document_history_state()
-        self._refresh_page_controls()
+        self._load_document_into_scene(document)
 
     def export_to_json(self, skip_close_dialog=False):
         self._finish_page_interaction()
@@ -727,6 +855,10 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             
         data["name"] = self._current_model_name
         model_name = self._current_model_name
+
+        if self._fornax_path is not None or self._current_model_dir is None:
+            self._export_to_fornax(data, skip_close_dialog=skip_close_dialog)
+            return
 
         slug = slugify_model_name(model_name)
         model_dir = get_models_dir() / slug
@@ -818,10 +950,219 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
 
         if msg_box.clickedButton() == btn_exit:
             self.close() # Fecha a janela do editor
+
+    def _choose_fornax_protection(self, has_signatures: bool):
+        dialog = QMessageBox(self)
+        dialog.setWindowTitle(tr("Proteção do modelo"))
+        dialog.setText(
+            tr("Modelos com assinatura exigem proteção. Escolha o alcance da senha.")
+            if has_signatures else
+            tr("Escolha como este modelo deve ser salvo.")
+        )
+        primary = dialog.addButton(
+            tr("Proteger assinaturas") if has_signatures else tr("Sem proteção"),
+            QMessageBox.ButtonRole.AcceptRole,
+        )
+        full = dialog.addButton(tr("Proteger modelo inteiro"), QMessageBox.ButtonRole.ActionRole)
+        dialog.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+        style_message_box(dialog)
+        dialog.exec()
+        if dialog.clickedButton() is primary:
+            return SIGNATURES_MODE if has_signatures else PUBLIC_MODE
+        if dialog.clickedButton() is full:
+            return FULL_MODE
+        return None
+
+    def _request_new_fornax_password(self):
+        first, accepted = dialog_get_text(
+            self, tr("Criar senha"),
+            tr("Digite uma senha de 8 a 64 caracteres:"),
+            echo=QLineEdit.EchoMode.Password,
+        )
+        if not accepted:
+            return None
+        second, accepted = dialog_get_text(
+            self, tr("Confirmar senha"), tr("Digite novamente a senha:"),
+            echo=QLineEdit.EchoMode.Password,
+        )
+        if not accepted:
+            return None
+        try:
+            first_normalized = password_bytes(first)
+            second_normalized = password_bytes(second)
+        except FornaxError as error:
+            QMessageBox.warning(self, tr("Senha inválida"), str(error))
+            return None
+        if first_normalized != second_normalized:
+            QMessageBox.warning(self, tr("Senha inválida"), tr("As senhas informadas não coincidem."))
+            return None
+        return first
+
+    def _show_save_success_dialog(self, skip_close_dialog=False):
+        if skip_close_dialog:
+            self.close()
+            return
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle(tr("Sucesso"))
+        msg_box.setIcon(QMessageBox.Icon.Information)
+        msg_box.setText(tr("Deseja sair do editor?"))
+        btn_exit = msg_box.addButton(tr("Encerrar edição"), QMessageBox.ButtonRole.AcceptRole)
+        btn_stay = msg_box.addButton(tr("Continuar editando"), QMessageBox.ButtonRole.ActionRole)
+        msg_box.setDefaultButton(btn_stay)
+        style_message_box(msg_box)
+        themed_style(btn_stay, NEUTRAL_STYLE)
+        button_width = max(96, btn_exit.sizeHint().width(), btn_stay.sizeHint().width())
+        for button in (btn_exit, btn_stay):
+            button.setFixedSize(button_width, 30)
+        msg_box.exec()
+        if msg_box.clickedButton() == btn_exit:
+            self.close()
+
+    def _export_to_fornax(self, data, *, skip_close_dialog=False):
+        save_as = self._fornax_save_as_required or self._fornax_path is None
+        model_name = self._current_model_name
+        if self._fornax_save_as_required:
+            suggested = tr("{nome} (Cópia)").format(nome=model_name)
+            new_name, accepted = dialog_get_text(
+                self, tr("Salvar como novo modelo"), tr("Nome do novo modelo:"),
+                text=suggested,
+            )
+            if not accepted or not new_name.strip():
+                return
+            model_name = new_name.strip()
+            data["name"] = model_name
+
+        document = self._model_document
+        if document is None:
+            document = normalize_model_document(data)
+        document = replace_model_page(document, data, self._active_page_id)
+        document["name"] = model_name
+        has_signatures = bool(document_signatures(document))
+
+        mode = self._fornax_mode
+        password = None
+        protection_transition = (
+            mode is None
+            or (mode == PUBLIC_MODE and has_signatures)
+            or (mode == SIGNATURES_MODE and not has_signatures)
+        )
+        if save_as or protection_transition:
+            mode = self._choose_fornax_protection(has_signatures)
+            if mode is None:
+                return
+            needs_new_password = (
+                mode != PUBLIC_MODE
+                and (save_as or self._fornax_mode in {None, PUBLIC_MODE})
+            )
+            if needs_new_password:
+                password = self._request_new_fornax_password()
+                if password is None:
+                    return
+
+        destination = (
+            get_models_dir() / f"{slugify_model_name(model_name)}.fornax"
+            if save_as else Path(self._fornax_path)
+        )
+        if save_as and destination.exists():
+            QMessageBox.warning(self, tr("Erro"), tr("Já existe um modelo com esse nome."))
+            return
+
+        try:
+            manager = self._fornax_session_manager
+            can_use_session = (
+                not save_as and manager is not None and self._fornax_path is not None
+                and not (self._fornax_mode == PUBLIC_MODE and mode != PUBLIC_MODE)
+            )
+            if can_use_session:
+                status = manager.save(
+                    document, path=self._fornax_path, destination=destination,
+                    mode=mode, asset_provider=self._save_asset_provider,
+                )
+                opened_document = manager.document(destination)
+                provider = lambda reference, p=destination: manager.asset(reference, p)
+                descriptor = status.descriptor
+            elif mode == PUBLIC_MODE:
+                descriptor = save_public_fornax(
+                    document, destination, asset_provider=self._save_asset_provider,
+                    model_id=None if save_as else self._fornax_model_id,
+                )
+                if manager is not None:
+                    status = manager.select(destination)
+                    opened_document = manager.document(destination)
+                    provider = lambda reference, p=destination: manager.asset(reference, p)
+                else:
+                    opened = open_public_fornax(descriptor)
+                    opened_document, provider = opened.document(), opened.asset
+            else:
+                descriptor = save_protected_fornax(
+                    document, destination, password, mode=mode,
+                    asset_provider=self._save_asset_provider,
+                    model_id=None if save_as else self._fornax_model_id,
+                )
+                if manager is not None:
+                    manager.forget(destination)
+                    manager.unlock(destination, password)
+                    opened_document = manager.document(destination)
+                    provider = lambda reference, p=destination: manager.asset(reference, p)
+                else:
+                    opened = unlock_fornax(descriptor, password)
+                    opened_document, provider = opened.document(), opened.asset
+        except FornaxExternalChangeError:
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle(tr("Modelo alterado externamente"))
+            dialog.setText(tr("O arquivo mudou enquanto este modelo estava aberto. Salve seu trabalho como uma nova cópia ou recarregue a versão do disco."))
+            copy_button = dialog.addButton(tr("Salvar como nova cópia"), QMessageBox.ButtonRole.AcceptRole)
+            reload_button = dialog.addButton(tr("Recarregar arquivo"), QMessageBox.ButtonRole.ActionRole)
+            dialog.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+            style_message_box(dialog)
+            dialog.exec()
+            if dialog.clickedButton() is copy_button:
+                self._fornax_save_as_required = True
+                self._export_to_fornax(data, skip_close_dialog=skip_close_dialog)
+            elif dialog.clickedButton() is reload_button:
+                self._remove_fornax_recovery()
+                self._last_saved_state = self.get_current_scene_state()
+                self._last_saved_document_state = self._capture_document_history_state()
+                self.close()
+                workspace = self._workspace_window
+                if workspace is not None:
+                    workspace._on_model_changed(workspace.preview_panel.cbo_models.currentText())
+            return
+        except Exception as error:
+            QMessageBox.critical(
+                self, tr("Erro"), tr("Falha ao salvar modelo:\n{erro}").format(erro=error),
+            )
+            return
+
+        self._fornax_path = destination.resolve()
+        self._fornax_mode = descriptor.mode
+        self._fornax_model_id = descriptor.model_id
+        self._fornax_asset_provider = self._detached_asset_provider(
+            opened_document, provider,
+        )
+        self._fornax_save_as_required = False
+        self._recovered_unsaved = False
+        self._remove_fornax_recovery()
+        self._recovery_source_path = self._fornax_path
+        self._autosave_timer.start()
+        self._current_model_name = model_name
+        self._current_model_dir = None
+        self._load_document_into_scene(opened_document)
+        self.modelSaved.emit(model_name, opened_document["placeholders"], str(destination))
+        self._show_save_success_dialog(skip_close_dialog)
     
-    def load_background_image(self, path, update_ui=True, props=None, force_document_resize=False):
+    def load_background_image(
+        self, path, update_ui=True, props=None, force_document_resize=False,
+        *, asset_data=None, asset_reference=None,
+    ):
         original_size = None
-        if path:
+        if asset_data is not None:
+            image = QImage.fromData(bytes(asset_data))
+            if image.isNull():
+                QMessageBox.warning(self, tr("Erro de leitura"), tr("A imagem está corrompida ou em um formato não suportado (ex.: CMYK sem plugin)."))
+                return
+            original_size = image.size()
+        elif path:
             reader = QImageReader(path)
             reader.setAutoTransform(True)
             raw_size = reader.size()
@@ -837,10 +1178,12 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         if self.bg_item:
             self.scene.removeItem(self.bg_item)
             
-        self.background_path = path
+        self.background_path = asset_reference or path
         
         # Instancia o fundo livre em vez de um Pixmap cimentado
-        self.bg_item = BackgroundItem(path)
+        self.bg_item = BackgroundItem(
+            path, pixmap_data=asset_data, asset_reference=asset_reference,
+        )
         self.scene.addItem(self.bg_item)
         self.refresh_layer_list()
         
@@ -2012,14 +2355,14 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         self.update_position_ui()
         self.save_snapshot()
 
-    def _on_physical_size_changed(self, _=None):
+    def _on_physical_size_changed(self, _=None, *, document_rect=None):
         """Redimensiona APENAS a prancheta (papel branco). A imagem de fundo agora é livre."""
         if not hasattr(self, 'scene'): return
         
         w_px = mm_to_px(self.spin_phys_w.value())
         h_px = mm_to_px(self.spin_phys_h.value())
         
-        rect = QRectF(0, 0, w_px, h_px)
+        rect = QRectF(document_rect) if document_rect is not None else QRectF(0, 0, w_px, h_px)
         
         self._set_document_rect(rect)
         
@@ -2983,22 +3326,30 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         self.fallback_bg.setZValue(-200)
         
         # Atualiza as labels informativas e o rect de fundo
-        self._on_physical_size_changed()
+        self._on_physical_size_changed(document_rect=QRectF(0, 0, canvas_w, canvas_h))
 
         # Fundo
         bg_path_raw = data.get("background_path")
         if bg_path_raw:
+            asset_data = self._authorized_asset_bytes(bg_path_raw)
             bg_path = Path(bg_path_raw)
-            # Tenta resolver o caminho se não for absoluto (procura no próprio modelo)
-            if not bg_path.is_absolute():
-                slug = slugify_model_name(data.get("name", ""))
-                bg_path = get_models_dir() / slug / bg_path_raw
-            
-            if bg_path.exists():
-                self.load_background_image(str(bg_path), update_ui=not is_undo_redo, props=data.get("bg_props"))
+            if asset_data is not None:
+                self.load_background_image(
+                    None, update_ui=not is_undo_redo, props=data.get("bg_props"),
+                    asset_data=asset_data, asset_reference=bg_path_raw,
+                )
                 if self.bg_item and "bg_props" in data:
                     self.bg_item.setZValue(data["bg_props"].get("z_value", -100))
             else:
+                # Tenta resolver o caminho se não for absoluto (procura no próprio modelo)
+                if not bg_path.is_absolute():
+                    slug = slugify_model_name(data.get("name", ""))
+                    bg_path = get_models_dir() / slug / bg_path_raw
+            if asset_data is None and bg_path.exists():
+                self.load_background_image(str(bg_path), update_ui=not is_undo_redo, props=data.get("bg_props"))
+                if self.bg_item and "bg_props" in data:
+                    self.bg_item.setZValue(data["bg_props"].get("z_value", -100))
+            elif asset_data is None:
                 self.load_background_image(None, update_ui=not is_undo_redo, props=data.get("bg_props"))
         else:
             self.load_background_image(None, update_ui=not is_undo_redo, props=data.get("bg_props"))
@@ -3011,13 +3362,17 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         # Assinaturas
         for sig_data in data.get("signatures", []):
             raw_path = sig_data["path"]
+            asset_data = self._authorized_asset_bytes(raw_path)
             sig_path = Path(raw_path)
-            if not sig_path.is_absolute():
+            if asset_data is None and not sig_path.is_absolute():
                 slug = slugify_model_name(data.get("name", ""))
                 sig_path = get_models_dir() / slug / raw_path
 
-            if sig_path.exists():
-                sig = SignatureItem(str(sig_path))
+            if asset_data is not None or sig_path.exists():
+                sig = SignatureItem(
+                    str(sig_path) if asset_data is None else None,
+                    pixmap_data=asset_data, asset_reference=raw_path if asset_data is not None else None,
+                )
                 sig.signature_id = sig_data.get("signature_id") or sig.signature_id
                 sig.custom_name = sig_data.get("custom_name", "")
                 sig.layer_id = sig_data.get("layer_id")
@@ -3041,13 +3396,17 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         # Imagens
         for img_data in data.get("images", []):
             raw_path = img_data["path"]
+            asset_data = self._authorized_asset_bytes(raw_path)
             img_path = Path(raw_path)
-            if not img_path.is_absolute():
+            if asset_data is None and not img_path.is_absolute():
                 slug = slugify_model_name(data.get("name", ""))
                 img_path = get_models_dir() / slug / raw_path
 
-            if img_path.exists():
-                img = ImageItem(str(img_path))
+            if asset_data is not None or img_path.exists():
+                img = ImageItem(
+                    str(img_path) if asset_data is None else None,
+                    pixmap_data=asset_data, asset_reference=raw_path if asset_data is not None else None,
+                )
                 img.custom_name = img_data.get("custom_name", "")
                 img.layer_id = img_data.get("layer_id")
                 img.group_id = img_data.get("group_id")

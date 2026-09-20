@@ -8,7 +8,7 @@ from PySide6.QtCore import Qt, QUrl, QSize, QProcess
 from PySide6.QtGui import QAction, QActionGroup, QDesktopServices
 from PySide6.QtWidgets import (
     QWidget, QFrame, QLabel, QPushButton, QToolButton, QHBoxLayout, QVBoxLayout,
-    QMessageBox, QMenu, QGridLayout, QSizePolicy, QListView,
+    QMessageBox, QMenu, QGridLayout, QSizePolicy, QListView, QApplication,
 )
 from core.paths import get_models_dir
 from core.resources import action_icon_path, navigation_icon_path
@@ -19,25 +19,35 @@ from features.tutorial.first_steps import start_first_steps_tutorial
 
 
 def _restart_application(window):
-    """Inicia uma nova instância e encerra a atual após confirmar o processo."""
-    if getattr(sys, "frozen", False):
+    """Reinicia depois de encerrar trabalhos e liberar a instância única."""
+    app = QApplication.instance()
+    app._restart_requested = True
+    if not window.close():
+        app._restart_requested = False
+
+
+def _launch_restarted_application():
+    if os.environ.get("APPIMAGE"):
+        program = os.environ["APPIMAGE"]
+        arguments = []
+    elif getattr(sys, "frozen", False) or "__compiled__" in globals():
         program = sys.executable
-        arguments = sys.argv[1:]
+        arguments = []
     else:
         program = sys.executable
-        arguments = [str(Path(sys.argv[0]).resolve()), *sys.argv[1:]]
+        arguments = [str(Path(sys.argv[0]).resolve())]
 
     result = QProcess.startDetached(program, arguments, os.getcwd())
     started = result[0] if isinstance(result, tuple) else bool(result)
     if started:
-        window.close()
-        return
+        return True
 
     QMessageBox.critical(
-        window,
+        None,
         tr('Não foi possível reiniciar'),
         tr('Feche e abra o FORNAX Forge para aplicar o novo idioma.'),
     )
+    return False
 
 
 STYLE = """

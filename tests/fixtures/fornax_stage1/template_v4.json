@@ -1,0 +1,132 @@
+{
+  "schema_version": 4,
+  "name": "Referência FORNAX etapa 1",
+  "canvas_size": {"w": 400, "h": 240},
+  "target_w_mm": 100.0,
+  "target_h_mm": 60.0,
+  "placeholders": ["Nome", "Cargo", "Site", "Foto", "Observacao"],
+  "guidelines_visible": true,
+  "guidelines_locked": false,
+  "pages": [
+    {
+      "page_id": "front",
+      "field_ids": ["Nome", "Cargo", "Site", "Foto"],
+      "background_path": null,
+      "boxes": [
+        {
+          "object_id": "text:front-title", "layer_id": 1, "custom_name": "Nome rico",
+          "id": "Nome", "html": "<p><span style=\"font-family:'Inter'; font-size:24px; font-weight:700; color:#10243e;\">{Nome}</span><br><span style=\"font-family:'Inter'; font-size:13px; font-style:italic; color:#35546f;\">{Cargo}</span></p>",
+          "rich_text_version": 1, "visible": true, "opacity": 1.0, "locked": false,
+          "x": 28, "y": 34, "w": 220, "h": 76, "rotation": 0,
+          "font_family": "Inter", "font_size": 24, "font_color": "#10243e",
+          "has_link": true, "link_key": "Site", "align": "left", "vertical_align": "middle",
+          "indent_px": 0, "line_height": 1.15, "keep_proportion": false, "z_value": 3,
+          "group_id": 1
+        }
+      ],
+      "images": [
+        {
+          "object_id": "image:masked", "layer_id": 2, "custom_name": "Foto mascarada",
+          "path": "assets/reference-photo.svg", "visible": true, "opacity": 0.85, "locked": false,
+          "x": 282, "y": 30, "width": 92, "height": 92, "rotation": 0,
+          "has_link": false, "link_key": "", "keep_proportion": true, "z_value": 2,
+          "mask_shape_id": "shape:mask", "mask_order": 0
+        },
+        {
+          "object_id": "image:missing", "layer_id": 6, "custom_name": "Asset ausente controlado",
+          "path": "assets/intentionally-missing.png", "visible": false, "opacity": 1.0, "locked": false,
+          "x": 10, "y": 190, "width": 20, "height": 20, "rotation": 0,
+          "has_link": false, "link_key": "", "keep_proportion": true, "z_value": 6
+        }
+      ],
+      "signatures": [
+        {
+          "object_id": "signature:visible", "signature_id": "sig-stage1-visible",
+          "layer_id": 4, "custom_name": "Diretor",
+          "path": "assets/reference-signature-visible.svg", "visible": true, "opacity": 1.0,
+          "locked": false, "x": 38, "y": 164, "width": 130, "height": 39,
+          "rotation": 0, "keep_proportion": true, "z_value": 4
+        },
+        {
+          "object_id": "signature:hidden", "signature_id": "sig-stage1-hidden",
+          "layer_id": 5, "custom_name": "Secretário",
+          "path": "assets/reference-signature-hidden.svg", "visible": false, "opacity": 1.0,
+          "locked": true, "x": 205, "y": 164, "width": 130, "height": 39,
+          "rotation": 0, "keep_proportion": true, "z_value": 5
+        }
+      ],
+      "shapes": [
+        {
+          "object_id": "shape:background-front", "layer_id": 0, "custom_name": "Plano de fundo",
+          "shape_type": "rectangle", "is_document_background": true,
+          "x": 0, "y": 0, "width": 400, "height": 240, "rotation": 0,
+          "visible": true, "opacity": 1.0, "locked": true, "keep_proportion": false, "z_value": -100,
+          "fill_color": "#eef3f8", "fill_opacity": 1.0, "outline_enabled": false,
+          "outline_color": "#000000", "outline_opacity": 1.0, "outline_width": 0.0,
+          "outline_position": "inside", "outline_join": "miter", "corner_radius": 0.0,
+          "corner_radii": {"top_left": 0.0, "top_right": 0.0, "bottom_right": 0.0, "bottom_left": 0.0},
+          "corner_radii_linked": true
+        },
+        {
+          "object_id": "shape:mask", "layer_id": 3, "custom_name": "Moldura da foto",
+          "shape_type": "ellipse", "is_document_background": false,
+          "x": 282, "y": 30, "width": 92, "height": 92, "rotation": 0,
+          "visible": true, "opacity": 1.0, "locked": false, "keep_proportion": true, "z_value": 2.5,
+          "fill_color": "#ffffff", "fill_opacity": 1.0, "outline_enabled": true,
+          "outline_color": "#2672c9", "outline_opacity": 1.0, "outline_width": 2.0,
+          "outline_position": "inside", "outline_join": "round", "corner_radius": 0.0,
+          "corner_radii": {"top_left": 0.0, "top_right": 0.0, "bottom_right": 0.0, "bottom_left": 0.0},
+          "corner_radii_linked": true, "mask_group_id": 1, "group_id": 1
+        },
+        {
+          "object_id": "shape:dynamic", "layer_id": 7, "custom_name": "Foto variável",
+          "shape_type": "rectangle", "is_document_background": false,
+          "x": 348, "y": 174, "width": 34, "height": 44, "rotation": 0,
+          "visible": true, "opacity": 1.0, "locked": false, "keep_proportion": true, "z_value": 7,
+          "fill_color": "#d9e1e8", "fill_opacity": 1.0, "outline_enabled": false,
+          "outline_color": "#000000", "outline_opacity": 1.0, "outline_width": 0.0,
+          "outline_position": "inside", "outline_join": "miter", "corner_radius": 3.0,
+          "corner_radii": {"top_left": 3.0, "top_right": 3.0, "bottom_right": 3.0, "bottom_left": 3.0},
+          "corner_radii_linked": true, "dynamic_image_field": "Foto", "dynamic_image_fit": "cover"
+        }
+      ],
+      "layer_order": ["shape:background-front", "image:masked", "shape:mask", "text:front-title", "signature:visible", "signature:hidden", "image:missing", "shape:dynamic"],
+      "guidelines": [{"pos": 200.0, "vertical": true, "visible": true}],
+      "editable_background_initialized": true
+    },
+    {
+      "page_id": "back",
+      "field_ids": ["Observacao"],
+      "background_path": null,
+      "boxes": [
+        {
+          "object_id": "text:back-note", "layer_id": 1, "custom_name": "Observação",
+          "id": "Observacao", "html": "<p><span style=\"font-family:'Inter'; font-size:18px; color:#f7f9fb;\">{Observacao}</span></p>",
+          "rich_text_version": 1, "visible": true, "opacity": 1.0, "locked": false,
+          "x": 30, "y": 70, "w": 340, "h": 90, "rotation": 0,
+          "font_family": "Inter", "font_size": 18, "font_color": "#f7f9fb",
+          "has_link": false, "link_key": "", "align": "center", "vertical_align": "middle",
+          "indent_px": 0, "line_height": 1.2, "keep_proportion": false, "z_value": 1
+        }
+      ],
+      "images": [],
+      "signatures": [],
+      "shapes": [
+        {
+          "object_id": "shape:background-back", "layer_id": 0, "custom_name": "Plano de fundo",
+          "shape_type": "rectangle", "is_document_background": true,
+          "x": 0, "y": 0, "width": 400, "height": 240, "rotation": 0,
+          "visible": true, "opacity": 1.0, "locked": true, "keep_proportion": false, "z_value": -100,
+          "fill_color": "#24364b", "fill_opacity": 1.0, "outline_enabled": false,
+          "outline_color": "#000000", "outline_opacity": 1.0, "outline_width": 0.0,
+          "outline_position": "inside", "outline_join": "miter", "corner_radius": 0.0,
+          "corner_radii": {"top_left": 0.0, "top_right": 0.0, "bottom_right": 0.0, "bottom_left": 0.0},
+          "corner_radii_linked": true
+        }
+      ],
+      "layer_order": ["shape:background-back", "text:back-note"],
+      "guidelines": [{"pos": 120.0, "vertical": false, "visible": true}],
+      "editable_background_initialized": true
+    }
+  ]
+}

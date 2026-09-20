@@ -8,7 +8,7 @@ from PySide6.QtCore import QSettings, Qt
 from PySide6.QtTest import QTest
 from PySide6.QtWidgets import QApplication, QTableWidgetItem
 
-from core.model_document import load_model_document
+from core.fornax_container import open_public_fornax
 from features.workspace.main_window import MainWindow
 
 
@@ -64,7 +64,9 @@ def test_workspace_builds_the_approved_layout_directly(tmp_path):
 def test_clean_install_creates_a_valid_starter_model_and_closes_workers(tmp_path):
     window, models = _workspace(tmp_path)
     try:
-        document = load_model_document(models / "modelo_exemplo")
+        package = models / "modelo_exemplo.fornax"
+        assert package.is_file()
+        document = open_public_fornax(package).document()
         front = document["pages"][0]
         object_ids = {
             item["object_id"]

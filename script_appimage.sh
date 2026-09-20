@@ -35,11 +35,16 @@ chmod +x "$APP_DIR/AppRun"
 cat > "$APP_DIR/app.desktop" << 'EOF'
 [Desktop Entry]
 Name=FORNAX Forge
-Exec=FORNAX_Forge
+Exec=FORNAX_Forge %F
 Icon=app
 Type=Application
 Categories=Utility;
+MimeType=application/x-fornax-template;
 EOF
+
+# Metadados MIME para integração no desktop (não instala no host automaticamente).
+mkdir -p "$APP_DIR/usr/share/mime/packages"
+cp assets/linux/com.leobelisario.FornaxForge.xml "$APP_DIR/usr/share/mime/packages/"
 
 # Ícone do aplicativo
 cp "$APP_ICON" "$APP_DIR/app.png"

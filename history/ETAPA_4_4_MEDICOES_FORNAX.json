@@ -1,0 +1,577 @@
+{
+  "baseline": {
+    "purpose": "reference-before-fornax-container-and-protection",
+    "captured_at": "2026-09-20T01:19:17-0300",
+    "environment": {
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "python": "3.13.11",
+      "pyside": "6.11.0",
+      "qt_qpa_platform": "offscreen"
+    },
+    "fixture": {
+      "json_bytes": 7283,
+      "json_sha256": "abb2d59578913e84cc5f262d9826058b5ddf1a1b5f2e6d1795d95a21cbae1f9f",
+      "pages": 2,
+      "canvas_pixels": {
+        "w": 400,
+        "h": 240
+      },
+      "physical_mm": [
+        100.0,
+        60.0
+      ],
+      "placeholders": [
+        "Nome",
+        "Cargo",
+        "Site",
+        "Foto",
+        "Observacao"
+      ],
+      "page_counts": [
+        {
+          "boxes": 1,
+          "images": 2,
+          "signatures": 2,
+          "shapes": 3
+        },
+        {
+          "boxes": 1,
+          "images": 0,
+          "signatures": 0,
+          "shapes": 1
+        }
+      ],
+      "assets": [
+        {
+          "path": "assets/reference-photo.svg",
+          "bytes": 257,
+          "pixels": [
+            120,
+            80
+          ],
+          "sha256": "3bc5d1b600004d232814307fabda2a6fa1308d7875a8985bad7256d21b5ec8c1"
+        },
+        {
+          "path": "assets/reference-signature-hidden.svg",
+          "bytes": 187,
+          "pixels": [
+            160,
+            48
+          ],
+          "sha256": "08787eea7cbbcdf8864bcc64048ea010ca1d059e8a4a493d8949a5b8aa245ec2"
+        },
+        {
+          "path": "assets/reference-signature-visible.svg",
+          "bytes": 206,
+          "pixels": [
+            160,
+            48
+          ],
+          "sha256": "aeb444b2edf90cdde89dfc67639366d876cf09773cd43dd97983ed564c3a48fa"
+        }
+      ]
+    },
+    "reference_outputs": {
+      "png": [
+        {
+          "path": "references/front.png",
+          "sha256": "0cb6bb8a7e6dddacfc78946a28ddffb507ab335e16ce2724d3458c5f1d313197",
+          "pixels": [
+            400,
+            240
+          ],
+          "bytes": 12348
+        },
+        {
+          "path": "references/back.png",
+          "sha256": "c94de46797aa1a9de62a4f50a72f559c4d8ccab9e8ad43e8d0194db7c1aa9160",
+          "pixels": [
+            400,
+            240
+          ],
+          "bytes": 5035
+        }
+      ],
+      "pdf_batch": {
+        "files": 100,
+        "pages_per_file": [
+          2
+        ],
+        "total_pages": 200,
+        "total_bytes": 2465270,
+        "first_file_sha256": "ec66aaaaa11876d1d356bc2235d0bc7e403b553b7a14e2ce1baf7e3dd1d3b96b"
+      }
+    },
+    "measurements": {
+      "load_cold": {
+        "median_ms": 0.454,
+        "p95_ms": 0.454,
+        "min_ms": 0.454,
+        "max_ms": 0.454,
+        "samples": 1
+      },
+      "load_warm": {
+        "median_ms": 0.339,
+        "p95_ms": 0.403,
+        "min_ms": 0.327,
+        "max_ms": 0.528,
+        "samples": 50
+      },
+      "adapt_front_and_back": {
+        "median_ms": 0.482,
+        "p95_ms": 0.49,
+        "min_ms": 0.475,
+        "max_ms": 0.526,
+        "samples": 100
+      },
+      "editor_open": {
+        "median_ms": 34.13,
+        "p95_ms": 34.13,
+        "min_ms": 34.13,
+        "max_ms": 34.13,
+        "samples": 1
+      },
+      "render_two_pages_cold": {
+        "median_ms": 5.206,
+        "p95_ms": 5.206,
+        "min_ms": 5.206,
+        "max_ms": 5.206,
+        "samples": 1
+      },
+      "render_two_pages_warm": {
+        "median_ms": 2.665,
+        "p95_ms": 2.949,
+        "min_ms": 2.638,
+        "max_ms": 3.017,
+        "samples": 30
+      },
+      "generate_100_items_200_pdf_pages": {
+        "median_ms": 862.192,
+        "p95_ms": 862.192,
+        "min_ms": 862.192,
+        "max_ms": 862.192,
+        "samples": 1
+      },
+      "scan_legacy_zip_100_models": {
+        "median_ms": 8.079,
+        "p95_ms": 9.05,
+        "min_ms": 7.903,
+        "max_ms": 9.05,
+        "samples": 10
+      },
+      "install_20_legacy_models": {
+        "median_ms": 170.662,
+        "p95_ms": 170.662,
+        "min_ms": 170.662,
+        "max_ms": 170.662,
+        "samples": 1
+      },
+      "legacy_zip_100_models_bytes": 166322,
+      "process_max_rss_kib": 128584
+    },
+    "notes": [
+      "Tempos valem para esta máquina e devem ser comparados no mesmo ambiente.",
+      "Cold usa uma amostra e registra custo inicial; warm registra múltiplas amostras.",
+      "O scan ZIP reproduz descoberta/leitura, não diálogos nem publicação na biblioteca.",
+      "Hash de PDF pode variar por metadados; páginas, dimensões e conteúdo também devem ser testados.",
+      "ru_maxrss é pico do processo e não representa toda alocação nativa do Qt."
+    ]
+  },
+  "legacy_current": {
+    "purpose": "reference-before-fornax-container-and-protection",
+    "captured_at": "2026-09-20T07:33:39-0300",
+    "environment": {
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "python": "3.13.11",
+      "pyside": "6.11.0",
+      "qt_qpa_platform": "offscreen"
+    },
+    "fixture": {
+      "json_bytes": 7283,
+      "json_sha256": "abb2d59578913e84cc5f262d9826058b5ddf1a1b5f2e6d1795d95a21cbae1f9f",
+      "pages": 2,
+      "canvas_pixels": {
+        "w": 400,
+        "h": 240
+      },
+      "physical_mm": [
+        100.0,
+        60.0
+      ],
+      "placeholders": [
+        "Nome",
+        "Cargo",
+        "Site",
+        "Foto",
+        "Observacao"
+      ],
+      "page_counts": [
+        {
+          "boxes": 1,
+          "images": 2,
+          "signatures": 2,
+          "shapes": 3
+        },
+        {
+          "boxes": 1,
+          "images": 0,
+          "signatures": 0,
+          "shapes": 1
+        }
+      ],
+      "assets": [
+        {
+          "path": "assets/reference-photo.svg",
+          "bytes": 257,
+          "pixels": [
+            120,
+            80
+          ],
+          "sha256": "3bc5d1b600004d232814307fabda2a6fa1308d7875a8985bad7256d21b5ec8c1"
+        },
+        {
+          "path": "assets/reference-signature-hidden.svg",
+          "bytes": 187,
+          "pixels": [
+            160,
+            48
+          ],
+          "sha256": "08787eea7cbbcdf8864bcc64048ea010ca1d059e8a4a493d8949a5b8aa245ec2"
+        },
+        {
+          "path": "assets/reference-signature-visible.svg",
+          "bytes": 206,
+          "pixels": [
+            160,
+            48
+          ],
+          "sha256": "aeb444b2edf90cdde89dfc67639366d876cf09773cd43dd97983ed564c3a48fa"
+        }
+      ]
+    },
+    "reference_outputs": {
+      "png": [
+        {
+          "path": "references/front.png",
+          "sha256": "0cb6bb8a7e6dddacfc78946a28ddffb507ab335e16ce2724d3458c5f1d313197",
+          "pixels": [
+            400,
+            240
+          ],
+          "bytes": 12348
+        },
+        {
+          "path": "references/back.png",
+          "sha256": "c94de46797aa1a9de62a4f50a72f559c4d8ccab9e8ad43e8d0194db7c1aa9160",
+          "pixels": [
+            400,
+            240
+          ],
+          "bytes": 5035
+        }
+      ],
+      "pdf_batch": {
+        "files": 100,
+        "pages_per_file": [
+          2
+        ],
+        "total_pages": 200,
+        "total_bytes": 2465270,
+        "first_file_sha256": "ba99d325b35fcadce23d38db40b9d7b5ddb54eabe48664724880cd128c11b5b3"
+      }
+    },
+    "measurements": {
+      "load_cold": {
+        "median_ms": 0.511,
+        "p95_ms": 0.511,
+        "min_ms": 0.511,
+        "max_ms": 0.511,
+        "samples": 1
+      },
+      "load_warm": {
+        "median_ms": 0.334,
+        "p95_ms": 0.364,
+        "min_ms": 0.325,
+        "max_ms": 0.388,
+        "samples": 50
+      },
+      "adapt_front_and_back": {
+        "median_ms": 0.485,
+        "p95_ms": 0.508,
+        "min_ms": 0.475,
+        "max_ms": 0.517,
+        "samples": 100
+      },
+      "editor_open": {
+        "median_ms": 34.879,
+        "p95_ms": 34.879,
+        "min_ms": 34.879,
+        "max_ms": 34.879,
+        "samples": 1
+      },
+      "render_two_pages_cold": {
+        "median_ms": 5.38,
+        "p95_ms": 5.38,
+        "min_ms": 5.38,
+        "max_ms": 5.38,
+        "samples": 1
+      },
+      "render_two_pages_warm": {
+        "median_ms": 2.647,
+        "p95_ms": 2.945,
+        "min_ms": 2.61,
+        "max_ms": 2.977,
+        "samples": 30
+      },
+      "generate_100_items_200_pdf_pages": {
+        "median_ms": 853.828,
+        "p95_ms": 853.828,
+        "min_ms": 853.828,
+        "max_ms": 853.828,
+        "samples": 1
+      },
+      "scan_legacy_zip_100_models": {
+        "median_ms": 8.356,
+        "p95_ms": 8.457,
+        "min_ms": 8.235,
+        "max_ms": 8.457,
+        "samples": 10
+      },
+      "install_20_legacy_models": {
+        "median_ms": 165.167,
+        "p95_ms": 165.167,
+        "min_ms": 165.167,
+        "max_ms": 165.167,
+        "samples": 1
+      },
+      "legacy_zip_100_models_bytes": 166322,
+      "process_max_rss_kib": 139036
+    },
+    "notes": [
+      "Tempos valem para esta máquina e devem ser comparados no mesmo ambiente.",
+      "Cold usa uma amostra e registra custo inicial; warm registra múltiplas amostras.",
+      "O scan ZIP reproduz descoberta/leitura, não diálogos nem publicação na biblioteca.",
+      "Hash de PDF pode variar por metadados; páginas, dimensões e conteúdo também devem ser testados.",
+      "ru_maxrss é pico do processo e não representa toda alocação nativa do Qt."
+    ]
+  },
+  "fornax_current": {
+    "environment": {
+      "platform": "Linux-7.0.0-31-generic-x86_64-with-glibc2.39",
+      "python": "3.13.11",
+      "pyside": "6.11.0",
+      "qt": "offscreen"
+    },
+    "captured_at": "2026-09-20T07:34:02-0300",
+    "modes": {
+      "none": {
+        "create": {
+          "median_ms": 16.12,
+          "p95_ms": 16.12,
+          "min_ms": 16.12,
+          "max_ms": 16.12,
+          "samples": 1
+        },
+        "open_or_unlock": {
+          "median_ms": 1.424,
+          "p95_ms": 1.431,
+          "min_ms": 1.349,
+          "max_ms": 1.431,
+          "samples": 5
+        },
+        "editor_load": {
+          "median_ms": 26.106,
+          "p95_ms": 26.106,
+          "min_ms": 26.106,
+          "max_ms": 26.106,
+          "samples": 1
+        },
+        "render_cold": {
+          "median_ms": 3.532,
+          "p95_ms": 3.532,
+          "min_ms": 3.532,
+          "max_ms": 3.532,
+          "samples": 1
+        },
+        "render_warm": {
+          "median_ms": 2.88,
+          "p95_ms": 3.469,
+          "min_ms": 2.797,
+          "max_ms": 3.674,
+          "samples": 30
+        },
+        "save_authorized": {
+          "median_ms": 17.946,
+          "p95_ms": 18.163,
+          "min_ms": 17.905,
+          "max_ms": 18.163,
+          "samples": 3
+        },
+        "generate_100_items_200_pages": {
+          "median_ms": 883.127,
+          "p95_ms": 883.127,
+          "min_ms": 883.127,
+          "max_ms": 883.127,
+          "samples": 1
+        },
+        "preview_500_rows_4_faces": {
+          "median_ms": 242.048,
+          "p95_ms": 242.048,
+          "min_ms": 242.048,
+          "max_ms": 242.048,
+          "samples": 1
+        },
+        "preview_faces": 4,
+        "package_bytes": 1989,
+        "png_sha256": [
+          "e7758ebfd31b483f711d9a546bf024b09a07b9b68d3fd00c3cef2e88240b3dcd",
+          "c94de46797aa1a9de62a4f50a72f559c4d8ccab9e8ad43e8d0194db7c1aa9160"
+        ],
+        "pdf_files": 100,
+        "pdf_pages": 200,
+        "process_peak_rss_kib": 248100
+      },
+      "signatures": {
+        "create": {
+          "median_ms": 251.342,
+          "p95_ms": 251.342,
+          "min_ms": 251.342,
+          "max_ms": 251.342,
+          "samples": 1
+        },
+        "open_or_unlock": {
+          "median_ms": 116.199,
+          "p95_ms": 117.079,
+          "min_ms": 115.926,
+          "max_ms": 117.079,
+          "samples": 5
+        },
+        "editor_load": {
+          "median_ms": 26.426,
+          "p95_ms": 26.426,
+          "min_ms": 26.426,
+          "max_ms": 26.426,
+          "samples": 1
+        },
+        "render_cold": {
+          "median_ms": 3.882,
+          "p95_ms": 3.882,
+          "min_ms": 3.882,
+          "max_ms": 3.882,
+          "samples": 1
+        },
+        "render_warm": {
+          "median_ms": 3.144,
+          "p95_ms": 3.633,
+          "min_ms": 3.111,
+          "max_ms": 3.672,
+          "samples": 30
+        },
+        "save_authorized": {
+          "median_ms": 19.86,
+          "p95_ms": 23.486,
+          "min_ms": 19.338,
+          "max_ms": 23.486,
+          "samples": 3
+        },
+        "generate_100_items_200_pages": {
+          "median_ms": 896.796,
+          "p95_ms": 896.796,
+          "min_ms": 896.796,
+          "max_ms": 896.796,
+          "samples": 1
+        },
+        "preview_500_rows_4_faces": {
+          "median_ms": 190.751,
+          "p95_ms": 190.751,
+          "min_ms": 190.751,
+          "max_ms": 190.751,
+          "samples": 1
+        },
+        "preview_faces": 4,
+        "package_bytes": 3670,
+        "png_sha256": [
+          "0cb6bb8a7e6dddacfc78946a28ddffb507ab335e16ce2724d3458c5f1d313197",
+          "c94de46797aa1a9de62a4f50a72f559c4d8ccab9e8ad43e8d0194db7c1aa9160"
+        ],
+        "pdf_files": 100,
+        "pdf_pages": 200,
+        "process_peak_rss_kib": 264272
+      },
+      "full": {
+        "create": {
+          "median_ms": 242.899,
+          "p95_ms": 242.899,
+          "min_ms": 242.899,
+          "max_ms": 242.899,
+          "samples": 1
+        },
+        "open_or_unlock": {
+          "median_ms": 116.25,
+          "p95_ms": 116.364,
+          "min_ms": 115.082,
+          "max_ms": 116.364,
+          "samples": 5
+        },
+        "editor_load": {
+          "median_ms": 21.638,
+          "p95_ms": 21.638,
+          "min_ms": 21.638,
+          "max_ms": 21.638,
+          "samples": 1
+        },
+        "render_cold": {
+          "median_ms": 4.008,
+          "p95_ms": 4.008,
+          "min_ms": 4.008,
+          "max_ms": 4.008,
+          "samples": 1
+        },
+        "render_warm": {
+          "median_ms": 3.127,
+          "p95_ms": 3.205,
+          "min_ms": 3.087,
+          "max_ms": 3.251,
+          "samples": 30
+        },
+        "save_authorized": {
+          "median_ms": 16.435,
+          "p95_ms": 19.701,
+          "min_ms": 16.29,
+          "max_ms": 19.701,
+          "samples": 3
+        },
+        "generate_100_items_200_pages": {
+          "median_ms": 875.269,
+          "p95_ms": 875.269,
+          "min_ms": 875.269,
+          "max_ms": 875.269,
+          "samples": 1
+        },
+        "preview_500_rows_4_faces": {
+          "median_ms": 198.363,
+          "p95_ms": 198.363,
+          "min_ms": 198.363,
+          "max_ms": 198.363,
+          "samples": 1
+        },
+        "preview_faces": 4,
+        "package_bytes": 3092,
+        "png_sha256": [
+          "0cb6bb8a7e6dddacfc78946a28ddffb507ab335e16ce2724d3458c5f1d313197",
+          "c94de46797aa1a9de62a4f50a72f559c4d8ccab9e8ad43e8d0194db7c1aa9160"
+        ],
+        "pdf_files": 100,
+        "pdf_pages": 200,
+        "process_peak_rss_kib": 304652
+      }
+    },
+    "fixture_sha256": "abb2d59578913e84cc5f262d9826058b5ddf1a1b5f2e6d1795d95a21cbae1f9f",
+    "notes": [
+      "Asset ausente invisível removido para permitir empacotamento válido.",
+      "Modo público compara contra referência sem assinaturas; demais modos preservam ambas.",
+      "Tempos locais sintéticos; cold inclui uma amostra, não é benchmark de hardware modesto.",
+      "RSS é pico acumulado do processo; não somar nem atribuir integralmente a cada modo."
+    ]
+  }
+}

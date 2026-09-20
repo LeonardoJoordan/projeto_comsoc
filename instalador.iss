@@ -58,6 +58,13 @@ Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
 Name: "{group}\Licenças e avisos"; Filename: "{app}\licenses\THIRD_PARTY_LICENSES.md"
 Name: "{group}\Desinstalar {#AppName}"; Filename: "{uninstallexe}"
 
+[Registry]
+Root: HKA; Subkey: "Software\Classes\.fornax"; ValueType: string; ValueName: ""; ValueData: "FornaxForge.Model"; Flags: uninsdeletevalue
+Root: HKA; Subkey: "Software\Classes\.fornax"; ValueType: string; ValueName: "Content Type"; ValueData: "application/x-fornax-template"
+Root: HKA; Subkey: "Software\Classes\FornaxForge.Model"; ValueType: string; ValueName: ""; ValueData: "Modelo FORNAX Forge"; Flags: uninsdeletekey
+Root: HKA; Subkey: "Software\Classes\FornaxForge.Model\DefaultIcon"; ValueType: string; ValueName: ""; ValueData: "{app}\{#AppExeName},0"
+Root: HKA; Subkey: "Software\Classes\FornaxForge.Model\shell\open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\{#AppExeName}"" ""%1"""
+
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Executar {#AppName}"; Flags: nowait postinstall skipifsilent
 

@@ -12,7 +12,15 @@ class ImportModelsDialog(QDialog):
         self.setWindowTitle(tr("Importação de modelos"))
         self.resize(900, 500)
         
-        self.zip_models = zip_models
+        self.zip_models = []
+        for model in zip_models:
+            if isinstance(model, (tuple, list)):
+                key, name = model[:2]
+                note = model[2] if len(model) > 2 else "-"
+            else:
+                key = name = model
+                note = "-"
+            self.zip_models.append((key, name, note))
         self.existing_slugs = existing_slugs
         self.decisions = {}
         
@@ -41,7 +49,7 @@ class ImportModelsDialog(QDialog):
         layout.addLayout(top_layout)
         
         # --- Tabela Central ---
-        self.table = QTableWidget(len(zip_models), 5)
+        self.table = QTableWidget(len(self.zip_models), 5)
         self.table.setHorizontalHeaderLabels([tr("Importar"), tr("Modelo no ZIP"), tr("Observação"), tr("Status"), tr("Resolução de conflito")])
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self.table.setAlternatingRowColors(True)
@@ -62,7 +70,7 @@ class ImportModelsDialog(QDialog):
 
     def get_decisions(self):
         results = {}
-        for row, model_name in enumerate(self.zip_models):
+        for row, (model_key, model_name, _note) in enumerate(self.zip_models):
             is_checked = self.checkboxes[row].isChecked()
             action = "new"
             if row in self.button_groups:
@@ -70,14 +78,14 @@ class ImportModelsDialog(QDialog):
                 if checked_id == 1: action = "replace"
                 elif checked_id == 2: action = "rename"
             
-            results[model_name] = {
+            results[model_key] = {
                 "import": is_checked,
                 "action": action
             }
         return results
 
     def _populate_table(self):
-        for row, model_name in enumerate(self.zip_models):
+        for row, (_model_key, model_name, note) in enumerate(self.zip_models):
             slug = slugify_model_name(model_name)
             is_conflict = slug in self.existing_slugs
 
@@ -97,7 +105,7 @@ class ImportModelsDialog(QDialog):
             self.table.setItem(row, 1, QTableWidgetItem(model_name))
             
             # 3. Coluna Observação
-            item_note = QTableWidgetItem("-")
+            item_note = QTableWidgetItem(note)
             item_note.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(row, 2, item_note)
             

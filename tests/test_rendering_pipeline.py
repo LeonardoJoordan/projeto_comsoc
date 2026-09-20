@@ -342,6 +342,125 @@ class RenderingPipelineTest(unittest.TestCase):
                 self.assertAlmostEqual(float(page.mediabox.width) * 25.4 / 72, 80, delta=.18)
                 self.assertAlmostEqual(float(page.mediabox.height) * 25.4 / 72, 60, delta=.18)
 
+    def test_protected_grouped_pdf_uses_memory_pipeline_and_releases_snapshot(self):
+        output = self.base / "protected-output"
+        output.mkdir()
+        snapshot = Mock()
+        rows = [
+            {"Site": "https://example.com/a", "SiteVerso": "https://example.com/a-verso"},
+            {"Site": "https://example.com/b", "SiteVerso": "https://example.com/b-verso"},
+        ]
+        manager = RenderManager(
+            renderers_for_document(two_page_template()), rows, rows, output,
+            "item_{Site}", export_format="PDF", single_pdf=True,
+            target_w_mm=80, target_h_mm=60,
+            authorized_snapshot=snapshot, protected_content=True,
+        )
+        errors, done = [], []
+        manager.error_occurred.connect(errors.append)
+        manager.finished_process.connect(lambda: done.append(True))
+        try:
+            manager.start()
+            for _ in range(1000):
+                if done:
+                    break
+                QTest.qWait(10)
+            self.assertTrue(done)
+            self.assertFalse(errors)
+            self.assertEqual(snapshot.close.call_count, 1)
+            self.assertEqual(manager.page_renderers, [])
+            self.assertIsNone(manager.renderer)
+            for worker in manager.workers:
+                self.assertEqual(worker.renderers, [])
+            self.assertFalse((output / ".temp_hybrid").exists())
+            self.assertFalse(list(output.glob(".*.partial.*")))
+            self.assertFalse(list(output.glob(".*.links.tmp")))
+            result = output / manager.generated_files[0]
+            self.assertEqual(len(PdfReader(result).pages), 4)
+        finally:
+            manager.stop()
+
+    def test_protected_individual_outputs_publish_only_final_files(self):
+        rows = [{"Site": "A", "SiteVerso": "A-verso"}]
+        for export_format in ("PNG", "PDF"):
+            with self.subTest(export_format=export_format):
+                output = self.base / f"protected-{export_format.lower()}"
+                output.mkdir()
+                snapshot = Mock()
+                manager = RenderManager(
+                    renderers_for_document(two_page_template()), rows, rows,
+                    output, "item_{Site}", export_format=export_format,
+                    target_w_mm=80, target_h_mm=60,
+                    authorized_snapshot=snapshot, protected_content=True,
+                )
+                errors, done = [], []
+                manager.error_occurred.connect(errors.append)
+                manager.finished_process.connect(lambda: done.append(True))
+                try:
+                    manager.start()
+                    for _ in range(1000):
+                        if done:
+                            break
+                        QTest.qWait(10)
+                    self.assertTrue(done)
+                    self.assertFalse(errors)
+                    self.assertEqual(snapshot.close.call_count, 1)
+                    self.assertFalse(list(output.glob(".*.partial.*")))
+                    self.assertFalse(list(output.glob(".*.links.tmp")))
+                    self.assertEqual(len(manager.generated_files), 2 if export_format == "PNG" else 1)
+                finally:
+                    manager.stop()
+
+    def test_protected_duplex_imposition_groups_faces_without_disk_cache(self):
+        output = self.base / "protected-imposition"
+        output.mkdir()
+        snapshot = Mock()
+        rows = [
+            {"Site": f"https://example.com/{index}",
+             "SiteVerso": f"https://example.com/{index}-verso"}
+            for index in range(2)
+        ]
+        settings = {
+            "enabled": True,
+            "target_w_mm": 100.0, "target_h_mm": 140.0,
+            "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
+            "crop_marks": False, "bleed_margin": False,
+        }
+        manager = RenderManager(
+            renderers_for_document(two_page_template()), rows, rows, output,
+            "item_{Site}", export_format="PDF", single_pdf=True,
+            target_w_mm=100, target_h_mm=140, imposition_settings=settings,
+            authorized_snapshot=snapshot, protected_content=True,
+        )
+        errors, done = [], []
+        manager.error_occurred.connect(errors.append)
+        manager.finished_process.connect(lambda: done.append(True))
+        try:
+            manager.start()
+            for _ in range(1000):
+                if done:
+                    break
+                QTest.qWait(10)
+            self.assertTrue(done)
+            self.assertFalse(errors)
+            self.assertEqual(snapshot.close.call_count, 1)
+            self.assertEqual(manager.page_renderers, [])
+            self.assertIsNone(manager.renderer)
+            for worker in manager.workers:
+                self.assertEqual(worker.renderers, [])
+            self.assertFalse((output / ".temp_hybrid").exists())
+            result = output / manager.generated_files[0]
+            pages = PdfReader(result).pages
+            self.assertEqual(len(pages), 2)
+            urls = [
+                [annotation.get_object()["/A"]["/URI"] for annotation in page.get("/Annots", [])]
+                for page in pages
+            ]
+            self.assertEqual(urls[0], [row["Site"] for row in rows])
+            self.assertEqual(urls[1], [row["SiteVerso"] for row in reversed(rows)])
+        finally:
+            manager.stop()
+
     def test_two_page_png_failure_does_not_publish_half_a_document(self):
         document = two_page_template()
         renderers = renderers_for_document(document)
@@ -457,6 +576,31 @@ class RenderingPipelineTest(unittest.TestCase):
         self.assertEqual(ready[0][0:2], (1, 1))
         self.assertTrue(Path(ready[0][2]).is_file())
         self.assertTrue(all(event[3] == 7 for event in ready))
+
+    def test_protected_sheet_preview_stays_in_memory_and_releases_snapshot(self):
+        settings = {
+            "enabled": True, "duplex": True,
+            "target_w_mm": 100.0, "target_h_mm": 140.0,
+            "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
+            "crop_marks": False, "bleed_margin": False,
+        }
+        rows = [({"Site": "A"}, {"Site": "A", "SiteVerso": "A-verso"})]
+        snapshot = Mock()
+        ready, failed = [], []
+        worker = SheetPreviewWorker(
+            two_page_template(), rows, settings, None, 9,
+            cache_limit=2, memory_only=True, authorized_snapshot=snapshot,
+        )
+        worker.pageReady.connect(lambda *args: ready.append(args))
+        worker.pageFailed.connect(lambda *args: failed.append(args))
+
+        worker.run()
+
+        self.assertFalse(failed)
+        self.assertEqual(len(ready), 2)
+        self.assertTrue(all(isinstance(event[2], QImage) for event in ready))
+        self.assertEqual(snapshot.close.call_count, 1)
+        self.assertFalse(list(self.base.glob("fornax_sheet_preview_*")))
 
     def test_duplex_landscape_keeps_four_items_and_maps_back_by_rows(self):
         settings = {

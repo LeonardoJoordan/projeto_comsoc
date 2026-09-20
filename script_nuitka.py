@@ -2,6 +2,7 @@ import subprocess
 import sys
 import platform
 import os
+import plistlib
 from pathlib import Path
 
 def build_app():
@@ -27,6 +28,7 @@ def build_app():
         "--include-package=core",
         "--include-package=shared",
         "--include-package=pypdf",
+        "--include-package=cryptography",
         "--include-data-dir=assets=assets",
         "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
         "--lto=no",                     
@@ -75,6 +77,27 @@ def build_app():
                     import shutil
                     shutil.rmtree(app_path)
                 os.rename("build/main.app", app_path)
+
+            plist_path = app_path / "Contents" / "Info.plist"
+            with plist_path.open("rb") as stream:
+                plist = plistlib.load(stream)
+            plist["CFBundleDocumentTypes"] = [{
+                "CFBundleTypeName": "Modelo FORNAX Forge",
+                "CFBundleTypeRole": "Editor",
+                "LSHandlerRank": "Owner",
+                "LSItemContentTypes": ["com.leobelisario.fornax-template"],
+            }]
+            plist["UTExportedTypeDeclarations"] = [{
+                "UTTypeIdentifier": "com.leobelisario.fornax-template",
+                "UTTypeDescription": "Modelo FORNAX Forge",
+                "UTTypeConformsTo": ["public.data", "public.archive"],
+                "UTTypeTagSpecification": {
+                    "public.filename-extension": ["fornax"],
+                    "public.mime-type": "application/x-fornax-template",
+                },
+            }]
+            with plist_path.open("wb") as stream:
+                plistlib.dump(plist, stream)
             
             try:
                 subprocess.run([

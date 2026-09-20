@@ -4,6 +4,7 @@ from PySide6.QtCore import QThread, Signal, QSizeF, QMarginsF
 from PySide6.QtGui import QImage, QPainter, QPdfWriter, QPageLayout, QPageSize
 
 from .imposition import SheetAssembler
+from .production_plan import build_imposition_plan
 from .pdf_links import inject_pdf_links
 from core.i18n import tr
 from core.model_document import resolve_model_file
@@ -27,7 +28,7 @@ class DirectRenderWorker(QThread):
     card_finished = Signal(object, int, object)
     error_occurred = Signal(str)
 
-    def __init__(self, chunk_data, renderers, output_dir, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0):
+    def __init__(self, chunk_data, renderers, output_dir, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0, secure_output=False):
         super().__init__()
         self.chunk_data = chunk_data
         if not isinstance(renderers, (list, tuple)):
@@ -39,6 +40,7 @@ class DirectRenderWorker(QThread):
         self.single_pdf = single_pdf
         self.target_w_mm = target_w_mm
         self.target_h_mm = target_h_mm
+        self.secure_output = bool(secure_output)
         self._is_running = True
 
     def stop(self):
@@ -50,10 +52,18 @@ class DirectRenderWorker(QThread):
                 if not self._is_running: break
                 links_by_page = {}
                 temporary_paths = []
+                published_paths = []
+                active_secure_paths = []
                 if self.export_format == "PDF":
                     out_path = self.output_dir / f"{filename}.pdf"
-                    temporary = self.output_dir / f".{filename}.{original_idx}.partial.pdf"
-                    temporary_paths.append(temporary)
+                    temporary = (
+                        out_path if self.secure_output else
+                        self.output_dir / f".{filename}.{original_idx}.partial.pdf"
+                    )
+                    if not self.secure_output:
+                        temporary_paths.append(temporary)
+                    else:
+                        active_secure_paths.append(out_path)
                     writer = QPdfWriter(str(temporary))
                     writer.setPageSize(QPageSize(QPageSize.PageSizeId.Custom))
                     layout = writer.pageLayout()
@@ -82,8 +92,11 @@ class DirectRenderWorker(QThread):
                         inject_pdf_links(
                             temporary, links_by_page,
                             canvas.get("w", 1000), canvas.get("h", 1000),
+                            memory_only=self.secure_output,
                         )
-                    temporary.replace(out_path)
+                    if not self.secure_output:
+                        temporary.replace(out_path)
+                    published_paths.append(out_path)
                     temporary_paths.clear()
                     output_names = [out_path.name]
                 else:
@@ -95,8 +108,14 @@ class DirectRenderWorker(QThread):
                             break
                         suffix = f"_pag{page_index + 1}" if multiple_pages else ""
                         out_path = self.output_dir / f"{filename}{suffix}.png"
-                        temporary = self.output_dir / f".{filename}{suffix}.{original_idx}.partial.png"
-                        temporary_paths.append(temporary)
+                        temporary = (
+                            out_path if self.secure_output else
+                            self.output_dir / f".{filename}{suffix}.{original_idx}.partial.png"
+                        )
+                        if not self.secure_output:
+                            temporary_paths.append(temporary)
+                        else:
+                            active_secure_paths.append(out_path)
                         local_links = []
                         renderer.render_row(
                             row_plain, row_rich, temporary, out_links=local_links,
@@ -109,11 +128,14 @@ class DirectRenderWorker(QThread):
                             temporary.unlink(missing_ok=True)
                         break
                     for temporary, out_path in staged:
-                        temporary.replace(out_path)
+                        if not self.secure_output:
+                            temporary.replace(out_path)
+                        published_paths.append(out_path)
                         output_names.append(out_path.name)
                     temporary_paths.clear()
 
                 self.card_finished.emit(output_names, original_idx, links_by_page)
+                active_secure_paths = []
 
         except Exception as e:
             active_painter = locals().get("painter")
@@ -124,13 +146,17 @@ class DirectRenderWorker(QThread):
             writer = None
             for path in locals().get("temporary_paths", []):
                 path.unlink(missing_ok=True)
+            for path in locals().get("published_paths", []):
+                path.unlink(missing_ok=True)
+            for path in locals().get("active_secure_paths", []):
+                path.unlink(missing_ok=True)
             self.error_occurred.emit(str(e))
 
 class PageRenderWorker(QThread):
     page_finished = Signal(int, object, int, object, str)
     error_occurred = Signal(str)
 
-    def __init__(self, tasks, renderers, output_dir, imposition_settings, export_format="PNG", single_pdf=False):
+    def __init__(self, tasks, renderers, output_dir, imposition_settings, export_format="PNG", single_pdf=False, secure_output=False):
         super().__init__()
         self.tasks = tasks
         if not isinstance(renderers, (list, tuple)):
@@ -141,6 +167,7 @@ class PageRenderWorker(QThread):
         self.export_format = export_format
         self.single_pdf = single_pdf
         self.duplex = bool(imposition_settings.get("duplex", False))
+        self.secure_output = bool(secure_output)
         
         w_mm = imposition_settings.get("target_w_mm", 100)
         h_mm = imposition_settings.get("target_h_mm", 150)
@@ -161,9 +188,11 @@ class PageRenderWorker(QThread):
 
     def run(self):
         temporary_paths = []
+        active_secure_paths = []
         try:
             for page_task in self.tasks:
                 if not self._is_running: break
+                active_secure_paths = []
 
                 page_num = page_task["page_num"]
                 face_tasks = [(0, page_task["front"])]
@@ -205,8 +234,14 @@ class PageRenderWorker(QThread):
                 final_names = []
                 if self.export_format == "PDF":
                     out_path = self.output_dir / f"{output_base}.pdf"
-                    temporary = self.output_dir / f".{output_base}.{page_num}.partial.pdf"
-                    temporary_paths.append(temporary)
+                    temporary = (
+                        out_path if self.secure_output else
+                        self.output_dir / f".{output_base}.{page_num}.partial.pdf"
+                    )
+                    if not self.secure_output:
+                        temporary_paths.append(temporary)
+                    else:
+                        active_secure_paths.append(out_path)
                     writer = QPdfWriter(str(temporary))
                     layout = writer.pageLayout()
                     layout.setPageSize(physical_page(self.assembler.sheet_w_mm, self.assembler.sheet_h_mm))
@@ -226,8 +261,10 @@ class PageRenderWorker(QThread):
                         inject_pdf_links(
                             temporary, links_by_face,
                             self.assembler.sheet_w, self.assembler.sheet_h,
+                            memory_only=self.secure_output,
                         )
-                    temporary.replace(out_path)
+                    if not self.secure_output:
+                        temporary.replace(out_path)
                     temporary_paths.clear()
                     final_names.append(out_path.name)
                 else:
@@ -236,8 +273,14 @@ class PageRenderWorker(QThread):
                     for face_index, image in enumerate(face_images):
                         suffix = suffixes[face_index]
                         out_path = self.output_dir / f"{output_base}{suffix}.png"
-                        temporary = self.output_dir / f".{output_base}{suffix}.{page_num}.partial.png"
-                        temporary_paths.append(temporary)
+                        temporary = (
+                            out_path if self.secure_output else
+                            self.output_dir / f".{output_base}{suffix}.{page_num}.partial.png"
+                        )
+                        if not self.secure_output:
+                            temporary_paths.append(temporary)
+                        else:
+                            active_secure_paths.append(out_path)
                         if not image.save(str(temporary), "PNG"):
                             raise OSError(tr("Não foi possível gravar {arquivo}.").format(arquivo=out_path))
                         staged.append((temporary, out_path))
@@ -246,9 +289,11 @@ class PageRenderWorker(QThread):
                             temporary.unlink(missing_ok=True)
                         break
                     for temporary, out_path in staged:
-                        temporary.replace(out_path)
+                        if not self.secure_output:
+                            temporary.replace(out_path)
                         final_names.append(out_path.name)
                     temporary_paths.clear()
+                active_secure_paths = []
 
                 num_cards = sum(task is not None for task in page_task["front"])
                 msg = tr("🖨️ FOLHA {folha:02d} OK ({itens} itens)").format(folha=page_num, itens=num_cards)
@@ -263,7 +308,140 @@ class PageRenderWorker(QThread):
             writer = None
             for path in temporary_paths:
                 path.unlink(missing_ok=True)
+            for path in active_secure_paths:
+                path.unlink(missing_ok=True)
             self.error_occurred.emit(tr("Erro no processamento: {erro}\n{detalhes}").format(erro=e, detalhes=traceback.format_exc()))
+
+
+class SecureGroupedPdfWorker(QThread):
+    """Monta o PDF final protegido sem materializar cartões ou folhas em cache."""
+
+    progress = Signal(int, str)
+    finished_assembly = Signal(str)
+    error_occurred = Signal(str)
+
+    def __init__(self, tasks, renderers, output_dir, imposition_settings,
+                 target_w_mm, target_h_mm):
+        super().__init__()
+        self.tasks = list(tasks)
+        self.renderers = [renderer.fork() for renderer in renderers]
+        self.output_dir = output_dir
+        self.settings = dict(imposition_settings or {})
+        self.target_w_mm = target_w_mm
+        self.target_h_mm = target_h_mm
+        self.is_imposition = bool(self.settings.get("enabled", False))
+        self._is_running = True
+
+    def stop(self):
+        self._is_running = False
+
+    def run(self):
+        output_path = self.output_dir / (
+            f"{self.output_dir.name}_Imposicao.pdf" if self.is_imposition
+            else f"{self.output_dir.name}_Completo.pdf"
+        )
+        painter = writer = layout = None
+        try:
+            writer = QPdfWriter(str(output_path))
+            layout = writer.pageLayout()
+            layout.setMargins(QMarginsF(0, 0, 0, 0))
+            links_by_page = {}
+            page_number = 0
+            first_page = True
+
+            if self.is_imposition:
+                settings = dict(self.settings)
+                settings["duplex"] = len(self.renderers) > 1
+                plan = build_imposition_plan(self.tasks, settings)
+                layout.setPageSize(physical_page(
+                    plan.assembler.sheet_w_mm, plan.assembler.sheet_h_mm,
+                ))
+                writer.setPageLayout(layout)
+                painter = pdf_painter(writer)
+                for sheet in plan.sheets:
+                    faces = [(0, sheet.front)]
+                    if sheet.back is not None:
+                        faces.append((1, sheet.back))
+                    for face_index, slots in faces:
+                        if not self._is_running:
+                            raise InterruptedError
+                        if not first_page:
+                            writer.newPage()
+                        first_page = False
+                        renderer = self.renderers[face_index]
+                        card_images, card_links = [], []
+                        for task in slots:
+                            if task is None:
+                                card_images.append(None)
+                                card_links.append([])
+                                continue
+                            _, _, _, row_plain, row_rich, _ = task
+                            local_links = []
+                            card_images.append(renderer.render_to_qimage(
+                                row_plain, row_rich, out_links=local_links,
+                            ))
+                            card_links.append(local_links)
+                        sheet_links = []
+                        canvas = renderer.tpl.get("canvas_size", {})
+                        image = plan.assembler.render_sheet(
+                            card_images, preserve_slots=plan.duplex,
+                            card_links=card_links,
+                            canvas_size=(canvas.get("w", 1000), canvas.get("h", 1000)),
+                            out_links=sheet_links,
+                            rotate_cards_180=(
+                                plan.duplex and face_index == 1
+                                and plan.assembler.orientation == QPageLayout.Orientation.Landscape
+                            ),
+                        )
+                        painter.drawImage(layout.paintRectPixels(writer.resolution()), image)
+                        links_by_page[page_number] = sheet_links
+                        page_number += 1
+                    completed = sum(task is not None for task in sheet.front)
+                    self.progress.emit(completed, tr("🖨️ FOLHA {folha:02d} OK ({itens} itens)").format(
+                        folha=sheet.number, itens=completed,
+                    ))
+                link_canvas = (plan.assembler.sheet_w, plan.assembler.sheet_h)
+            else:
+                layout.setPageSize(physical_page(self.target_w_mm, self.target_h_mm))
+                writer.setPageLayout(layout)
+                painter = pdf_painter(writer)
+                for original_idx, _source_row, _copy_index, row_plain, row_rich, filename in self.tasks:
+                    if not self._is_running:
+                        raise InterruptedError
+                    for renderer in self.renderers:
+                        if not first_page:
+                            writer.newPage()
+                        first_page = False
+                        local_links = []
+                        image = renderer.render_to_qimage(
+                            row_plain, row_rich, out_links=local_links,
+                        )
+                        painter.drawImage(layout.paintRectPixels(writer.resolution()), image)
+                        links_by_page[page_number] = local_links
+                        page_number += 1
+                    self.progress.emit(1, tr("Salvo no PDF agrupado: {arquivo}").format(arquivo=filename))
+                canvas = self.renderers[0].tpl.get("canvas_size", {})
+                link_canvas = (canvas.get("w", 1000), canvas.get("h", 1000))
+
+            painter.end()
+            painter = None
+            writer = layout = None
+            if links_by_page:
+                inject_pdf_links(
+                    output_path, links_by_page, *link_canvas, memory_only=True,
+                )
+            self.finished_assembly.emit(output_path.name)
+        except InterruptedError:
+            if painter is not None and painter.isActive():
+                painter.end()
+            painter = writer = layout = None
+            output_path.unlink(missing_ok=True)
+        except Exception as exc:
+            if painter is not None and painter.isActive():
+                painter.end()
+            painter = writer = layout = None
+            output_path.unlink(missing_ok=True)
+            self.error_occurred.emit(str(exc))
             
             
 class HybridAssemblerWorker(QThread):

@@ -1,3 +1,4 @@
+from io import BytesIO
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
@@ -31,11 +32,14 @@ def _pdf_link_rect(page, rect, canvas_width, canvas_height):
     return x0, y0, x1, y1
 
 
-def inject_pdf_links(pdf_path, links_by_page, canvas_width, canvas_height):
-    """Adiciona hyperlinks a um PDF pronto e o substitui de forma atômica.
+def inject_pdf_links(
+    pdf_path, links_by_page, canvas_width, canvas_height, *, memory_only=False,
+):
+    """Adiciona hyperlinks a um PDF pronto.
 
     ``links_by_page`` mapeia o índice (base zero) de cada página para uma lista
-    de dicionários com ``rect`` (QRectF) e ``url``.
+    de dicionários com ``rect`` (QRectF) e ``url``. O modo comum usa troca
+    atômica; ``memory_only`` evita criar uma segunda cópia sensível no disco.
     """
     if not links_by_page:
         return 0
@@ -77,11 +81,19 @@ def inject_pdf_links(pdf_path, links_by_page, canvas_width, canvas_height):
                     inserted_links += 1
 
             if inserted_links:
-                with temp_path.open("wb") as output_file:
-                    writer.write(output_file)
+                if memory_only:
+                    output = BytesIO()
+                    writer.write(output)
+                    rewritten = output.getvalue()
+                else:
+                    with temp_path.open("wb") as output_file:
+                        writer.write(output_file)
 
         if inserted_links:
-            temp_path.replace(pdf_path)
+            if memory_only:
+                pdf_path.write_bytes(rewritten)
+            else:
+                temp_path.replace(pdf_path)
         return inserted_links
     finally:
         if temp_path.exists():

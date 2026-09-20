@@ -6,13 +6,15 @@ import tempfile
 import copy
 import time
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
+from uuid import uuid4
+from shiboken6 import isValid
 from PySide6.QtWidgets import (QMainWindow, QWidget, QHBoxLayout, QVBoxLayout,
                                 QSplitter, QPushButton, QApplication, QMessageBox,
                                   QLineEdit, QLabel, QFileDialog, QProgressBar,
-                                  QComboBox, QTableWidgetItem)
+                                  QComboBox, QTableWidgetItem, QInputDialog)
 from PySide6.QtCore import Qt, QSignalBlocker, QTimer, QThread
-from PySide6.QtGui import QPainter, QImage, QIcon, QPageLayout, QPalette, QColor, QBrush
+from PySide6.QtGui import QPainter, QImage, QPixmap, QIcon, QPageLayout, QPalette, QColor, QBrush
 
 from features.preview.preview_panel import PreviewPanel
 from features.preview.sheet_preview_worker import SheetPreviewWorker
@@ -32,6 +34,23 @@ from core.settings import get_app_settings
 from core.render_cache import ensure_background_proxy, get_thumbnail_cache_path
 from core.resources import object_icon_path
 from core.output_folders import create_forge_output_dir
+from core.model_library import LibraryModel, scan_model_library
+from core.fornax_container import (
+    FULL_MODE, PUBLIC_MODE,
+    SIGNATURES_MODE,
+    FornaxError,
+    inspect_fornax,
+    open_public_fornax,
+    password_bytes,
+    save_public_fornax,
+    save_protected_fornax,
+    unlock_fornax,
+)
+from core.fornax_session import AccessState, FornaxSessionManager
+from core.legacy_migration import migrate_legacy_model
+from core.fornax_export import ExportRequest, export_models
+from core.fornax_import import import_candidate, import_legacy_document, open_import_package
+from core.file_transactions import file_sha256
 from core.dynamic_images import dynamic_image_fields, resolve_dynamic_image
 from core.themes import themed_style, theme_color
 from core.i18n import tr
@@ -41,7 +60,6 @@ from core.model_document import (
     V4_FILENAME,
     adapt_model_page,
     document_signatures,
-    install_model_directory,
     iter_page_link_items,
     load_model_document,
     normalize_model_document,
@@ -143,6 +161,19 @@ class MainWindow(QMainWindow):
         self.preview_renderer = None
         self._preview_renderers = []
         self.settings = get_app_settings()
+        self._fornax_sessions = FornaxSessionManager()
+        self._session_maintenance_timer = QTimer(self)
+        self._session_maintenance_timer.setInterval(1000)
+        self._session_clock_sample = (time.monotonic(), time.time())
+        self._session_maintenance_timer.timeout.connect(self._maintain_fornax_sessions)
+        self._session_maintenance_timer.start()
+        self._library_models_by_key = {}
+        self._active_library_model = None
+        self._fornax_asset_provider = None
+        self._protected_preview_memory_only = False
+        self._active_fornax_status = None
+        self._external_models_dir = tempfile.TemporaryDirectory(prefix="fornax_external_")
+        self._pending_external_files = []
 
         self._initialize_theme()
         from .frontend import install_frontend
@@ -221,8 +252,19 @@ class MainWindow(QMainWindow):
         from core.themes import theme_manager
         theme_manager().initialize(self.settings)
 
+    def _maintain_fornax_sessions(self):
+        now = (time.monotonic(), time.time())
+        previous = self._session_clock_sample
+        self._session_clock_sample = now
+        # Relógios divergentes indicam suspensão ou ajuste do relógio do SO.
+        # Em ambos os casos descarte apenas sessões fora do modelo ativo.
+        if abs((now[1] - previous[1]) - (now[0] - previous[0])) > 5:
+            self._fornax_sessions.suspend()
+        self._fornax_sessions.expire_due()
+
     def closeEvent(self, event):
         """Salva a posição, tamanho e estado do splitter ao fechar o programa."""
+        self._session_maintenance_timer.stop()
         self.settings.setValue("geometry", self.saveGeometry())
         self.settings.setValue("splitterState", self.splitter.saveState())
         self._stop_sheet_preview_worker(wait=True)
@@ -236,7 +278,138 @@ class MainWindow(QMainWindow):
         for directory in ({self._sheet_preview_dir} | self._stale_sheet_preview_dirs):
             if directory:
                 shutil.rmtree(directory, ignore_errors=True)
+        if self.manager is not None and self.manager._is_running:
+            self.manager.stop()
+        self._sheet_preview_revision += 1
+        self._sheet_preview_paths.clear()
+        self.preview_panel.set_preview_text("")
+        self._preview_renderers = []
+        self.preview_renderer = None
+        self.cached_model_document = None
+        self.cached_model_data = None
+        self._fornax_asset_provider = None
+        self._pending_external_files.clear()
+        self._fornax_sessions.close()
+        self._external_models_dir.cleanup()
         super().closeEvent(event)
+
+    def handle_external_files(self, paths):
+        self.showNormal()
+        self.raise_()
+        self.activateWindow()
+        for path in paths:
+            self.handle_external_file(path)
+
+    def handle_external_file(self, path):
+        try:
+            source = Path(path).expanduser().resolve(strict=True)
+        except (OSError, RuntimeError):
+            QMessageBox.warning(self, tr("Arquivo inválido"), tr("O arquivo solicitado não existe."))
+            return
+        if source.suffix.lower() not in {".fornax", ".zip"} or not source.is_file():
+            QMessageBox.warning(
+                self, tr("Arquivo inválido"),
+                tr("Selecione um arquivo .fornax ou um lote .zip."),
+            )
+            return
+        editor = getattr(self, "editor_window", None)
+        if editor is not None and isValid(editor) and editor.isVisible():
+            value = str(source)
+            if value not in self._pending_external_files:
+                self._pending_external_files.append(value)
+            QMessageBox.information(
+                editor, tr("Arquivo aguardando"),
+                tr("O arquivo será aberto quando a edição atual for encerrada. Suas alterações não foram afetadas."),
+            )
+            return
+        if source.suffix.lower() == ".zip":
+            self._dispatch_import_path(str(source))
+            return
+
+        library_model = self._matching_library_model(source)
+        if library_model is not None:
+            index = self.preview_panel.cbo_models.findData(library_model.key)
+            if index >= 0:
+                if index == self.preview_panel.cbo_models.currentIndex():
+                    # O arquivo já está aberto; não refazer desbloqueio/render.
+                    self.log_panel.append(
+                        tr("Modelo já presente na biblioteca: {nome}").format(
+                            nome=library_model.display_name,
+                        )
+                    )
+                else:
+                    self.preview_panel.cbo_models.setCurrentIndex(index)
+                return
+
+        prompt = QMessageBox(self)
+        prompt.setWindowTitle(tr("Abrir modelo FORNAX"))
+        prompt.setText(tr("Deseja adicionar este modelo à sua biblioteca?"))
+        add_button = prompt.addButton(
+            tr("Adicionar à biblioteca"), QMessageBox.ButtonRole.AcceptRole,
+        )
+        temporary_button = prompt.addButton(
+            tr("Abrir sem adicionar"), QMessageBox.ButtonRole.ActionRole,
+        )
+        prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+        prompt.exec()
+        if prompt.clickedButton() is add_button:
+            self._on_import_fornax(str(source))
+        elif prompt.clickedButton() is temporary_button:
+            self._open_temporary_fornax(source)
+
+    def _matching_library_model(self, source: Path) -> LibraryModel | None:
+        """Reconhece o próprio arquivo ou uma cópia da mesma revisão."""
+        source = source.resolve()
+        for model in self._library_models_by_key.values():
+            if not model.is_fornax:
+                continue
+            try:
+                if source.samefile(model.path):
+                    return model
+            except OSError:
+                if source == model.path.resolve():
+                    return model
+        try:
+            descriptor = inspect_fornax(source)
+        except Exception:
+            return None
+        for model in self._library_models_by_key.values():
+            current = model.descriptor
+            if (model.is_fornax and current is not None
+                    and current.model_id == descriptor.model_id
+                    and current.revision_id == descriptor.revision_id):
+                return model
+        return None
+
+    def _open_temporary_fornax(self, source: Path):
+        destination = Path(self._external_models_dir.name) / f"{uuid4().hex}.fornax"
+        shutil.copyfile(source, destination)
+        descriptor = inspect_fornax(destination)
+        if descriptor.mode == FULL_MODE:
+            name = source.stem
+        else:
+            name = str(open_public_fornax(descriptor).document().get("name") or source.stem)
+        display_name = tr("{nome} (temporário)").format(nome=name)
+        key = f"external:{uuid4()}"
+        model = LibraryModel(key, display_name, destination, "fornax", descriptor)
+        self._library_models_by_key[key] = model
+        self.preview_panel.cbo_models.addItem(display_name, key)
+        self.preview_panel.cbo_models.setCurrentIndex(
+            self.preview_panel.cbo_models.findData(key)
+        )
+        self.log_panel.append(tr("Modelo aberto temporariamente: {nome}").format(nome=name))
+
+    def _connect_editor_lifecycle(self):
+        editor = getattr(self, "editor_window", None)
+        if editor is not None:
+            editor.closed.connect(self._process_pending_external_files)
+
+    def _process_pending_external_files(self):
+        if not self._pending_external_files:
+            return
+        pending = self._pending_external_files[:]
+        self._pending_external_files.clear()
+        QTimer.singleShot(0, lambda: self.handle_external_files(pending))
 
     def _reload_models_from_disk(self, select_name: str | None = None):
         self.preview_panel.cbo_models.blockSignals(True)
@@ -245,17 +418,10 @@ class MainWindow(QMainWindow):
         models_dir = get_models_dir()
         models_dir.mkdir(parents=True, exist_ok=True)
 
-        found = []
-        for folder in sorted(models_dir.iterdir()):
-            if not folder.is_dir(): continue
-            try:
-                data = load_model_document(folder)
-                found.append((folder.name, data.get("name", folder.name)))
-            except Exception:
-                continue
-
-        for model_id, name in found:
-            self.preview_panel.cbo_models.addItem(name, model_id)
+        found = scan_model_library(models_dir, legacy_loader=load_model_document)
+        self._library_models_by_key = {model.key: model for model in found}
+        for model in found:
+            self.preview_panel.cbo_models.addItem(model.display_name, model.key)
 
         self.preview_panel.cbo_models.blockSignals(False)
 
@@ -280,9 +446,181 @@ class MainWindow(QMainWindow):
         else:
             self._on_model_changed("")
 
+    def _current_library_entry(self) -> LibraryModel | None:
+        key = self.preview_panel.cbo_models.currentData()
+        return self._library_models_by_key.get(str(key)) if key is not None else None
+
+    def _request_fornax_password(self, title: str) -> str | None:
+        password, accepted = QInputDialog.getText(
+            self, title, tr("Senha do modelo:"), QLineEdit.EchoMode.Password,
+        )
+        return password if accepted else None
+
+    def _request_new_fornax_password(self) -> str | None:
+        while True:
+            password, accepted = QInputDialog.getText(
+                self, tr("Criar senha"),
+                tr("Digite uma senha de 8 a 64 caracteres:"),
+                QLineEdit.EchoMode.Password,
+            )
+            if not accepted:
+                return None
+            confirmation, accepted = QInputDialog.getText(
+                self, tr("Confirmar senha"), tr("Digite novamente a senha:"),
+                QLineEdit.EchoMode.Password,
+            )
+            if not accepted:
+                return None
+            try:
+                normalized_password = password_bytes(password)
+                normalized_confirmation = password_bytes(confirmation)
+            except FornaxError as error:
+                QMessageBox.warning(self, tr("Senha inválida"), str(error))
+                continue
+            if normalized_password != normalized_confirmation:
+                QMessageBox.warning(
+                    self, tr("Senha inválida"),
+                    tr("As senhas informadas não coincidem."),
+                )
+                continue
+            return password
+
+    def _legacy_migration_credentials(self, document):
+        if not document_signatures(document):
+            return PUBLIC_MODE, None
+        prompt = QMessageBox(self)
+        prompt.setWindowTitle(tr("Proteção do modelo"))
+        prompt.setText(tr(
+            "Este modelo antigo possui assinaturas. Cadastre uma senha para convertê-lo com segurança."
+        ))
+        signatures_button = prompt.addButton(
+            tr("Proteger assinaturas"), QMessageBox.ButtonRole.AcceptRole,
+        )
+        full_button = prompt.addButton(
+            tr("Proteger modelo inteiro"), QMessageBox.ButtonRole.ActionRole,
+        )
+        prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+        prompt.exec()
+        clicked = prompt.clickedButton()
+        if clicked is signatures_button:
+            mode = SIGNATURES_MODE
+        elif clicked is full_button:
+            mode = FULL_MODE
+        else:
+            return None
+        password = self._request_new_fornax_password()
+        return (mode, password) if password is not None else None
+
+    def _migrate_selected_legacy(self, model: LibraryModel) -> bool:
+        try:
+            document = load_model_document(model.path)
+            credentials = self._legacy_migration_credentials(document)
+            if credentials is None:
+                return False
+            mode, password = credentials
+            result = migrate_legacy_model(
+                model.path, get_models_dir(), mode=mode, password=password,
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self, tr("Falha na conversão"),
+                tr("O modelo antigo foi preservado e não pôde ser convertido:\n{erro}").format(
+                    erro=error,
+                ),
+            )
+            return False
+        try:
+            if mode == PUBLIC_MODE:
+                self._fornax_sessions.select(result.destination)
+            else:
+                self._fornax_sessions.unlock(result.destination, password)
+        except Exception as error:
+            self.log_panel.append(
+                tr("O modelo foi convertido, mas precisará ser aberto novamente: {erro}").format(
+                    erro=error,
+                )
+            )
+        self.log_panel.append(
+            tr("Modelo convertido para .fornax: {nome}").format(nome=model.display_name)
+        )
+        if not result.cleanup_complete:
+            QMessageBox.warning(
+                self, tr("Conversão concluída com pendência"),
+                tr("O arquivo .fornax foi criado e validado, mas alguns arquivos antigos mudaram ou não puderam ser removidos. O programa manterá somente o novo modelo na biblioteca."),
+            )
+        self._reload_models_from_disk(select_name=model.display_name)
+        return True
+
+    def _open_selected_fornax(self, model: LibraryModel):
+        status = self._fornax_sessions.select(model.path)
+        if status.state in {
+            AccessState.PUBLIC_ACTIVE,
+            AccessState.AUTHORIZED_ACTIVE,
+            AccessState.SIGNATURE_FREE_COPY,
+        }:
+            return self._fornax_sessions.document(), self._fornax_sessions.asset, status
+
+        if status.descriptor.mode == SIGNATURES_MODE:
+            prompt = QMessageBox(self)
+            prompt.setWindowTitle(tr("Modelo protegido"))
+            prompt.setText(tr("Este modelo possui assinaturas protegidas."))
+            unlock_button = prompt.addButton(tr("Desbloquear"), QMessageBox.ButtonRole.AcceptRole)
+            public_button = prompt.addButton(
+                tr("Abrir sem assinaturas"), QMessageBox.ButtonRole.ActionRole
+            )
+            prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+            prompt.exec()
+            clicked = prompt.clickedButton()
+            if clicked is public_button:
+                status = self._fornax_sessions.open_without_signatures(model.path)
+                return self._fornax_sessions.document(), self._fornax_sessions.asset, status
+            if clicked is not unlock_button:
+                return None
+        elif status.descriptor.mode == FULL_MODE:
+            answer = QMessageBox.question(
+                self, tr("Modelo protegido"),
+                tr("Este modelo está integralmente protegido. Deseja desbloqueá-lo?"),
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return None
+
+        password = self._request_fornax_password(tr("Desbloquear modelo"))
+        if password is None:
+            return None
+        try:
+            status = self._fornax_sessions.unlock(model.path, password)
+        except FornaxError as error:
+            QMessageBox.warning(self, tr("Não foi possível desbloquear"), str(error))
+            return None
+        if status.public_changed:
+            answer = QMessageBox.warning(
+                self, tr("Possível alteração externa"),
+                tr("Foi identificada uma possível alteração no conteúdo deste modelo desde o último salvamento protegido. Confira os textos, imagens e configurações antes de gerar materiais."),
+                QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Ok:
+                self._fornax_sessions.forget(model.path)
+                return None
+        return self._fornax_sessions.document(), self._fornax_sessions.asset, status
+
+    def _approve_shared_model(self, opened):
+        """Não redefine a referência autenticada sem revisão explícita."""
+        if not opened.public_changed:
+            return True
+        return QMessageBox.warning(
+            self, tr("Possível alteração externa"),
+            tr("Foi identificada uma possível alteração no conteúdo deste modelo desde o último salvamento protegido. Confira os textos, imagens e configurações antes de gerar materiais."),
+            QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        ) == QMessageBox.StandardButton.Ok
+
     def _on_add_model(self):
         self.editor_window = EditorWindow(self)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
+        self._connect_editor_lifecycle()
         self.editor_window.show()
 
     def _on_duplicate_model(self):
@@ -290,6 +628,47 @@ class MainWindow(QMainWindow):
         
         if not original_name:
             QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo para duplicar."))
+            return
+
+        library_model = self._current_library_entry()
+        if library_model is not None and library_model.is_fornax:
+            counter = 1
+            while True:
+                suffix = " (Cópia)" if counter == 1 else f" (Cópia {counter})"
+                new_name = f"{original_name}{suffix}"
+                new_path = get_models_dir() / f"{slugify_model_name(new_name)}.fornax"
+                if not new_path.exists() and not new_path.with_suffix("").exists():
+                    break
+                counter += 1
+            try:
+                descriptor = library_model.descriptor
+                if descriptor.mode == "none":
+                    opened = open_public_fornax(descriptor)
+                    document = opened.document()
+                    document["name"] = new_name
+                    save_public_fornax(
+                        document, new_path, asset_provider=opened.asset,
+                    )
+                else:
+                    password = self._request_fornax_password(tr("Duplicar modelo protegido"))
+                    if password is None:
+                        return
+                    opened = unlock_fornax(descriptor, password)
+                    if not self._approve_shared_model(opened):
+                        return
+                    document = opened.document()
+                    document["name"] = new_name
+                    save_protected_fornax(
+                        document, new_path, password, mode=descriptor.mode,
+                        asset_provider=opened.asset,
+                    )
+                self.log_panel.append(tr("Modelo duplicado: '{nome}'").format(nome=new_name))
+                self._reload_models_from_disk(select_name=new_name)
+            except Exception as error:
+                QMessageBox.critical(
+                    self, tr("Erro"),
+                    tr("Falha ao duplicar modelo:\n{erro}").format(erro=error),
+                )
             return
 
         original_slug = slugify_model_name(original_name)
@@ -332,6 +711,14 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo para renomear."))
             return
 
+        current = self._current_library_entry()
+        if current is not None and current.key.startswith("external:"):
+            QMessageBox.information(
+                self, tr("Modelo temporário"),
+                tr("Para preservar o arquivo recebido, duplique o modelo ou abra o editor e salve-o como um novo modelo da biblioteca."),
+            )
+            return
+
         new_name, ok = dialog_get_text(
             self, tr("Renomear modelo"), tr("Novo nome:"), text=old_name
         )
@@ -340,6 +727,53 @@ class MainWindow(QMainWindow):
         
         new_name = new_name.strip()
         if new_name == old_name:
+            return
+
+        library_model = self._current_library_entry()
+        if library_model is not None and library_model.is_fornax:
+            new_path = get_models_dir() / f"{slugify_model_name(new_name)}.fornax"
+            if new_path != library_model.path and new_path.exists():
+                QMessageBox.warning(self, tr("Erro"), tr("Já existe um modelo com esse nome."))
+                return
+            try:
+                descriptor = library_model.descriptor
+                password = None
+                if descriptor.mode == "none":
+                    opened = open_public_fornax(descriptor)
+                else:
+                    password = self._request_fornax_password(tr("Renomear modelo protegido"))
+                    if password is None:
+                        return
+                    opened = unlock_fornax(descriptor, password)
+                    if not self._approve_shared_model(opened):
+                        return
+                document = opened.document()
+                document["name"] = new_name
+                if descriptor.mode == "none":
+                    save_public_fornax(
+                        document, new_path, asset_provider=opened.asset,
+                        model_id=descriptor.model_id,
+                    )
+                else:
+                    save_protected_fornax(
+                        document, new_path, password, mode=descriptor.mode,
+                        asset_provider=opened.asset, model_id=descriptor.model_id,
+                    )
+                if new_path != library_model.path:
+                    library_model.path.unlink()
+                    self._fornax_sessions.forget(library_model.path)
+                self.log_panel.append(
+                    tr("Modelo renomeado: '{anterior}' → '{novo}'").format(
+                        anterior=old_name, novo=new_name,
+                    )
+                )
+                self._reload_models_from_disk(select_name=new_name)
+            except Exception as error:
+                if new_path != library_model.path:
+                    new_path.unlink(missing_ok=True)
+                QMessageBox.critical(
+                    self, tr("Erro"), tr("Falha ao renomear: {erro}").format(erro=error),
+                )
             return
 
         old_slug = slugify_model_name(old_name)
@@ -389,8 +823,9 @@ class MainWindow(QMainWindow):
         model_name = (self.preview_panel.cbo_models.currentText() or "").strip()
         if not model_name: return
 
+        library_model = self._current_library_entry()
         slug = slugify_model_name(model_name)
-        model_dir = get_models_dir() / slug
+        model_dir = library_model.path if library_model is not None else get_models_dir() / slug
 
         if not model_dir.exists(): return
 
@@ -398,7 +833,11 @@ class MainWindow(QMainWindow):
         if resp != QMessageBox.StandardButton.Yes: return
 
         try:
-            shutil.rmtree(model_dir)
+            if model_dir.is_dir():
+                shutil.rmtree(model_dir)
+            else:
+                model_dir.unlink()
+                self._fornax_sessions.forget(model_dir)
         except Exception as e:
             QMessageBox.critical(self, tr("Erro"), tr("Falha ao excluir: {erro}").format(erro=e))
             return
@@ -409,16 +848,290 @@ class MainWindow(QMainWindow):
         self._reload_models_from_disk()
 
     def _on_import_models(self):
-        file_path, _ = QFileDialog.getOpenFileName(self, tr("Importar modelos"), "", tr("Pacotes de modelos ZIP (*.zip)"))
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, tr("Importar modelos"), "",
+            tr("Modelos FORNAX (*.fornax *.zip)"),
+        )
         if not file_path: return
+
+        self._dispatch_import_path(file_path)
+
+    def _dispatch_import_path(self, file_path):
+
+        path = Path(file_path)
+        modern = path.suffix.lower() == ".fornax"
+        if path.suffix.lower() == ".zip":
+            try:
+                with zipfile.ZipFile(path, "r") as archive:
+                    names = [info.filename for info in archive.infolist()]
+                modern = bool(names) and all(
+                    "/" not in name and "\\" not in name
+                    and Path(name).suffix.lower() == ".fornax"
+                    for name in names
+                )
+            except (OSError, zipfile.BadZipFile):
+                modern = True
+        if modern:
+            self._on_import_fornax(file_path)
+        else:
+            self._on_import_legacy_zip(file_path)
+
+    def _on_import_fornax(self, file_path):
+        try:
+            models_dir = get_models_dir()
+            with open_import_package(file_path) as candidates:
+                existing_slugs = {
+                    slugify_model_name(model.display_name)
+                    for model in self._library_models_by_key.values()
+                }
+                modes = {
+                    PUBLIC_MODE: tr("Sem proteção"),
+                    SIGNATURES_MODE: tr("Assinaturas protegidas"),
+                    FULL_MODE: tr("Modelo integralmente protegido"),
+                }
+                dialog_models = [
+                    (candidate.entry_name, candidate.display_name, modes[candidate.descriptor.mode])
+                    for candidate in candidates
+                ]
+                dlg = ImportModelsDialog(self, dialog_models, existing_slugs)
+                if not dlg.exec():
+                    return
+                decisions = dlg.get_decisions()
+                selected = [
+                    candidate for candidate in candidates
+                    if decisions.get(candidate.entry_name, {}).get("import")
+                    and decisions[candidate.entry_name]["action"] != "ignore"
+                ]
+                if not selected:
+                    return
+
+                protected = [
+                    candidate for candidate in selected
+                    if candidate.descriptor.mode != PUBLIC_MODE
+                ]
+                include_signatures = False
+                if protected:
+                    prompt = QMessageBox(self)
+                    prompt.setWindowTitle(tr("Importar modelos protegidos"))
+                    prompt.setText(tr("Deseja incorporar as assinaturas protegidas?"))
+                    include_button = prompt.addButton(
+                        tr("Importar com assinaturas"), QMessageBox.ButtonRole.AcceptRole,
+                    )
+                    remove_button = prompt.addButton(
+                        tr("Importar sem assinaturas"), QMessageBox.ButtonRole.ActionRole,
+                    )
+                    prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+                    prompt.exec()
+                    if prompt.clickedButton() is include_button:
+                        include_signatures = True
+                    elif prompt.clickedButton() is not remove_button:
+                        return
+
+                must_unlock = [
+                    candidate for candidate in protected
+                    if include_signatures or candidate.descriptor.mode == FULL_MODE
+                ]
+                common_transport = None
+                if must_unlock:
+                    common_transport = self._request_fornax_password(
+                        tr("Senha recebida com a exportação")
+                    )
+                    if common_transport is None:
+                        return
+
+                authorized = {}
+                skipped = []
+                signature_choice = {
+                    candidate.entry_name: include_signatures for candidate in selected
+                }
+                for candidate in must_unlock:
+                    password = common_transport
+                    while True:
+                        try:
+                            approved_hash = file_sha256(candidate.path)
+                            opened = unlock_fornax(candidate.descriptor, password)
+                            if not self._approve_shared_model(opened):
+                                skipped.append(candidate.entry_name)
+                                break
+                            # Não reter documentos/assets de todo o lote decifrados.
+                            authorized[candidate.entry_name] = (password, approved_hash)
+                            opened = None
+                            break
+                        except FornaxError:
+                            retry = QMessageBox(self)
+                            retry.setWindowTitle(tr("Senha inválida"))
+                            retry.setText(tr("Não foi possível desbloquear '{nome}'.").format(
+                                nome=candidate.display_name,
+                            ))
+                            retry_button = retry.addButton(
+                                tr("Tentar outra senha"), QMessageBox.ButtonRole.AcceptRole,
+                            )
+                            without_button = None
+                            if candidate.descriptor.mode == SIGNATURES_MODE:
+                                without_button = retry.addButton(
+                                    tr("Importar sem assinaturas"), QMessageBox.ButtonRole.ActionRole,
+                                )
+                            skip_button = retry.addButton(
+                                tr("Ignorar modelo"), QMessageBox.ButtonRole.DestructiveRole,
+                            )
+                            retry.addButton(tr("Cancelar importação"), QMessageBox.ButtonRole.RejectRole)
+                            retry.exec()
+                            clicked = retry.clickedButton()
+                            if clicked is retry_button:
+                                password = self._request_fornax_password(
+                                    tr("Senha recebida com a exportação")
+                                )
+                                if password is None:
+                                    return
+                                continue
+                            if without_button is not None and clicked is without_button:
+                                signature_choice[candidate.entry_name] = False
+                                break
+                            if clicked is skip_button:
+                                skipped.append(candidate.entry_name)
+                                break
+                            return
+
+                selected = [
+                    candidate for candidate in selected
+                    if candidate.entry_name not in skipped
+                ]
+                protected_local = [
+                    candidate for candidate in selected
+                    if candidate.descriptor.mode != PUBLIC_MODE
+                    and signature_choice[candidate.entry_name]
+                ]
+                local_passwords = {}
+                if protected_local:
+                    password_prompt = QMessageBox(self)
+                    password_prompt.setWindowTitle(tr("Nova proteção local"))
+                    password_prompt.setText(tr("Como deseja definir as novas senhas locais?"))
+                    common_button = password_prompt.addButton(
+                        tr("Usar a mesma senha"), QMessageBox.ButtonRole.AcceptRole,
+                    )
+                    individual_button = password_prompt.addButton(
+                        tr("Definir individualmente"), QMessageBox.ButtonRole.ActionRole,
+                    )
+                    password_prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+                    password_prompt.exec()
+                    clicked = password_prompt.clickedButton()
+                    if clicked is common_button:
+                        password = self._request_new_fornax_password()
+                        if password is None:
+                            return
+                        local_passwords = {
+                            candidate.entry_name: password for candidate in protected_local
+                        }
+                    elif clicked is individual_button:
+                        for candidate in protected_local:
+                            QMessageBox.information(
+                                self, tr("Nova senha local"),
+                                tr("Defina a senha local de '{nome}'.").format(
+                                    nome=candidate.display_name,
+                                ),
+                            )
+                            password = self._request_new_fornax_password()
+                            if password is None:
+                                skipped.append(candidate.entry_name)
+                                continue
+                            local_passwords[candidate.entry_name] = password
+                    else:
+                        return
+
+                imported = []
+                failures = []
+                for candidate in selected:
+                    if candidate.entry_name in skipped:
+                        continue
+                    decision = decisions[candidate.entry_name]
+                    target_name = candidate.display_name
+                    target_slug = slugify_model_name(target_name) or "modelo"
+                    conflict = (
+                        (models_dir / target_slug).exists()
+                        or (models_dir / f"{target_slug}.fornax").exists()
+                    )
+                    if decision["action"] == "rename" and conflict:
+                        base_name = tr("{nome} (Nova importação)").format(nome=target_name)
+                        target_name = base_name
+                        target_slug = slugify_model_name(target_name)
+                        counter = 2
+                        while (
+                            (models_dir / target_slug).exists()
+                            or (models_dir / f"{target_slug}.fornax").exists()
+                        ):
+                            target_name = f"{base_name} {counter}"
+                            target_slug = slugify_model_name(target_name)
+                            counter += 1
+                    destination = models_dir / f"{target_slug}.fornax"
+                    legacy_path = models_dir / target_slug
+                    try:
+                        import_candidate(
+                            candidate, destination,
+                            include_signatures=signature_choice[candidate.entry_name],
+                            transport_password=authorized.get(candidate.entry_name, (None, None))[0],
+                            approved_sha256=authorized.get(candidate.entry_name, (None, None))[1],
+                            local_password=local_passwords.get(candidate.entry_name),
+                            model_name=target_name,
+                            replace_existing=decision["action"] == "replace",
+                            legacy_source=(legacy_path if decision["action"] == "replace" and legacy_path.is_dir() else None),
+                        )
+                        if decision["action"] == "replace" and legacy_path.is_dir():
+                            failures.append(f"{target_name}: " + tr("Limpeza da pasta antiga pendente; os arquivos restantes foram preservados."))
+                        imported.append(target_name)
+                    except Exception as error:
+                        failures.append(f"{candidate.display_name}: {error}")
+
+            if imported:
+                self._reload_models_from_disk(select_name=imported[-1])
+                self.log_panel.append(
+                    tr("📥 {quantidade} modelo(s) incorporado(s) de: {arquivo}").format(
+                        quantidade=len(imported), arquivo=Path(file_path).name,
+                    )
+                )
+            report = []
+            if imported:
+                report.append(tr("Importados: {quantidade}").format(quantidade=len(imported)))
+            if skipped:
+                report.append(tr("Ignorados: {quantidade}").format(quantidade=len(skipped)))
+            if failures:
+                report.append(tr("Falhas:\n{falhas}").format(falhas="\n".join(failures)))
+            QMessageBox.information(
+                self, tr("Importação concluída"), "\n\n".join(report),
+            )
+        except Exception as error:
+            QMessageBox.critical(
+                self, tr("Falha na importação"),
+                tr("Não foi possível importar o pacote:\n{erro}").format(erro=error),
+            )
+
+    def _on_import_legacy_zip(self, file_path):
 
         try:
             models_dir = get_models_dir()
             
             # Etapa 1: Espionagem do ZIP (Leitura ultrarrápida de cabeçalhos sem extrair)
             with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                infos = zip_ref.infolist()
+                if len(infos) > 10000 or sum(info.file_size for info in infos) > 4 * 1024**3:
+                    raise ValueError(tr("O pacote legado excede os limites de segurança."))
+                seen_names = set()
+                for info in infos:
+                    member = PurePosixPath(info.filename)
+                    folded = info.filename.casefold()
+                    unix_mode = (info.external_attr >> 16) & 0o170000
+                    if (
+                        not info.filename or "\\" in info.filename or ":" in info.filename
+                        or any(ord(c) < 32 for c in info.filename)
+                        or member.as_posix() != info.filename.rstrip("/")
+                        or member.is_absolute() or ".." in member.parts
+                        or folded in seen_names or info.flag_bits & 0x1
+                        or info.compress_type not in {zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED}
+                        or unix_mode == 0o120000
+                    ):
+                        raise ValueError(tr("O pacote legado contém uma entrada insegura."))
+                    seen_names.add(folded)
                 # Descobre as pastas de modelo dentro do zip
-                top_level_folders = set(info.filename.split('/')[0] for info in zip_ref.infolist() if '/' in info.filename)
+                top_level_folders = set(info.filename.split('/')[0] for info in infos if '/' in info.filename)
                 names = set(zip_ref.namelist())
                 
                 models_in_zip = {} # Mapeamento (Nome Legível do JSON -> Nome da Pasta no Zip)
@@ -440,7 +1153,8 @@ class MainWindow(QMainWindow):
                     return
                 
                 # Etapa 2: Checagem de Conflitos e Abertura da Janela de Decisão
-                existing_slugs = set(d.name for d in models_dir.iterdir() if d.is_dir())
+                existing_slugs = {d.name if d.is_dir() else d.stem for d in models_dir.iterdir()
+                                  if d.is_dir() or d.suffix.lower() == ".fornax"}
                 
                 dlg = ImportModelsDialog(self, list(models_in_zip.keys()), existing_slugs)
                 if not dlg.exec():
@@ -450,6 +1164,7 @@ class MainWindow(QMainWindow):
                 
                 # Etapa 3: Extração Cirúrgica via Cache Temporário
                 imported_count = 0
+                failures = []
                 with tempfile.TemporaryDirectory() as temp_dir:
                     zip_ref.extractall(temp_dir)
                     
@@ -477,14 +1192,14 @@ class MainWindow(QMainWindow):
                         if decision["action"] == "rename":
                             # Validação dupla: Se por acaso o usuário marcou "Novo Nome" mas o arquivo 
                             # não era conflito, ele mantém o original. Se for conflito, roda a lógica.
-                            if (models_dir / target_slug).exists():
+                            if (models_dir / target_slug).exists() or (models_dir / f"{target_slug}.fornax").exists():
                                 counter = 1
                                 base_name = f"{model_name} (Nova Importação)"
                                 target_name = base_name
                                 target_slug = slugify_model_name(target_name)
                                 
                                 # Garante um nome livre na pasta de modelos (Ex: Nova Importação 2)
-                                while (models_dir / target_slug).exists():
+                                while (models_dir / target_slug).exists() or (models_dir / f"{target_slug}.fornax").exists():
                                     counter += 1
                                     target_name = f"{base_name} {counter}"
                                     target_slug = slugify_model_name(target_name)
@@ -495,13 +1210,23 @@ class MainWindow(QMainWindow):
                         imported_document["origin_info"] = build_model_snapshot(
                             imported_document, source="imported"
                         )
-                        save_model_document(imported_document, source_dir)
-                        
-                        # Instala a pasta completa e restaura a versão anterior se
-                        # houver falha durante a troca.
-                        target_dir = models_dir / target_slug
-                        install_model_directory(source_dir, target_dir)
-                        imported_count += 1
+                        try:
+                            credentials = self._legacy_migration_credentials(imported_document)
+                            if credentials is None:
+                                continue
+                            mode, password = credentials
+                            legacy_target = models_dir / target_slug
+                            import_legacy_document(
+                                imported_document, source_dir, models_dir / f"{target_slug}.fornax",
+                                mode=mode, password=password,
+                                replace_existing=decision["action"] == "replace",
+                                legacy_source=(legacy_target if decision["action"] == "replace" and legacy_target.is_dir() else None),
+                            )
+                            if decision["action"] == "replace" and legacy_target.is_dir():
+                                self.log_panel.append(tr("Limpeza da pasta antiga pendente; os arquivos restantes foram preservados."))
+                            imported_count += 1
+                        except Exception as error:
+                            failures.append(f"{model_name}: {error}")
             
             # Etapa 4: Finalização e Limpeza Automática do TempDir
             if imported_count > 0:
@@ -519,12 +1244,20 @@ class MainWindow(QMainWindow):
                 QMessageBox.information(self, tr("Importação concluída"), imported_message)
             else:
                 self.log_panel.append(tr("⚠️ Processo finalizado: nenhum modelo novo foi adicionado."))
+            if failures:
+                QMessageBox.warning(self, tr("Falha na importação"), "\n".join(failures))
                 
         except Exception as e:
             QMessageBox.critical(self, tr("Falha crítica"), tr("Falha ao processar o arquivo ZIP:\n{erro}").format(erro=e))
 
     def _on_export_models(self):
-        all_models = [self.preview_panel.cbo_models.itemText(i) for i in range(self.preview_panel.cbo_models.count())]
+        all_models = [
+            (
+                self.preview_panel.cbo_models.itemData(i),
+                self.preview_panel.cbo_models.itemText(i),
+            )
+            for i in range(self.preview_panel.cbo_models.count())
+        ]
         
         if not all_models:
             QMessageBox.warning(self, tr("Atenção"), tr("Nenhum modelo disponível para exportar."))
@@ -534,31 +1267,155 @@ class MainWindow(QMainWindow):
         if not dlg.exec():
             return
             
-        selected_models = dlg.get_selected_models()
-        if not selected_models:
+        selected_keys = dlg.get_selected_models()
+        if not selected_keys:
             QMessageBox.warning(self, tr("Atenção"), tr("Nenhum modelo foi selecionado para exportação."))
             return
-            
-        save_path, _ = QFileDialog.getSaveFileName(self, tr("Exportar modelos"), "Modelos_FORNAX_Forge.zip", tr("Arquivos ZIP (*.zip)"))
-        if not save_path: return
-        
+        selected = [
+            self._library_models_by_key[str(key)]
+            for key in selected_keys
+            if str(key) in self._library_models_by_key
+        ]
+        legacy = [model.display_name for model in selected if not model.is_fornax]
+        selected = [model for model in selected if model.is_fornax]
+        if legacy:
+            QMessageBox.warning(
+                self, tr("Modelos antigos não exportados"),
+                tr("Abra estes modelos uma vez para convertê-los antes da exportação:\n{modelos}").format(
+                    modelos="\n".join(legacy),
+                ),
+            )
+        if not selected:
+            return
+
+        protected = [model for model in selected if model.descriptor.mode != PUBLIC_MODE]
+        include_signatures = False
+        if protected:
+            prompt = QMessageBox(self)
+            prompt.setWindowTitle(tr("Exportar modelos protegidos"))
+            prompt.setText(tr("Deseja incluir as assinaturas protegidas na exportação?"))
+            include_button = prompt.addButton(
+                tr("Enviar com assinaturas"), QMessageBox.ButtonRole.AcceptRole,
+            )
+            remove_button = prompt.addButton(
+                tr("Enviar sem assinaturas"), QMessageBox.ButtonRole.ActionRole,
+            )
+            prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+            prompt.exec()
+            if prompt.clickedButton() is include_button:
+                include_signatures = True
+            elif prompt.clickedButton() is not remove_button:
+                return
+
+        common_password = None
+        if protected and (include_signatures or any(
+            model.descriptor.mode == FULL_MODE for model in protected
+        )):
+            common_password = self._request_fornax_password(
+                tr("Desbloquear modelos para exportação")
+            )
+            if common_password is None:
+                return
+
+        requests = []
+        skipped = []
+        for model in selected:
+            descriptor = model.descriptor
+            if descriptor.mode == PUBLIC_MODE:
+                requests.append(ExportRequest(model.path, model.display_name))
+                continue
+            include_for_model = include_signatures
+            needs_unlock = include_signatures or descriptor.mode == FULL_MODE
+            password = common_password if needs_unlock else None
+            opened = None
+            approved_hash = None
+            if needs_unlock:
+                while True:
+                    try:
+                        approved_hash = file_sha256(model.path)
+                        opened = unlock_fornax(descriptor, password)
+                        if not self._approve_shared_model(opened):
+                            skipped.append(model.display_name)
+                        break
+                    except FornaxError:
+                        retry = QMessageBox(self)
+                        retry.setWindowTitle(tr("Senha inválida"))
+                        retry.setText(tr("Não foi possível desbloquear '{nome}'.").format(
+                            nome=model.display_name,
+                        ))
+                        retry_button = retry.addButton(
+                            tr("Tentar outra senha"), QMessageBox.ButtonRole.AcceptRole,
+                        )
+                        without_button = None
+                        if descriptor.mode == SIGNATURES_MODE:
+                            without_button = retry.addButton(
+                                tr("Enviar sem assinaturas"), QMessageBox.ButtonRole.ActionRole,
+                            )
+                        skip_button = retry.addButton(
+                            tr("Ignorar modelo"), QMessageBox.ButtonRole.DestructiveRole,
+                        )
+                        retry.addButton(tr("Cancelar exportação"), QMessageBox.ButtonRole.RejectRole)
+                        retry.exec()
+                        clicked = retry.clickedButton()
+                        if clicked is retry_button:
+                            password = self._request_fornax_password(
+                                tr("Desbloquear modelo")
+                            )
+                            if password is None:
+                                return
+                            continue
+                        if without_button is not None and clicked is without_button:
+                            password = None
+                            include_for_model = False
+                            break
+                        if clicked is skip_button:
+                            skipped.append(model.display_name)
+                            break
+                        return
+                if model.display_name in skipped:
+                    continue
+            requests.append(ExportRequest(
+                model.path, model.display_name, local_password=password,
+                include_signatures=include_for_model, approved_sha256=approved_hash,
+            ))
+            opened = None
+        if not requests:
+            return
+
+        needs_transport_password = any(
+            request.include_signatures
+            and inspect_fornax(request.source).mode != PUBLIC_MODE
+            for request in requests
+        )
+        transport_password = None
+        if needs_transport_password:
+            QMessageBox.information(
+                self, tr("Senha de exportação"),
+                tr("Crie uma senha exclusiva para este envio. O destinatário usará essa senha apenas para importar os modelos."),
+            )
+            transport_password = self._request_new_fornax_password()
+            if transport_password is None:
+                return
+
+        single = len(requests) == 1
+        if single:
+            default_name = f"{slugify_model_name(requests[0].display_name)}.fornax"
+            file_filter = tr("Modelo FORNAX (*.fornax)")
+        else:
+            default_name = "Modelos_FORNAX_Forge.zip"
+            file_filter = tr("Arquivos ZIP (*.zip)")
+        save_path, _ = QFileDialog.getSaveFileName(
+            self, tr("Exportar modelos"), default_name, file_filter,
+        )
+        if not save_path:
+            return
+
         try:
-            models_dir = get_models_dir()
-            
-            with zipfile.ZipFile(save_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for model_name in selected_models:
-                    slug = slugify_model_name(model_name)
-                    model_dir = models_dir / slug
-                    if not model_dir.exists(): continue
-                    
-                    for root, dirs, files in os.walk(model_dir):
-                        dirs[:] = [d for d in dirs if d != ".render_cache"]
-                        for file in files:
-                            file_path = Path(root) / file
-                            arcname = Path(slug) / file_path.relative_to(model_dir)
-                            zipf.write(file_path, arcname)
-            
-            exported_count = len(selected_models)
+            exported = export_models(
+                requests, save_path, include_signatures=include_signatures,
+                transport_password=transport_password,
+            )
+            exported_count = len(exported)
             exported_log = (
                 tr("📤 1 modelo exportado para: {arquivo}") if exported_count == 1 else
                 tr("📤 {quantidade} modelos exportados para: {arquivo}").format(quantidade=exported_count)
@@ -569,14 +1426,27 @@ class MainWindow(QMainWindow):
                 tr("{quantidade} modelos exportados com sucesso!").format(quantidade=exported_count)
             )
             QMessageBox.information(self, tr("Sucesso"), exported_message)
+            if skipped:
+                QMessageBox.warning(
+                    self, tr("Modelos não exportados"),
+                    tr("Os seguintes modelos foram ignorados:\n{modelos}").format(
+                        modelos="\n".join(skipped),
+                    ),
+                )
         except Exception as e:
-            QMessageBox.critical(self, tr("Erro na exportação"), tr("Falha ao gerar o arquivo ZIP:\n{erro}").format(erro=e))
+            QMessageBox.critical(
+                self, tr("Erro na exportação"),
+                tr("Falha ao exportar os modelos:\n{erro}").format(erro=e),
+            )
 
     def _on_model_changed(self, name: str):
         self._preview_generation = getattr(self, "_preview_generation", 0) + 1
         generation = self._preview_generation
         self.preview_renderer = None
         self._preview_renderers = []
+        self._fornax_asset_provider = None
+        self._protected_preview_memory_only = False
+        self._active_fornax_status = None
         self.cached_model_data = None
         self.cached_model_document = None
         self._preview_mode = "item"
@@ -591,6 +1461,8 @@ class MainWindow(QMainWindow):
         self.current_filename_suffix = ""
 
         if not name:
+            self._fornax_sessions.leave_active()
+            self._active_library_model = None
             self._update_table_columns([])
             return
 
@@ -598,6 +1470,34 @@ class MainWindow(QMainWindow):
         if model_id:
             self.settings.setValue("workspace/last_model_id", str(model_id))
             self.settings.sync()
+
+        library_model = self._current_library_entry()
+        self._active_library_model = library_model
+        if library_model is not None and not library_model.is_fornax:
+            if self._migrate_selected_legacy(library_model):
+                return
+            self._fornax_sessions.leave_active()
+            self.cached_model_data = None
+            self.cached_model_document = None
+            self._update_table_columns([])
+            self.preview_panel.set_preview_text(tr("Conversão do modelo cancelada"))
+            if hasattr(self, "btn_config_model"):
+                self.btn_config_model.setEnabled(False)
+            return
+        if library_model is not None and library_model.is_fornax:
+            opened = self._open_selected_fornax(library_model)
+            if opened is None:
+                self.preview_panel.set_preview_text(tr("Modelo protegido"))
+                self._update_table_columns([])
+                if hasattr(self, "btn_config_model"):
+                    self.btn_config_model.setEnabled(False)
+                return
+            document, asset_provider, status = opened
+            self._load_fornax_document(document, asset_provider, status)
+            return
+        self._fornax_sessions.leave_active()
+        if hasattr(self, "btn_config_model"):
+            self.btn_config_model.setEnabled(True)
 
         slug = slugify_model_name(name)
         model_dir = get_models_dir() / slug
@@ -691,6 +1591,51 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 self.log_panel.append(tr("Erro ao ler as colunas do modelo: {erro}").format(erro=e))
 
+    def _load_fornax_document(self, document, asset_provider, status):
+        """Apresenta um snapshot autorizado sem criar arquivos de cache abertos."""
+        data = adapt_model_page(document, "front")
+        self.current_filename_suffix = data.get("output_suffix", "")
+        last_fmt = data.get("last_export_format", "PNG")
+        last_single = data.get("last_single_pdf", False)
+        last_mode = data.get("last_export_mode")
+        if last_mode not in {"png", "pdf_item", "pdf_grouped"}:
+            last_mode = "png" if last_fmt == "PNG" else (
+                "pdf_grouped" if last_single else "pdf_item"
+            )
+        self.cbo_export_format.blockSignals(True)
+        index = self.cbo_export_format.findData(last_mode)
+        if index >= 0:
+            self.cbo_export_format.setCurrentIndex(index)
+        self.cbo_export_format.blockSignals(False)
+        self._refresh_export_mode_tooltip()
+
+        self._fornax_asset_provider = asset_provider
+        self._active_fornax_status = status
+        self._protected_preview_memory_only = (
+            status.descriptor.mode != "none"
+            and status.state == AccessState.AUTHORIZED_ACTIVE
+        )
+        self.cached_model_document = document
+        self.cached_model_data = data
+        self._update_table_columns(
+            document.get("placeholders", []), document_signatures(document)
+        )
+        self._configure_dynamic_images_for_model(document)
+        self.preview_panel.set_page_navigation(len(document["pages"]), 0)
+        self._refresh_imposition_presets()
+        self._preview_renderers = renderers_for_document(
+            document, asset_provider=asset_provider,
+        )
+        self.preview_renderer = self._preview_renderers[0]
+        self.preview_panel.set_preview_pixmap(
+            self.preview_renderer.render_to_pixmap(row_rich=None, max_side=1600)
+        )
+        self._refresh_preview_navigation()
+        if status.notice:
+            self.log_panel.append(status.notice)
+        if hasattr(self, "btn_config_model"):
+            self.btn_config_model.setEnabled(True)
+
     # --- LEGO: Recebimento do Preview e Descarte Inteligente ---
     def _on_preview_ready(self, worker_model_name: str, thumb_path: str):
         """Atualiza a UI apenas se o usuário ainda estiver aguardando este modelo específico."""
@@ -766,6 +1711,15 @@ class MainWindow(QMainWindow):
         
         # --- LEGO: Fallback para a Thumbnail Estática se não houver linha selecionada ---
         if row < 0:
+            if self._active_library_model is not None and self._active_library_model.is_fornax:
+                if self._preview_renderers:
+                    renderer = self._preview_renderers[
+                        min(self._preview_page_index, len(self._preview_renderers) - 1)
+                    ]
+                    self.preview_panel.set_preview_pixmap(
+                        renderer.render_to_pixmap(row_rich=None, max_side=1600)
+                    )
+                return
             slug = slugify_model_name(self.active_model_name)
             model_dir = get_models_dir() / slug
             try:
@@ -795,7 +1749,7 @@ class MainWindow(QMainWindow):
             if not self._preview_renderers:
                 source = self.cached_model_document or self.cached_model_data
                 self._preview_renderers = (
-                    renderers_for_document(source)
+                    renderers_for_document(source, asset_provider=self._fornax_asset_provider)
                     if source.get("schema_version") == 4 else [NativeRenderer(source)]
                 )
             self._preview_page_index = min(self._preview_page_index, len(self._preview_renderers) - 1)
@@ -822,7 +1776,10 @@ class MainWindow(QMainWindow):
         return [row for row in range(table.rowCount()) if not table.isRowHidden(row)]
 
     def _sheet_preview_available(self):
-        return bool(self.cached_model_data and self._resolve_imposition_settings().get("enabled"))
+        return bool(
+            self.cached_model_data
+            and self._resolve_imposition_settings().get("enabled")
+        )
 
     def _preview_imposition_settings(self):
         settings = dict(self._resolve_imposition_settings())
@@ -1003,14 +1960,31 @@ class MainWindow(QMainWindow):
             return
 
         first_page = self._preview_sheet_index if first_page is None else first_page
-        output_dir = tempfile.mkdtemp(prefix="fornax_sheet_preview_")
+        memory_only = self._protected_preview_memory_only
+        authorized_snapshot = None
+        template = copy.deepcopy(self.cached_model_document or self.cached_model_data)
+        asset_provider = None
+        library_model = self._current_library_entry()
+        if library_model is not None and library_model.is_fornax:
+            try:
+                authorized_snapshot = self._fornax_sessions.borrow_job(library_model.path)
+                template = authorized_snapshot.document()
+                asset_provider = authorized_snapshot.asset
+            except FornaxError as error:
+                self.log_panel.append(
+                    tr("Erro na prévia da folha: {erro}").format(erro=error)
+                )
+                return
+        output_dir = None if memory_only else tempfile.mkdtemp(prefix="fornax_sheet_preview_")
         self._sheet_preview_dir = output_dir
         generation = self._sheet_preview_revision
         worker = SheetPreviewWorker(
-            copy.deepcopy(self.cached_model_document or self.cached_model_data), rows,
+            template, rows,
             self._preview_imposition_settings(), output_dir,
             generation, first_page=first_page,
             first_face=self._preview_page_index, cache_limit=12, parent=self,
+            asset_provider=asset_provider, memory_only=memory_only,
+            authorized_snapshot=authorized_snapshot,
         )
         self._sheet_preview_worker = worker
         self._sheet_preview_workers.add(worker)
@@ -1020,19 +1994,23 @@ class MainWindow(QMainWindow):
         worker.finished.connect(worker.deleteLater)
         worker.start(QThread.Priority.LowPriority)
 
-    def _on_sheet_preview_ready(self, page_index, face_index, path, generation):
+    def _on_sheet_preview_ready(self, page_index, face_index, preview, generation):
         if generation != self._sheet_preview_revision:
             return
         key = (page_index, face_index)
-        self._sheet_preview_paths[key] = path
+        self._sheet_preview_paths[key] = preview
         while len(self._sheet_preview_paths) > 12:
             old_key = next(iter(self._sheet_preview_paths))
-            old_path = self._sheet_preview_paths.pop(old_key)
-            Path(old_path).unlink(missing_ok=True)
+            old_preview = self._sheet_preview_paths.pop(old_key)
+            if isinstance(old_preview, (str, os.PathLike)):
+                Path(old_preview).unlink(missing_ok=True)
         if (self._preview_mode == "sheet"
                 and page_index == self._preview_sheet_index
                 and face_index == self._preview_page_index):
-            self.preview_panel.set_preview_image(path)
+            if isinstance(preview, QImage):
+                self.preview_panel.set_preview_pixmap(QPixmap.fromImage(preview))
+            else:
+                self.preview_panel.set_preview_image(preview)
 
     def _on_sheet_preview_failed(self, _page_index, _face_index, message, generation):
         if generation == self._sheet_preview_revision:
@@ -1065,11 +2043,14 @@ class MainWindow(QMainWindow):
         self.preview_panel.set_navigation(
             "sheet", self._preview_sheet_index, total, sheet_available=True
         )
-        path = self._sheet_preview_paths.get(
+        preview = self._sheet_preview_paths.get(
             (self._preview_sheet_index, self._preview_page_index)
         )
-        if path and Path(path).exists():
-            self.preview_panel.set_preview_image(path)
+        if isinstance(preview, QImage) and not preview.isNull():
+            self.preview_panel.set_preview_pixmap(QPixmap.fromImage(preview))
+            return
+        if preview and Path(preview).exists():
+            self.preview_panel.set_preview_image(preview)
             return
         self.preview_panel.set_preview_text(tr("Carregando prévia"))
         self._start_sheet_preview_preload(plan, first_page=self._preview_sheet_index)
@@ -1078,6 +2059,56 @@ class MainWindow(QMainWindow):
         current_model_name = self.preview_panel.cbo_models.currentText()
         if not current_model_name:
             QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo na lista antes de configurar."))
+            return
+        library_model = self._current_library_entry()
+        if library_model is not None and library_model.is_fornax:
+            try:
+                document = self._fornax_sessions.document(library_model.path)
+                status = self._fornax_sessions.status(library_model.path)
+            except FornaxError as error:
+                QMessageBox.warning(self, tr("Modelo protegido"), str(error))
+                return
+            asset_provider = lambda reference, p=library_model.path: self._fornax_sessions.asset(reference, p)
+            recovered = False
+            recovery_path = EditorWindow.fornax_recovery_path(library_model.path)
+            if recovery_path.is_file() and recovery_path.stat().st_mtime > library_model.path.stat().st_mtime:
+                answer = QMessageBox.question(
+                    self, tr("Recuperar edição"),
+                    tr("Foi encontrada uma edição não salva deste modelo. Deseja recuperá-la?"),
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                    QMessageBox.StandardButton.Yes,
+                )
+                if answer == QMessageBox.StandardButton.Yes:
+                    try:
+                        recovery = self._fornax_sessions.read_recovery(
+                            recovery_path, path=library_model.path,
+                        )
+                        document = recovery.document()
+                        asset_provider = recovery.asset
+                        recovered = True
+                    except FornaxError as error:
+                        QMessageBox.warning(self, tr("Recuperação indisponível"), str(error))
+                        recovery_path.unlink(missing_ok=True)
+                        recovery_path.with_name(recovery_path.name + ".bak").unlink(missing_ok=True)
+                else:
+                    recovery_path.unlink(missing_ok=True)
+                    recovery_path.with_name(recovery_path.name + ".bak").unlink(missing_ok=True)
+            self.editor_window = EditorWindow(self)
+            self.editor_window.modelSaved.connect(self._on_editor_saved)
+            self._connect_editor_lifecycle()
+            self.editor_window.load_from_fornax(
+                document,
+                path=library_model.path,
+                mode=status.descriptor.mode,
+                model_id=status.descriptor.model_id,
+                asset_provider=asset_provider,
+                session_manager=self._fornax_sessions,
+                save_as_required=(
+                    status.save_as_required or library_model.key.startswith("external:")
+                ),
+                recovered=recovered,
+            )
+            self.editor_window.show()
             return
             
         self.active_model_name = current_model_name
@@ -1091,6 +2122,7 @@ class MainWindow(QMainWindow):
 
         self.editor_window = EditorWindow(self)
         self.editor_window.modelSaved.connect(self._on_editor_saved)
+        self._connect_editor_lifecycle()
 
         if json_path is not None:
             self.editor_window.load_from_json(str(model_dir))
@@ -1103,6 +2135,28 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo primeiro."))
             return
         model_id = self.preview_panel.cbo_models.currentData()
+        library_model = self._current_library_entry()
+        if library_model is not None and library_model.is_fornax:
+            try:
+                document = self._fornax_sessions.document(library_model.path)
+                saved_at = datetime.fromtimestamp(
+                    library_model.path.stat().st_mtime
+                ).astimezone().isoformat(timespec="seconds")
+                origin = document.get("origin_info")
+                if not isinstance(origin, dict):
+                    origin = build_model_snapshot(
+                        document, source="fornax", captured_at=saved_at,
+                    )
+                current = current_model_snapshot(document, captured_at=saved_at)
+                ModelInfoDialog(origin, current, self).exec()
+            except Exception as error:
+                QMessageBox.warning(
+                    self, tr("Modelo protegido"),
+                    tr("Desbloqueie o modelo antes de consultar suas informações.\n{erro}").format(
+                        erro=error
+                    ),
+                )
+            return
         model_dir = get_models_dir() / str(model_id or slugify_model_name(model_name))
         try:
             document = load_model_document(model_dir)
@@ -1221,6 +2275,38 @@ class MainWindow(QMainWindow):
     def _update_template_json(self, new_data: dict):
         """Atualiza metadados comuns e publica o documento v4 atomicamente."""
         if not self.active_model_name:
+            return
+        library_model = self._current_library_entry()
+        if library_model is not None and library_model.is_fornax:
+            try:
+                document = copy.deepcopy(self.cached_model_document)
+                document.update(copy.deepcopy(new_data))
+                status = self._fornax_sessions.status(library_model.path)
+                if status.save_as_required:
+                    self.cached_model_document = document
+                    if self.cached_model_data:
+                        self.cached_model_data.update(copy.deepcopy(new_data))
+                    return
+                status = self._fornax_sessions.save(
+                    document, path=library_model.path,
+                    asset_provider=self._fornax_asset_provider,
+                )
+                updated = LibraryModel(
+                    key=library_model.key, display_name=library_model.display_name,
+                    path=library_model.path, kind=library_model.kind,
+                    descriptor=status.descriptor,
+                )
+                self._active_library_model = updated
+                self._library_models_by_key[updated.key] = updated
+                self.cached_model_document = self._fornax_sessions.document(library_model.path)
+                self.cached_model_data = adapt_model_page(
+                    self.cached_model_document, self._active_page_id if hasattr(self, "_active_page_id") else "front"
+                )
+            except Exception as error:
+                QMessageBox.warning(
+                    self, tr("Erro"),
+                    tr("Falha ao salvar modelo:\n{erro}").format(erro=error),
+                )
             return
         slug = slugify_model_name(self.active_model_name)
         model_dir = get_models_dir() / slug
@@ -1550,24 +2636,6 @@ class MainWindow(QMainWindow):
                 self.log_panel.append(tr("🛑 Geração cancelada para alteração de formato."))
                 return
             
-        slug = slugify_model_name(current_name)
-        model_dir = get_models_dir() / slug
-        try:
-            document = load_model_document(model_dir)
-        except (FileNotFoundError, ValueError):
-            self.log_panel.append(tr("ERRO: modelo '{nome}' não encontrado.").format(nome=self.active_model_name))
-            return
-
-        if dynamic_image_fields(document):
-            document["__dynamic_image_dir"] = dynamic_directory
-
-        imposition_cfg = self._resolve_imposition_settings()
-        for page in document["pages"]:
-            page_data = adapt_model_page(document, page["page_id"])
-            ensure_background_proxy(model_dir, page_data)
-
-        renderers = renderers_for_document(document, dynamic_directory)
-
         custom_path = self.txt_output_path.text().strip()
         if not custom_path:
             QMessageBox.warning(
@@ -1576,6 +2644,50 @@ class MainWindow(QMainWindow):
             )
             self.log_panel.append(tr("🛑 Geração cancelada: pasta de saída não definida."))
             return
+
+        authorized_snapshot = None
+        protected_content = False
+        library_model = self._current_library_entry()
+        if library_model is not None and library_model.is_fornax:
+            try:
+                authorized_snapshot = self._fornax_sessions.borrow_job(library_model.path)
+                document = authorized_snapshot.document()
+                asset_provider = authorized_snapshot.asset
+                status = self._fornax_sessions.status(library_model.path)
+                protected_content = (
+                    status.descriptor.mode != PUBLIC_MODE
+                    and status.state == AccessState.AUTHORIZED_ACTIVE
+                )
+            except FornaxError as error:
+                if authorized_snapshot is not None:
+                    authorized_snapshot.close()
+                self.log_panel.append(
+                    tr("ERRO: não foi possível autorizar a geração: {erro}").format(erro=error)
+                )
+                return
+            model_dir = None
+        else:
+            slug = slugify_model_name(current_name)
+            model_dir = get_models_dir() / slug
+            try:
+                document = load_model_document(model_dir)
+            except (FileNotFoundError, ValueError):
+                self.log_panel.append(tr("ERRO: modelo '{nome}' não encontrado.").format(nome=self.active_model_name))
+                return
+            asset_provider = None
+
+        if dynamic_image_fields(document):
+            document["__dynamic_image_dir"] = dynamic_directory
+
+        imposition_cfg = self._resolve_imposition_settings()
+        if model_dir is not None:
+            for page in document["pages"]:
+                page_data = adapt_model_page(document, page["page_id"])
+                ensure_background_proxy(model_dir, page_data)
+
+        renderers = renderers_for_document(
+            document, dynamic_directory, asset_provider=asset_provider,
+        )
 
         base_dir = Path(custom_path)
         self.settings.setValue("last_output_dir", custom_path)
@@ -1612,6 +2724,8 @@ class MainWindow(QMainWindow):
             target_w_mm=model_w_mm,
             target_h_mm=model_h_mm,
             source_rows=source_rows,
+            authorized_snapshot=authorized_snapshot,
+            protected_content=protected_content,
         )
         self._generation_failed = False
         self.manager.progress_updated.connect(self.progress_bar.setValue)

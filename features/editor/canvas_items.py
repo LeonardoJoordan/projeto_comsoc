@@ -5,7 +5,7 @@ from pathlib import Path
 from PySide6.QtWidgets import (QGraphicsLineItem, QGraphicsRectItem, QGraphicsTextItem,
                                QGraphicsItem, QInputDialog, QLineEdit, QGraphicsPixmapItem,
                                QStyle, QStyleOptionGraphicsItem)
-from PySide6.QtCore import Qt, QPointF, QRectF, QSize
+from PySide6.QtCore import Qt, QPointF, QRectF, QSize, QBuffer, QByteArray, QIODevice
 from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
                            QImageReader, QPainterPath, QPainter,
@@ -71,6 +71,33 @@ def _load_proxy_pixmap(path):
     pix = QPixmap.fromImage(img) if not img.isNull() else QPixmap(path)
     
     return pix, logical_w, logical_h, proxy_scale
+
+
+def _load_proxy_pixmap_bytes(data):
+    """Decodifica um asset autorizado sem materializá-lo no sistema de arquivos."""
+    encoded = QByteArray(bytes(data or b""))
+    buffer = QBuffer(encoded)
+    if not buffer.open(QIODevice.OpenModeFlag.ReadOnly):
+        return _load_proxy_pixmap(None)
+    reader = QImageReader(buffer)
+    reader.setAutoTransform(True)
+    raw_size = reader.size()
+    image = reader.read()
+    if image.isNull():
+        return _load_proxy_pixmap(None)
+    logical = _reader_logical_size(reader, raw_size) if raw_size.isValid() else image.size()
+    logical_w = float(logical.width() or image.width())
+    logical_h = float(logical.height() or image.height())
+    longest = max(logical_w, logical_h)
+    proxy_scale = min(1.0, 2048.0 / longest) if longest > 0 else 1.0
+    if proxy_scale < 1.0:
+        image = image.scaled(
+            max(1, round(logical_w * proxy_scale)),
+            max(1, round(logical_h * proxy_scale)),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+    return QPixmap.fromImage(image), logical_w, logical_h, proxy_scale
 
 
 def _rotated_point(position, origin, angle, point):
@@ -1068,11 +1095,14 @@ class Guideline(QGraphicsLineItem):
 class ImageItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
-    def __init__(self, pixmap_path=None, parent=None):
-        pixmap, logical_w, logical_h, proxy_scale = _load_proxy_pixmap(pixmap_path)
+    def __init__(self, pixmap_path=None, parent=None, *, pixmap_data=None, asset_reference=None):
+        pixmap, logical_w, logical_h, proxy_scale = (
+            _load_proxy_pixmap_bytes(pixmap_data)
+            if pixmap_data is not None else _load_proxy_pixmap(pixmap_path)
+        )
             
         super().__init__(pixmap)
-        self._original_path = pixmap_path or ""
+        self._original_path = asset_reference or pixmap_path or ""
         self._logical_w = logical_w
         self._logical_h = logical_h
         self._current_w = logical_w
@@ -1400,8 +1430,11 @@ class BackgroundItem(ImageItem):
     Ele ganha alças de redimensionamento e vira uma camada livre (Z-Value -100), 
     mas é renderizado estritamente dentro da área da prancheta.
     """
-    def __init__(self, pixmap_path=None, parent=None):
-        super().__init__(pixmap_path, parent)
+    def __init__(self, pixmap_path=None, parent=None, *, pixmap_data=None, asset_reference=None):
+        super().__init__(
+            pixmap_path, parent, pixmap_data=pixmap_data,
+            asset_reference=asset_reference,
+        )
         self.setZValue(-100)
 
     def paint(self, painter, option, widget=None):
@@ -1424,11 +1457,14 @@ class BackgroundItem(ImageItem):
 class SignatureItem(QGraphicsPixmapItem):
     SNAP_DISTANCE = 15
 
-    def __init__(self, pixmap_path, parent=None):
-        pixmap, logical_w, logical_h, proxy_scale = _load_proxy_pixmap(pixmap_path)
+    def __init__(self, pixmap_path=None, parent=None, *, pixmap_data=None, asset_reference=None):
+        pixmap, logical_w, logical_h, proxy_scale = (
+            _load_proxy_pixmap_bytes(pixmap_data)
+            if pixmap_data is not None else _load_proxy_pixmap(pixmap_path)
+        )
         
         super().__init__(pixmap)
-        self._original_path = pixmap_path
+        self._original_path = asset_reference or pixmap_path or ""
         self._logical_w = logical_w
         self._logical_h = logical_h
         self._current_w = logical_w

@@ -10,6 +10,8 @@ Este arquivo descreve os componentes identificados na compilação Windows do FO
 | Qt 6 (Core, Gui, Widgets, Network, Svg, Pdf e plugins) | 6.11.0 | LGPL-3.0-only/GPL ou comercial, mais licenças de terceiros do Qt | Preservar os avisos dos módulos e plugins efetivamente empacotados. |
 | Python | 3.13 | Python Software Foundation License | O runtime e módulos da biblioteca padrão acompanham o executável. |
 | pypdf | 6.14.2 fixado | BSD-3-Clause | A versão do pacote deve coincidir com `requirements.txt`; refaça o build em ambiente limpo. |
+| cryptography | 50.0.1 fixado | Apache-2.0 ou BSD-3-Clause | Fornece Argon2id e AES-256-GCM para os modelos protegidos; preservar os avisos distribuídos pelo pacote. |
+| cffi / pycparser | conforme resolução da versão fixada | MIT / BSD-3-Clause | Dependências transitivas de `cryptography`; registrar versões e hashes usados no build final. |
 | OpenSSL | 3.x | Apache-2.0 | `libcrypto-3.dll` e `libssl-3.dll` foram encontrados no pacote. |
 | libffi | 8.x | MIT | `libffi-8.dll` foi encontrado no pacote. |
 | SQLite | incorporado ao Python | Public domain/blessing | `sqlite3.dll` e `_sqlite3.pyd` foram encontrados no pacote. |
@@ -43,6 +45,7 @@ Feche o FORNAX Forge, faça backup da pasta de instalação e substitua somente 
 - Licença Python: https://docs.python.org/3/license.html
 - Licença OpenSSL: https://www.openssl.org/source/license.html
 - pypdf: https://github.com/py-pdf/pypdf
+- cryptography: https://cryptography.io/en/latest/about/license/
 - Inter: https://github.com/rsms/inter
 
 ## Verificação antes de publicar

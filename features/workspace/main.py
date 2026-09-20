@@ -10,8 +10,10 @@ os.environ.setdefault('GTK_IM_MODULE', 'ibus')
 os.environ.setdefault('XMODIFIERS', '@im=ibus')
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
+from PySide6.QtCore import QEvent, QTimer, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
+from core.app_instance import ApplicationInstance
 from core.custom_tooltip import CustomTooltipManager
 from core.paths import APP_ID, get_logs_dir
 from core.settings import SETTINGS_APPLICATION, SETTINGS_ORGANIZATION
@@ -21,6 +23,31 @@ from core.wheel_focus import install_wheel_focus_guard
 from core.i18n import initialize_i18n, tr
 from core.dialog_buttons import install_dialog_button_style
 from features.workspace.main_window import MainWindow
+
+
+class FornaxApplication(QApplication):
+    fileOpenRequested = Signal(str)
+
+    def __init__(self, arguments):
+        super().__init__(arguments)
+        self.pending_file_opens = []
+
+    def event(self, event):
+        if event.type() == QEvent.Type.FileOpen and event.file():
+            path = str(Path(event.file()).expanduser())
+            self.pending_file_opens.append(path)
+            self.fileOpenRequested.emit(path)
+            return True
+        return super().event(event)
+
+
+def _external_arguments(arguments):
+    result = []
+    for argument in arguments[1:]:
+        path = Path(argument).expanduser()
+        if path.suffix.lower() in {".fornax", ".zip"}:
+            result.append(str(path.resolve()))
+    return result
 
 
 def global_exception_handler(exc_type, exc_value, exc_traceback):
@@ -45,7 +72,7 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
 
 
 def main():
-    app = QApplication(sys.argv)
+    app = FornaxApplication(sys.argv)
     app.setOrganizationName(SETTINGS_ORGANIZATION)
     app.setApplicationName(SETTINGS_APPLICATION)
     app.setApplicationDisplayName('FORNAX Forge')
@@ -62,9 +89,33 @@ def main():
     install_dialog_button_style(app)
     sys.excepthook = global_exception_handler
     CustomTooltipManager.install(delay_ms=1500)
+    external_paths = _external_arguments(sys.argv)
+    instance = ApplicationInstance(app)
+    if ApplicationInstance.forward_to_running(external_paths):
+        return 0
+    if not instance.listen():
+        # Outro processo pode ter vencido a eleição depois da primeira tentativa.
+        if ApplicationInstance.forward_to_running(external_paths):
+            return 0
+        QMessageBox.critical(None, tr('Erro fatal'), tr('Não foi possível iniciar uma instância exclusiva do programa. Tente novamente.'))
+        return 1
+    queued_files = []
+    instance.filesReceived.connect(queued_files.extend)
     window = MainWindow()
+    instance.filesReceived.disconnect(queued_files.extend)
+    instance.filesReceived.connect(window.handle_external_files)
+    app.fileOpenRequested.connect(window.handle_external_file)
     window.show()
-    return app.exec()
+    initial_paths = list(dict.fromkeys([*external_paths, *app.pending_file_opens, *queued_files]))
+    if initial_paths:
+        QTimer.singleShot(0, lambda: window.handle_external_files(initial_paths))
+    result = app.exec()
+    instance.close()
+    if getattr(app, "_restart_requested", False):
+        from features.workspace.frontend import _launch_restarted_application
+        if not _launch_restarted_application():
+            return 1
+    return result
 
 
 if __name__ == '__main__':

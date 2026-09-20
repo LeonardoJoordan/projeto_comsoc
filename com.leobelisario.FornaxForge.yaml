@@ -19,7 +19,7 @@ modules:
   - name: dependencias
     buildsystem: simple
     build-commands:
-      - pip3 install --prefix=/app PySide6==6.11.0 pypdf==6.14.2
+      - pip3 install --prefix=/app PySide6==6.11.0 pypdf==6.14.2 cryptography==50.0.1
     
   - name: fornax-forge
     buildsystem: simple
@@ -28,6 +28,7 @@ modules:
       - mkdir -p /app/share/fornax-forge
       - mkdir -p /app/bin
       - mkdir -p /app/share/applications
+      - mkdir -p /app/share/mime/packages
       - mkdir -p /app/share/icons/hicolor/32x32/apps /app/share/icons/hicolor/48x48/apps /app/share/icons/hicolor/64x64/apps /app/share/icons/hicolor/128x128/apps /app/share/icons/hicolor/256x256/apps /app/share/icons/hicolor/512x512/apps
       
       # VASSOURA: Apaga os ambientes virtuais e pastas de compilação antes de copiar
@@ -58,13 +59,16 @@ modules:
         [Desktop Entry]
         Name=FORNAX Forge
         Comment=Geração de material personalizado em lote
-        Exec=fornax-forge
+        Exec=fornax-forge %F
         Icon=com.leobelisario.FornaxForge
         Terminal=false
         Type=Application
         Categories=Office;Utility;Graphics;
+        MimeType=application/x-fornax-template;
         EOF
-        
+      - cp assets/linux/com.leobelisario.FornaxForge.xml /app/share/mime/packages/com.leobelisario.FornaxForge.xml
+      - update-mime-database /app/share/mime
+
     sources:
       - type: dir
         path: .

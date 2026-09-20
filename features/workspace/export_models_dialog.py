@@ -20,8 +20,13 @@ class ExportModelsDialog(QDialog):
         self.list_widget = QListWidget()
         layout.addWidget(self.list_widget)
         
-        for model_name in (models or []):
+        for model in (models or []):
+            if isinstance(model, (tuple, list)) and len(model) == 2:
+                model_key, model_name = model
+            else:
+                model_key = model_name = model
             item = QListWidgetItem(model_name)
+            item.setData(Qt.ItemDataRole.UserRole, model_key)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.list_widget.addItem(item)
@@ -41,7 +46,7 @@ class ExportModelsDialog(QDialog):
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
             if item.checkState() == Qt.CheckState.Checked:
-                selected.append(item.text())
+                selected.append(item.data(Qt.ItemDataRole.UserRole))
         return selected
 
     def _on_master_toggled(self, state):

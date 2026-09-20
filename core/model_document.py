@@ -469,6 +469,26 @@ def remove_model_page(document: dict, page_id: str) -> dict:
 def persistent_model_document(document: dict) -> dict:
     """Remove somente metadados internos e retorna um documento pronto para JSON."""
     normalized = normalize_model_document(document)
+    if normalized.get("__source_schema_version") == LEGACY_SCHEMA_VERSION:
+        from core.document_layers import layer_entries, upgrade_layers
+
+        # A tolerância v3 termina ao persistir v4. Materializar a ordem histórica
+        # antes de remover o marcador; incluir também o antigo fundo, que o
+        # renderer desenhava separadamente antes das demais camadas.
+        for index, page in enumerate(normalized["pages"]):
+            scene = deepcopy(page)
+            scene["canvas_size"] = normalized["canvas_size"]
+            if scene.get("layer_order") is None:
+                scene.pop("layer_order", None)
+            if "layer_order" not in scene and not scene.get("shapes"):
+                upgraded = upgrade_layers(scene)
+            else:
+                # Documentos com ordenação/formas já usam o renderer por
+                # camadas, que não pinta o background_path legado separado.
+                upgraded = scene
+                upgraded["layer_order"] = [key for key, _, _ in layer_entries(scene)]
+            upgraded.pop("canvas_size", None)
+            normalized["pages"][index] = upgraded
 
     def clean(value):
         if isinstance(value, dict):

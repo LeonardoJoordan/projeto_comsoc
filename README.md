@@ -14,11 +14,16 @@ O FORNAX Forge é um aplicativo desktop para criar modelos gráficos, alimentar 
 - PNG por item, PDF por item ou PDF agrupado;
 - modelos com frente e verso, com PNGs identificados por página e PDFs multipágina;
 - imposição em folhas, marcas de corte, sangria e links em PDF;
-- biblioteca local de modelos com importação e exportação em ZIP.
+- biblioteca local em `.fornax`, exportação individual ou lote ZIP e importação de ZIPs antigos;
+- proteção por senha das assinaturas ou do modelo inteiro.
 
 O fluxo de criação, exportação, recuperação e impressão duplex está descrito em [Modelos com frente e verso](docs/MODELOS_FRENTE_VERSO.md).
 
 O motor de renderização é compartilhado pelo editor, pela prévia e pela geração final. Isso mantém posição, tipografia, transparência e dimensões físicas consistentes ao longo do fluxo.
+
+O formato e a proteção estão em validação para distribuição. Consulte o
+[guia de modelos `.fornax`](docs/GUIA_MODELOS_FORNAX.md) e o
+[relatório de fechamento e pendências](history/ETAPA_4_5_FECHAMENTO_FORNAX.md).
 
 ## Estrutura atual
 
@@ -56,11 +61,11 @@ python features/editor/main.py
 
 ## Dados e compatibilidade com o COMSOC
 
-Em **Exibir > Tema da interface**, escolha entre os cinco temas padrão: **Carbono** (preto e cinza profundo), **Marinho** (azul escuro), **Grafite** (cinza médio), **Rosê** (rosa envelhecido e sépia) e **Pérola** (claro). Os perfis personalizados salvos também aparecem nessa lista. O botão **Criar tema**, no rodapé, abre uma segunda janela com os controles avançados de cores e o nome do novo perfil. A interface mostra a prévia imediatamente; Cancelar restaura o tema anterior. Os arquivos oficiais ficam em `assets/themes/` e as personalizações em `themes/` dentro da pasta de dados do aplicativo. As cores dos documentos e arquivos gerados não são alteradas.
+Em **Programa > Temas**, escolha entre os cinco temas padrão: **Carbono** (preto e cinza profundo), **Marinho** (azul escuro), **Grafite** (cinza médio), **Rosê** (rosa envelhecido e sépia) e **Pérola** (claro). Os perfis personalizados salvos também aparecem nessa lista. O botão **Criar tema**, no rodapé, abre uma segunda janela com os controles avançados de cores e o nome do novo perfil. A interface mostra a prévia imediatamente; Cancelar restaura o tema anterior. Os arquivos oficiais ficam em `assets/themes/` e as personalizações em `themes/` dentro da pasta de dados do aplicativo. As cores dos documentos e arquivos gerados não são alteradas.
 
 O FORNAX Forge usa o identificador técnico `com.leobelisario.FornaxForge`. No primeiro acesso, dados encontrados no diretório da instalação COMSOC são copiados para a nova área. Modelos já existentes no destino são preservados integralmente, sem mesclar assets. A cópia é verificada antes de ser publicada, sua conclusão fica registrada e a origem não é apagada. Uma interrupção pode ser retomada; modelos excluídos após a migração não são recriados. Conflitos podem ser resolvidos posteriormente pela importação de modelos.
 
-As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Modelos existentes em `template_v3.json` continuam compatíveis. Novos salvamentos usam o documento versionado `template_v4.json`; quando um v4 anterior existe, ele é mantido como cópia de recuperação.
+As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Modelos existentes em `template_v3.json` e `template_v4.json` continuam compatíveis. Ao selecionar uma pasta legada na biblioteca, o programa converte o modelo para `.fornax`, normalizando o documento e solicitando proteção quando houver assinaturas. O JSON versionado passa a integrar o contêiner. Backup e recuperação seguem as regras descritas no [guia de modelos](docs/GUIA_MODELOS_FORNAX.md).
 
 Em uma instalação Flatpak, cada identificador possui uma sandbox própria. Nesse caso, use **Modelo > Exportar modelos** no COMSOC e **Modelo > Importar modelos** no FORNAX Forge quando a sandbox nova não conseguir acessar os dados antigos.
 
@@ -81,11 +86,13 @@ Os testes offscreen verificam o comportamento funcional, mas não substituem a v
 
 ## Distribuição
 
+Antes de publicar, conclua o [checklist de distribuição](docs/CHECKLIST_DISTRIBUICAO_FORNAX.md). Testes locais não aprovam automaticamente os pacotes nativos.
+
 - `script_nuitka.py`: executável nativo com Nuitka;
 - `script_appimage.sh`: AppImage Linux criado a partir da saída Nuitka, incluindo o Qt do próprio standalone;
 - `com.leobelisario.FornaxForge.yaml`: manifesto Flatpak.
 
-O Nuitka usa até quatro tarefas de compilação por padrão, respeitando o número de CPUs. É possível ajustar com `FORNAX_BUILD_JOBS`. O AppImage exige a compilação standalone concluída e `appimagetool` na raiz.
+O Nuitka usa até quatro tarefas de compilação por padrão, respeitando o número de CPUs. É possível ajustar com `FORNAX_BUILD_JOBS`. O AppImage exige a compilação standalone concluída e `appimagetool` na raiz. Para registrar `.fornax` e seu ícone na execução Linux pelo código, execute `python3 tools/install_linux_integration.py`; para um AppImage instalado, use `--appimage /caminho/FORNAX_Forge.AppImage`. Veja os detalhes no [checklist](docs/CHECKLIST_DISTRIBUICAO_FORNAX.md).
 
 No Windows, depois de gerar `build/main.dist`, compile `instalador.iss` com Inno Setup 6. O script usa a versão `1.0.0`; atualize `AppVersion` a cada release sem alterar o `AppId`. Faça a compilação em ambiente virtual limpo para que as versões do binário coincidam com `requirements.txt` e complete o checklist de `docs/THIRD_PARTY_LICENSES.md` antes de publicar.
 
@@ -93,4 +100,4 @@ Os ícones oficiais ficam em `assets/icons/`: PNGs dimensionados para a interfac
 
 ## Tecnologias e licença
 
-O aplicativo usa Python, Qt for Python/PySide6 e pypdf. Consulte os avisos de terceiros antes de distribuir um pacote. A licença própria do FORNAX Forge ainda deve ser definida e adicionada ao repositório antes da publicação ampla.
+O aplicativo usa Python, Qt for Python/PySide6, pypdf e cryptography. Consulte os avisos de terceiros antes de distribuir um pacote. A licença própria do FORNAX Forge ainda deve ser definida e adicionada ao repositório antes da publicação ampla.

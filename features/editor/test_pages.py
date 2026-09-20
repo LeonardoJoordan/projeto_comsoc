@@ -157,6 +157,9 @@ class EditorPagesTest(unittest.TestCase):
             with patch("features.editor.editor_window.get_models_dir", return_value=models_dir):
                 window = self.make_window()
                 window._current_model_name = "Modelo Duas Páginas"
+                # Exercita explicitamente a rota legada, preservada até a
+                # migração do checkpoint 3.7.
+                window._current_model_dir = models_dir / "modelo_duas_paginas"
                 window.add_new_box()
                 window.add_model_page()
                 window.add_new_box()

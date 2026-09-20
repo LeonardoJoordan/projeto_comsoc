@@ -6,7 +6,10 @@ import shutil
 # Imports corrigidos para a nova arquitetura
 from core.naming_engine import build_output_filename
 from .production_plan import build_imposition_plan
-from .workers import PageRenderWorker, DirectRenderWorker, HybridAssemblerWorker
+from .workers import (
+    PageRenderWorker, DirectRenderWorker, HybridAssemblerWorker,
+    SecureGroupedPdfWorker,
+)
 from core.i18n import tr
 
 class RenderManager(QObject):
@@ -15,7 +18,7 @@ class RenderManager(QObject):
     finished_process = Signal()
     error_occurred = Signal(str)
 
-    def __init__(self, renderers, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0, source_rows=None):
+    def __init__(self, renderers, rows_plain, rows_rich, output_dir, filename_pattern, imposition_settings=None, export_format="PNG", single_pdf=False, target_w_mm=100.0, target_h_mm=150.0, source_rows=None, authorized_snapshot=None, protected_content=False):
         super().__init__()
         if not isinstance(renderers, (list, tuple)):
             renderers = [renderers]
@@ -32,6 +35,8 @@ class RenderManager(QObject):
         self.single_pdf = single_pdf
         self.target_w_mm = target_w_mm
         self.target_h_mm = target_h_mm
+        self.authorized_snapshot = authorized_snapshot
+        self.protected_content = bool(protected_content)
         
         self.imposition_settings = imposition_settings or {"enabled": False}
         self.is_imposition = self.imposition_settings.get("enabled", False)
@@ -44,6 +49,14 @@ class RenderManager(QObject):
         self._is_running = False
 
     def start(self):
+        try:
+            self._start()
+        except Exception as error:
+            if not self._is_running:
+                self._is_running = True
+            self._on_worker_error(str(error))
+
+    def _start(self):
         self._is_running = True
         self._finish_emitted = False # Trava de segurança da Etapa Anterior
         self.cards_done = 0
@@ -61,7 +74,10 @@ class RenderManager(QObject):
         num_threads = max(1, cpu_count - 2)
         
         # --- LÓGICA HÍBRIDA (Fim do castramento de threads) ---
-        self.is_hybrid = (self.single_pdf and self.export_format == "PDF")
+        self.is_hybrid = (
+            self.single_pdf and self.export_format == "PDF"
+            and not self.protected_content
+        )
         self.work_dir = self.output_dir / ".temp_hybrid" if self.is_hybrid else self.output_dir
         self.worker_format = "PNG" if self.is_hybrid else self.export_format
 
@@ -93,7 +109,9 @@ class RenderManager(QObject):
         for page_renderer in self.page_renderers:
             page_renderer.pre_render_static_base()
 
-        if self.is_imposition:
+        if self.protected_content and self.single_pdf and self.export_format == "PDF":
+            self._start_secure_grouped_pdf(all_tasks_data)
+        elif self.is_imposition:
             self._start_imposition_mode(all_tasks_data, num_threads)
         else:
             self._start_direct_mode(all_tasks_data, num_threads)
@@ -111,6 +129,61 @@ class RenderManager(QObject):
             assembler.wait()
         if getattr(self, "is_hybrid", False):
             shutil.rmtree(self.work_dir, ignore_errors=True)
+        self._release_authorized_snapshot()
+
+    def _release_authorized_snapshot(self):
+        # Os sinais de último item podem chegar antes de QThread.finished.
+        # Aguarde a saída de run() antes de descartar dados usados pelo worker.
+        if self.protected_content:
+            for worker in self.workers:
+                worker.wait()
+                worker.renderers = []
+                worker.renderer = None
+                if hasattr(worker, "chunk_data"):
+                    worker.chunk_data = []
+                if hasattr(worker, "tasks"):
+                    worker.tasks = []
+            self.page_renderers = []
+            self.renderer = None
+            self.rows_plain = []
+            self.rows_rich = []
+            self.all_cards_links.clear()
+        snapshot = self.authorized_snapshot
+        self.authorized_snapshot = None
+        if snapshot is not None:
+            snapshot.close()
+
+    def _start_secure_grouped_pdf(self, all_tasks_data):
+        self.log_updated.emit(tr("🔒 Gerando PDF protegido sem cache intermediário…"))
+        worker = SecureGroupedPdfWorker(
+            all_tasks_data, self.page_renderers, self.output_dir,
+            self.imposition_settings, self.target_w_mm, self.target_h_mm,
+        )
+        worker.progress.connect(self._on_secure_grouped_progress)
+        worker.finished_assembly.connect(self._on_secure_grouped_finished)
+        worker.error_occurred.connect(self._on_worker_error)
+        self.workers.append(worker)
+        worker.start()
+
+    def _on_secure_grouped_progress(self, count, message):
+        if not self._is_running:
+            return
+        self.cards_done += count
+        self.log_updated.emit(message)
+        done = min(self.cards_done, self.total_cards)
+        self.progress_updated.emit(int((done / self.total_cards) * 95))
+
+    def _on_secure_grouped_finished(self, filename):
+        if not self._is_running:
+            return
+        self.generated_files = [filename]
+        self.cards_done = self.total_cards
+        self._finish_emitted = True
+        self._is_running = False
+        self.progress_updated.emit(100)
+        self._release_authorized_snapshot()
+        self.finished_process.emit()
+        self.log_updated.emit(tr("✅ Processo finalizado com sucesso!"))
 
     def _start_imposition_mode(self, all_data, num_threads):
         settings = dict(self.imposition_settings)
@@ -153,7 +226,10 @@ class RenderManager(QObject):
             
             if not worker_tasks: continue
             
-            w = PageRenderWorker(worker_tasks, self.page_renderers, self.work_dir, settings, self.worker_format, False)
+            w = PageRenderWorker(
+                worker_tasks, self.page_renderers, self.work_dir, settings,
+                self.worker_format, False, secure_output=self.protected_content,
+            )
             w.page_finished.connect(self._on_page_finished)
             w.error_occurred.connect(self._on_worker_error)
             
@@ -172,7 +248,11 @@ class RenderManager(QObject):
             
             if not chunk: continue
             
-            w = DirectRenderWorker(chunk, self.page_renderers, self.work_dir, self.worker_format, False, self.target_w_mm, self.target_h_mm)
+            w = DirectRenderWorker(
+                chunk, self.page_renderers, self.work_dir, self.worker_format,
+                False, self.target_w_mm, self.target_h_mm,
+                secure_output=self.protected_content,
+            )
             w.card_finished.connect(self._on_direct_card_finished)
             w.error_occurred.connect(self._on_worker_error)
             
@@ -236,6 +316,8 @@ class RenderManager(QObject):
         out_name = f"{self.output_dir.name}_Imposicao.pdf" if self.is_imposition else f"{self.output_dir.name}_Completo.pdf"
         self.generated_files = [out_name]
         self.progress_updated.emit(100)
+        self._is_running = False
+        self._release_authorized_snapshot()
         self.finished_process.emit()
         self.log_updated.emit(tr("✅ Processo finalizado com sucesso!"))
 
@@ -259,6 +341,8 @@ class RenderManager(QObject):
                     self._start_hybrid_assembly()
                 else:
                     self.progress_updated.emit(100)
+                    self._is_running = False
+                    self._release_authorized_snapshot()
                     self.finished_process.emit()
                     self.log_updated.emit(tr("✅ Processo finalizado com sucesso!"))
     

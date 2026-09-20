@@ -16,10 +16,23 @@ def test_prepare_scene_page_adds_only_editor_defaults_without_mutating_source():
 
     assert source == original
     assert prepared["bg_props"] == {"layer_id": None, "custom_name": ""}
-    assert prepared["boxes"][0]["layer_id"] is None
+    layer_ids = [prepared[collection][0]['layer_id']
+                 for collection in ('boxes', 'images', 'signatures')]
+    assert all(type(value) is int for value in layer_ids)
+    assert len(set(layer_ids)) == 3
     assert prepared["boxes"][0]["html"] == "<p>{nome}</p>"
-    assert prepared["images"][0]["layer_id"] is None
-    assert prepared["signatures"][0]["layer_id"] is None
+
+
+def test_prepare_scene_page_reserves_background_id_and_repairs_duplicates():
+    source = {'bg_props': {'layer_id': 3},
+              'shapes': [{'layer_id': 3, 'object_id': 'mask'}],
+              'images': [{'layer_id': 3, 'mask_shape_id': 'mask'}]}
+    prepared = prepare_scene_page(source)
+    shape = prepared['shapes'][0]
+    image = prepared['images'][0]
+    assert len({3, shape['layer_id'], image['layer_id']}) == 3
+    assert image['mask_shape_id'] == f"shape:{shape['layer_id']}"
+    assert source['images'][0]['mask_shape_id'] == 'mask'
 
 
 def test_prepare_scene_page_preserves_explicit_current_values():

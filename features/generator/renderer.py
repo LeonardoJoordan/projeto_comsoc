@@ -1,5 +1,5 @@
 from PySide6.QtGui import QPainter, QImage, QPixmap, QFont, QImageReader
-from PySide6.QtCore import Qt, QPointF, QRectF
+from PySide6.QtCore import Qt, QPointF, QRectF, QBuffer, QByteArray, QIODevice
 from html import unescape
 import re
 from pathlib import Path
@@ -9,6 +9,7 @@ from core.document_layers import layer_entries
 from core.object_style import draw_shape, outline_margin, rounded_rect_path
 from core.text_layout import PLACEHOLDER_PATTERN, build_document, text_geometry, resolve_rich_text
 from core.dynamic_images import resolve_dynamic_image
+from core.image_memory_cache import ImageMemoryCache
 
 
 def signature_is_visible(signature: dict, row_data: dict | None) -> bool:
@@ -32,20 +33,27 @@ def signature_is_visible(signature: dict, row_data: dict | None) -> bool:
     return bool(signature.get("visible", True))
 
 
-def renderers_for_document(document: dict, dynamic_image_dir=None) -> list["NativeRenderer"]:
+def renderers_for_document(
+    document: dict, dynamic_image_dir=None, asset_provider=None,
+) -> list["NativeRenderer"]:
     """Cria o mesmo renderizador de prancheta para cada página do documento."""
     normalized = normalize_model_document(document)
     renderers = [
-        NativeRenderer(adapt_model_page(normalized, page["page_id"]))
+        NativeRenderer(
+            adapt_model_page(normalized, page["page_id"]),
+            asset_provider=asset_provider,
+        )
         for page in normalized["pages"]
     ]
     directory = dynamic_image_dir or document.get("__dynamic_image_dir")
+    image_cache = ImageMemoryCache()
     for renderer in renderers:
+        renderer._image_cache = image_cache.fork()
         renderer.set_dynamic_image_directory(directory)
     return renderers
 
 class NativeRenderer:
-    def __init__(self, template_data: dict):
+    def __init__(self, template_data: dict, asset_provider=None):
         if template_data.get("schema_version") == 4 and isinstance(template_data.get("pages"), list):
             raise ValueError(
                 "NativeRenderer recebe uma única página. Use renderers_for_document()."
@@ -53,10 +61,11 @@ class NativeRenderer:
         self.tpl = template_data
         self.page_id = self.tpl.get("__page_id", "front")
         self.model_dir = infer_model_dir(self.tpl)
-        self._image_cache = {}
+        self._image_cache = ImageMemoryCache()
         self._static_base_cache = None
         self._pixmap_cache = {}
         self.dynamic_image_dir = self.tpl.get("__dynamic_image_dir")
+        self.asset_provider = asset_provider
 
     def set_dynamic_image_directory(self, directory):
         self.dynamic_image_dir = str(directory) if directory else None
@@ -64,27 +73,41 @@ class NativeRenderer:
         return self
 
     def fork(self):
-        """Cria um renderizador com caches mutáveis próprios para outra thread."""
-        renderer = NativeRenderer(self.tpl)
+        """Isola estado de pintura e compartilha o cache LRU protegido por lock."""
+        renderer = NativeRenderer(self.tpl, asset_provider=self.asset_provider)
         renderer.model_dir = self.model_dir
         renderer.dynamic_image_dir = self.dynamic_image_dir
+        renderer._image_cache = self._image_cache.fork()
         if self._static_base_cache is not None:
-            renderer._static_base_cache = self._static_base_cache.copy()
+            renderer._static_base_cache = QImage(self._static_base_cache)
         return renderer
 
-    def _get_image(self, path) -> QImage:
+    def _get_image(self, path, *, external=False) -> QImage:
         path_str = str(path)
-        if path_str in self._image_cache:
-            return self._image_cache[path_str]
+        cache_key = f"external:{path_str}" if external else path_str
+        cached = self._image_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        img = QImage()
+        if self.asset_provider is not None and not external:
+            try:
+                encoded = QByteArray(self.asset_provider(path_str))
+                buffer = QBuffer(encoded)
+                if buffer.open(QIODevice.OpenModeFlag.ReadOnly):
+                    reader = QImageReader(buffer)
+                    reader.setAutoTransform(True)
+                    img = reader.read()
+            except Exception:
+                img = QImage()
+        else:
+            reader = QImageReader(path_str)
+            reader.setAutoTransform(True)
+            img = reader.read()
+            if img.isNull():
+                img = QImage(path_str)
             
-        reader = QImageReader(path_str)
-        reader.setAutoTransform(True)
-        img = reader.read()
-        
-        if img.isNull():
-            img = QImage(path_str)
-            
-        self._image_cache[path_str] = img
+        self._image_cache[cache_key] = img
         return img
 
     def _draw_image_item(self, painter: QPainter, img: QImage, x, y, w, h, rotation=0, opacity=1.0) -> QRectF:
@@ -259,7 +282,7 @@ class NativeRenderer:
             layer = {**self.tpl, "images": [], "boxes": [], "signatures": [], "background_path": None}
             layer.pop("layer_order", None)
             layer[{"image": "images", "text": "boxes", "signature": "signatures"}[kind]] = [item]
-            child = NativeRenderer(layer)
+            child = NativeRenderer(layer, asset_provider=self.asset_provider)
             child.model_dir = self.model_dir
             child._image_cache = self._image_cache
             child._paint_card_legacy(painter, row_rich, out_links, row_plain=row_plain)
@@ -274,7 +297,9 @@ class NativeRenderer:
         result = resolve_dynamic_image(self.dynamic_image_dir, (values or {}).get(field, ""))
         if result.path is None:
             return rect
-        source = self._get_image(result.path)
+        # Imagens dinâmicas vêm da pasta vinculada à planilha, fora do
+        # pacote do modelo, e precisam continuar usando o sistema de arquivos.
+        source = self._get_image(result.path, external=True)
         if source.isNull():
             return rect
 
@@ -361,8 +386,9 @@ class NativeRenderer:
             for image in images:
                 if not image.get('visible', True):
                     continue
-                path = self._resolve_asset_path(image.get('path', ''))
-                if not path.exists():
+                raw_path = image.get('path', '')
+                path = raw_path if self.asset_provider is not None else self._resolve_asset_path(raw_path)
+                if self.asset_provider is None and not path.exists():
                     continue
                 source = self._get_image(path)
                 iw = float(image.get('width', 0))
@@ -397,7 +423,7 @@ class NativeRenderer:
         if not dynamic_only and self.tpl.get("background_path"):
             bg_props = self.tpl.get("bg_props", {})
             if bg_props.get("visible", True):
-                proxy_path = get_background_proxy_path(self.model_dir, self.tpl)
+                proxy_path = None if self.asset_provider is not None else get_background_proxy_path(self.model_dir, self.tpl)
                 proxy_drawn = False
                 if proxy_path:
                     bg = self._get_image(proxy_path)
@@ -409,9 +435,11 @@ class NativeRenderer:
                         )
                         proxy_drawn = True
                 if not proxy_drawn:
-                    bg_path = Path(self.tpl["background_path"])
-                    if not bg_path.is_absolute() and self.model_dir:
-                        bg_path = self.model_dir / bg_path
+                    bg_path = self.tpl["background_path"]
+                    if self.asset_provider is None:
+                        bg_path = Path(bg_path)
+                        if not bg_path.is_absolute() and self.model_dir:
+                            bg_path = self.model_dir / bg_path
                     bg = self._get_image(bg_path)
                     if not bg.isNull():
                         w = bg_props.get("w", self.tpl["canvas_size"]["w"])
@@ -432,6 +460,19 @@ class NativeRenderer:
             if dynamic_only and not is_linked: continue
             
             raw_path = img.get("path", "")
+            if self.asset_provider is not None:
+                pix = self._get_image(raw_path)
+                w, h = img.get("width", 0), img.get("height", 0)
+                if not pix.isNull() and w > 0 and h > 0:
+                    rect = self._draw_image_item(
+                        painter, pix, float(img.get("x", 0)), float(img.get("y", 0)),
+                        w, h, img.get("rotation", 0), img.get("opacity", 1.0),
+                    )
+                    if img.get("has_link") and img.get("link_key"):
+                        url = self._resolve_link_url(img["link_key"], row_rich, row_plain)
+                        if url and out_links is not None:
+                            out_links.append({"url": url, "rect": rect})
+                continue
             img_path = Path(raw_path)
             if not img_path.is_absolute() and self.model_dir:
                 img_path = self.model_dir / img_path
@@ -563,6 +604,15 @@ class NativeRenderer:
                 continue
 
             raw_sig = sig["path"]
+            if self.asset_provider is not None:
+                pix = self._get_image(raw_sig)
+                if not pix.isNull():
+                    self._draw_image_item(
+                        painter, pix, float(sig.get("x", 0)), float(sig.get("y", 0)),
+                        sig["width"], sig["height"], sig.get("rotation", 0),
+                        sig.get("opacity", 1.0),
+                    )
+                continue
             sig_path = Path(raw_sig)
             if not sig_path.is_absolute() and self.model_dir:
                 sig_path = self.model_dir / sig_path
