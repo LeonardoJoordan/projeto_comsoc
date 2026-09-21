@@ -49,14 +49,14 @@ def test_english_catalog_loads_and_portuguese_remains_the_source(tmp_path):
 
     set_preferred_locale(settings, "en_US")
     assert initialize_i18n(app, settings) == "en_US"
-    assert tr("Programa") == "Application"
+    assert tr("Arquivo") == "File"
     assert tr("Dados para o modelo") == "Template data"
     assert tr("Salvar sem senha") == "Save without password"
     assert tr("Proteger modelo…") == "Protect template…"
 
     set_preferred_locale(settings, "pt_BR")
     assert initialize_i18n(app, settings) == "pt_BR"
-    assert tr("Programa") == "Programa"
+    assert tr("Arquivo") == "Arquivo"
 
 
 def test_spanish_catalog_loads(tmp_path):
@@ -65,7 +65,7 @@ def test_spanish_catalog_loads(tmp_path):
 
     set_preferred_locale(settings, "es_ES")
     assert initialize_i18n(app, settings) == "es_ES"
-    assert tr("Programa") == "Programa"
+    assert tr("Arquivo") == "Archivo"
     assert tr("Dados para o modelo") == "Datos para la plantilla"
     assert tr("Folha de impressão") == "Hoja de impresión"
     assert tr("Salvar sem senha") == "Guardar sin contraseña"

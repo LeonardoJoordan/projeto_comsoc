@@ -120,6 +120,7 @@ def install_frontend(panel):
 
     heading = QFrame()
     heading.setObjectName('sheetHeading')
+    heading.setFixedHeight(58)
     head = QHBoxLayout(heading)
     head.setContentsMargins(14, 14, 14, 14)
     title = QLabel(tr('Dados para o modelo'))
@@ -252,6 +253,9 @@ def install_frontend(panel):
 
     image_footer = QFrame()
     image_footer.setObjectName('dynamicImageFooter')
+    # Alinha o início deste rodapé ao conjunto de saída (100 px) e à barra
+    # de progresso (8 px) existentes no painel de pré-visualização.
+    image_footer.setMinimumHeight(108)
     image_footer_layout = QVBoxLayout(image_footer)
     image_footer_layout.setContentsMargins(14, 9, 14, 11)
     image_footer_layout.setSpacing(6)
@@ -264,11 +268,15 @@ def install_frontend(panel):
     image_path = QLineEdit()
     image_path.setObjectName('dynamicImageDirectory')
     image_path.setReadOnly(True)
+    image_path.setFixedHeight(34)
     image_path.setPlaceholderText(tr('Selecione a pasta que contém as imagens'))
     image_path.setToolTip(tr('Pasta usada para localizar os arquivos indicados na tabela'))
-    image_button = QPushButton('…')
-    image_button.setObjectName('dynamicImageBrowse')
-    image_button.setFixedSize(34, 30)
+    image_button = QPushButton()
+    # Usa exatamente a mesma construção visual do seletor de pasta de saída.
+    image_button.setObjectName('outputFolderBrowse')
+    image_button.setIcon(themed_svg_icon(action_icon_path('more')))
+    image_button.setIconSize(QSize(18, 18))
+    image_button.setFixedSize(34, 34)
     image_button.setToolTip(tr('Selecionar pasta de imagens'))
     image_row.addWidget(image_path, 1)
     image_row.addWidget(image_button)
@@ -401,8 +409,6 @@ def install_frontend(panel):
         QLabel#sheetHint { background: @panel@; color: @muted@; padding: 9px 14px; font-size: 11px; border-bottom: 1px solid @border@; }
         QFrame#dynamicImageFooter { background: @panel@; border: none; border-top: 1px solid @border@; }
         QLabel#dynamicImageStatus { color: @muted@; font-size: 11px; }
-        QLineEdit#dynamicImageDirectory { min-height: 28px; max-height: 28px; }
-        QPushButton#dynamicImageBrowse { padding: 0; min-height: 28px; max-height: 28px; }
         QPushButton#sheetSquare, QPushButton#sheetAction, QPushButton#sheetLineAction { background: transparent; color: @text@; border: 1px solid transparent; border-radius: 5px; }
         QPushButton#sheetSquare:hover, QPushButton#sheetAction:hover, QPushButton#sheetLineAction:hover { background: @hover@; }
         QPushButton#sheetSquare:pressed, QPushButton#sheetAction:checked, QPushButton#sheetLineAction:checked { background: @selection@; color: @text@; }
@@ -420,3 +426,5 @@ def install_frontend(panel):
         QScrollBar::handle:hover { background: @scroll_hover@; }
         QAbstractScrollArea::corner { background: @scroll_track@; }
     ''')
+    image_path.setFixedHeight(34)
+    image_button.setFixedSize(34, 34)

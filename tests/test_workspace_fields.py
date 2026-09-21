@@ -1,4 +1,5 @@
 import os
+import json
 from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -233,6 +234,8 @@ def test_model_reload_restores_last_selected_model(tmp_path, monkeypatch):
         preview_panel=SimpleNamespace(cbo_models=combo),
         settings=settings,
         _on_model_changed=loaded.append,
+        _protected_model_names=lambda: {},
+        _model_library_list_setting=lambda _key: [],
     )
     monkeypatch.setattr(
         "features.workspace.main_window.get_models_dir", lambda: models
@@ -247,3 +250,50 @@ def test_model_reload_restores_last_selected_model(tmp_path, monkeypatch):
     assert combo.currentText() == "Modelo 4"
     assert combo.currentData() == "modelo_4"
     assert loaded == ["Modelo 4"]
+
+
+def test_model_library_places_pinned_first_and_then_recent_models(tmp_path, monkeypatch):
+    models = tmp_path / "models"
+    names = {
+        "modelo_a": "Alfa", "modelo_b": "Beta",
+        "modelo_c": "Gama", "modelo_d": "Delta",
+    }
+    for key in names:
+        (models / key).mkdir(parents=True, exist_ok=True)
+    settings = QSettings(
+        str(tmp_path / "settings.ini"), QSettings.Format.IniFormat
+    )
+    settings.setValue("workspace/model_library_sort", "recent")
+    settings.setValue("workspace/model_library_pinned", json.dumps(["modelo_c"]))
+    settings.setValue(
+        "workspace/model_library_recent", json.dumps(["modelo_b", "modelo_a"])
+    )
+    combo = QComboBox()
+    loaded = []
+    harness = SimpleNamespace(
+        preview_panel=SimpleNamespace(cbo_models=combo),
+        settings=settings,
+        _on_model_changed=loaded.append,
+        _protected_model_names=lambda: {},
+        _model_library_list_setting=lambda key: json.loads(
+            str(settings.value(key, "[]"))
+        ),
+    )
+    monkeypatch.setattr(
+        "features.workspace.main_window.get_models_dir", lambda: models
+    )
+    monkeypatch.setattr(
+        "features.workspace.main_window.load_model_document",
+        lambda folder: {"name": names[folder.name]},
+    )
+
+    MainWindow._reload_models_from_disk(harness)
+
+    ordered_keys = [
+        combo.itemData(index) for index in range(combo.count())
+        if combo.itemData(index) is not None
+    ]
+    assert ordered_keys == ["modelo_c", "modelo_b", "modelo_a", "modelo_d"]
+    assert combo.itemData(1) is None  # separador após os modelos fixados
+    assert combo.currentText() == "Gama"
+    assert loaded == ["Gama"]

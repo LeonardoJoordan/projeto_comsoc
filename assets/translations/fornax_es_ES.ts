@@ -3674,5 +3674,28 @@ cargo: Alcaldesa</translation>
     <message><source>Modelo bloqueado: {nome}</source><translation>Plantilla bloqueada: {nome}</translation></message>
     <message><source>Processamento em andamento</source><translation>Procesamiento en curso</translation></message>
     <message><source>Aguarde o término da geração antes de bloquear o modelo.</source><translation>Espere a que termine la generación antes de bloquear la plantilla.</translation></message>
+    <message><source>Arquivo</source><translation>Archivo</translation></message>
+    <message><source>Ajuda</source><translation>Ayuda</translation></message>
+    <message><source>Configurações</source><translation>Configuración</translation></message>
+    <message><source>Abrir modelo…</source><translation>Abrir plantilla…</translation></message>
+    <message><source>Abrir modelo</source><translation>Abrir plantilla</translation></message>
+    <message><source>Modelos FORNAX (*.fornax)</source><translation>Plantillas FORNAX (*.fornax)</translation></message>
+    <message><source>Configurações de geração…</source><translation>Configuración de generación…</translation></message>
+    <message><source>Fixar tabela de dados</source><translation>Fijar tabla de datos</translation></message>
+    <message><source>Mostrar log de processamento</source><translation>Mostrar registro de procesamiento</translation></message>
+    <message><source>Tema da interface…</source><translation>Tema de la interfaz…</translation></message>
+    <message><source>Sair</source><translation>Salir</translation></message>
+    <message><source>Tutorial interativo…</source><translation>Tutorial interactivo…</translation></message>
+    <message><source>Clique em Arquivo</source><translation>Haga clic en Archivo</translation></message>
+    <message><source>Abra o menu Arquivo</source><translation>Abra el menú Archivo</translation></message>
+    <message><source>Os modelos definem o visual e os campos personalizados. Clique em Arquivo.</source><translation>Las plantillas definen el aspecto y los campos personalizados. Haga clic en Archivo.</translation></message>
+    <message><source>Abrir biblioteca de modelos</source><translation>Abrir biblioteca de plantillas</translation></message>
+    <message><source>Fixar modelo no topo</source><translation>Fijar plantilla arriba</translation></message>
+    <message><source>Remover modelo do topo</source><translation>Quitar plantilla de la parte superior</translation></message>
+    <message><source>Ordenar modelos por</source><translation>Ordenar plantillas por</translation></message>
+    <message><source>Nome</source><translation>Nombre</translation></message>
+    <message><source>Usados recentemente</source><translation>Usadas recientemente</translation></message>
+    <message><source>Formato</source><translation>Formato</translation></message>
+    <message><source>Predefinição</source><translation>Preajuste</translation></message>
   </context>
 </TS>

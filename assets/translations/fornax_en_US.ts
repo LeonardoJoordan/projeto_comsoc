@@ -3674,5 +3674,28 @@ role: Mayor</translation>
     <message><source>Modelo bloqueado: {nome}</source><translation>Template locked: {nome}</translation></message>
     <message><source>Processamento em andamento</source><translation>Processing in progress</translation></message>
     <message><source>Aguarde o término da geração antes de bloquear o modelo.</source><translation>Wait for generation to finish before locking the template.</translation></message>
+    <message><source>Arquivo</source><translation>File</translation></message>
+    <message><source>Ajuda</source><translation>Help</translation></message>
+    <message><source>Configurações</source><translation>Settings</translation></message>
+    <message><source>Abrir modelo…</source><translation>Open template…</translation></message>
+    <message><source>Abrir modelo</source><translation>Open template</translation></message>
+    <message><source>Modelos FORNAX (*.fornax)</source><translation>FORNAX templates (*.fornax)</translation></message>
+    <message><source>Configurações de geração…</source><translation>Generation settings…</translation></message>
+    <message><source>Fixar tabela de dados</source><translation>Pin data table</translation></message>
+    <message><source>Mostrar log de processamento</source><translation>Show processing log</translation></message>
+    <message><source>Tema da interface…</source><translation>Interface theme…</translation></message>
+    <message><source>Sair</source><translation>Exit</translation></message>
+    <message><source>Tutorial interativo…</source><translation>Interactive tutorial…</translation></message>
+    <message><source>Clique em Arquivo</source><translation>Click File</translation></message>
+    <message><source>Abra o menu Arquivo</source><translation>Open the File menu</translation></message>
+    <message><source>Os modelos definem o visual e os campos personalizados. Clique em Arquivo.</source><translation>Templates define the appearance and custom fields. Click File.</translation></message>
+    <message><source>Abrir biblioteca de modelos</source><translation>Open template library</translation></message>
+    <message><source>Fixar modelo no topo</source><translation>Pin template to top</translation></message>
+    <message><source>Remover modelo do topo</source><translation>Unpin template from top</translation></message>
+    <message><source>Ordenar modelos por</source><translation>Sort templates by</translation></message>
+    <message><source>Nome</source><translation>Name</translation></message>
+    <message><source>Usados recentemente</source><translation>Recently used</translation></message>
+    <message><source>Formato</source><translation>Format</translation></message>
+    <message><source>Predefinição</source><translation>Preset</translation></message>
   </context>
 </TS>

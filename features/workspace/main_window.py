@@ -412,6 +412,61 @@ class MainWindow(QMainWindow):
         self._pending_external_files.clear()
         QTimer.singleShot(0, lambda: self.handle_external_files(pending))
 
+    def _model_library_list_setting(self, key: str) -> list[str]:
+        raw = str(self.settings.value(key, "") or "")
+        try:
+            value = json.loads(raw) if raw else []
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(value, list):
+            return []
+        return list(dict.fromkeys(str(item) for item in value if isinstance(item, str)))
+
+    def _set_model_library_list_setting(self, key: str, values):
+        self.settings.setValue(
+            key, json.dumps(list(dict.fromkeys(values)), ensure_ascii=False),
+        )
+        self.settings.sync()
+
+    def _remember_recent_model(self, model_key: str):
+        if not model_key or model_key.startswith("external:"):
+            return
+        key = "workspace/model_library_recent"
+        recent = self._model_library_list_setting(key)
+        recent = [model_key] + [item for item in recent if item != model_key]
+        self._set_model_library_list_setting(key, recent[:100])
+
+    def _set_model_library_sort_mode(self, mode: str):
+        mode = mode if mode in {"name", "recent"} else "name"
+        current_name = self.preview_panel.cbo_models.currentText()
+        self.settings.setValue("workspace/model_library_sort", mode)
+        self.settings.sync()
+        self._reload_models_from_disk(select_name=current_name)
+
+    def _toggle_current_model_pinned(self):
+        model = self._current_library_entry()
+        if model is None or model.key.startswith("external:"):
+            return
+        key = "workspace/model_library_pinned"
+        pinned = self._model_library_list_setting(key)
+        if model.key in pinned:
+            pinned.remove(model.key)
+        else:
+            pinned.append(model.key)
+        self._set_model_library_list_setting(key, pinned)
+        self._reload_models_from_disk(select_name=model.display_name)
+
+    def _forget_model_library_order(self, model_key: str):
+        for key in (
+            "workspace/model_library_pinned",
+            "workspace/model_library_recent",
+        ):
+            values = self._model_library_list_setting(key)
+            if model_key in values:
+                self._set_model_library_list_setting(
+                    key, [value for value in values if value != model_key]
+                )
+
     def _reload_models_from_disk(self, select_name: str | None = None):
         self.preview_panel.cbo_models.blockSignals(True)
         self.preview_panel.cbo_models.clear()
@@ -421,7 +476,7 @@ class MainWindow(QMainWindow):
 
         found = scan_model_library(models_dir, legacy_loader=load_model_document)
         protected_names = self._protected_model_names()
-        found = tuple(sorted((
+        found = tuple((
             LibraryModel(
                 model.key,
                 protected_names.get(model.descriptor.model_id, model.display_name)
@@ -429,9 +484,34 @@ class MainWindow(QMainWindow):
                 model.path, model.kind, model.descriptor,
             )
             for model in found
-        ), key=lambda model: (model.display_name.casefold(), model.key)))
+        ))
+        pinned_keys = set(self._model_library_list_setting(
+            "workspace/model_library_pinned"
+        ))
+        pinned = sorted(
+            (model for model in found if model.key in pinned_keys),
+            key=lambda model: (model.display_name.casefold(), model.key),
+        )
+        remaining = [model for model in found if model.key not in pinned_keys]
+        sort_mode = str(
+            self.settings.value("workspace/model_library_sort", "name") or "name"
+        )
+        if sort_mode == "recent":
+            recent = self._model_library_list_setting("workspace/model_library_recent")
+            recent_rank = {key: index for index, key in enumerate(recent)}
+            remaining.sort(key=lambda model: (
+                recent_rank.get(model.key, len(recent_rank)),
+                model.display_name.casefold(), model.key,
+            ))
+        else:
+            remaining.sort(key=lambda model: (model.display_name.casefold(), model.key))
+        found = tuple(pinned + remaining)
         self._library_models_by_key = {model.key: model for model in found}
-        for model in found:
+        for index, model in enumerate(found):
+            if index == len(pinned) and pinned and remaining:
+                self.preview_panel.cbo_models.insertSeparator(
+                    self.preview_panel.cbo_models.count()
+                )
             self.preview_panel.cbo_models.addItem(model.display_name, model.key)
 
         self.preview_panel.cbo_models.blockSignals(False)
@@ -1012,6 +1092,8 @@ class MainWindow(QMainWindow):
             return
 
         self.settings.remove(self._dynamic_image_settings_key())
+        if library_model is not None:
+            self._forget_model_library_order(library_model.key)
         self.settings.sync()
         self.log_panel.append(tr("Modelo excluído: {nome}").format(nome=model_name))
         self._reload_models_from_disk()
@@ -1710,6 +1792,7 @@ class MainWindow(QMainWindow):
         model_id = self.preview_panel.cbo_models.currentData()
         if model_id:
             self.settings.setValue("workspace/last_model_id", str(model_id))
+            self._remember_recent_model(str(model_id))
             self.settings.sync()
 
         library_model = self._current_library_entry()

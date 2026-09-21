@@ -351,9 +351,9 @@ class FirstStepsTutorial(QObject):
         elif self.step == 2:
             menu = w._model_menu
             self._show(w, provider=self._menubar_action_rect(menu), wait=True,
-                       action=tr("Clique em Modelo"),
-                       title=tr("Abra o menu Modelo"), body=tr(
-                "Os modelos definem o visual e os campos personalizados. Clique em Modelo."))
+                       action=tr("Clique em Arquivo"),
+                       title=tr("Abra o menu Arquivo"), body=tr(
+                "Os modelos definem o visual e os campos personalizados. Clique em Arquivo."))
             self._connect(menu.aboutToShow, lambda: QTimer.singleShot(0, lambda: self._advance(2)))
         elif self.step == 3:
             menu, action = w._model_menu, w._new_model_action

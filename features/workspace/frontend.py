@@ -98,6 +98,11 @@ QPushButton:disabled { color: @disabled@; background: @surface@; }
 QPushButton#primary { background: @accent@; border-color: @accent@; color: @on_accent@; font-weight: 600; }
 QPushButton#primary:hover { background: @accent_hover@; }
 QPushButton#danger { color: @danger@; }
+QPushButton#outputFolderBrowse {
+    padding: 0; min-width: 32px; max-width: 32px;
+    min-height: 32px; max-height: 32px;
+}
+QLineEdit#dynamicImageDirectory { min-height: 22px; max-height: 22px; }
 QPushButton#previewPrevious, QPushButton#previewNext {
     min-height: 0; padding: 0; border-radius: 5px; font-size: 15px;
 }
@@ -140,7 +145,7 @@ QListView#workspaceComboOptions {
     selection-background-color: transparent;
 }
 QListView#workspaceComboOptions::item {
-    min-height: 20px; padding: 8px 12px; border: 1px solid transparent;
+    min-height: 18px; padding: 2px 12px; border: 1px solid transparent;
     border-radius: 5px; background: transparent;
 }
 QListView#workspaceComboOptions::item:selected,
@@ -183,7 +188,6 @@ def install_frontend(window):
     window.splitter.setHandleWidth(1)
 
     window.btn_generate_cards.setObjectName('primary')
-    window.btn_generate_cards.setMinimumHeight(42)
     themed_style(window.progress_bar, '')
 
     window.table_panel.table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -206,6 +210,7 @@ def install_frontend(window):
     # Barra permanente do modelo.
     model_bar = QFrame()
     model_bar.setObjectName('modelBar')
+    model_bar.setFixedHeight(58)
     model_row = QHBoxLayout(model_bar)
     model_row.setContentsMargins(14, 10, 14, 10)
     model_row.setSpacing(8)
@@ -228,6 +233,10 @@ def install_frontend(window):
     more.setToolTip(tr('Mais ações do modelo'))
     more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     model_actions = QMenu(more)
+    pin_action = model_actions.addAction(
+        tr('Fixar modelo no topo'), window._toggle_current_model_pinned
+    )
+    model_actions.addSeparator()
     protect_action = model_actions.addAction(
         tr('Proteger modelo…'), window._protect_current_model
     )
@@ -253,13 +262,22 @@ def install_frontend(window):
         else:
             themed_style(model_actions, '')
     model_actions.hovered.connect(style_model_action_hover)
-    def refresh_protect_action():
+    def refresh_model_actions():
         entry = window._current_library_entry()
+        pinned = set(window._model_library_list_setting(
+            'workspace/model_library_pinned'
+        ))
+        pin_action.setEnabled(bool(entry and not entry.key.startswith('external:')))
+        pin_action.setText(
+            tr('Remover modelo do topo')
+            if entry is not None and entry.key in pinned else
+            tr('Fixar modelo no topo')
+        )
         protect_action.setEnabled(bool(
             entry is not None and entry.is_fornax
             and entry.descriptor.mode == 'none'
         ))
-    model_actions.aboutToShow.connect(refresh_protect_action)
+    model_actions.aboutToShow.connect(refresh_model_actions)
     more.setMenu(model_actions)
     model_row.addWidget(more)
     for control in (window.preview_panel.cbo_models, window.btn_config_model, more):
@@ -275,16 +293,31 @@ def install_frontend(window):
     output_grid.setVerticalSpacing(8)
     destination = QHBoxLayout()
     destination.setSpacing(8)
-    destination.addWidget(QLabel(tr('Salvar em')))
+    destination_label = QLabel(tr('Salvar em'))
+    destination_label.setObjectName('outputDestinationLabel')
+    destination.addWidget(destination_label)
     destination.addWidget(window.txt_output_path, 1)
     window.txt_output_path.setPlaceholderText(tr('Escolha a pasta de destino dos arquivos'))
     window.btn_sel_out.setText('')
+    window.btn_sel_out.setObjectName('outputFolderBrowse')
     window.btn_sel_out.setIcon(themed_svg_icon(action_icon_path('more')))
     window.btn_sel_out.setIconSize(QSize(18, 18))
+    window.btn_sel_out.setFixedSize(34, 34)
     window.btn_sel_out.setToolTip(tr('Escolher a pasta de destino'))
     destination.addWidget(window.btn_sel_out)
     output_grid.addLayout(destination, 0, 0, 1, 5)
-    output_grid.addWidget(window.cbo_export_format, 1, 0)
+    format_label = QLabel(tr('Formato'))
+    format_label.setObjectName('outputFormatLabel')
+    output_label_width = max(
+        destination_label.sizeHint().width(), format_label.sizeHint().width()
+    )
+    destination_label.setFixedWidth(output_label_width)
+    format_label.setFixedWidth(output_label_width)
+    output_grid.addWidget(format_label, 1, 0)
+    window.cbo_export_format.setSizePolicy(
+        QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed
+    )
+    output_grid.addWidget(window.cbo_export_format, 1, 1)
     export_tooltips = {
         'png': tr('Uma imagem PNG para cada item.'),
         'pdf_item': tr('Um arquivo PDF separado para cada item.'),
@@ -297,18 +330,23 @@ def install_frontend(window):
     window.cbo_presets_main.setMinimumWidth(100)
     window.cbo_presets_main.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
     window.cbo_presets_main.setToolTip(tr('Selecionar uma predefinição de impressão'))
-    output_grid.addWidget(window.cbo_presets_main, 1, 1, 1, 3)
+    preset_label = QLabel(tr('Predefinição'))
+    preset_label.setObjectName('outputPresetLabel')
+    output_grid.addWidget(preset_label, 1, 2)
+    output_grid.addWidget(window.cbo_presets_main, 1, 3)
     output_grid.setColumnStretch(1, 1)
+    output_grid.setColumnStretch(3, 2)
     window.btn_generate_cards.setFixedWidth(140)
-    window.btn_generate_cards.setFixedHeight(42)
+    window.btn_generate_cards.setFixedHeight(34)
     window.btn_generate_cards.setToolTip(tr('Gerar os arquivos usando os dados da tabela'))
     output_grid.addWidget(window.btn_generate_cards, 1, 4, 1, 1, Qt.AlignmentFlag.AlignVCenter)
-    for control in (window.txt_output_path, window.btn_sel_out, window.cbo_export_format,
+    for control in (window.txt_output_path, window.cbo_export_format,
                     window.cbo_presets_main):
         control.setFixedHeight(34)
 
     window.footer_container = QWidget()
     window.footer_container.setObjectName('outputPanel')
+    window.footer_container.setFixedHeight(100)
     footer_layout = QHBoxLayout(window.footer_container)
     footer_layout.setContentsMargins(14, 12, 14, 12)
     footer_layout.setSpacing(0)
@@ -399,10 +437,50 @@ def install_frontend(window):
     # Menus conhecidos de aplicativos de criação, reutilizando as ações existentes.
     menu = window.menuBar()
     menu.clear()
-    programa = menu.addMenu(tr('Programa'))
-    programa.addAction(tr('Configuração de exportação…'), window._open_config_dialog)
-    programa.addAction(tr('Temas…'), window._open_theme_dialog)
-    idioma = programa.addMenu(tr('Idioma'))
+    arquivo = menu.addMenu(tr('Arquivo'))
+    new_model_action = arquivo.addAction(tr('Novo modelo'), window._on_add_model)
+    arquivo.addAction(tr('Importar modelos…'), window._on_import_models)
+    arquivo.addAction(tr('Exportar modelos…'), window._on_export_models)
+    arquivo.addSeparator()
+    arquivo.addAction(tr('Configurações de geração…'), window._open_config_dialog)
+    arquivo.addSeparator()
+    arquivo.addAction(
+        tr('Abrir biblioteca de modelos'),
+        lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(get_models_dir())))
+    )
+    arquivo.addAction(tr('Sair'), window.close)
+
+    exibir = menu.addMenu(tr('Exibir'))
+    fixed_data = exibir.addAction(tr('Fixar tabela de dados'))
+    fixed_data.setCheckable(True)
+    show_log = exibir.addAction(tr('Mostrar log de processamento'))
+    show_log.setCheckable(True)
+    show_log.toggled.connect(toggle_log)
+    exibir.addSeparator()
+    sort_menu = exibir.addMenu(tr('Ordenar modelos por'))
+    sort_group = QActionGroup(sort_menu)
+    sort_group.setExclusive(True)
+    selected_sort = str(
+        window.settings.value('workspace/model_library_sort', 'name') or 'name'
+    )
+    sort_actions = []
+    for mode, label in (
+        ('name', tr('Nome')),
+        ('recent', tr('Usados recentemente')),
+    ):
+        action = sort_menu.addAction(label)
+        action.setCheckable(True)
+        action.setChecked(selected_sort == mode)
+        action.triggered.connect(
+            lambda checked=False, selected=mode:
+            window._set_model_library_sort_mode(selected) if checked else None
+        )
+        sort_group.addAction(action)
+        sort_actions.append(action)
+
+    configuracoes = menu.addMenu(tr('Configurações'))
+    configuracoes.addAction(tr('Tema da interface…'), window._open_theme_dialog)
+    idioma = configuracoes.addMenu(tr('Idioma'))
     language_group = QActionGroup(idioma)
     language_group.setExclusive(True)
     for locale, native_name in SUPPORTED_LANGUAGES:
@@ -430,21 +508,6 @@ def install_frontend(window):
             if prompt.clickedButton() is restart_now:
                 _restart_application(window)
         language_action.triggered.connect(choose_language)
-    modelo = menu.addMenu(tr('Modelo'))
-    new_model_action = modelo.addAction(tr('Novo modelo'), window._on_add_model)
-    modelo.addAction(tr('Importar modelos…'), window._on_import_models)
-    modelo.addAction(tr('Exportar modelos…'), window._on_export_models)
-    modelo.addSeparator()
-    modelo.addAction(
-        tr('Abrir pasta de modelos'),
-        lambda: QDesktopServices.openUrl(QUrl.fromLocalFile(str(get_models_dir())))
-    )
-    exibir = menu.addMenu(tr('Exibir'))
-    show_log = exibir.addAction(tr('Log de processamento'))
-    show_log.setCheckable(True)
-    show_log.toggled.connect(toggle_log)
-    fixed_data = exibir.addAction(tr('Tabela de dados fixa'))
-    fixed_data.setCheckable(True)
     def set_data_panel_fixed(fixed):
         panel_state['fixed'] = bool(fixed)
         if fixed:
@@ -456,9 +519,8 @@ def install_frontend(window):
             )
         window.settings.setValue('workspaceDataPanelFixed', bool(fixed))
     fixed_data.toggled.connect(set_data_panel_fixed)
-    ajuda = menu.addMenu(tr('Sobre'))
-    tutorial = ajuda.addMenu(tr('Tutorial interativo'))
-    first_steps_tutorial_action = tutorial.addAction(tr('Primeiros passos'))
+    ajuda = menu.addMenu(tr('Ajuda'))
+    first_steps_tutorial_action = ajuda.addAction(tr('Tutorial interativo…'))
     first_steps_tutorial_action.triggered.connect(
         lambda: start_first_steps_tutorial(window)
     )
@@ -475,22 +537,33 @@ def install_frontend(window):
     ))
     # Mantém wrappers Python vivos durante toda a janela (necessário no PySide).
     window._workspace_menus = (
-        programa, idioma, language_group, modelo, exibir, ajuda, tutorial,
+        arquivo, idioma, language_group, exibir, sort_menu, sort_group,
+        configuracoes, ajuda,
         model_actions,
     )
-    window._tutorial_menu = tutorial
+    window._tutorial_menu = ajuda
     window._tutorial_actions = (first_steps_tutorial_action,)
     window._first_steps_tutorial_action = first_steps_tutorial_action
-    window._model_menu = modelo
+    window._model_menu = arquivo
     window._new_model_action = new_model_action
     window._view_menu = exibir
     window._workspace_log_toggle = show_log
     window._workspace_data_toggle = data_toggle
     window._workspace_data_fixed_action = fixed_data
     window._workspace_data_rail = data_rail
+    window._model_pin_action = pin_action
+    window._model_sort_menu = sort_menu
+    window._model_sort_actions = tuple(sort_actions)
     data_panel_fixed = window.settings.value('workspaceDataPanelFixed', False, type=bool)
     if data_panel_fixed:
         fixed_data.setChecked(True)
     elif window.settings.value('workspaceDataPanelCollapsed', False, type=bool):
         set_data_panel_collapsed(True)
     themed_style(window, STYLE)
+    # Reaplica as dimensões depois do QSS: no Qt, padding e borda podem alterar
+    # as restrições calculadas durante o polimento do estilo.
+    window.txt_output_path.setFixedHeight(34)
+    window.btn_sel_out.setFixedSize(34, 34)
+    window.cbo_export_format.setFixedHeight(34)
+    window.cbo_presets_main.setFixedHeight(34)
+    window.btn_generate_cards.setFixedHeight(34)

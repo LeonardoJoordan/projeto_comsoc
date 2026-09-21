@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PySide6.QtCore import QSettings, Qt
+from PySide6.QtCore import QSettings, QSize, Qt
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QTableWidgetItem
+from PySide6.QtWidgets import QApplication, QFrame, QLabel, QTableWidgetItem
 
 from core.fornax_container import open_public_fornax
 from features.workspace.main_window import MainWindow
@@ -57,6 +57,44 @@ def test_workspace_builds_the_approved_layout_directly(tmp_path):
         assert window.btn_config_model.isVisible()
         assert window.footer_container.parentWidget().objectName() == "previewWorkspace"
         assert window.table_panel.parentWidget().objectName() == "dataRail"
+        assert window.txt_output_path.height() == 34
+        assert window.btn_sel_out.size() == QSize(34, 34)
+        assert window.btn_sel_out.iconSize() == QSize(18, 18)
+        assert not window.btn_sel_out.icon().isNull()
+        assert window.cbo_presets_main.height() == 34
+        assert window.btn_generate_cards.height() == window.cbo_presets_main.height()
+        assert window.findChild(QLabel, "outputFormatLabel").text() == "Formato"
+        assert window.findChild(QLabel, "outputPresetLabel").text() == "Predefinição"
+        destination_label = window.findChild(QLabel, "outputDestinationLabel")
+        format_label = window.findChild(QLabel, "outputFormatLabel")
+        assert destination_label.width() == format_label.width()
+        assert window.txt_output_path.geometry().left() == window.cbo_export_format.geometry().left()
+        format_width = window.cbo_export_format.width()
+        preset_width = window.cbo_presets_main.width()
+        assert abs(preset_width - (2 * format_width)) <= 2
+        assert window.table_panel.txt_dynamic_image_dir.height() == 34
+        assert window.table_panel.btn_dynamic_image_dir.size() == QSize(34, 34)
+        assert (
+            window.table_panel.btn_dynamic_image_dir.objectName()
+            == window.btn_sel_out.objectName()
+            == "outputFolderBrowse"
+        )
+        assert window.table_panel.btn_dynamic_image_dir.iconSize() == QSize(18, 18)
+        assert not window.table_panel.btn_dynamic_image_dir.icon().isNull()
+        window.table_panel.dynamic_image_footer.show()
+        APP.processEvents()
+        assert window.table_panel.txt_dynamic_image_dir.height() == 34
+        assert window.table_panel.btn_dynamic_image_dir.size() == QSize(34, 34)
+        model_bar = window.findChild(QFrame, "modelBar")
+        sheet_heading = window.findChild(QFrame, "sheetHeading")
+        assert model_bar.height() == sheet_heading.height() == 58
+        assert window.table_panel.dynamic_image_footer.height() == (
+            window.footer_container.height() + window.progress_bar.height()
+        )
+        assert (
+            window.table_panel.dynamic_image_footer.geometry().top()
+            == window.footer_container.geometry().top()
+        )
     finally:
         _close(window)
 
@@ -85,12 +123,28 @@ def test_clean_install_creates_a_valid_starter_model_and_closes_workers(tmp_path
 def test_about_menu_exposes_first_steps_tutorial(tmp_path):
     window, _models = _workspace(tmp_path)
     try:
-        assert window._tutorial_menu.title() == "Tutorial interativo"
+        assert [action.text() for action in window.menuBar().actions()] == [
+            "Arquivo", "Exibir", "Configurações", "Ajuda",
+        ]
+        assert [
+            action.text() for action in window._model_menu.actions()
+            if not action.isSeparator()
+        ] == [
+            "Novo modelo", "Importar modelos…",
+            "Exportar modelos…", "Configurações de geração…",
+            "Abrir biblioteca de modelos", "Sair",
+        ]
+        assert window._tutorial_menu.title() == "Ajuda"
         assert [action.text() for action in window._tutorial_actions] == [
-            "Primeiros passos",
+            "Tutorial interativo…",
         ]
         assert window._first_steps_tutorial_action.isEnabled()
         assert window._tutorial_menu.isEnabled()
+        assert window._model_sort_menu.title() == "Ordenar modelos por"
+        assert [action.text() for action in window._model_sort_actions] == [
+            "Nome", "Usados recentemente",
+        ]
+        assert window._model_sort_actions[0].isChecked()
     finally:
         _close(window)
 
