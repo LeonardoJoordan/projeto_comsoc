@@ -927,7 +927,8 @@ def _publish_package_locked(destination: Path, entries: Mapping[str, bytes], ver
             for name in sorted(entries):
                 compression = zipfile.ZIP_STORED if name == PROTECTED_PATH else zipfile.ZIP_DEFLATED
                 archive.writestr(name, entries[name], compress_type=compression)
-        with temporary_path.open("rb") as stream:
+        # Windows requires a writable descriptor for fsync; preserve the bytes.
+        with temporary_path.open("r+b") as stream:
             os.fsync(stream.fileno())
         verify(temporary_path)
         if _file_stamp(destination) != expected_stamp:
@@ -952,7 +953,7 @@ def _publish_package_locked(destination: Path, entries: Mapping[str, bytes], ver
             os.close(fd)
             backup_temporary = Path(backup_name)
             shutil.copyfile(backup_source, backup_temporary)
-            with backup_temporary.open("rb") as stream:
+            with backup_temporary.open("r+b") as stream:
                 os.fsync(stream.fileno())
             os.replace(backup_temporary, destination.with_name(destination.name + ".bak"))
             backup_temporary = None

@@ -69,7 +69,12 @@ def test_export_cannot_replace_original_through_alias(protected, tmp_path, alias
     if alias != "same":
         destination = tmp_path / "alias.fornax"
         if alias == "symlink":
-            destination.symlink_to(protected)
+            try:
+                destination.symlink_to(protected)
+            except OSError as exc:
+                if getattr(exc, "winerror", None) == 1314:
+                    pytest.skip("Windows account lacks the symbolic-link privilege")
+                raise
         else:
             os.link(protected, destination)
     with pytest.raises(container.FornaxError, match="sobrescrever"):

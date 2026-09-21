@@ -236,7 +236,7 @@ def import_candidate(
                 pending_backup = destination.with_name(f".{destination.name}.backup-{uuid4().hex}")
                 try:
                     shutil.copyfile(backup_source, pending_backup)
-                    with pending_backup.open("rb") as stream:
+                    with pending_backup.open("r+b") as stream:
                         os.fsync(stream.fileno())
                     os.replace(pending_backup, backup)
                     sync_directory(destination.parent)

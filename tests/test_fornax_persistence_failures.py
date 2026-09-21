@@ -132,6 +132,15 @@ def test_cleanup_does_not_follow_replaced_parent_symlink(tmp_path):
     outside.mkdir()
     foreign = outside / "same.txt"
     foreign.write_text("same contents")
+    # Check capability before migration can catch an OS error as a cleanup failure.
+    probe = tmp_path / "symlink-probe"
+    try:
+        probe.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account lacks the symbolic-link privilege")
+        raise
+    probe.unlink()
     original_cleanup = migration._cleanup_source
 
     def swap_then_cleanup(folder, inventory):

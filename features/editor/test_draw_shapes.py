@@ -205,8 +205,12 @@ class DrawShapesTest(unittest.TestCase):
         link = self.w.caixa_texto_panel.chk_link
         for button in (outline, mask, link, dynamic):
             self.assertEqual(button.height(), 22)
+            # Native font/style metrics may require more than 65% to fit text.
+            wrapper_width = button.parentWidget().width()
+            expected_width = max(wrapper_width * 0.65, button.minimumSizeHint().width())
+            self.assertAlmostEqual(button.width(), expected_width, delta=wrapper_width * 0.03)
             self.assertAlmostEqual(
-                button.width() / button.parentWidget().width(), 0.65, delta=0.03
+                button.x() + button.width() / 2, wrapper_width / 2, delta=1
             )
         self.assertTrue(mask.isVisible())
         self.assertFalse(mask.isEnabled())

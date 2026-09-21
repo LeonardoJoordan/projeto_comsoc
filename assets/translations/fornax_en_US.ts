@@ -3651,5 +3651,6 @@ role: Mayor</translation>
       <source>Não foi possível iniciar uma instância exclusiva do programa. Tente novamente.</source>
       <translation>Could not start a single instance of the application. Please try again.</translation>
     </message>
+    <message><source>Modelo já presente na biblioteca: {nome}</source><translation>Template already in the library: {nome}</translation></message>
   </context>
 </TS>

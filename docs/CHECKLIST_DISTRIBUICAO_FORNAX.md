@@ -19,6 +19,11 @@ resultado, evidência e responsável/data. Campos vazios são pendências.
 
 ## Matriz nativa
 
+Atualização Windows (20/09/2026): correções, testes automatizados com Qt Windows
+e compilação Nuitka/Inno registrados em
+[VALIDACAO_WINDOWS_FORNAX.md](../history/VALIDACAO_WINDOWS_FORNAX.md).
+A instalação e a associação pelo Explorer continuam pendentes na matriz.
+
 | Pacote | Instalação e abertura | Duplo clique/instância única | Reinício por idioma | Migração e geração | Estado |
 |---|---|---|---|---|---|
 | Windows / Inno Setup | — | — | — | — | Pendente |

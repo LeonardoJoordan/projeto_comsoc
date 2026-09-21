@@ -3651,5 +3651,6 @@ cargo: Alcaldesa</translation>
       <source>Não foi possível iniciar uma instância exclusiva do programa. Tente novamente.</source>
       <translation>No se pudo iniciar una instancia única del programa. Inténtelo de nuevo.</translation>
     </message>
+    <message><source>Modelo já presente na biblioteca: {nome}</source><translation>La plantilla ya está en la biblioteca: {nome}</translation></message>
   </context>
 </TS>

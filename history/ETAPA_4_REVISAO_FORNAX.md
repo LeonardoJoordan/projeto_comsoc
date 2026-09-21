@@ -1,5 +1,9 @@
 # Etapa 4 — Revisão de segurança do formato FORNAX
 
+Atualização de 20/09/2026: a validação Windows posterior, suas correções e os
+artefatos compilados estão em [VALIDACAO_WINDOWS_FORNAX.md](VALIDACAO_WINDOWS_FORNAX.md).
+Os resultados Linux abaixo são preservados como histórico.
+
 Revisão interna iniciada pelo checkpoint 4.1, por solicitação do usuário.
 A etapa 4 inteira não está concluída. O checkpoint 3.11 (textos, ajuda e
 traduções) continua pendente; iniciar esta etapa não o conclui implicitamente.

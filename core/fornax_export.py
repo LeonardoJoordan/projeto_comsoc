@@ -160,7 +160,7 @@ def export_models(
             pending = destination.with_name(f".{destination.name}.pending-{uuid4().hex}")
             try:
                 shutil.copyfile(staged, pending)
-                with pending.open("rb") as stream:
+                with pending.open("r+b") as stream:
                     os.fsync(stream.fileno())
                 inspect_fornax(pending)
                 os.replace(pending, destination)
@@ -178,7 +178,7 @@ def export_models(
                         if total > MAX_BATCH_BYTES:
                             raise FornaxFormatError("O lote excede o limite de 2 GiB.")
                         archive.write(staged, item.exported_name)
-                with pending.open("rb") as stream:
+                with pending.open("r+b") as stream:
                     os.fsync(stream.fileno())
                 with zipfile.ZipFile(pending, "r") as archive:
                     infos = archive.infolist()

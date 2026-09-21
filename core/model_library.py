@@ -77,7 +77,7 @@ def scan_model_library(
                                 continue
                             except Exception:
                                 shutil.copyfile(backup, pending)
-                                with pending.open("rb") as stream:
+                                with pending.open("r+b") as stream:
                                     os.fsync(stream.fileno())
                                 _inspect_recoverable(pending)
                                 os.replace(pending, entry)

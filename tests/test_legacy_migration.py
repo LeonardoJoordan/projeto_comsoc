@@ -231,7 +231,12 @@ def test_symlink_in_legacy_model_is_rejected_without_touching_source(tmp_path):
     save_model_document(_legacy_document(), source)
     outside = tmp_path / "outside.txt"
     outside.write_text("externo", encoding="utf-8")
-    (source / "unsafe").symlink_to(outside)
+    try:
+        (source / "unsafe").symlink_to(outside)
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 1314:
+            pytest.skip("Windows account lacks the symbolic-link privilege")
+        raise
 
     with pytest.raises(LegacyMigrationError, match="link simbólico"):
         migrate_legacy_model(source, models, mode=PUBLIC_MODE)
