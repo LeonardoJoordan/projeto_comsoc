@@ -7,7 +7,8 @@ resultado, evidência e responsável/data. Campos vazios são pendências.
 
 ## Pré-requisitos de liberação
 
-- [ ] Concluir textos, ajuda acessível e tradução dos erros do checkpoint 3.11.
+- [ ] Conferir no pacote instalado os textos PT/EN/ES da recomendação de proteção,
+  importação, exportação e erros de senha.
 - [ ] Confirmar versão do produto; `instalador.iss` ainda declara `1.0.0`.
 - [ ] Construir em ambiente limpo; registrar todas as dependências resolvidas,
   hashes de wheels/artefatos e ferramentas de build, não só requirements.
@@ -41,11 +42,13 @@ Para cada pacote:
 4. Recusar incorporação, fechar e reabrir: o modelo temporário não reaparece.
    Aceitar incorporação: a cópia local existe e a origem recebida não mudou.
 5. Trocar idioma/reiniciar: a nova instância abre; não repete importação anterior.
-6. Testar os três modos, senha errada/cancelamento, cinco minutos após sair do
-   modelo, cópia sem assinaturas e nova senha local na importação.
+6. Testar público sem assinatura, público com assinatura aceita, assinaturas
+   protegidas e proteção integral. Conferir senha errada/cancelamento, cinco minutos
+   após sair do modelo, cópia sem assinaturas e nova senha local na importação.
 7. Converter modelo legado de uma e duas páginas; conferir prévia/editor/PNG/PDF,
    assinatura visível e oculta, grupos, máscaras, clipboard e fotos variáveis.
-8. Exportar/importar lote com senhas diferentes, falha parcial e nome conflitante.
+8. Exportar/importar lote mantendo e retirando assinaturas, com destino público e
+   protegido, senhas diferentes, falha parcial e nome conflitante.
    Nenhuma substituição sem escolha; não reaproveitar senha de transporte como
    chave adicional da cópia local.
 9. Simular fechamento durante operação em biblioteca descartável; conferir

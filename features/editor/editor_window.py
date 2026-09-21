@@ -954,23 +954,34 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
     def _choose_fornax_protection(self, has_signatures: bool):
         dialog = QMessageBox(self)
         dialog.setWindowTitle(tr("Proteção do modelo"))
-        dialog.setText(
-            tr("Modelos com assinatura exigem proteção. Escolha o alcance da senha.")
-            if has_signatures else
-            tr("Escolha como este modelo deve ser salvo.")
-        )
-        primary = dialog.addButton(
-            tr("Proteger assinaturas") if has_signatures else tr("Sem proteção"),
-            QMessageBox.ButtonRole.AcceptRole,
-        )
+        if has_signatures:
+            dialog.setText(tr(
+                "Este modelo possui assinaturas. Recomendamos protegê-las com senha para "
+                "evitar o uso não autorizado. Você também pode continuar sem senha; nesse "
+                "caso, as assinaturas ficarão acessíveis dentro do arquivo do modelo."
+            ))
+            primary = dialog.addButton(
+                tr("Proteger assinaturas"), QMessageBox.ButtonRole.AcceptRole,
+            )
+            public = dialog.addButton(
+                tr("Salvar sem senha"), QMessageBox.ButtonRole.ActionRole,
+            )
+        else:
+            dialog.setText(tr("Escolha como este modelo deve ser salvo."))
+            primary = dialog.addButton(
+                tr("Sem proteção"), QMessageBox.ButtonRole.AcceptRole,
+            )
+            public = primary
         full = dialog.addButton(tr("Proteger modelo inteiro"), QMessageBox.ButtonRole.ActionRole)
         dialog.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
         style_message_box(dialog)
         dialog.exec()
         if dialog.clickedButton() is primary:
-            return SIGNATURES_MODE if has_signatures else PUBLIC_MODE
+            return (SIGNATURES_MODE, False) if has_signatures else (PUBLIC_MODE, False)
+        if has_signatures and dialog.clickedButton() is public:
+            return PUBLIC_MODE, True
         if dialog.clickedButton() is full:
-            return FULL_MODE
+            return FULL_MODE, False
         return None
 
     def _request_new_fornax_password(self):
@@ -1039,17 +1050,29 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         document["name"] = model_name
         has_signatures = bool(document_signatures(document))
 
+        # Uma nova identidade precisa de uma decisão local. A cópia usada para
+        # gravar pode receber o aceite; o estado vivo do editor só é substituído
+        # pelo documento reaberto depois de a publicação ser verificada.
+        if save_as:
+            document = copy.deepcopy(document)
+            document.pop("protection_preferences", None)
+        acknowledged = (
+            document.get("protection_preferences", {})
+            .get("public_signatures_acknowledged") is True
+        )
+
         mode = self._fornax_mode
         password = None
         protection_transition = (
             mode is None
-            or (mode == PUBLIC_MODE and has_signatures)
+            or (mode == PUBLIC_MODE and has_signatures and not acknowledged)
             or (mode == SIGNATURES_MODE and not has_signatures)
         )
         if save_as or protection_transition:
-            mode = self._choose_fornax_protection(has_signatures)
-            if mode is None:
+            choice = self._choose_fornax_protection(has_signatures)
+            if choice is None:
                 return
+            mode, acknowledge_public_signatures = choice
             needs_new_password = (
                 mode != PUBLIC_MODE
                 and (save_as or self._fornax_mode in {None, PUBLIC_MODE})
@@ -1058,6 +1081,13 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 password = self._request_new_fornax_password()
                 if password is None:
                     return
+            document = copy.deepcopy(document)
+            if mode == PUBLIC_MODE and has_signatures and acknowledge_public_signatures:
+                document["protection_preferences"] = {
+                    "public_signatures_acknowledged": True,
+                }
+            else:
+                document.pop("protection_preferences", None)
 
         destination = (
             get_models_dir() / f"{slugify_model_name(model_name)}.fornax"

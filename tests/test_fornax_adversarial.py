@@ -172,12 +172,18 @@ def test_cancelled_public_change_does_not_leave_grace_authorization(monkeypatch,
     host = SimpleNamespace(
         _fornax_sessions=sessions,
         _request_fornax_password=lambda _: PASSWORD,
+        _current_library_entry=lambda: model,
+        _on_model_changed=Mock(),
+        preview_panel=SimpleNamespace(cbo_models=SimpleNamespace(currentText=lambda: "Modelo")),
     )
-    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.StandardButton.Yes)
     monkeypatch.setattr(QMessageBox, "warning", lambda *args: QMessageBox.StandardButton.Cancel)
-    model = SimpleNamespace(path=tmp_path / "model.fornax")
-    assert MainWindow._open_selected_fornax(host, model) is None
+    model = SimpleNamespace(
+        path=tmp_path / "model.fornax", is_fornax=True,
+        descriptor=SimpleNamespace(mode=container.FULL_MODE),
+    )
+    MainWindow._unlock_selected_model(host)
     sessions.forget.assert_called_once_with(model.path)
+    host._on_model_changed.assert_called_once_with("Modelo")
     sessions.document.assert_not_called()
 
 

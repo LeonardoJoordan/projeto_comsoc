@@ -3552,7 +3552,6 @@ cargo: Alcaldesa</translation>
 {erro}</source><translation>No se pudo guardar la plantilla:
 {erro}</translation></message>
     <message><source>Foi encontrada uma edição não salva deste modelo. Deseja recuperá-la?</source><translation>Se encontró una edición no guardada de esta plantilla. ¿Desea recuperarla?</translation></message>
-    <message><source>Modelos com assinatura exigem proteção. Escolha o alcance da senha.</source><translation>Las plantillas con firmas requieren protección. Elija el alcance de la contraseña.</translation></message>
     <message><source>Nome do novo modelo:</source><translation>Nombre de la nueva plantilla:</translation></message>
     <message><source>Proteger assinaturas</source><translation>Proteger firmas</translation></message>
     <message><source>Proteger modelo inteiro</source><translation>Proteger toda la plantilla</translation></message>
@@ -3572,7 +3571,6 @@ cargo: Alcaldesa</translation>
     <message><source>🔒 Gerando PDF protegido sem cache intermediário…</source><translation>🔒 Generando PDF protegido sin caché intermedia…</translation></message>
     <message><source>Conversão concluída com pendência</source><translation>Conversión completada con limpieza pendiente</translation></message>
     <message><source>Conversão do modelo cancelada</source><translation>Conversión de la plantilla cancelada</translation></message>
-    <message><source>Este modelo antigo possui assinaturas. Cadastre uma senha para convertê-lo com segurança.</source><translation>Esta plantilla antigua contiene firmas. Cree una contraseña para convertirla de forma segura.</translation></message>
     <message><source>Falha na conversão</source><translation>Error de conversión</translation></message>
     <message><source>Modelo convertido para .fornax: {nome}</source><translation>Plantilla convertida a .fornax: {nome}</translation></message>
     <message><source>O arquivo .fornax foi criado e validado, mas alguns arquivos antigos mudaram ou não puderam ser removidos. O programa manterá somente o novo modelo na biblioteca.</source><translation>El archivo .fornax se creó y validó, pero algunos archivos antiguos cambiaron o no se pudieron eliminar. La aplicación mantendrá solamente la nueva plantilla en la biblioteca.</translation></message>
@@ -3586,7 +3584,6 @@ cargo: Alcaldesa</translation>
     <message><source>Cancelar exportação</source><translation>Cancelar exportación</translation></message>
     <message><source>Crie uma senha exclusiva para este envio. O destinatário usará essa senha apenas para importar os modelos.</source><translation>Cree una contraseña exclusiva para este envío. El destinatario la usará solamente para importar las plantillas.</translation></message>
     <message><source>Desbloquear modelos para exportação</source><translation>Desbloquear plantillas para exportar</translation></message>
-    <message><source>Deseja incluir as assinaturas protegidas na exportação?</source><translation>¿Desea incluir las firmas protegidas en la exportación?</translation></message>
     <message><source>Enviar com assinaturas</source><translation>Enviar con firmas</translation></message>
     <message><source>Enviar sem assinaturas</source><translation>Enviar sin firmas</translation></message>
     <message><source>Exportar modelos protegidos</source><translation>Exportar plantillas protegidas</translation></message>
@@ -3608,7 +3605,6 @@ cargo: Alcaldesa</translation>
     <message><source>Como deseja definir as novas senhas locais?</source><translation>¿Cómo desea definir las nuevas contraseñas locales?</translation></message>
     <message><source>Defina a senha local de '{nome}'.</source><translation>Defina la contraseña local de '{nome}'.</translation></message>
     <message><source>Definir individualmente</source><translation>Definir individualmente</translation></message>
-    <message><source>Deseja incorporar as assinaturas protegidas?</source><translation>¿Desea importar las firmas protegidas?</translation></message>
     <message><source>Falha na importação</source><translation>Error de importación</translation></message>
     <message><source>Falhas:
 {falhas}</source><translation>Errores:
@@ -3652,5 +3648,31 @@ cargo: Alcaldesa</translation>
       <translation>No se pudo iniciar una instancia única del programa. Inténtelo de nuevo.</translation>
     </message>
     <message><source>Modelo já presente na biblioteca: {nome}</source><translation>La plantilla ya está en la biblioteca: {nome}</translation></message>
+    <message><source>Escolha o alcance da proteção por senha.</source><translation>Elija el alcance de la protección por contraseña.</translation></message>
+    <message><source>Este modelo já está protegido.</source><translation>Esta plantilla ya está protegida.</translation></message>
+    <message><source>Este modelo possui assinaturas. Recomendamos protegê-las com senha para evitar o uso não autorizado. Você também pode continuar sem senha; nesse caso, as assinaturas ficarão acessíveis dentro do arquivo do modelo.</source><translation>Esta plantilla contiene firmas. Recomendamos protegerlas con una contraseña para evitar el uso no autorizado. También puede continuar sin contraseña; en ese caso, las firmas permanecerán accesibles dentro del archivo de la plantilla.</translation></message>
+    <message><source>Falha ao proteger modelo:
+{erro}</source><translation>No se pudo proteger la plantilla:
+{erro}</translation></message>
+    <message><source>Proteger modelo</source><translation>Proteger plantilla</translation></message>
+    <message><source>Proteger modelo…</source><translation>Proteger plantilla…</translation></message>
+    <message><source>Proteção ativada para '{nome}'.</source><translation>Protección activada para '{nome}'.</translation></message>
+    <message><source>Salvar sem senha</source><translation>Guardar sin contraseña</translation></message>
+    <message><source>Selecione um modelo FORNAX.</source><translation>Seleccione una plantilla FORNAX.</translation></message>
+    <message><source>Deseja incluir as assinaturas dos modelos selecionados?</source><translation>¿Desea incluir las firmas de las plantillas seleccionadas?</translation></message>
+    <message><source>Deseja incorporar as assinaturas dos modelos selecionados?</source><translation>¿Desea importar las firmas de las plantillas seleccionadas?</translation></message>
+    <message><source>Exportar assinaturas</source><translation>Exportar firmas</translation></message>
+    <message><source>Importar assinaturas</source><translation>Importar firmas</translation></message>
+    <message><source>Proteção local</source><translation>Protección local</translation></message>
+    <message><source>Os modelos públicos selecionados possuem assinaturas. Recomendamos protegê-las com senha.</source><translation>Las plantillas públicas seleccionadas contienen firmas. Recomendamos protegerlas con una contraseña.</translation></message>
+    <message><source>Manter sem senha</source><translation>Mantener sin contraseña</translation></message>
+    <message><source>Há uma recuperação pendente deste modelo. Abra o editor e salve ou descarte a recuperação antes de ativar a proteção.</source><translation>Esta plantilla tiene una recuperación pendiente. Abra el editor y guarde o descarte la recuperación antes de activar la protección.</translation></message>
+    <message><source>Digite a senha para acessar o modelo completo</source><translation>Introduzca la contraseña para acceder a la plantilla completa</translation></message>
+    <message><source>O modelo já está desbloqueado</source><translation>La plantilla ya está desbloqueada</translation></message>
+    <message><source>Bloquear modelo</source><translation>Bloquear plantilla</translation></message>
+    <message><source>Remover imediatamente o acesso ao conteúdo protegido</source><translation>Retirar inmediatamente el acceso al contenido protegido</translation></message>
+    <message><source>Modelo bloqueado: {nome}</source><translation>Plantilla bloqueada: {nome}</translation></message>
+    <message><source>Processamento em andamento</source><translation>Procesamiento en curso</translation></message>
+    <message><source>Aguarde o término da geração antes de bloquear o modelo.</source><translation>Espere a que termine la generación antes de bloquear la plantilla.</translation></message>
   </context>
 </TS>

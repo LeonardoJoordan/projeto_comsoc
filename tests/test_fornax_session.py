@@ -61,6 +61,14 @@ def source_document(*, signatures=True):
     return persistent_model_document(document)
 
 
+def acknowledged_public_document():
+    document = source_document()
+    document["protection_preferences"] = {
+        "public_signatures_acknowledged": True,
+    }
+    return document
+
+
 @pytest.fixture
 def packages(tmp_path):
     partial = tmp_path / "partial.fornax"
@@ -95,6 +103,30 @@ def test_active_model_never_expires_and_return_before_deadline_reuses_access(pac
     clock.advance(299.9)
     assert manager.select(partial).state == AccessState.AUTHORIZED_ACTIVE
     assert len(document_signatures(manager.document())) == 2
+
+
+def test_public_signature_session_preserves_content_on_save_and_recovery(tmp_path):
+    package = tmp_path / "signed-public.fornax"
+    recovery = tmp_path / ".signed-public.autosave.fornax"
+    save_public_fornax(
+        acknowledged_public_document(), package, source_dir=FIXTURE_DIR,
+    )
+    manager = FornaxSessionManager()
+
+    status = manager.select(package)
+    assert status.state == AccessState.PUBLIC_ACTIVE
+    assert status.descriptor.version == 2
+    assert len(document_signatures(manager.document())) == 2
+
+    document = manager.document()
+    document["name"] = "Público assinado revisado"
+    saved = manager.save(document, path=package)
+    assert saved.descriptor.version == 2
+    assert len(document_signatures(manager.document())) == 2
+
+    recovered = manager.write_recovery(manager.document(), recovery, path=package)
+    assert recovered.version == 2
+    assert len(document_signatures(manager.read_recovery(recovery, path=package).document())) == 2
 
 
 def test_leaving_again_restarts_five_minutes_and_exact_deadline_expires(packages):

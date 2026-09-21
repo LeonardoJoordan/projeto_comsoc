@@ -96,6 +96,18 @@ class PreviewPanel(QWidget):
         themed_style(self.preview, "background-color: @canvas@; border-radius: 10px;")
         layout.addWidget(self.preview, 1)
 
+        navigation_bar = QHBoxLayout()
+        navigation_bar.setContentsMargins(14, 0, 14, 8)
+        navigation_bar.setSpacing(8)
+
+        # Reserva, à esquerda, exatamente o mesmo espaço da ação contextual.
+        # Assim os controles de navegação permanecem no centro do preview.
+        self.unlock_balance_spacer = QWidget()
+        self.unlock_balance_spacer.setObjectName("modelLockBalance")
+        self.unlock_balance_spacer.setFixedWidth(144)
+        self.unlock_balance_spacer.setEnabled(False)
+        navigation_bar.addWidget(self.unlock_balance_spacer)
+
         navigation_stack = QVBoxLayout()
         navigation_stack.setContentsMargins(0, 0, 0, 0)
         navigation_stack.setSpacing(4)
@@ -151,7 +163,23 @@ class PreviewPanel(QWidget):
         mode_navigation.addWidget(self.cbo_preview_mode)
         mode_navigation.addStretch(1)
         navigation_stack.addLayout(mode_navigation)
-        layout.addLayout(navigation_stack)
+        navigation_bar.addLayout(navigation_stack, 1)
+
+        self.unlock_action_slot = QWidget()
+        self.unlock_action_slot.setObjectName("modelLockActionSlot")
+        self.unlock_action_slot.setFixedWidth(144)
+        unlock_action_layout = QHBoxLayout(self.unlock_action_slot)
+        unlock_action_layout.setContentsMargins(0, 0, 0, 0)
+        self.btn_unlock_model = QPushButton(tr("Desbloquear modelo"))
+        self.btn_unlock_model.setObjectName("unlockModel")
+        self.btn_unlock_model.setFixedSize(144, 30)
+        self.btn_unlock_model.setVisible(False)
+        unlock_action_layout.addWidget(self.btn_unlock_model)
+        navigation_bar.addWidget(
+            self.unlock_action_slot, 0,
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter,
+        )
+        layout.addLayout(navigation_bar)
 
         self.btn_previous.clicked.connect(lambda: self.indexRequested.emit(self.spin_navigation.value() - 2))
         self.btn_next.clicked.connect(lambda: self.indexRequested.emit(self.spin_navigation.value()))
@@ -171,6 +199,18 @@ class PreviewPanel(QWidget):
         self.destroyed.connect(disconnect_navigation_icons)
         self.set_navigation("item", 0, 0, sheet_available=False)
         self.set_page_navigation(1, 0)
+
+    def set_model_lock_state(self, visible: bool, *, unlocked: bool = False):
+        """Alterna a ação de segurança sem deslocar a navegação central."""
+        self.btn_unlock_model.setVisible(visible)
+        self.btn_unlock_model.setEnabled(True)
+        self.btn_unlock_model.setText(
+            tr("Bloquear modelo") if unlocked else tr("Desbloquear modelo")
+        )
+        self.btn_unlock_model.setToolTip(
+            tr("Remover imediatamente o acesso ao conteúdo protegido") if unlocked else
+            tr("Digite a senha para acessar o modelo completo")
+        )
 
     def _emit_mode(self):
         self.modeChanged.emit(self.cbo_preview_mode.currentData() or "item")

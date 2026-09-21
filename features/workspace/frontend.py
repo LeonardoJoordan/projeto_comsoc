@@ -107,6 +107,19 @@ QPushButton#previewPageButton {
 QPushButton#previewPageButton:checked {
     background: @selection@; border-color: @accent@;
 }
+QPushButton#unlockModel {
+    background: transparent; border: 1px solid @border@; border-radius: 5px;
+    padding: 4px 10px;
+}
+QPushButton#unlockModel:hover {
+    background: @hover@; border-color: @border_strong@;
+}
+QPushButton#unlockModel:disabled {
+    background: transparent; border-color: @grid@; color: @disabled@;
+}
+QWidget#modelLockBalance, QWidget#modelLockActionSlot {
+    background: transparent; border: none;
+}
 QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox, QTextEdit {
     background: @field@; color: @text@; border: 1px solid @border@;
     border-radius: 5px; padding: 5px; min-height: 20px;
@@ -215,6 +228,10 @@ def install_frontend(window):
     more.setToolTip(tr('Mais ações do modelo'))
     more.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
     model_actions = QMenu(more)
+    protect_action = model_actions.addAction(
+        tr('Proteger modelo…'), window._protect_current_model
+    )
+    model_actions.addSeparator()
     delete_action = None
     for action_id, label, callback in (
         ('duplicate', tr('Duplicar modelo'), window._on_duplicate_model),
@@ -236,6 +253,13 @@ def install_frontend(window):
         else:
             themed_style(model_actions, '')
     model_actions.hovered.connect(style_model_action_hover)
+    def refresh_protect_action():
+        entry = window._current_library_entry()
+        protect_action.setEnabled(bool(
+            entry is not None and entry.is_fornax
+            and entry.descriptor.mode == 'none'
+        ))
+    model_actions.aboutToShow.connect(refresh_protect_action)
     more.setMenu(model_actions)
     model_row.addWidget(more)
     for control in (window.preview_panel.cbo_models, window.btn_config_model, more):

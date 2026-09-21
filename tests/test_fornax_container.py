@@ -21,7 +21,11 @@ from core.fornax_container import (
     open_public_fornax,
     save_public_fornax,
 )
-from core.model_document import load_model_document, persistent_model_document
+from core.model_document import (
+    ModelValidationError,
+    load_model_document,
+    persistent_model_document,
+)
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "fornax_stage1"
@@ -47,6 +51,26 @@ def public_document():
             for item in page[collection]
         }
         page["layer_order"] = [item for item in page["layer_order"] if item in present_ids]
+    return persistent_model_document(document)
+
+
+def signed_public_document(*, acknowledged=True):
+    document = load_model_document(FIXTURE_DIR / "template_v4.json")
+    for page in document["pages"]:
+        removed = {
+            item["object_id"] for item in page["images"]
+            if item.get("path") == "assets/intentionally-missing.png"
+        }
+        page["images"] = [
+            item for item in page["images"]
+            if item.get("path") != "assets/intentionally-missing.png"
+        ]
+        page["layer_order"] = [
+            item for item in page["layer_order"] if item not in removed
+        ]
+    document["protection_preferences"] = {
+        "public_signatures_acknowledged": acknowledged,
+    }
     return persistent_model_document(document)
 
 
@@ -92,10 +116,13 @@ def test_public_round_trip_preserves_document_and_asset_bytes(tmp_path):
     assert opened.document()["pages"][0]["boxes"]
 
 
-def test_writer_rejects_signature_and_missing_asset(tmp_path):
-    signed = load_model_document(FIXTURE_DIR / "template_v4.json")
-    with pytest.raises(FornaxFormatError, match="assinatura"):
+def test_writer_requires_explicit_acknowledgement_for_public_signatures(tmp_path):
+    signed = signed_public_document(acknowledged=False)
+    with pytest.raises(FornaxFormatError, match="aceite explícito"):
         save_public_fornax(signed, tmp_path / "signed.fornax", source_dir=FIXTURE_DIR)
+
+
+def test_writer_rejects_missing_asset(tmp_path):
 
     source = public_document()
     source["pages"][0]["images"][0]["path"] = "assets/missing.svg"
@@ -187,7 +214,7 @@ def test_reader_rejects_duplicate_json_keys_and_unknown_mode_or_version(tmp_path
 
     for filename, changed in (
         ("mode.fornax", manifest(mode="future")),
-        ("version.fornax", manifest(version=2)),
+        ("version.fornax", manifest(version=3)),
     ):
         package = tmp_path / filename
         write_zip(package, [
@@ -196,6 +223,77 @@ def test_reader_rejects_duplicate_json_keys_and_unknown_mode_or_version(tmp_path
         ])
         with pytest.raises(UnsupportedFornaxFeature):
             inspect_fornax(package)
+
+
+def test_public_v2_round_trip_preserves_signatures_and_assets(tmp_path):
+    source = signed_public_document()
+    target = tmp_path / "signed-public.fornax"
+
+    descriptor = save_public_fornax(source, target, source_dir=FIXTURE_DIR)
+    opened = open_public_fornax(target)
+
+    assert descriptor.version == 2
+    assert inspect_fornax(target).version == 2
+    signatures = [
+        signature
+        for page in opened.document()["pages"]
+        for signature in page["signatures"]
+    ]
+    assert [signature["visible"] for signature in signatures] == [True, False]
+    assert all(signature["path"] in opened.asset_references for signature in signatures)
+    assert opened.document()["protection_preferences"] == {
+        "public_signatures_acknowledged": True,
+    }
+
+
+def test_signature_free_public_save_strips_stale_acknowledgement(tmp_path):
+    source = public_document()
+    source["protection_preferences"] = {"public_signatures_acknowledged": True}
+
+    descriptor = save_public_fornax(source, tmp_path / "public.fornax", source_dir=FIXTURE_DIR)
+    opened = open_public_fornax(descriptor)
+
+    assert descriptor.version == 1
+    assert "protection_preferences" not in opened.document()
+
+
+@pytest.mark.parametrize("value", [None, 1, "true", [], {}])
+def test_acknowledgement_metadata_is_strict(value):
+    source = public_document()
+    source["protection_preferences"] = value
+    with pytest.raises(ModelValidationError, match="protection_preferences"):
+        persistent_model_document(source)
+
+
+def test_reader_rejects_v2_without_signatures(tmp_path):
+    package = tmp_path / "empty-v2.fornax"
+    write_zip(package, [
+        ("manifest.json", json.dumps(manifest(version=2))),
+        ("public/document.json", json.dumps(public_document())),
+    ])
+    with pytest.raises(FornaxFormatError, match="deve conter assinaturas"):
+        open_public_fornax(package)
+
+
+def test_v1_reader_rule_still_rejects_public_signatures(tmp_path):
+    target = tmp_path / "signed-as-v1.fornax"
+    save_public_fornax(signed_public_document(), target, source_dir=FIXTURE_DIR)
+    with zipfile.ZipFile(target, "r") as archive:
+        entries = {info.filename: archive.read(info) for info in archive.infolist()}
+    package_manifest = json.loads(entries["manifest.json"])
+    package_manifest["header"]["version"] = 1
+    entries["manifest.json"] = json.dumps(package_manifest).encode()
+    write_zip(target, list(entries.items()))
+
+    with pytest.raises(FornaxFormatError, match="v1"):
+        open_public_fornax(target)
+
+
+def test_v2_is_rejected_for_protected_mode(tmp_path):
+    package = tmp_path / "protected-v2.fornax"
+    write_zip(package, [("manifest.json", json.dumps(manifest(mode="full", version=2)))])
+    with pytest.raises(UnsupportedFornaxFeature, match="exclusiva"):
+        inspect_fornax(package)
 
 
 def test_reader_rejects_missing_and_orphan_assets(tmp_path):

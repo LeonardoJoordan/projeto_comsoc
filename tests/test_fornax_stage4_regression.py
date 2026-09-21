@@ -10,6 +10,78 @@ from tests.test_legacy_migration import _legacy_document
 PASSWORD = 'regression-test-password'
 
 
+@pytest.mark.parametrize('mode', ['signatures', 'full'])
+def test_protecting_public_v2_also_protects_backup(tmp_path, mode):
+    from tests.test_fornax_export import acknowledged_public_signature_document
+    from tests.test_fornax_crypto import FIXTURE_DIR
+    from core.fornax_container import inspect_fornax, open_public_fornax, unlock_fornax
+    from core.model_document import document_signatures
+    source = acknowledged_public_signature_document()
+    target = tmp_path / 'model.fornax'
+    descriptor = save_public_fornax(source, target, source_dir=FIXTURE_DIR)
+    save_protected_fornax(source, target, PASSWORD, mode=mode,
+                         source_dir=FIXTURE_DIR, model_id=descriptor.model_id)
+    for path in (target, target.with_name(target.name + '.bak')):
+        assert inspect_fornax(path).mode == mode
+        assert inspect_fornax(path).model_id == descriptor.model_id
+        if mode == FULL_MODE:
+            with pytest.raises(FornaxError):
+                open_public_fornax(path)
+        else:
+            assert not document_signatures(open_public_fornax(path).document())
+        opened = unlock_fornax(path, PASSWORD)
+        assert document_signatures(opened.document())
+        assert 'protection_preferences' not in opened.document()
+
+
+@pytest.mark.parametrize('case', ['external', 'recovery', 'recovery_backup'])
+def test_protection_action_preserves_external_files_and_pending_recovery(tmp_path, case):
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    from features.workspace.main_window import MainWindow
+    from features.editor.editor_window import EditorWindow
+    target = tmp_path / 'model.fornax'
+    descriptor = save_public_fornax(_legacy_document('public'), target)
+    before = target.read_bytes()
+    entry = SimpleNamespace(is_fornax=True, path=target, descriptor=descriptor,
+                            key='external:model' if case == 'external' else 'model')
+    if case != 'external':
+        recovery = EditorWindow.fornax_recovery_path(target)
+        if case == 'recovery_backup':
+            recovery = recovery.with_name(recovery.name + '.bak')
+        recovery.write_bytes(b'unsaved recovery')
+    host = SimpleNamespace(_current_library_entry=lambda: entry,
+                           _open_selected_fornax=Mock())
+    with patch('features.workspace.main_window.QMessageBox.information'), \
+         patch('features.workspace.main_window.QMessageBox.warning'):
+        MainWindow._protect_current_model(host)
+    host._open_selected_fornax.assert_not_called()
+    assert target.read_bytes() == before
+    if case != 'external':
+        assert recovery.read_bytes() == b'unsaved recovery'
+
+
+def test_public_signatures_never_derive_password_and_preserve_rendering(tmp_path):
+    from tests.test_fornax_export import acknowledged_public_signature_document
+    from tests.test_fornax_crypto import FIXTURE_DIR
+    from core.fornax_container import open_public_fornax
+    from features.generator.renderer import renderers_for_document
+    source = acknowledged_public_signature_document()
+    expected = [r.render_to_qimage({}, {}) for r in renderers_for_document(
+        source, asset_provider=lambda reference: (FIXTURE_DIR / reference).read_bytes())]
+    target = tmp_path / 'public.fornax'
+    with patch('core.fornax_container._derive_kek', side_effect=AssertionError('public KDF')):
+        save_public_fornax(source, target, source_dir=FIXTURE_DIR)
+        opened = open_public_fornax(target)
+        actual = [r.render_to_qimage({}, {}) for r in renderers_for_document(
+            opened.document(), asset_provider=opened.asset)]
+        assert actual == expected
+        sessions = FornaxSessionManager()
+        sessions.select(target)
+        sessions.save(sessions.document())
+        sessions.close()
+
+
 def test_grace_keeps_authorization_but_releases_document_and_assets(tmp_path):
     one, two = tmp_path / 'one.fornax', tmp_path / 'two.fornax'
     save_protected_fornax(_legacy_document('one'), one, PASSWORD, mode=FULL_MODE)

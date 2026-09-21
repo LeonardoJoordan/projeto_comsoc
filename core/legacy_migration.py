@@ -200,6 +200,7 @@ def migrate_legacy_model(
     *,
     mode: str,
     password: str | None = None,
+    public_signatures_acknowledged: bool = False,
 ) -> LegacyMigrationResult:
     models_dir = Path(models_dir).resolve()
     with file_lock(_migration_dir(models_dir) / ".migration.lock"):
@@ -209,7 +210,10 @@ def migrate_legacy_model(
             journal = _load_journal(journal_path)
             if journal["source"] == Path(source).name:
                 raise LegacyMigrationError("Há uma migração pendente para este modelo.")
-        result = _migrate_legacy_model(source, models_dir, mode=mode, password=password)
+        result = _migrate_legacy_model(
+            source, models_dir, mode=mode, password=password,
+            public_signatures_acknowledged=public_signatures_acknowledged,
+        )
     try:
         _migration_dir(models_dir).rmdir()
     except OSError:
@@ -217,7 +221,10 @@ def migrate_legacy_model(
     return result
 
 
-def _migrate_legacy_model(source, models_dir, *, mode, password=None):
+def _migrate_legacy_model(
+    source, models_dir, *, mode, password=None,
+    public_signatures_acknowledged=False,
+):
     """Converte uma pasta, publica o pacote validado e limpa somente a origem intacta."""
     source = Path(source).absolute()
     if source.is_symlink():
@@ -232,8 +239,12 @@ def _migrate_legacy_model(source, models_dir, *, mode, password=None):
     inventory = _inventory(source)
     document = load_model_document(source)
     has_signatures = bool(document_signatures(document))
-    if has_signatures and mode not in {SIGNATURES_MODE, FULL_MODE}:
-        raise LegacyMigrationError("Modelos com assinatura exigem proteção.")
+    if has_signatures and mode == PUBLIC_MODE and not public_signatures_acknowledged:
+        raise LegacyMigrationError(
+            "A conversão pública de assinaturas exige aceite explícito."
+        )
+    if has_signatures and mode not in {PUBLIC_MODE, SIGNATURES_MODE, FULL_MODE}:
+        raise LegacyMigrationError("Modo de proteção inválido para assinaturas.")
     if not has_signatures and mode != PUBLIC_MODE:
         raise LegacyMigrationError("A migração pública esperava um modelo sem assinatura.")
 
@@ -255,6 +266,10 @@ def _migrate_legacy_model(source, models_dir, *, mode, password=None):
     _atomic_json(journal_path, journal)
     try:
         if mode == PUBLIC_MODE:
+            if has_signatures:
+                document["protection_preferences"] = {
+                    "public_signatures_acknowledged": True,
+                }
             save_public_fornax(document, staging, source_dir=source)
         else:
             if password is None:

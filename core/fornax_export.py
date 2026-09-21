@@ -25,6 +25,7 @@ from core.fornax_container import (
 )
 from core.template_manager import slugify_model_name
 from core.file_transactions import file_sha256
+from core.model_document import without_signatures
 
 
 MAX_BATCH_MODELS = 1000
@@ -65,8 +66,11 @@ def _export_copy(
     )
     if descriptor.mode == PUBLIC_MODE:
         opened = open_public_fornax(descriptor)
+        document = opened.document()
+        if not effective_include:
+            document = without_signatures(document)
         return save_public_fornax(
-            opened.document(), destination, asset_provider=opened.asset,
+            document, destination, asset_provider=opened.asset,
         )
     if not effective_include:
         return save_signature_free_copy(

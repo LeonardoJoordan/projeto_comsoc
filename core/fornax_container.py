@@ -1,4 +1,4 @@
-"""Contêiner ``.fornax`` versão 1, independente da interface."""
+"""Contêiner ``.fornax`` independente da interface."""
 
 from __future__ import annotations
 
@@ -36,11 +36,14 @@ from core.model_document import (
     document_signatures,
     normalize_model_document,
     persistent_model_document,
+    without_signatures,
 )
 
 
 FORMAT_NAME = "fornax"
 CONTAINER_VERSION = 1
+PUBLIC_SIGNATURES_VERSION = 2
+SUPPORTED_CONTAINER_VERSIONS = {CONTAINER_VERSION, PUBLIC_SIGNATURES_VERSION}
 PUBLIC_MODE = "none"
 SIGNATURES_MODE = "signatures"
 FULL_MODE = "full"
@@ -230,17 +233,21 @@ def _parse_manifest(raw: bytes, path: Path) -> FornaxDescriptor:
     version = header["version"]
     if isinstance(version, bool) or not isinstance(version, int):
         raise FornaxFormatError("A versão do contêiner deve ser inteira.")
-    if version != CONTAINER_VERSION:
+    if version not in SUPPORTED_CONTAINER_VERSIONS:
         raise UnsupportedFornaxFeature(f"Versão .fornax não suportada: {version!r}.")
     mode = header["mode"]
     if not isinstance(mode, str) or mode not in SUPPORTED_MODES:
         raise UnsupportedFornaxFeature(f"Modo .fornax não suportado: {mode!r}.")
+    if version == PUBLIC_SIGNATURES_VERSION and mode != PUBLIC_MODE:
+        raise UnsupportedFornaxFeature(
+            "A versão 2 do contêiner é exclusiva para modelos públicos com assinaturas."
+        )
     model_id = _canonical_uuid(header["model_id"], field="model_id")
     revision_id = _canonical_uuid(header["revision_id"], field="revision_id")
     if mode == PUBLIC_MODE:
         if set(manifest) != {"header"} or set(header) != base_fields:
             raise FornaxFormatError("Manifesto público possui campos desconhecidos.")
-        return FornaxDescriptor(path.resolve(), mode, model_id, revision_id)
+        return FornaxDescriptor(path.resolve(), mode, model_id, revision_id, version)
     crypto_fields = {
         "crypto_profile", "salt", "wrap_nonce", "payload_nonce",
     }
@@ -253,6 +260,7 @@ def _parse_manifest(raw: bytes, path: Path) -> FornaxDescriptor:
         mode=mode,
         model_id=model_id,
         revision_id=revision_id,
+        version=version,
         crypto_profile=header["crypto_profile"],
         salt=_hex_bytes(header["salt"], field="salt", length=16),
         wrap_nonce=_hex_bytes(header["wrap_nonce"], field="wrap_nonce", length=12),
@@ -264,7 +272,7 @@ def _parse_manifest(raw: bytes, path: Path) -> FornaxDescriptor:
 def _descriptor_header(descriptor: FornaxDescriptor) -> dict:
     header = {
         "format": FORMAT_NAME,
-        "version": CONTAINER_VERSION,
+        "version": descriptor.version,
         "mode": descriptor.mode,
         "model_id": descriptor.model_id,
         "revision_id": descriptor.revision_id,
@@ -521,8 +529,20 @@ def open_public_fornax(path_or_descriptor: str | Path | FornaxDescriptor) -> Ope
             raise UnsupportedFornaxFeature(str(exc)) from exc
         except (TypeError, ValueError) as exc:
             raise FornaxFormatError(f"Documento gráfico inválido: {exc}.") from exc
-        if document_signatures(document):
-            raise FornaxFormatError("A parte pública não pode conter assinaturas.")
+        signatures = document_signatures(document)
+        acknowledged = (
+            document.get("protection_preferences", {})
+            .get("public_signatures_acknowledged") is True
+        )
+        if descriptor.version == CONTAINER_VERSION and signatures:
+            raise FornaxFormatError("A parte pública v1 não pode conter assinaturas.")
+        if descriptor.version == PUBLIC_SIGNATURES_VERSION:
+            if not signatures:
+                raise FornaxFormatError("Um pacote público v2 deve conter assinaturas.")
+            if not acknowledged:
+                raise FornaxFormatError(
+                    "Um pacote público com assinaturas exige aceite explícito."
+                )
         references = _document_asset_references(document)
         for reference in references:
             _validate_public_reference(reference)
@@ -572,10 +592,10 @@ def _load_source_asset(path: Path) -> bytes:
     return data
 
 
-def _manifest(model_id: str, revision_id: str) -> dict:
+def _manifest(model_id: str, revision_id: str, *, version: int = CONTAINER_VERSION) -> dict:
     return {"header": {
         "format": FORMAT_NAME,
-        "version": CONTAINER_VERSION,
+        "version": version,
         "mode": PUBLIC_MODE,
         "model_id": model_id,
         "revision_id": revision_id,
@@ -594,7 +614,7 @@ def save_public_fornax(
     asset_provider=None,
     model_id: str | None = None,
 ) -> FornaxDescriptor:
-    """Publica atomicamente um modelo sem assinaturas em um único ``.fornax``."""
+    """Publica atomicamente um modelo público em um único ``.fornax``."""
     destination = Path(destination)
     expected_stamp = _file_stamp(destination)
     if destination.suffix.lower() != ".fornax":
@@ -602,8 +622,19 @@ def save_public_fornax(
     if destination.exists() and not destination.is_file():
         raise FornaxFormatError("O destino .fornax não é um arquivo regular.")
     normalized = persistent_model_document(document)
-    if document_signatures(normalized):
-        raise FornaxFormatError("Modelos com assinatura exigem um modo protegido.")
+    has_signatures = bool(document_signatures(normalized))
+    preferences = normalized.get("protection_preferences")
+    acknowledged = (
+        isinstance(preferences, dict)
+        and preferences.get("public_signatures_acknowledged") is True
+    )
+    if has_signatures and not acknowledged:
+        raise FornaxFormatError(
+            "Salvar assinaturas sem proteção exige aceite explícito do usuário."
+        )
+    if not has_signatures:
+        normalized.pop("protection_preferences", None)
+    version = PUBLIC_SIGNATURES_VERSION if has_signatures else CONTAINER_VERSION
     rewritten, assets = _rewrite_selected_assets(
         normalized, prefix=PUBLIC_ASSET_PREFIX,
         source_dir=Path(source_dir).resolve() if source_dir is not None else None,
@@ -613,7 +644,7 @@ def save_public_fornax(
     selected_model_id = model_id or str(uuid4())
     _canonical_uuid(selected_model_id, field="model_id")
     revision_id = str(uuid4())
-    manifest_bytes = _json_bytes(_manifest(selected_model_id, revision_id))
+    manifest_bytes = _json_bytes(_manifest(selected_model_id, revision_id, version=version))
     document_bytes = _json_bytes(rewritten)
     if len(manifest_bytes) > MAX_MANIFEST_BYTES or len(document_bytes) > MAX_JSON_BYTES:
         raise FornaxLimitError("Metadados do modelo excedem o limite do formato.")
@@ -631,7 +662,7 @@ def save_public_fornax(
     entries = {MANIFEST_PATH: manifest_bytes, PUBLIC_DOCUMENT_PATH: document_bytes, **assets}
     _publish_package(destination, entries, verify, expected_stamp=expected_stamp)
     return FornaxDescriptor(
-        destination.resolve(), PUBLIC_MODE, selected_model_id, revision_id
+        destination.resolve(), PUBLIC_MODE, selected_model_id, revision_id, version
     )
 
 
@@ -1001,6 +1032,7 @@ def _save_protected_fornax(
     if destination.suffix.lower() != ".fornax":
         raise FornaxFormatError("O destino deve usar a extensão .fornax.")
     normalized = persistent_model_document(document)
+    normalized.pop("protection_preferences", None)
     signatures = document_signatures(normalized)
     if mode == SIGNATURES_MODE and not signatures:
         raise FornaxFormatError("Proteção de assinaturas exige ao menos uma assinatura.")
@@ -1424,12 +1456,7 @@ def save_signature_free_copy(
             for item in page.get("signatures", [])
             if isinstance(item.get("path"), str)
         }
-        for page in document["pages"]:
-            signature_ids = {item["object_id"] for item in page.get("signatures", [])}
-            page["signatures"] = []
-            page["layer_order"] = [
-                item for item in page["layer_order"] if item not in signature_ids
-            ]
+        document = without_signatures(document)
         _filter_origin_info(document, signature_paths)
         # No modo integral os paths já foram anonimizados antes da abertura e
         # não permitem relacionar com segurança os nomes do snapshot legado.
@@ -1441,6 +1468,7 @@ def save_signature_free_copy(
     else:
         opened = open_public_fornax(descriptor)
         document = opened.document()
+    document = without_signatures(document)
     return save_public_fornax(
         document, destination_path, asset_provider=opened.asset,
     )

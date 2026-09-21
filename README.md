@@ -15,7 +15,7 @@ O FORNAX Forge é um aplicativo desktop para criar modelos gráficos, alimentar 
 - modelos com frente e verso, com PNGs identificados por página e PDFs multipágina;
 - imposição em folhas, marcas de corte, sangria e links em PDF;
 - biblioteca local em `.fornax`, exportação individual ou lote ZIP e importação de ZIPs antigos;
-- proteção por senha das assinaturas ou do modelo inteiro.
+- assinaturas públicas ou protegidas por senha e proteção integral opcional do modelo.
 
 O fluxo de criação, exportação, recuperação e impressão duplex está descrito em [Modelos com frente e verso](docs/MODELOS_FRENTE_VERSO.md).
 
@@ -65,7 +65,7 @@ Em **Programa > Temas**, escolha entre os cinco temas padrão: **Carbono** (pret
 
 O FORNAX Forge usa o identificador técnico `com.leobelisario.FornaxForge`. No primeiro acesso, dados encontrados no diretório da instalação COMSOC são copiados para a nova área. Modelos já existentes no destino são preservados integralmente, sem mesclar assets. A cópia é verificada antes de ser publicada, sua conclusão fica registrada e a origem não é apagada. Uma interrupção pode ser retomada; modelos excluídos após a migração não são recriados. Conflitos podem ser resolvidos posteriormente pela importação de modelos.
 
-As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Modelos existentes em `template_v3.json` e `template_v4.json` continuam compatíveis. Ao selecionar uma pasta legada na biblioteca, o programa converte o modelo para `.fornax`, normalizando o documento e solicitando proteção quando houver assinaturas. O JSON versionado passa a integrar o contêiner. Backup e recuperação seguem as regras descritas no [guia de modelos](docs/GUIA_MODELOS_FORNAX.md).
+As preferências visuais e de exportação também são copiadas do namespace antigo somente quando ainda não possuem valor no FORNAX Forge. Modelos existentes em `template_v3.json` e `template_v4.json` continuam compatíveis. Ao selecionar uma pasta legada na biblioteca, o programa converte o modelo para `.fornax`, normaliza o documento e recomenda proteção quando houver assinaturas. O usuário pode proteger as assinaturas, proteger o modelo inteiro ou aceitar conscientemente o armazenamento público. O JSON versionado passa a integrar o contêiner. Backup e recuperação seguem as regras descritas no [guia de modelos](docs/GUIA_MODELOS_FORNAX.md).
 
 Em uma instalação Flatpak, cada identificador possui uma sandbox própria. Nesse caso, use **Modelo > Exportar modelos** no COMSOC e **Modelo > Importar modelos** no FORNAX Forge quando a sandbox nova não conseguir acessar os dados antigos.
 

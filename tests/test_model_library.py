@@ -1,5 +1,5 @@
 import os
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 from core.fornax_container import (
     FULL_MODE,
+    SIGNATURES_MODE,
     inspect_fornax,
     open_public_fornax,
     save_protected_fornax,
@@ -166,22 +167,22 @@ def test_workspace_converts_unsigned_legacy_model_when_selected(tmp_path):
         APP.processEvents()
 
 
-def test_workspace_keeps_full_protected_model_neutral_when_unlock_is_cancelled(tmp_path):
+def test_workspace_opens_full_protected_model_neutral_without_prompt(tmp_path):
     models = tmp_path / "models"
     models.mkdir()
+    password = "senha-segura"
+    expected_name = "2.2.1 - Nome interno confidencial"
     save_protected_fornax(
-        _document("Nome interno confidencial"), models / "modelo-protegido.fornax",
-        "senha-segura", mode=FULL_MODE,
+        _document(expected_name), models / "221_nome_interno_confidencial.fornax",
+        password, mode=FULL_MODE,
     )
     settings = QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
+    question = Mock()
     patches = (
         patch("features.workspace.main_window.get_models_dir", return_value=models),
         patch("features.workspace.frontend.get_models_dir", return_value=models),
         patch("features.workspace.main_window.get_app_settings", return_value=settings),
-        patch(
-            "features.workspace.main_window.QMessageBox.question",
-            return_value=QMessageBox.StandardButton.Cancel,
-        ),
+        patch("features.workspace.main_window.QMessageBox.question", new=question),
     )
     for current in patches:
         current.start()
@@ -192,11 +193,86 @@ def test_workspace_keeps_full_protected_model_neutral_when_unlock_is_cancelled(t
             current.stop()
     try:
         APP.processEvents()
-        assert window.preview_panel.cbo_models.currentText() == "modelo-protegido"
+        assert window.preview_panel.cbo_models.currentText() == "221_nome_interno_confidencial"
         assert window.cached_model_document is None
         assert window.preview_panel.preview.text() == "Modelo protegido"
         assert window.table_panel.table.columnCount() == 1
         assert not window.btn_config_model.isEnabled()
+        assert not window.preview_panel.btn_unlock_model.isHidden()
+        assert window.preview_panel.btn_unlock_model.isEnabled()
+        assert window.preview_panel.btn_unlock_model.text() == "Desbloquear modelo"
+        question.assert_not_called()
+
+        password_prompt = Mock(return_value=password)
+        window._request_fornax_password = password_prompt
+        with patch("features.workspace.main_window.get_models_dir", return_value=models):
+            window.preview_panel.btn_unlock_model.click()
+            APP.processEvents()
+        assert window.preview_panel.cbo_models.currentText() == expected_name
+        assert window.preview_panel.btn_unlock_model.text() == "Bloquear modelo"
+
+        window.preview_panel.btn_unlock_model.click()
+        APP.processEvents()
+        assert window.preview_panel.cbo_models.currentText() == expected_name
+        assert window.cached_model_document is None
+        assert window.preview_panel.btn_unlock_model.text() == "Desbloquear modelo"
+        password_prompt.assert_called_once()
+    finally:
+        window.close()
+        APP.processEvents()
+
+
+def test_signature_protected_model_opens_without_prompt_and_unlocks_from_button(tmp_path):
+    models = tmp_path / "models"
+    models.mkdir()
+    password = "senha-segura"
+    package = models / "assinatura-protegida.fornax"
+    signature = tmp_path / "signature.svg"
+    signature.write_text(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="10">'
+        '<path d="M1 8 L19 2" stroke="black"/></svg>',
+        encoding="utf-8",
+    )
+    document = _document("Assinatura protegida")
+    document["pages"][0]["signatures"].append({
+        "object_id": "signature:test", "signature_id": "test",
+        "path": "signature.svg", "x": 20, "y": 30,
+        "width": 40, "height": 20, "rotation": 0,
+        "opacity": 1.0, "visible": True,
+    })
+    document["pages"][0]["layer_order"].append("signature:test")
+    save_protected_fornax(
+        document, package, password,
+        mode=SIGNATURES_MODE, source_dir=tmp_path,
+    )
+    settings = QSettings(str(tmp_path / "settings.ini"), QSettings.Format.IniFormat)
+    patches = (
+        patch("features.workspace.main_window.get_models_dir", return_value=models),
+        patch("features.workspace.frontend.get_models_dir", return_value=models),
+        patch("features.workspace.main_window.get_app_settings", return_value=settings),
+    )
+    for current in patches:
+        current.start()
+    try:
+        window = MainWindow()
+    finally:
+        for current in reversed(patches):
+            current.stop()
+    try:
+        APP.processEvents()
+        password_prompt = Mock(return_value=password)
+        window._request_fornax_password = password_prompt
+        assert not window.preview_panel.btn_unlock_model.isHidden()
+        assert window.preview_panel.btn_unlock_model.isEnabled()
+        assert not window.cached_model_document["pages"][0]["signatures"]
+        password_prompt.assert_not_called()
+
+        with patch("features.workspace.main_window.get_models_dir", return_value=models):
+            window.preview_panel.btn_unlock_model.click()
+            APP.processEvents()
+        assert window.cached_model_document["pages"][0]["signatures"]
+        assert window.preview_panel.btn_unlock_model.text() == "Bloquear modelo"
+        password_prompt.assert_called_once()
     finally:
         window.close()
         APP.processEvents()

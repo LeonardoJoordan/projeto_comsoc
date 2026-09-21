@@ -54,7 +54,7 @@ from core.file_transactions import file_sha256
 from core.dynamic_images import dynamic_image_fields, resolve_dynamic_image
 from core.themes import themed_style, theme_color
 from core.i18n import tr
-from core.dialog_buttons import get_text as dialog_get_text
+from core.dialog_buttons import get_text as dialog_get_text, style_message_box
 from core.model_document import (
     V3_FILENAME,
     V4_FILENAME,
@@ -155,6 +155,7 @@ class MainWindow(QMainWindow):
         self.preview_panel.modeChanged.connect(self._on_preview_mode_changed)
         self.preview_panel.indexRequested.connect(self._on_preview_index_requested)
         self.preview_panel.pageChanged.connect(self._on_preview_page_changed)
+        self.preview_panel.btn_unlock_model.clicked.connect(self._toggle_selected_model_lock)
 
         self.cached_model_data = None
         self.cached_model_document = None
@@ -419,6 +420,16 @@ class MainWindow(QMainWindow):
         models_dir.mkdir(parents=True, exist_ok=True)
 
         found = scan_model_library(models_dir, legacy_loader=load_model_document)
+        protected_names = self._protected_model_names()
+        found = tuple(sorted((
+            LibraryModel(
+                model.key,
+                protected_names.get(model.descriptor.model_id, model.display_name)
+                if model.is_fornax and model.descriptor.mode == FULL_MODE else model.display_name,
+                model.path, model.kind, model.descriptor,
+            )
+            for model in found
+        ), key=lambda model: (model.display_name.casefold(), model.key)))
         self._library_models_by_key = {model.key: model for model in found}
         for model in found:
             self.preview_panel.cbo_models.addItem(model.display_name, model.key)
@@ -449,6 +460,46 @@ class MainWindow(QMainWindow):
     def _current_library_entry(self) -> LibraryModel | None:
         key = self.preview_panel.cbo_models.currentData()
         return self._library_models_by_key.get(str(key)) if key is not None else None
+
+    def _protected_model_names(self) -> dict[str, str]:
+        """Nomes locais dos modelos integrais, cujo documento fica criptografado."""
+        raw = str(self.settings.value("workspace/protected_model_names", "") or "")
+        try:
+            value = json.loads(raw) if raw else {}
+        except (TypeError, ValueError):
+            return {}
+        if not isinstance(value, dict):
+            return {}
+        return {
+            str(model_id): str(name)
+            for model_id, name in value.items()
+            if isinstance(model_id, str) and isinstance(name, str) and name.strip()
+        }
+
+    def _remember_protected_model_name(self, model_id: str, name: str):
+        name = str(name or "").strip()
+        if not model_id or not name:
+            return
+        names = self._protected_model_names()
+        if names.get(model_id) == name:
+            return
+        names[model_id] = name
+        self.settings.setValue(
+            "workspace/protected_model_names",
+            json.dumps(names, ensure_ascii=False, sort_keys=True),
+        )
+        self.settings.sync()
+
+    def _forget_protected_model_name(self, model_id: str):
+        names = self._protected_model_names()
+        if model_id not in names:
+            return
+        names.pop(model_id, None)
+        self.settings.setValue(
+            "workspace/protected_model_names",
+            json.dumps(names, ensure_ascii=False, sort_keys=True),
+        )
+        self.settings.sync()
 
     def _request_fornax_password(self, title: str) -> str | None:
         password, accepted = QInputDialog.getText(
@@ -487,11 +538,14 @@ class MainWindow(QMainWindow):
 
     def _legacy_migration_credentials(self, document):
         if not document_signatures(document):
+            document.pop("protection_preferences", None)
             return PUBLIC_MODE, None
         prompt = QMessageBox(self)
         prompt.setWindowTitle(tr("Proteção do modelo"))
         prompt.setText(tr(
-            "Este modelo antigo possui assinaturas. Cadastre uma senha para convertê-lo com segurança."
+            "Este modelo possui assinaturas. Recomendamos protegê-las com senha para "
+            "evitar o uso não autorizado. Você também pode continuar sem senha; nesse "
+            "caso, as assinaturas ficarão acessíveis dentro do arquivo do modelo."
         ))
         signatures_button = prompt.addButton(
             tr("Proteger assinaturas"), QMessageBox.ButtonRole.AcceptRole,
@@ -499,15 +553,25 @@ class MainWindow(QMainWindow):
         full_button = prompt.addButton(
             tr("Proteger modelo inteiro"), QMessageBox.ButtonRole.ActionRole,
         )
+        public_button = prompt.addButton(
+            tr("Salvar sem senha"), QMessageBox.ButtonRole.ActionRole,
+        )
         prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+        style_message_box(prompt)
         prompt.exec()
         clicked = prompt.clickedButton()
         if clicked is signatures_button:
             mode = SIGNATURES_MODE
         elif clicked is full_button:
             mode = FULL_MODE
+        elif clicked is public_button:
+            document["protection_preferences"] = {
+                "public_signatures_acknowledged": True,
+            }
+            return PUBLIC_MODE, None
         else:
             return None
+        document.pop("protection_preferences", None)
         password = self._request_new_fornax_password()
         return (mode, password) if password is not None else None
 
@@ -520,6 +584,9 @@ class MainWindow(QMainWindow):
             mode, password = credentials
             result = migrate_legacy_model(
                 model.path, get_models_dir(), mode=mode, password=password,
+                public_signatures_acknowledged=(
+                    mode == PUBLIC_MODE and bool(document_signatures(document))
+                ),
             )
         except Exception as error:
             QMessageBox.critical(
@@ -552,6 +619,7 @@ class MainWindow(QMainWindow):
         return True
 
     def _open_selected_fornax(self, model: LibraryModel):
+        """Abre o conteúdo disponível sem interromper a seleção com diálogos."""
         status = self._fornax_sessions.select(model.path)
         if status.state in {
             AccessState.PUBLIC_ACTIVE,
@@ -561,39 +629,24 @@ class MainWindow(QMainWindow):
             return self._fornax_sessions.document(), self._fornax_sessions.asset, status
 
         if status.descriptor.mode == SIGNATURES_MODE:
-            prompt = QMessageBox(self)
-            prompt.setWindowTitle(tr("Modelo protegido"))
-            prompt.setText(tr("Este modelo possui assinaturas protegidas."))
-            unlock_button = prompt.addButton(tr("Desbloquear"), QMessageBox.ButtonRole.AcceptRole)
-            public_button = prompt.addButton(
-                tr("Abrir sem assinaturas"), QMessageBox.ButtonRole.ActionRole
-            )
-            prompt.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
-            prompt.exec()
-            clicked = prompt.clickedButton()
-            if clicked is public_button:
-                status = self._fornax_sessions.open_without_signatures(model.path)
-                return self._fornax_sessions.document(), self._fornax_sessions.asset, status
-            if clicked is not unlock_button:
-                return None
-        elif status.descriptor.mode == FULL_MODE:
-            answer = QMessageBox.question(
-                self, tr("Modelo protegido"),
-                tr("Este modelo está integralmente protegido. Deseja desbloqueá-lo?"),
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Yes,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
-                return None
+            status = self._fornax_sessions.open_without_signatures(model.path)
+            return self._fornax_sessions.document(), self._fornax_sessions.asset, status
+        return None
+
+    def _unlock_selected_model(self):
+        """Solicita a senha somente quando o usuário pede acesso ao conteúdo protegido."""
+        model = self._current_library_entry()
+        if model is None or not model.is_fornax or model.descriptor.mode == PUBLIC_MODE:
+            return
 
         password = self._request_fornax_password(tr("Desbloquear modelo"))
         if password is None:
-            return None
+            return
         try:
             status = self._fornax_sessions.unlock(model.path, password)
         except FornaxError as error:
             QMessageBox.warning(self, tr("Não foi possível desbloquear"), str(error))
-            return None
+            return
         if status.public_changed:
             answer = QMessageBox.warning(
                 self, tr("Possível alteração externa"),
@@ -603,8 +656,107 @@ class MainWindow(QMainWindow):
             )
             if answer != QMessageBox.StandardButton.Ok:
                 self._fornax_sessions.forget(model.path)
-                return None
-        return self._fornax_sessions.document(), self._fornax_sessions.asset, status
+                self._on_model_changed(self.preview_panel.cbo_models.currentText())
+                return
+        document = self._fornax_sessions.document()
+        display_name = str(document.get("name") or model.display_name)
+        self._remember_protected_model_name(status.descriptor.model_id, display_name)
+        self._reload_models_from_disk(select_name=display_name)
+
+    def _toggle_selected_model_lock(self):
+        model = self._current_library_entry()
+        if model is None or not model.is_fornax or model.descriptor.mode == PUBLIC_MODE:
+            return
+        try:
+            status = self._fornax_sessions.status(model.path)
+        except FornaxError:
+            status = None
+        if status is not None and status.state == AccessState.AUTHORIZED_ACTIVE:
+            if self.manager is not None and self.manager._is_running:
+                QMessageBox.information(
+                    self, tr("Processamento em andamento"),
+                    tr("Aguarde o término da geração antes de bloquear o modelo."),
+                )
+                return
+            self._fornax_sessions.forget(model.path)
+            self.log_panel.append(
+                tr("Modelo bloqueado: {nome}").format(nome=model.display_name)
+            )
+            self._on_model_changed(model.display_name)
+            return
+        self._unlock_selected_model()
+
+    def _protect_current_model(self):
+        """Eleva explicitamente um modelo público sem deixar backup aberto."""
+        model = self._current_library_entry()
+        if model is None or not model.is_fornax:
+            QMessageBox.warning(self, tr("Atenção"), tr("Selecione um modelo FORNAX."))
+            return
+        if model.key.startswith("external:"):
+            QMessageBox.information(
+                self, tr("Modelo temporário"),
+                tr("Para preservar o arquivo recebido, duplique o modelo ou abra o editor e salve-o como um novo modelo da biblioteca."),
+            )
+            return
+        recovery = EditorWindow.fornax_recovery_path(model.path)
+        if recovery.exists() or recovery.with_name(recovery.name + ".bak").exists():
+            QMessageBox.warning(
+                self, tr("Proteção do modelo"),
+                tr("Há uma recuperação pendente deste modelo. Abra o editor e salve ou descarte a recuperação antes de ativar a proteção."),
+            )
+            return
+        if model.descriptor.mode != PUBLIC_MODE:
+            QMessageBox.information(self, tr("Modelo protegido"), tr("Este modelo já está protegido."))
+            return
+        try:
+            opened = self._open_selected_fornax(model)
+            if opened is None:
+                return
+            document, asset_provider, _status = opened
+            has_signatures = bool(document_signatures(document))
+            dialog = QMessageBox(self)
+            dialog.setWindowTitle(tr("Proteger modelo"))
+            dialog.setText(tr("Escolha o alcance da proteção por senha."))
+            signature_button = None
+            if has_signatures:
+                signature_button = dialog.addButton(
+                    tr("Proteger assinaturas"), QMessageBox.ButtonRole.AcceptRole,
+                )
+            full_button = dialog.addButton(
+                tr("Proteger modelo inteiro"), QMessageBox.ButtonRole.ActionRole,
+            )
+            dialog.addButton(tr("Cancelar"), QMessageBox.ButtonRole.RejectRole)
+            style_message_box(dialog)
+            dialog.exec()
+            clicked = dialog.clickedButton()
+            if signature_button is not None and clicked is signature_button:
+                mode = SIGNATURES_MODE
+            elif clicked is full_button:
+                mode = FULL_MODE
+            else:
+                return
+            password = self._request_new_fornax_password()
+            if password is None:
+                return
+            save_protected_fornax(
+                document, model.path, password, mode=mode,
+                asset_provider=asset_provider, model_id=model.descriptor.model_id,
+            )
+            if mode == FULL_MODE:
+                self._remember_protected_model_name(
+                    model.descriptor.model_id, model.display_name,
+                )
+            self._fornax_sessions.forget(model.path)
+            self._fornax_sessions.unlock(model.path, password)
+            self.log_panel.append(
+                tr("Proteção ativada para '{nome}'.").format(nome=model.display_name)
+            )
+            self._reload_models_from_disk(select_name=model.display_name)
+        except Exception as error:
+            QMessageBox.critical(
+                self, tr("Erro"),
+                tr("Falha ao proteger modelo:\n{erro}").format(erro=error),
+            )
 
     def _approve_shared_model(self, opened):
         """Não redefine a referência autenticada sem revisão explícita."""
@@ -646,9 +798,20 @@ class MainWindow(QMainWindow):
                     opened = open_public_fornax(descriptor)
                     document = opened.document()
                     document["name"] = new_name
-                    save_public_fornax(
-                        document, new_path, asset_provider=opened.asset,
-                    )
+                    document.pop("protection_preferences", None)
+                    credentials = self._legacy_migration_credentials(document)
+                    if credentials is None:
+                        return
+                    mode, password = credentials
+                    if mode == PUBLIC_MODE:
+                        save_public_fornax(document, new_path, asset_provider=opened.asset)
+                    else:
+                        saved = save_protected_fornax(
+                            document, new_path, password, mode=mode,
+                            asset_provider=opened.asset,
+                        )
+                        if mode == FULL_MODE:
+                            self._remember_protected_model_name(saved.model_id, new_name)
                 else:
                     password = self._request_fornax_password(tr("Duplicar modelo protegido"))
                     if password is None:
@@ -658,10 +821,12 @@ class MainWindow(QMainWindow):
                         return
                     document = opened.document()
                     document["name"] = new_name
-                    save_protected_fornax(
+                    saved = save_protected_fornax(
                         document, new_path, password, mode=descriptor.mode,
                         asset_provider=opened.asset,
                     )
+                    if descriptor.mode == FULL_MODE:
+                        self._remember_protected_model_name(saved.model_id, new_name)
                 self.log_panel.append(tr("Modelo duplicado: '{nome}'").format(nome=new_name))
                 self._reload_models_from_disk(select_name=new_name)
             except Exception as error:
@@ -759,6 +924,8 @@ class MainWindow(QMainWindow):
                         document, new_path, password, mode=descriptor.mode,
                         asset_provider=opened.asset, model_id=descriptor.model_id,
                     )
+                    if descriptor.mode == FULL_MODE:
+                        self._remember_protected_model_name(descriptor.model_id, new_name)
                 if new_path != library_model.path:
                     library_model.path.unlink()
                     self._fornax_sessions.forget(library_model.path)
@@ -838,6 +1005,8 @@ class MainWindow(QMainWindow):
             else:
                 model_dir.unlink()
                 self._fornax_sessions.forget(model_dir)
+                if library_model is not None and library_model.descriptor is not None:
+                    self._forget_protected_model_name(library_model.descriptor.model_id)
         except Exception as e:
             QMessageBox.critical(self, tr("Erro"), tr("Falha ao excluir: {erro}").format(erro=e))
             return
@@ -909,11 +1078,16 @@ class MainWindow(QMainWindow):
                     candidate for candidate in selected
                     if candidate.descriptor.mode != PUBLIC_MODE
                 ]
+                candidates_with_signatures = [
+                    candidate for candidate in selected
+                    if candidate.descriptor.mode != PUBLIC_MODE
+                    or candidate.descriptor.version == 2
+                ]
                 include_signatures = False
-                if protected:
+                if candidates_with_signatures:
                     prompt = QMessageBox(self)
-                    prompt.setWindowTitle(tr("Importar modelos protegidos"))
-                    prompt.setText(tr("Deseja incorporar as assinaturas protegidas?"))
+                    prompt.setWindowTitle(tr("Importar assinaturas"))
+                    prompt.setText(tr("Deseja incorporar as assinaturas dos modelos selecionados?"))
                     include_button = prompt.addButton(
                         tr("Importar com assinaturas"), QMessageBox.ButtonRole.AcceptRole,
                     )
@@ -942,7 +1116,11 @@ class MainWindow(QMainWindow):
                 authorized = {}
                 skipped = []
                 signature_choice = {
-                    candidate.entry_name: include_signatures for candidate in selected
+                    candidate.entry_name: (
+                        include_signatures
+                        if candidate in candidates_with_signatures else False
+                    )
+                    for candidate in selected
                 }
                 for candidate in must_unlock:
                     password = common_transport
@@ -996,10 +1174,57 @@ class MainWindow(QMainWindow):
                     candidate for candidate in selected
                     if candidate.entry_name not in skipped
                 ]
+                target_modes = {
+                    candidate.entry_name: (
+                        candidate.descriptor.mode
+                        if candidate.descriptor.mode != PUBLIC_MODE
+                        and signature_choice[candidate.entry_name]
+                        else PUBLIC_MODE
+                    )
+                    for candidate in selected
+                }
+                public_signed = [
+                    candidate for candidate in selected
+                    if candidate.descriptor.mode == PUBLIC_MODE
+                    and candidate.descriptor.version == 2
+                    and signature_choice[candidate.entry_name]
+                ]
+                if public_signed:
+                    protection_prompt = QMessageBox(self)
+                    protection_prompt.setWindowTitle(tr("Proteção local"))
+                    protection_prompt.setText(tr(
+                        "Os modelos públicos selecionados possuem assinaturas. "
+                        "Recomendamos protegê-las com senha."
+                    ))
+                    signatures_button = protection_prompt.addButton(
+                        tr("Proteger assinaturas"), QMessageBox.ButtonRole.AcceptRole,
+                    )
+                    full_button = protection_prompt.addButton(
+                        tr("Proteger modelo inteiro"), QMessageBox.ButtonRole.ActionRole,
+                    )
+                    public_button = protection_prompt.addButton(
+                        tr("Manter sem senha"), QMessageBox.ButtonRole.ActionRole,
+                    )
+                    protection_prompt.addButton(
+                        tr("Cancelar"), QMessageBox.ButtonRole.RejectRole,
+                    )
+                    style_message_box(protection_prompt)
+                    protection_prompt.exec()
+                    clicked = protection_prompt.clickedButton()
+                    if clicked is signatures_button:
+                        public_target_mode = SIGNATURES_MODE
+                    elif clicked is full_button:
+                        public_target_mode = FULL_MODE
+                    elif clicked is public_button:
+                        public_target_mode = PUBLIC_MODE
+                    else:
+                        return
+                    for candidate in public_signed:
+                        target_modes[candidate.entry_name] = public_target_mode
+
                 protected_local = [
                     candidate for candidate in selected
-                    if candidate.descriptor.mode != PUBLIC_MODE
-                    and signature_choice[candidate.entry_name]
+                    if target_modes[candidate.entry_name] != PUBLIC_MODE
                 ]
                 local_passwords = {}
                 if protected_local:
@@ -1068,6 +1293,11 @@ class MainWindow(QMainWindow):
                         import_candidate(
                             candidate, destination,
                             include_signatures=signature_choice[candidate.entry_name],
+                            target_mode=target_modes[candidate.entry_name],
+                            public_signatures_acknowledged=(
+                                target_modes[candidate.entry_name] == PUBLIC_MODE
+                                and signature_choice[candidate.entry_name]
+                            ),
                             transport_password=authorized.get(candidate.entry_name, (None, None))[0],
                             approved_sha256=authorized.get(candidate.entry_name, (None, None))[1],
                             local_password=local_passwords.get(candidate.entry_name),
@@ -1218,7 +1448,13 @@ class MainWindow(QMainWindow):
                             legacy_target = models_dir / target_slug
                             import_legacy_document(
                                 imported_document, source_dir, models_dir / f"{target_slug}.fornax",
-                                mode=mode, password=password,
+                                mode=mode,
+                                include_signatures=bool(document_signatures(imported_document)),
+                                public_signatures_acknowledged=(
+                                    mode == PUBLIC_MODE
+                                    and bool(document_signatures(imported_document))
+                                ),
+                                password=password,
                                 replace_existing=decision["action"] == "replace",
                                 legacy_source=(legacy_target if decision["action"] == "replace" and legacy_target.is_dir() else None),
                             )
@@ -1289,11 +1525,15 @@ class MainWindow(QMainWindow):
             return
 
         protected = [model for model in selected if model.descriptor.mode != PUBLIC_MODE]
+        signature_bearing = [
+            model for model in selected
+            if model.descriptor.mode != PUBLIC_MODE or model.descriptor.version == 2
+        ]
         include_signatures = False
-        if protected:
+        if signature_bearing:
             prompt = QMessageBox(self)
-            prompt.setWindowTitle(tr("Exportar modelos protegidos"))
-            prompt.setText(tr("Deseja incluir as assinaturas protegidas na exportação?"))
+            prompt.setWindowTitle(tr("Exportar assinaturas"))
+            prompt.setText(tr("Deseja incluir as assinaturas dos modelos selecionados?"))
             include_button = prompt.addButton(
                 tr("Enviar com assinaturas"), QMessageBox.ButtonRole.AcceptRole,
             )
@@ -1455,6 +1695,7 @@ class MainWindow(QMainWindow):
         self._preview_sheet_index = 0
         self._invalidate_sheet_previews()
         self.preview_panel.set_page_navigation(1, 0)
+        self.preview_panel.set_model_lock_state(False)
         self.preview_panel.set_preview_text(tr("Prévia do modelo selecionado:\n{nome}").format(nome=name))
         self.log_panel.append(tr("Modelo ativo: {nome}").format(nome=name))
         self.active_model_name = name
@@ -1488,6 +1729,7 @@ class MainWindow(QMainWindow):
             opened = self._open_selected_fornax(library_model)
             if opened is None:
                 self.preview_panel.set_preview_text(tr("Modelo protegido"))
+                self.preview_panel.set_model_lock_state(True)
                 self._update_table_columns([])
                 if hasattr(self, "btn_config_model"):
                     self.btn_config_model.setEnabled(False)
@@ -1611,6 +1853,10 @@ class MainWindow(QMainWindow):
 
         self._fornax_asset_provider = asset_provider
         self._active_fornax_status = status
+        self.preview_panel.set_model_lock_state(
+            status.descriptor.mode != PUBLIC_MODE,
+            unlocked=status.state == AccessState.AUTHORIZED_ACTIVE,
+        )
         self._protected_preview_memory_only = (
             status.descriptor.mode != "none"
             and status.state == AccessState.AUTHORIZED_ACTIVE

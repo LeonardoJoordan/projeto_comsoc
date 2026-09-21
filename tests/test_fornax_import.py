@@ -18,10 +18,13 @@ from core.fornax_container import (
     save_public_fornax,
     unlock_fornax,
 )
-from core.fornax_import import import_candidate, open_import_package
+from core.fornax_import import import_candidate, import_legacy_document, open_import_package
 from core.model_document import document_signatures
 from tests.test_fornax_crypto import FIXTURE_DIR, PASSWORD, protected_document
-from tests.test_fornax_export import signature_free_document
+from tests.test_fornax_export import (
+    acknowledged_public_signature_document,
+    signature_free_document,
+)
 
 
 TRANSPORT_PASSWORD = "Senha do pacote recebido 2026"
@@ -47,6 +50,70 @@ def test_public_import_creates_new_local_identity_and_preserves_received_file(tm
     assert open_public_fornax(destination).document()["origin_info"]["source"] == "imported"
 
 
+def test_public_v2_import_requires_fresh_local_decision(tmp_path):
+    received = tmp_path / "signed-public.fornax"
+    save_public_fornax(
+        acknowledged_public_signature_document(), received, source_dir=FIXTURE_DIR,
+    )
+    destination = tmp_path / "library" / "modelo.fornax"
+
+    with open_import_package(received) as candidates:
+        with pytest.raises(FornaxError, match="aceite local"):
+            import_candidate(
+                candidates[0], destination, include_signatures=True,
+                target_mode=PUBLIC_MODE,
+            )
+        imported = import_candidate(
+            candidates[0], destination, include_signatures=True,
+            target_mode=PUBLIC_MODE, public_signatures_acknowledged=True,
+        )
+
+    restored = open_public_fornax(destination).document()
+    assert imported.version == 2
+    assert len(document_signatures(restored)) == 2
+    assert restored["protection_preferences"]["public_signatures_acknowledged"] is True
+
+
+def test_public_v2_import_can_remove_or_protect_signatures(tmp_path):
+    received = tmp_path / "signed-public.fornax"
+    save_public_fornax(
+        acknowledged_public_signature_document(), received, source_dir=FIXTURE_DIR,
+    )
+    without = tmp_path / "library" / "without.fornax"
+    protected = tmp_path / "library" / "protected.fornax"
+
+    with open_import_package(received) as candidates:
+        candidate = candidates[0]
+        removed = import_candidate(
+            candidate, without, include_signatures=False, target_mode=PUBLIC_MODE,
+        )
+        secured = import_candidate(
+            candidate, protected, include_signatures=True,
+            target_mode=SIGNATURES_MODE, local_password=LOCAL_PASSWORD,
+        )
+
+    assert removed.version == 1
+    assert document_signatures(open_public_fornax(without).document()) == []
+    assert secured.mode == SIGNATURES_MODE
+    assert len(document_signatures(unlock_fornax(protected, LOCAL_PASSWORD).document())) == 2
+
+
+@pytest.mark.parametrize("include_signatures", [True, False])
+def test_legacy_public_import_keeps_signature_choice_independent_from_mode(
+    tmp_path, include_signatures,
+):
+    destination = tmp_path / "library" / "legacy.fornax"
+    descriptor = import_legacy_document(
+        protected_document(), FIXTURE_DIR, destination,
+        mode=PUBLIC_MODE, include_signatures=include_signatures,
+        public_signatures_acknowledged=include_signatures,
+    )
+    restored = open_public_fornax(destination).document()
+
+    assert descriptor.version == (2 if include_signatures else 1)
+    assert bool(document_signatures(restored)) is include_signatures
+
+
 def test_partial_import_without_signatures_does_not_require_transport_password(tmp_path):
     received = tmp_path / "partial.fornax"
     save_protected_fornax(
@@ -64,6 +131,39 @@ def test_partial_import_without_signatures_does_not_require_transport_password(t
     with zipfile.ZipFile(destination) as archive:
         assert "protected.bin" not in archive.namelist()
     assert received.read_bytes() == before
+
+
+def test_signature_choice_and_target_protection_are_independent(tmp_path):
+    received = tmp_path / "partial.fornax"
+    save_protected_fornax(
+        protected_document(), received, TRANSPORT_PASSWORD,
+        mode=SIGNATURES_MODE, source_dir=FIXTURE_DIR,
+    )
+    destination = tmp_path / "library" / "full-without-signatures.fornax"
+
+    with open_import_package(received) as candidates:
+        imported = import_candidate(
+            candidates[0], destination, include_signatures=False,
+            target_mode=FULL_MODE, local_password=LOCAL_PASSWORD,
+        )
+
+    assert imported.mode == FULL_MODE
+    restored = unlock_fornax(destination, LOCAL_PASSWORD).document()
+    assert document_signatures(restored) == []
+
+
+def test_signature_only_target_rejects_content_without_signatures(tmp_path):
+    received = tmp_path / "public.fornax"
+    save_public_fornax(signature_free_document(), received, source_dir=FIXTURE_DIR)
+    destination = tmp_path / "library" / "invalid.fornax"
+
+    with open_import_package(received) as candidates:
+        with pytest.raises(FornaxError, match="ao menos uma assinatura"):
+            import_candidate(
+                candidates[0], destination, include_signatures=False,
+                target_mode=SIGNATURES_MODE, local_password=LOCAL_PASSWORD,
+            )
+    assert not destination.exists()
 
 
 @pytest.mark.parametrize("mode", [SIGNATURES_MODE, FULL_MODE])

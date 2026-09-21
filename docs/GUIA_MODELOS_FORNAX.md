@@ -15,6 +15,12 @@ Não renomeie um ZIP antigo para `.fornax`: a estrutura interna é diferente.
 Fotos variáveis referenciadas por pasta continuam externas ao modelo; configure
 a pasta no computador de destino.
 
+O contêiner versão 1 continua sendo usado para modelos públicos sem assinatura e
+para os modos protegidos. O contêiner versão 2 identifica especificamente um
+modelo público com assinaturas. Essa distinção permite que versões anteriores do
+programa recusem a capacidade desconhecida, em vez de interpretar o arquivo como
+corrompido. O documento gráfico interno permanece no schema v4.
+
 Ao abrir um `.fornax` externo, o programa oferece adicioná-lo à biblioteca.
 Recusar permite o uso temporário; ele não passa a fazer parte da biblioteca na
 próxima execução. Importar cria uma cópia local, preservando o arquivo recebido.
@@ -22,16 +28,19 @@ Abertura por duplo clique depende da associação instalada pelo sistema; sua
 validação nos pacotes está pendente. O ícone previsto é o do programa, sem
 miniatura personalizada nesta versão.
 
-## Três modos de proteção
+## Armazenamento e proteção
 
 | Modo | Sem senha | Com senha |
 |---|---|---|
-| Sem proteção | Abre e edita o modelo | Não se aplica |
+| Sem proteção | Abre e edita o modelo, inclusive assinaturas aceitas como públicas | Não se aplica |
 | Proteger assinaturas | Permite uma cópia sem assinaturas | Libera as assinaturas e a edição do original |
 | Proteger modelo inteiro | Não libera conteúdo nem prévia do modelo | Libera o documento completo |
 
-Modelos com objetos do tipo **assinatura** exigem proteção ao salvar ou converter.
-Um modelo sem assinaturas também pode receber proteção integral. Imagens comuns
+Ao salvar ou converter um modelo com objetos do tipo **assinatura**, o programa
+recomenda proteção. O usuário pode proteger somente as assinaturas, proteger o
+modelo inteiro ou continuar sem senha depois de aceitar que essas imagens ficarão
+acessíveis dentro do arquivo. Um modelo sem assinaturas também pode receber
+proteção integral. Imagens comuns
 não são classificadas automaticamente como assinaturas: inserir a foto de uma
 assinatura como imagem comum não ativa essa política.
 
@@ -40,10 +49,15 @@ recuperação da senha perdida. Guarde-a em local adequado; o backup do modelo
 não contorna a senha. Mesmo com proteção integral, o nome do arquivo e parte dos
 metadados técnicos do contêiner continuam visíveis. Evite dados sensíveis no nome.
 
+A ação **Proteger modelo…** preserva arquivos abertos temporariamente: primeiro
+salve uma cópia na biblioteca. Se houver recuperação pendente do editor, abra o
+editor e salve ou descarte essa recuperação antes de ativar a proteção. Isso evita
+deixar uma recuperação pública antiga ao lado do modelo recém-protegido.
+
 **“Cópia sem assinaturas — o original está preservado”** significa que nenhuma
 assinatura faz parte daquela cópia. Salvar suas alterações exige um novo modelo,
-sem substituir o original protegido. Assinaturas adicionadas à cópia exigirão
-proteção no novo salvamento.
+sem substituir o original protegido. Se forem adicionadas assinaturas, o novo
+salvamento apresenta novamente a recomendação e as opções de proteção.
 
 Enquanto um modelo autorizado permanece ativo, a senha não expira por um timer
 de inatividade. Ao trocar de modelo, começa uma tolerância individual de cinco
@@ -56,6 +70,9 @@ Encerrar o programa encerra a autorização; não é um login permanente.
 Na exportação, escolha se deseja incluir assinaturas. Sem elas, a cópia exportada
 é pública; o original não é alterado. Um modelo integralmente protegido precisa
 ser desbloqueado para que o programa possa produzir qualquer cópia de seu conteúdo.
+Um modelo público com assinaturas pode ser enviado sem senha de transporte; suas
+assinaturas permanecem extraíveis do arquivo recebido. Retirá-las produz uma
+cópia pública sem esses objetos e sem seus assets exclusivos.
 
 Para enviar conteúdo protegido, desbloqueie os modelos necessários e defina uma
 senha de transporte. É possível tentar a mesma senha local em vários modelos;
@@ -69,6 +86,11 @@ escolher deliberadamente a mesma senha, ela continuará funcionando por ser igua
 Importar sem assinaturas é possível quando há uma parte pública disponível;
 proteção integral não permite abrir conteúdo sem desbloqueio.
 
+Ao incorporar um modelo público com assinaturas, a decisão tomada pelo remetente
+não é herdada silenciosamente. O programa recomenda uma proteção local e permite
+manter as assinaturas sem senha, protegê-las ou retirá-las. Incluir assinatura e
+escolher proteção são decisões independentes.
+
 ## Converter os modelos antigos dos testers
 
 1. Antes do teste, com o programa fechado, faça uma cópia da biblioteca antiga.
@@ -76,8 +98,9 @@ proteção integral não permite abrir conteúdo sem desbloqueio.
    não a trate como um arquivo já protegido pelo FORNAX.
 2. Abra o programa normalmente. A biblioteca pode listar pastas antigas junto
    dos novos arquivos; a conversão ocorre ao selecionar o modelo antigo.
-3. Se houver assinatura, cadastre a senha e escolha proteger as assinaturas ou
-   o modelo inteiro. Cancelar essa etapa não autoriza uma conversão sem proteção.
+3. Se houver assinatura, escolha proteger as assinaturas, proteger o modelo inteiro
+   ou continuar sem senha após o aviso. Cancelar preserva a pasta antiga e não
+   publica uma conversão incompleta.
 4. O programa normaliza o documento, preservando a página única dos modelos
    antigos e as páginas existentes, publica o `.fornax` e verifica o resultado.
 5. A limpeza dos arquivos antigos só ocorre após as verificações. Arquivos que
@@ -125,6 +148,11 @@ Os PNGs/PDFs gerados incluem as assinaturas autorizadas e não recebem a senha d
 modelo. Essa proteção não prova autoria, não é assinatura digital de documento
 nem impede captura do material já exibido ou gerado. Arquivos antigos e backups
 externos não são criptografados retroativamente.
+
+No modo público, um `.fornax` é um contêiner organizado, não um cofre: quem recebe
+o arquivo pode abrir sua estrutura e extrair assinaturas e demais assets. O aviso
+registra uma decisão de uso, mas não adiciona criptografia. Para confidencialidade
+do modelo armazenado, use uma das opções protegidas.
 
 A revisão interna não é certificação nem auditoria independente. Evidências e
 pendências estão no [relatório de fechamento](../history/ETAPA_4_5_FECHAMENTO_FORNAX.md).

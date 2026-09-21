@@ -89,7 +89,7 @@ def test_public_legacy_conversion_preserves_rendering_and_removes_source(tmp_pat
     assert after == before
 
 
-def test_signed_legacy_requires_protection_and_keeps_hidden_signature(tmp_path):
+def test_signed_legacy_requires_explicit_choice_and_keeps_hidden_signature(tmp_path):
     models = tmp_path / "models"
     source = models / "diploma"
     source.mkdir(parents=True)
@@ -98,7 +98,7 @@ def test_signed_legacy_requires_protection_and_keeps_hidden_signature(tmp_path):
         _legacy_document(signature_path="signature.png"), source,
     )
 
-    with pytest.raises(LegacyMigrationError, match="exigem proteção"):
+    with pytest.raises(LegacyMigrationError, match="aceite explícito"):
         migrate_legacy_model(source, models, mode=PUBLIC_MODE)
     assert source.is_dir()
 
@@ -113,6 +113,26 @@ def test_signed_legacy_requires_protection_and_keeps_hidden_signature(tmp_path):
     signatures = restored["pages"][0]["signatures"]
     assert len(signatures) == 1
     assert signatures[0]["visible"] is False
+    assert not source.exists()
+
+
+def test_signed_legacy_can_be_converted_to_acknowledged_public_v2(tmp_path):
+    models = tmp_path / "models"
+    source = models / "diploma-publico"
+    source.mkdir(parents=True)
+    _image(source / "signature.png", "#151515")
+    save_model_document(_legacy_document(signature_path="signature.png"), source)
+
+    result = migrate_legacy_model(
+        source, models, mode=PUBLIC_MODE,
+        public_signatures_acknowledged=True,
+    )
+    descriptor = inspect_fornax(result.destination)
+    restored = open_public_fornax(descriptor).document()
+
+    assert descriptor.version == 2
+    assert restored["protection_preferences"]["public_signatures_acknowledged"] is True
+    assert restored["pages"][0]["signatures"][0]["visible"] is False
     assert not source.exists()
 
 

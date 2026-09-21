@@ -293,6 +293,16 @@ def validate_model_document(document: dict) -> None:
         raise ModelValidationError("O modelo deve ser um objeto JSON.")
     if document.get("schema_version") != SCHEMA_VERSION:
         raise UnsupportedSchemaError(f"Versão de modelo não suportada: {document.get('schema_version')!r}.")
+    if "protection_preferences" in document:
+        preferences = document["protection_preferences"]
+        if not isinstance(preferences, dict):
+            raise ModelValidationError("protection_preferences deve ser um objeto.")
+        if set(preferences) != {"public_signatures_acknowledged"}:
+            raise ModelValidationError("protection_preferences possui campos inválidos.")
+        if not isinstance(preferences["public_signatures_acknowledged"], bool):
+            raise ModelValidationError(
+                "public_signatures_acknowledged deve ser um valor booleano."
+            )
     _validate_dimensions(document)
     placeholders = document.get("placeholders", [])
     if not isinstance(placeholders, list) or not all(isinstance(value, str) for value in placeholders):
@@ -499,6 +509,47 @@ def persistent_model_document(document: dict) -> dict:
 
     result = clean(normalized)
     result.pop("source_schema_version", None)
+    validate_model_document(result)
+    return result
+
+
+def without_signatures(document: dict) -> dict:
+    """Retorna uma cópia persistente sem objetos nem estado de assinaturas."""
+    result = persistent_model_document(document)
+    signature_paths = {
+        item.get("path")
+        for page in result["pages"]
+        for item in page.get("signatures", [])
+        if isinstance(item.get("path"), str) and item.get("path")
+    }
+    retained_paths = {
+        reference
+        for page in result["pages"]
+        for reference in (
+            [page.get("background_path")]
+            + [item.get("path") for item in page.get("images", [])]
+        )
+        if isinstance(reference, str) and reference
+    }
+    for page in result["pages"]:
+        signature_ids = {
+            item["object_id"] for item in page.get("signatures", [])
+        }
+        page["signatures"] = []
+        page["layer_order"] = [
+            object_id for object_id in page.get("layer_order", [])
+            if object_id not in signature_ids
+        ]
+    result.pop("protection_preferences", None)
+    exclusive_names = {
+        Path(reference).name for reference in signature_paths - retained_paths
+    }
+    origin = result.get("origin_info")
+    if exclusive_names and isinstance(origin, dict) and isinstance(origin.get("assets"), list):
+        origin["assets"] = [
+            item for item in origin["assets"]
+            if not isinstance(item, dict) or item.get("name") not in exclusive_names
+        ]
     validate_model_document(result)
     return result
 

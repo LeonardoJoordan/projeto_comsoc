@@ -51,6 +51,8 @@ def test_english_catalog_loads_and_portuguese_remains_the_source(tmp_path):
     assert initialize_i18n(app, settings) == "en_US"
     assert tr("Programa") == "Application"
     assert tr("Dados para o modelo") == "Template data"
+    assert tr("Salvar sem senha") == "Save without password"
+    assert tr("Proteger modelo…") == "Protect template…"
 
     set_preferred_locale(settings, "pt_BR")
     assert initialize_i18n(app, settings) == "pt_BR"
@@ -66,6 +68,8 @@ def test_spanish_catalog_loads(tmp_path):
     assert tr("Programa") == "Programa"
     assert tr("Dados para o modelo") == "Datos para la plantilla"
     assert tr("Folha de impressão") == "Hoja de impresión"
+    assert tr("Salvar sem senha") == "Guardar sin contraseña"
+    assert tr("Importar assinaturas") == "Importar firmas"
 
     set_preferred_locale(settings, "pt_BR")
     assert initialize_i18n(app, settings) == "pt_BR"

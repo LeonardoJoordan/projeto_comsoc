@@ -35,6 +35,8 @@ ROW = {'Nome': 'Ada Lovelace', 'Cargo': 'Referência', 'Site': 'https://example.
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output', type=Path, default=ROOT / '.validation/fornax_stage4/modern')
+    parser.add_argument('--public-signatures', action='store_true',
+                        help='Inclui também o cenário público v2 com assinaturas.')
     args = parser.parse_args()
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -50,12 +52,18 @@ def main():
               'captured_at': time.strftime('%Y-%m-%dT%H:%M:%S%z'), 'modes': {},
               'fixture_sha256': hashlib.sha256(FIXTURE.read_bytes()).hexdigest(),
               'notes': ['Asset ausente invisível removido para permitir empacotamento válido.',
-                        'Modo público compara contra referência sem assinaturas; demais modos preservam ambas.',
+                        'Cenário none usa referência sem assinaturas; public_signatures e modos protegidos preservam ambas.',
                         'Tempos locais sintéticos; cold inclui uma amostra, não é benchmark de hardware modesto.',
                         'RSS é pico acumulado do processo; não somar nem atribuir integralmente a cada modo.']}
-    for mode in (PUBLIC_MODE, SIGNATURES_MODE, FULL_MODE):
+    scenarios = [PUBLIC_MODE, SIGNATURES_MODE, FULL_MODE]
+    if args.public_signatures:
+        scenarios.append('public_signatures')
+    for scenario in scenarios:
+        mode = PUBLIC_MODE if scenario == 'public_signatures' else scenario
         source = deepcopy(document)
-        if mode == PUBLIC_MODE:
+        if scenario == 'public_signatures':
+            source['protection_preferences'] = {'public_signatures_acknowledged': True}
+        elif mode == PUBLIC_MODE:
             for page in source['pages']:
                 removed = {item['object_id'] for item in page['signatures']}
                 page['signatures'] = []
@@ -64,7 +72,7 @@ def main():
         expected = [renderer.render_to_qimage(ROW, ROW) for renderer in reference]
         if mode != PUBLIC_MODE:
             assert expected == [r.render_to_qimage(ROW, ROW) for r in renderers_for_document(original)]
-        target = output / f'{mode}.fornax'
+        target = output / f'{scenario}.fornax'
         if target.exists():
             raise RuntimeError(f'Use um diretório novo: {target}')
         create = (lambda: save_public_fornax(source, target, source_dir=FIXTURE.parent)) if mode == PUBLIC_MODE else (
@@ -77,7 +85,7 @@ def main():
         assert images == expected, f'Paridade visual falhou: {mode}'
         hashes = []
         for index, image in enumerate(images):
-            path = output / f'{mode}-page{index+1}.png'
+            path = output / f'{scenario}-page{index+1}.png'
             assert image.save(str(path))
             hashes.append(hashlib.sha256(path.read_bytes()).hexdigest())
         sessions = FornaxSessionManager()
@@ -91,7 +99,7 @@ def main():
         editor.close()
         app.processEvents()
         _, save_time = _measure(lambda: sessions.save(sessions.document()), 3)
-        batch = output / f'pdf-{mode}'
+        batch = output / f'pdf-{scenario}'
         batch.mkdir()
         tasks = [(i, i, 0, {**ROW, 'Nome': f'Pessoa {i}'}, {**ROW, 'Nome': f'Pessoa {i}'}, f'item-{i:03d}') for i in range(100)]
         worker = DirectRenderWorker(tasks, renderers, batch, 'PDF', False, 100, 60, secure_output=mode != PUBLIC_MODE)
@@ -112,7 +120,7 @@ def main():
         preview.pageFailed.connect(lambda *data: errors.append(data))
         _, sheet_time = _measure(preview.run, 1)
         assert not errors and previews, errors
-        report['modes'][mode] = {'create': create_time, 'open_or_unlock': unlock_time, 'editor_load': editor_time,
+        report['modes'][scenario] = {'create': create_time, 'open_or_unlock': unlock_time, 'editor_load': editor_time,
                                   'render_cold': cold_render, 'render_warm': warm_render, 'save_authorized': save_time,
                                   'generate_100_items_200_pages': generate_time, 'preview_500_rows_4_faces': sheet_time,
                                   'preview_faces': len(previews), 'package_bytes': target.stat().st_size,

@@ -16,6 +16,8 @@ from core.fornax_container import (
     MAX_PACKAGE_BYTES,
     FULL_MODE,
     PUBLIC_MODE,
+    SIGNATURES_MODE,
+    PROTECTED_MODES,
     FornaxDescriptor,
     FornaxFormatError,
     inspect_fornax,
@@ -25,6 +27,7 @@ from core.fornax_container import (
     unlock_fornax,
 )
 from core.model_info import build_model_snapshot
+from core.model_document import document_signatures, without_signatures
 from core.file_transactions import file_lock, publish_new, sync_directory, file_sha256
 
 
@@ -143,6 +146,8 @@ def import_candidate(
     destination: str | Path,
     *,
     include_signatures: bool,
+    target_mode: str | None = None,
+    public_signatures_acknowledged: bool = False,
     transport_password: str | None = None,
     local_password: str | None = None,
     opened=None,
@@ -193,23 +198,39 @@ def import_candidate(
     if model_name is not None:
         document["name"] = model_name
 
+    # O aceite pertence à biblioteca de destino e nunca é herdado do remetente.
+    document.pop("protection_preferences", None)
     if not include_signatures:
-        for page in document["pages"]:
-            signature_ids = {item["object_id"] for item in page["signatures"]}
-            page["signatures"] = []
-            page["layer_order"] = [
-                item for item in page["layer_order"] if item not in signature_ids
-            ]
+        document = without_signatures(document)
+    has_signatures = bool(document_signatures(document))
+    if target_mode is None:
+        target_mode = (
+            descriptor.mode
+            if include_signatures and descriptor.mode in PROTECTED_MODES
+            else PUBLIC_MODE
+        )
+    if target_mode not in {PUBLIC_MODE, *PROTECTED_MODES}:
+        raise FornaxFormatError("Modo de destino inválido para importação.")
+    if target_mode == SIGNATURES_MODE and not has_signatures:
+        raise FornaxFormatError("Proteção de assinaturas exige ao menos uma assinatura.")
+    if target_mode == PUBLIC_MODE and has_signatures:
+        if not public_signatures_acknowledged:
+            raise FornaxFormatError(
+                "Importar assinaturas sem proteção exige aceite local explícito."
+            )
+        document["protection_preferences"] = {
+            "public_signatures_acknowledged": True,
+        }
     document["origin_info"] = build_model_snapshot(document, source="imported")
 
     destination.parent.mkdir(parents=True, exist_ok=True)
     staged = destination.with_name(f".{destination.name}.import-{uuid4().hex}.fornax")
     try:
-        if include_signatures and descriptor.mode != PUBLIC_MODE:
+        if target_mode in PROTECTED_MODES:
             if local_password is None:
-                raise FornaxFormatError("Defina uma nova senha local para as assinaturas.")
+                raise FornaxFormatError("Defina uma nova senha local para o modelo protegido.")
             saved = save_protected_fornax(
-                document, staged, local_password, mode=descriptor.mode,
+                document, staged, local_password, mode=target_mode,
                 asset_provider=opened.asset,
             )
         else:
@@ -254,8 +275,11 @@ def import_candidate(
         staged.unlink(missing_ok=True)
 
 
-def import_legacy_document(document, source_dir, destination, *, mode=PUBLIC_MODE,
-                           password=None, replace_existing=False, legacy_source=None):
+def import_legacy_document(
+    document, source_dir, destination, *, mode=PUBLIC_MODE,
+    include_signatures: bool = True, public_signatures_acknowledged: bool = False,
+    password=None, replace_existing=False, legacy_source=None,
+):
     """Normaliza ZIPs antigos pelo mesmo fluxo transacional dos pacotes atuais."""
     from core.model_document import iter_page_asset_paths
     root = Path(source_dir).resolve()
@@ -266,13 +290,27 @@ def import_legacy_document(document, source_dir, destination, *, mode=PUBLIC_MOD
             raise FornaxFormatError("O modelo recebido referencia um asset fora da pasta importada.")
     with tempfile.TemporaryDirectory(prefix="fornax_legacy_import_") as temporary:
         converted = Path(temporary) / "converted.fornax"
+        source_document = document if include_signatures else without_signatures(document)
         if mode == PUBLIC_MODE:
-            save_public_fornax(document, converted, source_dir=source_dir)
+            if document_signatures(source_document):
+                if not public_signatures_acknowledged:
+                    raise FornaxFormatError(
+                        "Importar assinaturas sem proteção exige aceite local explícito."
+                    )
+                source_document = dict(source_document)
+                source_document["protection_preferences"] = {
+                    "public_signatures_acknowledged": True,
+                }
+            save_public_fornax(source_document, converted, source_dir=source_dir)
         else:
-            save_protected_fornax(document, converted, password, mode=mode, source_dir=source_dir)
+            save_protected_fornax(
+                source_document, converted, password, mode=mode, source_dir=source_dir,
+            )
         with open_import_package(converted) as candidates:
             return import_candidate(
-                candidates[0], destination, include_signatures=mode != PUBLIC_MODE,
+                candidates[0], destination, include_signatures=include_signatures,
+                target_mode=mode,
+                public_signatures_acknowledged=public_signatures_acknowledged,
                 transport_password=password, local_password=password,
                 replace_existing=replace_existing, legacy_source=legacy_source,
             )

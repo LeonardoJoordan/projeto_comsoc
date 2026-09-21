@@ -37,6 +37,14 @@ def signature_free_document():
     return document
 
 
+def acknowledged_public_signature_document():
+    document = protected_document()
+    document["protection_preferences"] = {
+        "public_signatures_acknowledged": True,
+    }
+    return document
+
+
 def test_public_single_export_creates_independent_copy(tmp_path):
     source = tmp_path / "source.fornax"
     original = save_public_fornax(
@@ -55,6 +63,47 @@ def test_public_single_export_creates_independent_copy(tmp_path):
     assert inspect_fornax(destination).model_id != original.model_id
     assert open_public_fornax(destination).document()["pages"]
     assert source.read_bytes() == before
+
+
+@pytest.mark.parametrize("include_signatures", [True, False])
+def test_public_v2_export_respects_signature_choice(tmp_path, include_signatures):
+    source = tmp_path / "signed-public.fornax"
+    save_public_fornax(
+        acknowledged_public_signature_document(), source, source_dir=FIXTURE_DIR,
+    )
+    destination = tmp_path / "shared.fornax"
+
+    export_models(
+        [ExportRequest(source, "Público assinado")], destination,
+        include_signatures=include_signatures,
+    )
+    descriptor = inspect_fornax(destination)
+    restored = open_public_fornax(destination).document()
+
+    assert descriptor.version == (2 if include_signatures else 1)
+    assert bool(document_signatures(restored)) is include_signatures
+    assert ("protection_preferences" in restored) is include_signatures
+
+
+def test_removing_public_signature_preserves_asset_shared_with_image(tmp_path):
+    document = acknowledged_public_signature_document()
+    shared_path = document["pages"][0]["signatures"][0]["path"]
+    document["pages"][0]["images"][0]["path"] = shared_path
+    source = tmp_path / "shared-source.fornax"
+    save_public_fornax(document, source, source_dir=FIXTURE_DIR)
+    destination = tmp_path / "without-signatures.fornax"
+
+    export_models(
+        [ExportRequest(source, "Asset compartilhado")], destination,
+        include_signatures=False,
+    )
+    opened = open_public_fornax(destination)
+    restored = opened.document()
+    image_path = restored["pages"][0]["images"][0]["path"]
+
+    assert restored["pages"][0]["signatures"] == []
+    assert image_path in opened.asset_references
+    assert opened.asset(image_path)
 
 
 def test_partial_export_reencrypts_signatures_with_transport_password(tmp_path):

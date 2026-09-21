@@ -70,6 +70,20 @@ def test_production_kdf_matches_public_stage2_vector():
     )
 
 
+@pytest.mark.parametrize("mode", [SIGNATURES_MODE, FULL_MODE])
+def test_protected_save_remains_v1_and_strips_public_acknowledgement(tmp_path, mode):
+    source = protected_document()
+    source["protection_preferences"] = {"public_signatures_acknowledged": True}
+    target = tmp_path / f"protected-{mode}.fornax"
+
+    descriptor = save_protected_fornax(source, target, PASSWORD, mode=mode, source_dir=FIXTURE_DIR)
+    opened = unlock_fornax(target, PASSWORD)
+
+    assert descriptor.version == 1
+    assert inspect_fornax(target).version == 1
+    assert "protection_preferences" not in opened.document()
+
+
 def test_signature_mode_exposes_clean_public_copy_and_restores_all_signatures(tmp_path):
     source = protected_document()
     target = tmp_path / "partial.fornax"

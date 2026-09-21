@@ -3552,7 +3552,6 @@ role: Mayor</translation>
 {erro}</source><translation>Could not save the template:
 {erro}</translation></message>
     <message><source>Foi encontrada uma edição não salva deste modelo. Deseja recuperá-la?</source><translation>An unsaved edit of this template was found. Do you want to recover it?</translation></message>
-    <message><source>Modelos com assinatura exigem proteção. Escolha o alcance da senha.</source><translation>Templates containing signatures require protection. Choose the password scope.</translation></message>
     <message><source>Nome do novo modelo:</source><translation>New template name:</translation></message>
     <message><source>Proteger assinaturas</source><translation>Protect signatures</translation></message>
     <message><source>Proteger modelo inteiro</source><translation>Protect entire template</translation></message>
@@ -3572,7 +3571,6 @@ role: Mayor</translation>
     <message><source>🔒 Gerando PDF protegido sem cache intermediário…</source><translation>🔒 Generating protected PDF without intermediate cache…</translation></message>
     <message><source>Conversão concluída com pendência</source><translation>Conversion completed with pending cleanup</translation></message>
     <message><source>Conversão do modelo cancelada</source><translation>Template conversion cancelled</translation></message>
-    <message><source>Este modelo antigo possui assinaturas. Cadastre uma senha para convertê-lo com segurança.</source><translation>This legacy template contains signatures. Create a password to convert it securely.</translation></message>
     <message><source>Falha na conversão</source><translation>Conversion failed</translation></message>
     <message><source>Modelo convertido para .fornax: {nome}</source><translation>Template converted to .fornax: {nome}</translation></message>
     <message><source>O arquivo .fornax foi criado e validado, mas alguns arquivos antigos mudaram ou não puderam ser removidos. O programa manterá somente o novo modelo na biblioteca.</source><translation>The .fornax file was created and validated, but some legacy files changed or could not be removed. The application will keep only the new template in the library.</translation></message>
@@ -3586,7 +3584,6 @@ role: Mayor</translation>
     <message><source>Cancelar exportação</source><translation>Cancel export</translation></message>
     <message><source>Crie uma senha exclusiva para este envio. O destinatário usará essa senha apenas para importar os modelos.</source><translation>Create a unique password for this shipment. The recipient will use it only to import the templates.</translation></message>
     <message><source>Desbloquear modelos para exportação</source><translation>Unlock templates for export</translation></message>
-    <message><source>Deseja incluir as assinaturas protegidas na exportação?</source><translation>Do you want to include protected signatures in the export?</translation></message>
     <message><source>Enviar com assinaturas</source><translation>Send with signatures</translation></message>
     <message><source>Enviar sem assinaturas</source><translation>Send without signatures</translation></message>
     <message><source>Exportar modelos protegidos</source><translation>Export protected templates</translation></message>
@@ -3608,7 +3605,6 @@ role: Mayor</translation>
     <message><source>Como deseja definir as novas senhas locais?</source><translation>How do you want to set the new local passwords?</translation></message>
     <message><source>Defina a senha local de '{nome}'.</source><translation>Set the local password for '{nome}'.</translation></message>
     <message><source>Definir individualmente</source><translation>Set individually</translation></message>
-    <message><source>Deseja incorporar as assinaturas protegidas?</source><translation>Do you want to import the protected signatures?</translation></message>
     <message><source>Falha na importação</source><translation>Import failed</translation></message>
     <message><source>Falhas:
 {falhas}</source><translation>Failures:
@@ -3652,5 +3648,31 @@ role: Mayor</translation>
       <translation>Could not start a single instance of the application. Please try again.</translation>
     </message>
     <message><source>Modelo já presente na biblioteca: {nome}</source><translation>Template already in the library: {nome}</translation></message>
+    <message><source>Escolha o alcance da proteção por senha.</source><translation>Choose the scope of password protection.</translation></message>
+    <message><source>Este modelo já está protegido.</source><translation>This template is already protected.</translation></message>
+    <message><source>Este modelo possui assinaturas. Recomendamos protegê-las com senha para evitar o uso não autorizado. Você também pode continuar sem senha; nesse caso, as assinaturas ficarão acessíveis dentro do arquivo do modelo.</source><translation>This template contains signatures. We recommend protecting them with a password to prevent unauthorized use. You may also continue without a password; in that case, the signatures will remain accessible inside the template file.</translation></message>
+    <message><source>Falha ao proteger modelo:
+{erro}</source><translation>Failed to protect template:
+{erro}</translation></message>
+    <message><source>Proteger modelo</source><translation>Protect template</translation></message>
+    <message><source>Proteger modelo…</source><translation>Protect template…</translation></message>
+    <message><source>Proteção ativada para '{nome}'.</source><translation>Protection enabled for '{nome}'.</translation></message>
+    <message><source>Salvar sem senha</source><translation>Save without password</translation></message>
+    <message><source>Selecione um modelo FORNAX.</source><translation>Select a FORNAX template.</translation></message>
+    <message><source>Deseja incluir as assinaturas dos modelos selecionados?</source><translation>Do you want to include signatures from the selected templates?</translation></message>
+    <message><source>Deseja incorporar as assinaturas dos modelos selecionados?</source><translation>Do you want to import signatures from the selected templates?</translation></message>
+    <message><source>Exportar assinaturas</source><translation>Export signatures</translation></message>
+    <message><source>Importar assinaturas</source><translation>Import signatures</translation></message>
+    <message><source>Proteção local</source><translation>Local protection</translation></message>
+    <message><source>Os modelos públicos selecionados possuem assinaturas. Recomendamos protegê-las com senha.</source><translation>The selected public templates contain signatures. We recommend protecting them with a password.</translation></message>
+    <message><source>Manter sem senha</source><translation>Keep without password</translation></message>
+    <message><source>Há uma recuperação pendente deste modelo. Abra o editor e salve ou descarte a recuperação antes de ativar a proteção.</source><translation>This template has a pending recovery. Open the editor and save or discard the recovery before enabling protection.</translation></message>
+    <message><source>Digite a senha para acessar o modelo completo</source><translation>Enter the password to access the complete template</translation></message>
+    <message><source>O modelo já está desbloqueado</source><translation>The template is already unlocked</translation></message>
+    <message><source>Bloquear modelo</source><translation>Lock template</translation></message>
+    <message><source>Remover imediatamente o acesso ao conteúdo protegido</source><translation>Immediately remove access to protected content</translation></message>
+    <message><source>Modelo bloqueado: {nome}</source><translation>Template locked: {nome}</translation></message>
+    <message><source>Processamento em andamento</source><translation>Processing in progress</translation></message>
+    <message><source>Aguarde o término da geração antes de bloquear o modelo.</source><translation>Wait for generation to finish before locking the template.</translation></message>
   </context>
 </TS>
