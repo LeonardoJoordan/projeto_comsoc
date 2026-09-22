@@ -7,6 +7,12 @@ resultado, evidência e responsável/data. Campos vazios são pendências.
 
 ## Pré-requisitos de liberação
 
+- [ ] Confirmar que `LICENSE`, `NOTICE`, `AUTHORS.md`, `TRADEMARKS.md`, a orientação
+  de uso institucional e os avisos de terceiros estão presentes no pacote final.
+- [ ] Substituir todos os SVGs derivados do Flaticon por desenhos originais antes
+  de publicar o repositório ou distribuir um novo pacote público.
+- [ ] Preservar a evidência de criação e edição do ícone principal, incluindo
+  arquivo-fonte, ferramenta, data aproximada e termos aplicáveis.
 - [ ] Conferir no pacote instalado os textos PT/EN/ES da recomendação de proteção,
   importação, exportação e erros de senha.
 - [ ] Confirmar versão do produto; `instalador.iss` ainda declara `1.0.0`.

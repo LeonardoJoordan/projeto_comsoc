@@ -1,16 +1,38 @@
 from PySide6.QtCore import Signal, QObject
 import os
 import math
+import re
 import shutil
+import tempfile
+from pathlib import Path
 
 # Imports corrigidos para a nova arquitetura
-from core.naming_engine import build_output_filename
+from core.naming_engine import build_output_filename, sanitize_filename, unique_filename
 from .production_plan import build_imposition_plan
 from .workers import (
     PageRenderWorker, DirectRenderWorker, HybridAssemblerWorker,
     SecureGroupedPdfWorker,
 )
 from core.i18n import tr
+from core.paths import get_temp_dir
+
+RENDER_MEMORY_BUDGET = 768 * 1024 * 1024
+
+
+def _bounded_worker_count(requested, renderers, *, sheet=None, capacity=1, duplex=False):
+    """Limita buffers simultâneos sem reduzir a velocidade de modelos comuns."""
+    canvas = renderers[0].tpl.get("canvas_size", {})
+    canvas_pixels = int(canvas.get("w", 0)) * int(canvas.get("h", 0))
+    page_count = len(renderers)
+    shared_bases = canvas_pixels * 4 * page_count
+    if sheet is None:
+        per_worker = canvas_pixels * 4
+    else:
+        sheet_pixels = sheet.sheet_w * sheet.sheet_h
+        face_count = 2 if duplex else 1
+        per_worker = 4 * (canvas_pixels * max(1, capacity) + sheet_pixels * face_count)
+    available = max(per_worker, RENDER_MEMORY_BUDGET - shared_bases)
+    return max(1, min(requested, available // max(1, per_worker)))
 
 class RenderManager(QObject):
     progress_updated = Signal(int)
@@ -42,6 +64,7 @@ class RenderManager(QObject):
         self.is_imposition = self.imposition_settings.get("enabled", False)
         
         self.workers = []
+        self._hybrid_temporary = None
         self.total_cards = len(rows_plain)
         self.cards_done = 0
         self.generated_files = []
@@ -72,21 +95,34 @@ class RenderManager(QObject):
         
         cpu_count = os.cpu_count() or 4
         num_threads = max(1, cpu_count - 2)
+        num_threads = _bounded_worker_count(num_threads, self.page_renderers)
         
         # --- LÓGICA HÍBRIDA (Fim do castramento de threads) ---
         self.is_hybrid = (
             self.single_pdf and self.export_format == "PDF"
             and not self.protected_content
         )
-        self.work_dir = self.output_dir / ".temp_hybrid" if self.is_hybrid else self.output_dir
+        if self.is_hybrid:
+            self._hybrid_temporary = tempfile.TemporaryDirectory(
+                prefix="generation-", dir=get_temp_dir(),
+            )
+            self.work_dir = Path(self._hybrid_temporary.name)
+        else:
+            self.work_dir = self.output_dir
         self.worker_format = "PNG" if self.is_hybrid else self.export_format
 
         if self.is_hybrid:
-            self.work_dir.mkdir(parents=True, exist_ok=True)
             self.log_updated.emit(tr("⚡ Modo híbrido: gerando em cache ({threads} threads)…").format(threads=num_threads))
 
         all_tasks_data = []
         used_names = set()
+        if self.work_dir.exists():
+            for path in self.work_dir.iterdir():
+                if not path.is_file():
+                    continue
+                stem = path.stem
+                stem = re.sub(r"_(?:pag\d+|frente|verso)$", "", stem, flags=re.IGNORECASE)
+                used_names.add(stem)
         
         copy_counts = {}
         for i in range(len(self.rows_plain)):
@@ -129,6 +165,10 @@ class RenderManager(QObject):
             assembler.wait()
         if getattr(self, "is_hybrid", False):
             shutil.rmtree(self.work_dir, ignore_errors=True)
+            temporary = self._hybrid_temporary
+            self._hybrid_temporary = None
+            if temporary is not None:
+                temporary.cleanup()
         self._release_authorized_snapshot()
 
     def _release_authorized_snapshot(self):
@@ -195,6 +235,10 @@ class RenderManager(QObject):
         if capacity <= 0:
             self._on_worker_error(tr("O modelo é grande demais para as margens da folha."))
             return
+        num_threads = _bounded_worker_count(
+            num_threads, self.page_renderers, sheet=plan.assembler,
+            capacity=capacity, duplex=plan.duplex,
+        )
             
         total_pages = len(plan.sheets)
         self.log_updated.emit(tr("📚 Imposição: {itens} itens em {folhas} folhas físicas (capacidade: {capacidade} por folha).").format(itens=len(all_data), folhas=total_pages, capacidade=capacity))
@@ -205,13 +249,23 @@ class RenderManager(QObject):
         self.log_updated.emit(tr("🚀 Distribuindo o trabalho entre {threads} threads…").format(threads=num_threads))
 
         pages_jobs = []
-        safe_pattern = self.pattern.replace("{", "").replace("}", "")
+        safe_pattern = sanitize_filename(self.pattern.replace("{", "").replace("}", ""))
+        used_sheet_names = set()
+        if self.work_dir.exists():
+            used_sheet_names.update(
+                re.sub(r"_(?:frente|verso)$", "", path.stem, flags=re.IGNORECASE)
+                for path in self.work_dir.iterdir() if path.is_file()
+            )
 
         for sheet in plan.sheets:
             page_num = sheet.number
+            output_base = unique_filename(
+                sanitize_filename(f"{safe_pattern}_Folha_{page_num:02d}"),
+                used_sheet_names,
+            )
             job = {
                 "page_num": page_num,
-                "output_base": f"{safe_pattern}_Folha_{page_num:02d}",
+                "output_base": output_base,
                 "front": sheet.front,
                 "back": sheet.back,
             }
@@ -307,8 +361,10 @@ class RenderManager(QObject):
                 self.all_cards_links[original_idx * page_count + int(page_index)] = local_links
             
         self.cards_done += 1
-        display_name = ", ".join(filenames)
-        self.log_updated.emit(tr("[{concluidos}/{total}] Salvo: {arquivo}").format(concluidos=self.cards_done, total=self.total_cards, arquivo=display_name))
+        self.log_updated.emit(tr("[{concluidos}/{total}] Salvo: {arquivo}").format(
+            concluidos=self.cards_done, total=self.total_cards,
+            arquivo=", ".join(filenames),
+        ))
         self.generated_files.extend(filenames)
         self._update_progress()
 

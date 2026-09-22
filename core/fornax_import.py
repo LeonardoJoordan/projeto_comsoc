@@ -29,6 +29,7 @@ from core.fornax_container import (
 from core.model_info import build_model_snapshot
 from core.model_document import document_signatures, without_signatures
 from core.file_transactions import file_lock, publish_new, sync_directory, file_sha256
+from core.paths import get_temp_dir
 
 
 MAX_BATCH_MODELS = 1000
@@ -93,7 +94,7 @@ def open_import_package(source: str | Path):
     if source.stat().st_size > limit:
         raise FornaxFormatError("O arquivo recebido excede o limite de tamanho.")
     before = _file_sha256(source)
-    with tempfile.TemporaryDirectory(prefix="fornax_import_") as temporary_dir:
+    with tempfile.TemporaryDirectory(prefix="import-", dir=get_temp_dir()) as temporary_dir:
         temporary_root = Path(temporary_dir)
         if source.suffix.lower() == ".fornax":
             candidate_path = temporary_root / source.name
@@ -288,7 +289,7 @@ def import_legacy_document(
         resolved = (path if path.is_absolute() else root / path).resolve()
         if not resolved.is_relative_to(root):
             raise FornaxFormatError("O modelo recebido referencia um asset fora da pasta importada.")
-    with tempfile.TemporaryDirectory(prefix="fornax_legacy_import_") as temporary:
+    with tempfile.TemporaryDirectory(prefix="legacy-import-", dir=get_temp_dir()) as temporary:
         converted = Path(temporary) / "converted.fornax"
         source_document = document if include_signatures else without_signatures(document)
         if mode == PUBLIC_MODE:

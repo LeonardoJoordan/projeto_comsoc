@@ -111,16 +111,17 @@ class RenderingPipelineTest(unittest.TestCase):
             "rotation": 0,
         }
 
-    def produce(self, rows, *, fmt="PDF", single=False, template_data=None, imposition=None):
+    def produce(self, rows, *, fmt="PDF", single=False, template_data=None,
+                imposition=None, pattern="item_{Site}"):
         output = self.base / f"output_{fmt}_{single}"
-        output.mkdir()
+        output.mkdir(exist_ok=True)
         source = template_data or template()
         renderers = (
             renderers_for_document(source)
             if source.get("schema_version") == 4 else [NativeRenderer(source)]
         )
         manager = RenderManager(
-            renderers, rows, rows, output, "item_{Site}",
+            renderers, rows, rows, output, pattern,
             export_format=fmt, single_pdf=single,
             target_w_mm=80, target_h_mm=60,
             imposition_settings=imposition,
@@ -548,6 +549,34 @@ class RenderingPipelineTest(unittest.TestCase):
             for page in pages:
                 self.assertAlmostEqual(float(page.mediabox.width) * 25.4 / 72, 210, delta=.18)
                 self.assertAlmostEqual(float(page.mediabox.height) * 25.4 / 72, 297, delta=.18)
+
+    def test_imposition_pattern_cannot_escape_output_directory(self):
+        settings = {
+            "enabled": True,
+            "target_w_mm": 80.0, "target_h_mm": 60.0,
+            "sheet_w_mm": 210.0, "sheet_h_mm": 297.0,
+            "crop_marks": False, "bleed_margin": False,
+        }
+
+        files = self.produce(
+            [{"Site": "A"}], fmt="PNG", imposition=settings,
+            pattern="../../outside",
+        )
+
+        self.assertEqual([path.name for path in files], ["__.._outside_Folha_01.png"])
+        self.assertTrue(files[0].is_relative_to(self.base.resolve()))
+        self.assertFalse((self.base.parent / "outside_Folha_01.png").exists())
+
+    def test_generation_preserves_an_existing_case_insensitive_name(self):
+        output = self.base / "output_PNG_False"
+        output.mkdir()
+        existing = output / "ITEM_A.png"
+        existing.write_bytes(b"keep")
+
+        files = self.produce([{"Site": "A"}], fmt="PNG")
+
+        self.assertEqual(existing.read_bytes(), b"keep")
+        self.assertEqual([path.name for path in files], ["item_A_01.png"])
 
     def test_sheet_preview_prioritizes_requested_face_and_limits_cache(self):
         output = self.base / "preview"

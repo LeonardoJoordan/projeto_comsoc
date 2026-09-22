@@ -3,20 +3,100 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PySide6.QtCore import QSettings
 from PySide6.QtGui import QColor, QImage
 from PySide6.QtWidgets import QApplication
 
 from core.fornax_container import (
-    PUBLIC_MODE, SIGNATURES_MODE, inspect_fornax, open_public_fornax,
+    FULL_MODE, PUBLIC_MODE, SIGNATURES_MODE, inspect_fornax, open_public_fornax,
     save_protected_fornax, save_public_fornax,
 )
 from core.fornax_session import FornaxSessionManager
 from core.model_document import normalize_model_document
-from features.editor.canvas_items import BackgroundItem, ImageItem, RectangleItem
+from features.editor.canvas_items import BackgroundItem, ImageItem, RectangleItem, SignatureItem
 from features.editor.editor_window import EditorWindow
+from features.workspace.main_window import MainWindow
 
 
 APP = QApplication.instance() or QApplication([])
+
+
+def test_protection_menu_uses_signatures_from_unsaved_scene(tmp_path):
+    signature = tmp_path / 'signature.png'
+    image = QImage(24, 12, QImage.Format.Format_ARGB32)
+    image.fill(QColor('#151515'))
+    assert image.save(str(signature), 'PNG')
+    editor = EditorWindow()
+    try:
+        editor.refresh_protection_control()
+        assert not editor.protection_actions[SIGNATURES_MODE].isEnabled()
+        item = SignatureItem(str(signature))
+        editor.scene.addItem(item)
+        editor.refresh_protection_control()
+        assert editor.protection_actions[SIGNATURES_MODE].isEnabled()
+        editor.scene.removeItem(item)
+        editor.refresh_protection_control()
+        assert not editor.protection_actions[SIGNATURES_MODE].isEnabled()
+    finally:
+        editor._last_saved_state = editor.get_current_scene_state()
+        editor._last_saved_document_state = editor._capture_document_history_state()
+        editor.close()
+        APP.processEvents()
+
+
+def test_protection_transitions_keep_workspace_selection_and_signatures(tmp_path):
+    models = tmp_path / 'models'
+    models.mkdir()
+    signature = tmp_path / 'signature.png'
+    image = QImage(24, 12, QImage.Format.Format_ARGB32)
+    image.fill(QColor('#151515'))
+    assert image.save(str(signature), 'PNG')
+    document = _signature_document(signature)
+    document['name'] = '2.2.1 - Diploma'
+    package = models / '221_diploma.fornax'
+    other = _signature_document(signature)
+    other['name'] = '1.1.1 - Outro modelo'
+    save_public_fornax(other, models / '111_outro.fornax')
+    save_public_fornax(document, package)
+    settings = QSettings(str(tmp_path / 'settings.ini'), QSettings.Format.IniFormat)
+    with (
+        patch('features.workspace.main_window.get_models_dir', return_value=models),
+        patch('features.workspace.frontend.get_models_dir', return_value=models),
+        patch('features.workspace.main_window.get_app_settings', return_value=settings),
+        patch('features.editor.editor_window.QMessageBox.critical') as critical,
+    ):
+        workspace = MainWindow()
+        workspace._reload_models_from_disk(select_name=document['name'])
+        manager = workspace._fornax_sessions
+        status = manager.status(package)
+        editor = EditorWindow()
+        editor.load_from_fornax(
+            manager.document(package), path=package, mode=PUBLIC_MODE,
+            model_id=status.descriptor.model_id,
+            asset_provider=lambda ref: manager.asset(ref, package),
+            session_manager=manager,
+        )
+        editor.modelSaved.connect(workspace._on_editor_saved)
+        try:
+            with patch.object(editor, '_request_new_fornax_password', return_value='senha-segura'):
+                for mode in (SIGNATURES_MODE, FULL_MODE, PUBLIC_MODE):
+                    editor.request_protection_mode(mode)
+                    assert not critical.called, critical.call_args
+                    assert inspect_fornax(package).mode == mode
+                    assert workspace.preview_panel.cbo_models.currentText() == document['name']
+                    assert manager.document(package)['pages'][0]['signatures']
+                    assert editor.protection_actions[SIGNATURES_MODE].isEnabled()
+            assert open_public_fornax(package).document()['pages'][0]['signatures']
+            # Reabrir deve mostrar o mesmo nível e conservar as assinaturas.
+            workspace._reload_models_from_disk(select_name=document['name'])
+            assert workspace.cached_model_document['pages'][0]['signatures']
+            assert manager.status(package).descriptor.mode == PUBLIC_MODE
+        finally:
+            editor._last_saved_state = editor.get_current_scene_state()
+            editor._last_saved_document_state = editor._capture_document_history_state()
+            editor.close()
+            workspace.close()
+            APP.processEvents()
 
 
 def _image_document(path):

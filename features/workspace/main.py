@@ -2,7 +2,6 @@
 import os
 import sys
 import traceback
-from datetime import datetime
 from pathlib import Path
 
 os.environ.setdefault('QT_IM_MODULE', 'ibus')
@@ -22,6 +21,8 @@ from core.ui_font import install_ui_font
 from core.wheel_focus import install_wheel_focus_guard
 from core.i18n import initialize_i18n, tr
 from core.dialog_buttons import install_dialog_button_style
+from core.diagnostic_logs import append_diagnostic_log, crash_summary
+from core.temp_storage import cleanup_stale_workspaces
 from features.workspace.main_window import MainWindow
 
 
@@ -56,10 +57,9 @@ def global_exception_handler(exc_type, exc_value, exc_traceback):
         return
     log_file = get_logs_dir() / 'crash_log.txt'
     try:
-        with log_file.open('a', encoding='utf-8') as stream:
-            stream.write(f"\n[{datetime.now():%Y-%m-%d %H:%M:%S}] CRASH OCORRIDO:\n")
-            traceback.print_exception(exc_type, exc_value, exc_traceback, file=stream)
-            stream.write('-' * 50 + '\n')
+        append_diagnostic_log(
+            "crash_log.txt", crash_summary(exc_type, exc_traceback), sanitize=False,
+        )
     except OSError:
         pass
     message = QMessageBox()
@@ -99,6 +99,7 @@ def main():
             return 0
         QMessageBox.critical(None, tr('Erro fatal'), tr('Não foi possível iniciar uma instância exclusiva do programa. Tente novamente.'))
         return 1
+    cleanup_stale_workspaces()
     queued_files = []
     instance.filesReceived.connect(queued_files.extend)
     window = MainWindow()

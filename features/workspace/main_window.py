@@ -32,6 +32,7 @@ from core.template_manager import slugify_model_name
 from core.paths import get_models_dir
 from core.settings import get_app_settings
 from core.render_cache import ensure_background_proxy, get_thumbnail_cache_path
+from core.theme_icons import themed_svg_icon
 from core.resources import object_icon_path
 from core.output_folders import create_forge_output_dir
 from core.model_library import LibraryModel, scan_model_library
@@ -1989,7 +1990,7 @@ class MainWindow(QMainWindow):
             label = str(signature.get("custom_name") or "").strip() or tr("Assinatura {numero}").format(numero=offset)
             header = QTableWidgetItem(label)
             header.setData(SIGNATURE_ID_ROLE, signature["signature_id"])
-            header.setIcon(QIcon(str(object_icon_path("signature"))))
+            header.setIcon(themed_svg_icon(object_icon_path("signature")))
             header.setToolTip(
                 tr("{nome}\nClique no ícone para marcar ou desmarcar toda a coluna.").format(
                     nome=label
@@ -2503,6 +2504,14 @@ class MainWindow(QMainWindow):
             )
 
     def _on_editor_saved(self, model_name, placeholders, file_path, *, previous_name=None):
+        # O nome fica criptografado no modo integral. Preserve o nome autorizado
+        # antes de reexaminar a biblioteca, para não selecionar outro modelo e
+        # retirar a sessão ativa do editor que acabou de salvar.
+        saved_path = Path(file_path)
+        if saved_path.suffix.lower() == '.fornax':
+            descriptor = inspect_fornax(saved_path)
+            if descriptor.mode == FULL_MODE:
+                self._remember_protected_model_name(descriptor.model_id, model_name)
         table = self.table_panel.table
         old_name = self.preview_panel.cbo_models.currentText()
         target_name = old_name if previous_name and old_name not in (previous_name, model_name) else model_name

@@ -10,7 +10,7 @@ from PySide6.QtGui import (QPen, QBrush, QColor, QFont, QTextCursor,
                            QTextBlockFormat, QPixmap, QPainterPathStroker, QTextCharFormat,
                            QImageReader, QPainterPath, QPainter,
                            QImageIOHandler)
-from core.html_utils import normalize_text_decoration
+from core.html_utils import normalize_text_decoration, sanitize_text_html
 from core.text_layout import line_reference_ink_bounds, variables_in_html
 from core.text_state import TextState
 
@@ -759,11 +759,11 @@ class ResizeHandle(QGraphicsRectItem):
                         angle = round(angle / (math.pi / 4)) * math.pi / 4
                     endpoint = anchor_scene + QPointF(length * math.cos(angle), length * math.sin(angle))
                     center = (anchor_scene + endpoint) / 2
-                    parent.resize_custom(length, 1)
+                    parent.resize_custom(length, self._initial_h)
                     parent.setRotation(math.degrees(angle) + (180 if self.x_dir < 0 else 0))
                     parent._resizing_from_handle = True
                     try:
-                        parent.setPos(center.x()-length/2, center.y()-0.5)
+                        parent.setPos(center.x()-length/2, center.y()-self._initial_h/2)
                     finally:
                         parent._resizing_from_handle = False
                     if window is not None and hasattr(window, 'update_group_resize'):
@@ -1248,6 +1248,7 @@ class RectangleItem(ImageItem):
         super().__init__(None)
         self.fill_color = color
         self.shape_type = 'rectangle'
+        self.line_body = True
         self.outline_enabled = False
         self.outline_color = '#000000'
         self.outline_width = mm_to_px(0.2)
@@ -1312,7 +1313,7 @@ class RectangleItem(ImageItem):
 
     def style_data(self):
         return {key: getattr(self, key) for key in (
-            'shape_type', 'fill_color', 'fill_opacity', 'outline_enabled',
+            'shape_type', 'line_body', 'fill_color', 'fill_opacity', 'outline_enabled',
             'outline_color', 'outline_opacity', 'outline_width',
             'outline_position', 'outline_join', 'corner_radius',
             'corner_radii', 'corner_radii_linked', 'dynamic_image_field',
@@ -1321,8 +1322,8 @@ class RectangleItem(ImageItem):
     def drawing_path(self):
         path = QPainterPath()
         if getattr(self, 'shape_type', 'rectangle') == 'line':
-            path.moveTo(0, self.rect().height()/2)
-            path.lineTo(self.rect().width(), self.rect().height()/2)
+            radius = min(max(0, self.corner_radius), self.rect().width() / 2, self.rect().height() / 2)
+            path.addRoundedRect(self.rect(), radius, radius)
         elif getattr(self, 'shape_type', 'rectangle') in ('ellipse', 'circle'):
             path.addEllipse(self.rect())
         else:
@@ -1340,7 +1341,7 @@ class RectangleItem(ImageItem):
         if getattr(self, 'shape_type', '') == 'line':
             stroker = QPainterPathStroker()
             stroker.setWidth(max(self.outline_width, 10))
-            return stroker.createStroke(path)
+            return path.united(stroker.createStroke(path))
         return path
 
     def boundingRect(self):
@@ -1349,14 +1350,12 @@ class RectangleItem(ImageItem):
             return self.rect()
         margin = outline_margin(self.style_data())
         if self.shape_type == 'line':
-            margin = max(5, self.outline_width/2 + 1)
+            margin = max(5, margin)
         return self.rect().adjusted(-margin, -margin, margin, margin)
 
     def resize_custom(self, w, h):
         if getattr(self, 'is_document_background', False) and not getattr(self, '_syncing_document', False):
             return
-        if getattr(self, 'shape_type', '') == 'line':
-            h = 1
         old_w = getattr(self, '_current_w', 0.0)
         old_h = getattr(self, '_current_h', 0.0)
         children = self.masked_images() if hasattr(self, '_mask_editing') else []
@@ -1746,7 +1745,7 @@ class DesignerBox(QGraphicsRectItem):
         html = re.sub(r"(?i)</h[1-6]>", "</p>", html)
         
         rich = getattr(self.state, 'rich_text_version', 0) == 1
-        self.text_item.setHtml(self.state.html_content if rich else html)
+        self.text_item.setHtml(sanitize_text_html(self.state.html_content if rich else html))
         
         # 2. Aplicar Fonte Global e Cor NATIVA (SEMPRE após o setHtml, pois ele reseta o documento)
         font = QFont(self.state.font_family, self.state.font_size)

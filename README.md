@@ -100,4 +100,8 @@ Os ícones oficiais ficam em `assets/icons/`: PNGs dimensionados para a interfac
 
 ## Tecnologias e licença
 
-O aplicativo usa Python, Qt for Python/PySide6, pypdf e cryptography. Consulte os avisos de terceiros antes de distribuir um pacote. A licença própria do FORNAX Forge ainda deve ser definida e adicionada ao repositório antes da publicação ampla.
+O aplicativo usa Python, Qt for Python/PySide6, pypdf e cryptography. O código e a documentação próprios do FORNAX Forge são licenciados sob a **GNU General Public License v3.0 exclusivamente** (`GPL-3.0-only`). Consulte [LICENSE](LICENSE), [NOTICE](NOTICE) e os [avisos de terceiros](docs/THIRD_PARTY_LICENSES.md) antes de distribuir uma cópia.
+
+O nome **FORNAX Forge** e o logotipo identificam o projeto oficial e seguem a política descrita em [TRADEMARKS.md](TRADEMARKS.md). Modelos, textos, imagens, fontes, planilhas e materiais produzidos pelos usuários não passam automaticamente a integrar o programa nem a ser licenciados sob a GPL. Consulte também as [orientações para uso institucional](docs/USO_INSTITUCIONAL.md).
+
+**Atenção antes da publicação pública:** os SVGs funcionais atuais foram obtidos ou adaptados a partir de recursos do Flaticon Premium. Eles estão sendo substituídos por desenhos originais e não devem ser incluídos em um repositório público ou novo pacote de distribuição até a conclusão dessa substituição. Consulte [docs/ASSET_PROVENANCE.md](docs/ASSET_PROVENANCE.md).

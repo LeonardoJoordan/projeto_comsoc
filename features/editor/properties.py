@@ -114,7 +114,7 @@ class CaixaDeTextoPanel(QWidget):
             (self.btn_rot_minus_90, "rotate-left"),
             (self.btn_rot_plus_90, "rotate-right"),
         ):
-            button.setIcon(QIcon(str(action_icon_path(asset_name))))
+            button.setIcon(themed_svg_icon(action_icon_path(asset_name)))
             button.setIconSize(QSize(18, 18))
         self.op_rot_minus = QGraphicsOpacityEffect(self.btn_rot_minus_90)
         self.btn_rot_minus_90.setGraphicsEffect(self.op_rot_minus)
@@ -217,7 +217,7 @@ class CaixaDeTextoPanel(QWidget):
     def _refresh_proportion_button(self, available: bool):
         checked = self.chk_proporcao.isChecked()
         asset_name = "lock ratio" if checked else "unlock ratio"
-        self.chk_proporcao.setIcon(QIcon(str(action_icon_path(asset_name))))
+        self.chk_proporcao.setIcon(themed_svg_icon(action_icon_path(asset_name)))
         self.chk_proporcao.setIconSize(QSize(20, 20))
         self.chk_proporcao.setEnabled(available)
         themed_style(self.chk_proporcao, self._proportion_button_style(available and checked))
@@ -289,6 +289,7 @@ class CaixaDeTextoPanel(QWidget):
         self._restore_available = False
         self._link_available = True
         rect = box.rect()
+        self.spin_h.setMinimum(1.0)
         self.spin_w.setValue(px_to_mm(rect.width()))
         self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(self._normalize_rotation(box.rotation()))
@@ -313,6 +314,7 @@ class CaixaDeTextoPanel(QWidget):
         self._restore_available = True
         self._link_available = isinstance(img, ImageItem) and not isinstance(img, BackgroundItem)
         rect = img.rect() if hasattr(img, 'rect') else img.pixmap().rect()
+        self.spin_h.setMinimum(0.01 if getattr(img, 'shape_type', '') == 'line' else 1.0)
         self.spin_w.setValue(px_to_mm(rect.width()))
         self.spin_h.setValue(px_to_mm(rect.height()))
         self.spin_rot.setValue(self._normalize_rotation(img.rotation()))
@@ -476,7 +478,11 @@ class EditorDeTextoPanel(QWidget):
         self.txt_content.setTextCursor(cursor)
 
         # 2. Preenche os controles com os metadados puros da Fonte da Verdade
-        self.cbo_font.setCurrentFont(QFont(state.font_family))
+        font_signals_blocked = self.cbo_font.blockSignals(True)
+        try:
+            self.cbo_font.setCurrentFont(QFont(state.font_family))
+        finally:
+            self.cbo_font.blockSignals(font_signals_blocked)
         self.spin_size.setValue(state.font_size)
         
         color_hex = getattr(state, 'font_color', '#000000')

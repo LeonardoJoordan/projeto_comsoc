@@ -29,6 +29,34 @@ QWidget { background: @surface@; color: @text@; font-size: 12px; }
 QMainWindow, QWidget#root { background: @window@; }
 QFrame#footer { background: @window@; border: none; }
 QLabel { background: transparent; }
+QMenu {
+ background: @button@; color: @text@; font-size: 12px;
+ border: 1px solid @border_strong@; border-radius: 8px; padding: 6px;
+}
+QMenu::item {
+ min-height: 18px; padding: 2px 28px; border: 1px solid transparent;
+ border-radius: 5px; background: transparent;
+}
+QMenu::item:selected { background: @selection@; border-color: @accent@; }
+QMenu::item:disabled { color: @disabled@; }
+QMenu::separator { height: 1px; background: @border_strong@; margin: 6px 8px; }
+QMenu#shapeMenu::item { padding-left: 36px; }
+QMenu#shapeMenu::icon { left: 10px; }
+QListView#editorComboOptions {
+ background: @button@; color: @text@; font-size: 12px;
+ border: 1px solid @border_strong@; border-radius: 8px;
+ padding: 6px; outline: none; selection-background-color: transparent;
+}
+QListView#editorComboOptions::item {
+ min-height: 18px; padding: 2px 12px; border: 1px solid transparent;
+ border-radius: 5px; background: transparent;
+}
+QListView#editorComboOptions::item:selected,
+QListView#editorComboOptions::item:hover {
+ background: @selection@; border-color: @accent@; color: @text@;
+}
+QListView#editorComboOptions::item:disabled { color: @disabled@; }
+
 QLabel#muted { color: @muted@; }
 QFrame#bar { background: @panel@; border-bottom: 1px solid @border@; }
 QFrame#compact { background: @field@; border: 1px solid @border@; border-radius: 6px; }
@@ -47,6 +75,11 @@ QFrame#pageButton QPushButton#pageMain { border-top-left-radius: 5px; border-bot
 QFrame#pageButton QPushButton#pageMore { border-left: 1px solid @border@; border-top-right-radius: 5px; border-bottom-right-radius: 5px; padding: 0; }
 QFrame#pageButton[active="true"] { border-color: @accent@; }
 QFrame#pageButton[active="true"] QPushButton { background: @selection@; }
+QFrame#saveButtonGroup { background: @accent@; border: 1px solid @accent@; border-radius: 6px; }
+QFrame#saveButtonGroup QPushButton { background: @accent@; color: @on_accent@; border: none; border-radius: 0; }
+QFrame#saveButtonGroup QPushButton:hover { background: @accent_hover@; }
+QFrame#saveButtonGroup QPushButton#saveMain { border-top-left-radius: 5px; border-bottom-left-radius: 5px; }
+QFrame#saveButtonGroup QPushButton#saveSecurity { border-left: 1px solid @on_accent@; border-top-right-radius: 5px; border-bottom-right-radius: 5px; padding: 0; }
 QPushButton[squareControl="true"] {
  padding: 0; min-width: 28px; max-width: 28px;
  min-height: 28px; max-height: 28px; border: 1px solid @border@;
@@ -424,7 +457,7 @@ def install_frontend(w):
         themed_style(button, 'padding: 0;')
         button.setFixedSize(30, 30)
         tools.addWidget(button)
-    tools.addWidget(compact('↻', p.spin_rot, '°', 78))
+    tools.addWidget(compact(state_icon_path('rotate'), p.spin_rot, '°', 78))
     tools.addWidget(compact(
         state_icon_path('opacity'), p.spin_opacity, '%', 88, tr('Opacidade')
     ))
@@ -437,7 +470,7 @@ def install_frontend(w):
         (True, tr('Adicionar guia vertical'), 'v.guide'),
     ]:
         button = QPushButton()
-        button.setIcon(QIcon(str(state_icon_path(asset_name))))
+        button.setIcon(themed_svg_icon(state_icon_path(asset_name)))
         button.setIconSize(QSize(20, 20))
         button.setFixedSize(30, 30)
         themed_style(button, 'padding: 0;')
@@ -445,11 +478,11 @@ def install_frontend(w):
         button.clicked.connect(lambda checked=False, v=vertical: w.add_guide(v))
         tools.addWidget(button)
     for button, asset_name, tip in (
-        (w.btn_toggle_guides, 'guide', tr('Exibir ou ocultar guias')),
-        (w.btn_lock_guides, 'l.guide', tr('Bloquear ou desbloquear a movimentação das guias')),
+        (w.btn_toggle_guides, 'eye' if w.btn_toggle_guides.isChecked() else 'eye-off', tr('Exibir ou ocultar guias')),
+        (w.btn_lock_guides, 'lock' if w.btn_lock_guides.isChecked() else 'unlock', tr('Bloquear ou desbloquear a movimentação das guias')),
     ):
         button.setText('')
-        button.setIcon(QIcon(str(state_icon_path(asset_name))))
+        button.setIcon(themed_svg_icon(state_icon_path(asset_name)))
         button.setIconSize(QSize(20, 20))
         button.setToolTip(tip)
         themed_style(button, 'QPushButton { padding: 0; min-width: 28px; max-width: 28px; '
@@ -462,7 +495,7 @@ def install_frontend(w):
         (w.btn_redo, 'redo', tr('Refazer')),
     ):
         button.setText('')
-        button.setIcon(QIcon(str(action_icon_path(asset_name))))
+        button.setIcon(themed_svg_icon(action_icon_path(asset_name)))
         button.setIconSize(QSize(18, 18))
         button.setToolTip(tip)
         button.setMinimumSize(0, 0)
@@ -492,26 +525,6 @@ def install_frontend(w):
     forms.setToolTip(tr('Escolha uma forma e arraste no canvas. Shift restringe proporções ou ângulo; Esc cancela.'))
     shape_menu = QMenu(forms)
     shape_menu.setObjectName('shapeMenu')
-    themed_style(shape_menu, '''
-        QMenu#shapeMenu {
-            background-color: @button@;
-            border: 1px solid @border_strong@;
-            border-radius: 8px;
-            padding: 6px;
-        }
-        QMenu#shapeMenu::item {
-            color: @text@;
-            background-color: transparent;
-            padding: 10px 28px 10px 36px;
-            border: 1px solid transparent;
-            border-radius: 5px;
-        }
-        QMenu#shapeMenu::item:selected {
-            background-color: @selection@;
-            border-color: @accent@;
-        }
-        QMenu#shapeMenu::icon { left: 10px; }
-    ''')
     shape_menu.aboutToShow.connect(lambda: shape_menu.setMinimumWidth(forms.width()))
     for name, kind, asset_name in (
         (tr('Quadrado'), 'rectangle', 'square'),
@@ -535,7 +548,10 @@ def install_frontend(w):
         leading_icon.setFixedSize(20, 20)
         leading_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         leading_icon.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
-        leading_icon.setPixmap(QIcon(str(object_icon_path(asset_name))).pixmap(20, 20))
+        def refresh_leading_icon(target=leading_icon, name=asset_name):
+            target.setPixmap(themed_svg_icon(object_icon_path(name)).pixmap(20, 20))
+        refresh_leading_icon()
+        _connect_theme_callback(leading_icon, refresh_leading_icon)
         contents.addWidget(leading_icon)
         caption = QLabel(f'<b>{label}</b><br><span style="font-size:9px">{detail}</span>')
         caption.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
@@ -695,7 +711,7 @@ def install_frontend(w):
     shape_swatch.clicked.connect(choose_shape_color)
     shape_color.editingFinished.connect(lambda: set_shape_color(shape_color.text()))
     fill_alpha.editingFinished.connect(lambda: set_shape_color(shape_color.text()))
-    outline_enabled = QPushButton(tr('Ativar contorno'))
+    outline_enabled = QPushButton(tr('Habilitar contorno'))
     outline_enabled.setObjectName('shapeOutlineEnabled')
     outline_enabled.setCheckable(True)
     outline_toggle_container = centered_toggle_button(shape_layout, outline_enabled)
@@ -776,7 +792,7 @@ def install_frontend(w):
     square_control(sync_radii)
     def refresh_radius_sync_icon(checked):
         asset_name = 'lock ratio' if checked else 'unlock ratio'
-        sync_radii.setIcon(QIcon(str(action_icon_path(asset_name))))
+        sync_radii.setIcon(themed_svg_icon(action_icon_path(asset_name)))
         sync_radii.setIconSize(QSize(20, 20))
     refresh_radius_sync_icon(sync_radii.isChecked())
     corner_grid = QGridLayout()
@@ -832,23 +848,6 @@ def install_frontend(w):
     outline_heading = property_heading(outline_heading_layout, tr('CONTORNO'), separated=True)
     shape_layout.insertWidget(shape_layout.indexOf(outline_toggle_container), outline_heading_container)
 
-    radius = QDoubleSpinBox()
-    radius.setObjectName('shapeCornerRadius')
-    radius.setDecimals(2)
-    radius.setRange(0, 1000)
-    radius.setSingleStep(0.1)
-    radius.setKeyboardTracking(False)
-    radius_field = field(tr('Arredondamento'), compact('', radius, 'mm', None))
-    radius_field.setToolTip(tr('Arredonda as extremidades da linha, limitado à metade da espessura.'))
-    def apply_line_radius():
-        selected = w.scene.selectedItems()
-        if len(selected) == 1 and getattr(selected[0], 'shape_type', '') == 'line':
-            item = selected[0]
-            item.prepareGeometryChange()
-            item.corner_radius = mm_to_px(radius.value())
-            item.update()
-            w.save_snapshot()
-    radius.editingFinished.connect(apply_line_radius)
     updating_radii = {'active': False}
     def apply_corner_radius(changed_key):
         if updating_radii['active']:
@@ -895,38 +894,6 @@ def install_frontend(w):
             break
     outline_details_layout.insertLayout(0, thickness_row)
     shape_layout.insertWidget(shape_layout.indexOf(outline_toggle_container) + 1, outline_details)
-    line_geometry, line_layout = column()
-    line_layout.setContentsMargins(0, 0, 0, 0)
-    line_length = QDoubleSpinBox()
-    line_length.setObjectName('lineLength')
-    line_length.setDecimals(2)
-    line_length.setRange(0.01, 5000)
-    line_length.setKeyboardTracking(False)
-    line_angle = QDoubleSpinBox()
-    line_angle.setObjectName('lineAngle')
-    line_angle.setRange(0, 359.99)
-    line_angle.setDecimals(2)
-    line_angle.setWrapping(True)
-    line_angle.setKeyboardTracking(False)
-    line_dimensions = row(line_layout, field(tr('Comprimento'), compact('', line_length, 'mm')),
-                          field(tr('Ângulo'), compact('', line_angle, '°')))
-    line_dimensions.setStretch(0, 1)
-    line_dimensions.setStretch(1, 1)
-    shape_layout.addWidget(line_geometry)
-    def apply_line_geometry():
-        selected = w.scene.selectedItems()
-        if len(selected) == 1 and getattr(selected[0], 'shape_type', '') == 'line':
-            item = selected[0]
-            center = item.mapToScene(item.rect().center())
-            item.resize_custom(mm_to_px(line_length.value()), 1)
-            item.setRotation(-line_angle.value())
-            item.setPos(center.x()-item.rect().width()/2, center.y()-0.5)
-            w.update_position_ui()
-            w.caixa_texto_panel.load_from_image(item)
-            sync_enabled()
-            w.save_snapshot()
-    line_length.editingFinished.connect(apply_line_geometry)
-    line_angle.editingFinished.connect(apply_line_geometry)
     background_outline_hint = QLabel(tr('No plano de fundo, o contorno cresce sempre para dentro da página.'))
     background_outline_hint.setWordWrap(True)
     background_outline_hint.setObjectName('muted')
@@ -943,7 +910,7 @@ def install_frontend(w):
             return
         item.prepareGeometryChange()
         is_line = item.shape_type == 'line'
-        item.outline_enabled = is_line or outline_enabled.isChecked()
+        item.outline_enabled = outline_enabled.isChecked()
         item.outline_color = color.name()
         item.outline_opacity = outline_alpha.value() / 100
         item.outline_join = 'miter' if join_straight.isChecked() else 'round'
@@ -964,6 +931,9 @@ def install_frontend(w):
             apply_outline()
     outline_swatch.clicked.connect(choose_outline_color)
     outline_color.editingFinished.connect(apply_outline)
+    def update_outline_label(enabled):
+        outline_enabled.setText(tr('Desabilitar contorno') if enabled else tr('Habilitar contorno'))
+    outline_enabled.toggled.connect(update_outline_label)
     outline_enabled.toggled.connect(outline_details.setVisible)
     outline_enabled.toggled.connect(apply_outline)
     outline_width.editingFinished.connect(apply_outline)
@@ -1541,11 +1511,50 @@ def install_frontend(w):
     footer = QHBoxLayout(footer_bar)
     footer.setContentsMargins(14, 5, 14, 5)
     footer.addStretch()
+    save_group = QFrame(footer_bar)
+    save_group.setObjectName('saveButtonGroup')
+    save_layout = QHBoxLayout(save_group)
+    save_layout.setContentsMargins(0, 0, 0, 0)
+    save_layout.setSpacing(0)
+    w.btn_save.setObjectName('saveMain')
     w.btn_save.setText(tr('Salvar modelo'))
     w.btn_save.setMinimumSize(0, 0)
     w.btn_save.setMaximumSize(16777215, 16777215)
     w.btn_save.setFixedSize(116, 34)
-    footer.addWidget(w.btn_save)
+    save_layout.addWidget(w.btn_save)
+    w.btn_save_security = QPushButton(save_group)
+    w.btn_save_security.setObjectName('saveSecurity')
+    w.btn_save_security.setFixedSize(34, 34)
+    w.btn_save_security.setIconSize(QSize(16, 16))
+    protection_menu = QMenu(w.btn_save_security)
+    protection_actions = {}
+    for mode, label in (
+        ('none', tr('Sem proteção')),
+        ('signatures', tr('Proteger assinaturas')),
+        ('full', tr('Proteger modelo inteiro')),
+    ):
+        action = protection_menu.addAction(label)
+        action.setCheckable(True)
+        action.triggered.connect(
+            lambda _checked=False, selected=mode: w.request_protection_mode(selected)
+        )
+        protection_actions[mode] = action
+    protection_menu.addSeparator()
+    change_password = protection_menu.addAction(tr('Alterar senha'))
+    change_password.triggered.connect(w.change_fornax_password)
+    protection_menu.aboutToShow.connect(w.refresh_protection_control)
+    w.protection_actions = protection_actions
+    w.action_change_password = change_password
+    w.protection_menu = protection_menu
+    w.btn_save_security.clicked.connect(
+        lambda: protection_menu.exec(
+            w.btn_save_security.mapToGlobal(QPoint(0, w.btn_save_security.height()))
+        )
+    )
+    save_layout.addWidget(w.btn_save_security)
+    footer.addWidget(save_group)
+    w.save_button_group = save_group
+    w.refresh_protection_control()
     page_selector = QFrame(footer_bar)
     page_selector.setObjectName('pageSelector')
     page_layout = QHBoxLayout(page_selector)
@@ -1618,7 +1627,7 @@ def install_frontend(w):
     rebuild_page_selector()
     outer.addWidget(footer_bar)
     w._footer_save_alignment = FooterSaveAlignment(
-        w, right, split.widget(1), footer_bar, footer, w.btn_save, page_selector
+        w, right, split.widget(1), footer_bar, footer, save_group, page_selector
     )
     split.splitterMoved.connect(lambda *_: w._footer_save_alignment.schedule())
     w._footer_save_alignment.schedule()
@@ -1746,23 +1755,15 @@ def install_frontend(w):
             finally:
                 updating_dynamic['active'] = False
             fill_controls.setVisible(True)
-            fill_controls.setEnabled(not is_line)
+            fill_controls.setEnabled(True)
             outline_heading_container.setVisible(True)
             outline_enabled.setVisible(True)
-            outline_enabled.setEnabled(not is_line)
+            outline_enabled.setEnabled(True)
             position_field.setVisible(not is_line)
             join_field.setVisible(item.shape_type == 'rectangle')
-            rectangle_radius.setVisible(True)
+            rectangle_radius.setVisible(item.shape_type == 'rectangle')
             rectangle_radius.setEnabled(item.shape_type == 'rectangle')
-            # A linha mantém um único arredondamento para suas duas extremidades.
-            shape_layout.removeWidget(radius_field)
-            thickness_row.removeWidget(radius_field)
-            if is_line:
-                thickness_row.addWidget(radius_field, 1)
-            radius_field.setVisible(is_line)
-            if is_line:
-                radius.setValue(px_to_mm(item.corner_radius))
-            elif item.shape_type == 'rectangle':
+            if item.shape_type == 'rectangle':
                 stored_radii = dict(getattr(item, 'corner_radii', {}) or {})
                 fallback = getattr(item, 'corner_radius', 0)
                 updating_radii['active'] = True
@@ -1773,19 +1774,15 @@ def install_frontend(w):
                         spin.setValue(px_to_mm(stored_radii.get(key, fallback)))
                 finally:
                     updating_radii['active'] = False
-            line_geometry.setVisible(is_line)
             if is_line:
-                line_length.setValue(px_to_mm(item.rect().width()))
-                line_angle.setValue((-item.rotation()) % 360)
-                p.spin_h.setEnabled(False)
-                p.chk_proporcao.setEnabled(False)
                 p.spin_rot.blockSignals(True)
                 p.spin_rot.setValue((-item.rotation()) % 360)
                 p.spin_rot.blockSignals(False)
             outline_enabled.blockSignals(True)
             outline_enabled.setChecked(item.outline_enabled)
             outline_enabled.blockSignals(False)
-            outline_details.setVisible(is_line or item.outline_enabled)
+            update_outline_label(item.outline_enabled)
+            outline_details.setVisible(item.outline_enabled)
             outline_color.setText(item.outline_color)
             fill_alpha.setValue(item.fill_opacity * 100)
             outline_alpha.setValue(item.outline_opacity * 100)
@@ -1871,3 +1868,17 @@ def install_frontend(w):
         )
 
     w._restore_inspector_state = restore_inspector_state
+
+    # QListView permite que os popups usem as mesmas métricas do workspace.
+    # O seletor de fontes conserva seu delegate de prévia tipográfica.
+    from PySide6.QtWidgets import QFontComboBox
+    for combo in w.findChildren(QComboBox):
+        if isinstance(combo, QFontComboBox):
+            popup = combo.view()
+        else:
+            popup = QListView(combo)
+            combo.setView(popup)
+        popup.setObjectName('editorComboOptions')
+        popup.setMouseTracking(True)
+        popup.setUniformItemSizes(True)
+        combo.setMaxVisibleItems(12)

@@ -45,9 +45,10 @@ class DrawShapesTest(unittest.TestCase):
     def test_line_angle_history_and_persistence(self):
         line = self.draw('line', QPoint(350, 100))
         self.assertAlmostEqual(line.rotation(), -45)
-        angle = self.w.findChild(QDoubleSpinBox, 'lineAngle')
-        self.assertEqual(angle.value(), 45)
-        self.assertFalse(self.w.caixa_texto_panel.spin_h.isEnabled())
+        self.assertIsNone(self.w.findChild(QDoubleSpinBox, 'lineAngle'))
+        self.assertIsNone(self.w.findChild(QDoubleSpinBox, 'lineLength'))
+        self.assertEqual(self.w.caixa_texto_panel.spin_rot.value(), 45)
+        self.assertTrue(self.w.caixa_texto_panel.spin_h.isEnabled())
         saved = self.w.get_current_scene_state()
         self.w.undo()
         self.assertFalse(any(getattr(i, 'shape_type', '') == 'line' for i in self.w.scene.items()))
@@ -60,6 +61,88 @@ class DrawShapesTest(unittest.TestCase):
         self.assertAlmostEqual(lines[0].rotation(), -45)
         snapped = self.draw('line', QPoint(360, 210), Qt.ShiftModifier)
         self.assertAlmostEqual(snapped.rotation(), 0)
+
+    def test_line_height_outline_and_rounding_sections(self):
+        from .canvas_items import mm_to_px
+        for kind in ('ellipse', 'line'):
+            item = self.draw(kind, QPoint(350, 330))
+            headings = [label.text() for label in self.w.findChildren(
+                QLabel, 'propertySectionHeading') if label.isVisible()]
+            self.assertNotIn('ARREDONDAMENTO DE BORDAS', headings)
+        panel = self.w.caixa_texto_panel
+        panel.spin_h.setValue(8)
+        self.assertAlmostEqual(item.rect().height(), mm_to_px(8))
+        self.assertTrue(item.contains(item.rect().center()))
+        outline = self.w.findChild(QPushButton, 'shapeOutlineEnabled')
+        self.assertTrue(outline.isEnabled())
+        self.assertFalse(outline.isChecked())
+        self.assertEqual(outline.text(), 'Habilitar contorno')
+        outline.click()
+        self.assertTrue(item.outline_enabled)
+        self.assertEqual(outline.text(), 'Desabilitar contorno')
+        outline.click()
+        self.assertFalse(item.outline_enabled)
+        saved = self.w.get_current_scene_state()
+        self.w.apply_scene_state(saved)
+        restored = next(i for i in self.w.scene.items() if getattr(i, 'shape_type', '') == 'line')
+        self.assertAlmostEqual(restored.rect().height(), mm_to_px(8), places=2)
+        self.assertFalse(restored.outline_enabled)
+        self.draw('rectangle', QPoint(350, 330))
+        self.assertTrue(any(label.isVisible() and label.text() == 'ARREDONDAMENTO DE BORDAS'
+                            for label in self.w.findChildren(QLabel, 'propertySectionHeading')))
+
+    def test_line_body_rendering_and_legacy_appearance(self):
+        from PySide6.QtGui import QImage, QPainter
+        from core.object_style import draw_shape, normalize_line_body
+        def render(entry):
+            image = QImage(100, 60, QImage.Format_ARGB32_Premultiplied)
+            image.fill(Qt.transparent)
+            painter = QPainter(image)
+            draw_shape(painter, entry)
+            painter.end()
+            return image
+        line = dict(shape_type='line', line_body=True, x=10, y=20,
+                    width=70, height=15, fill_color='#ff0000', outline_enabled=False)
+        image = render(line)
+        self.assertEqual(image.pixelColor(40, 27).name(), '#ff0000')
+        self.assertEqual(image.pixelColor(40, 38).alpha(), 0)
+        line.update(outline_enabled=True, outline_color='#0000ff', outline_width=4,
+                    outline_position='center')
+        self.assertEqual(render(line).pixelColor(40, 20).name(), '#0000ff')
+        old = dict(shape_type='line', x=10, y=20, width=70, height=1,
+                   outline_width=6, outline_color='#0000ff', corner_radius=2)
+        upgraded = normalize_line_body(old)
+        self.assertEqual(upgraded['height'], 6)
+        self.assertEqual(upgraded['y'] + upgraded['height']/2, 20.5)
+        self.assertFalse(upgraded['outline_enabled'])
+        self.assertEqual(render(old), render(upgraded))
+        state = self.w.get_current_scene_state()
+        state['shapes'].append(old)
+        self.w.apply_scene_state(state)
+        restored = next(i for i in self.w.scene.items() if getattr(i, 'shape_type', '') == 'line')
+        self.assertEqual(restored.rect().height(), 6)
+        self.assertEqual(restored.fill_color, '#0000ff')
+        self.assertTrue(restored.line_body)
+
+    def test_line_endpoint_resize_keeps_height(self):
+        from PySide6.QtWidgets import QGraphicsSceneMouseEvent
+        from PySide6.QtCore import QEvent, QPointF
+        from .canvas_items import ResizeHandle
+        item = self.draw('line', QPoint(350, 330))
+        item.resize_custom(200, 60)
+        handle = next(h for h in item.childItems() if isinstance(h, ResizeHandle) and h.name == 'bottom_right')
+        press = QGraphicsSceneMouseEvent(QEvent.GraphicsSceneMousePress)
+        press.setButton(Qt.LeftButton)
+        handle.mousePressEvent(press)
+        anchor = QPointF(handle._anchor_scene)
+        move = QGraphicsSceneMouseEvent(QEvent.GraphicsSceneMouseMove)
+        move.setScenePos(anchor + QPointF(300, 100))
+        handle.mouseMoveEvent(move)
+        self.assertEqual(item.rect().height(), 60)
+        self.assertLess((item.mapToScene(QPointF(0, 30)) - anchor).manhattanLength(), 0.001)
+        release = QGraphicsSceneMouseEvent(QEvent.GraphicsSceneMouseRelease)
+        release.setButton(Qt.LeftButton)
+        handle.mouseReleaseEvent(release)
 
     def test_line_renderer(self):
         from features.generator.renderer import NativeRenderer

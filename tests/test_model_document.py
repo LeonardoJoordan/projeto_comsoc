@@ -10,6 +10,9 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QColor, QImage
 
 from core.model_document import (
+    MAX_CANVAS_DIMENSION,
+    MAX_CANVAS_PIXELS,
+    MAX_PHYSICAL_DIMENSION_MM,
     ModelDocumentError,
     ModelValidationError,
     UnsupportedSchemaError,
@@ -216,6 +219,63 @@ def test_invalid_v4_documents_are_rejected(mutate):
     document = two_page_document()
     mutate(document)
     with pytest.raises(ModelValidationError):
+        normalize_model_document(document)
+
+
+@pytest.mark.parametrize("canvas", [
+    {"w": MAX_CANVAS_DIMENSION + 1, "h": 1},
+    {"w": 8_001, "h": 4_000},
+    {"w": 320.5, "h": 200},
+])
+def test_canvas_dimensions_are_bounded_before_rendering(canvas):
+    document = two_page_document()
+    document["canvas_size"] = canvas
+
+    with pytest.raises(ModelValidationError, match="canvas|pixels"):
+        normalize_model_document(document)
+
+
+def test_canvas_accepts_the_documented_pixel_area_boundary():
+    document = two_page_document()
+    document["canvas_size"] = {"w": 8_000, "h": 4_000}
+
+    normalized = normalize_model_document(document)
+
+    assert normalized["canvas_size"]["w"] * normalized["canvas_size"]["h"] == MAX_CANVAS_PIXELS
+
+
+def test_physical_dimensions_are_bounded():
+    document = two_page_document()
+    document["target_w_mm"] = MAX_PHYSICAL_DIMENSION_MM + 1
+
+    with pytest.raises(ModelValidationError, match="dimensões físicas"):
+        normalize_model_document(document)
+
+
+@pytest.mark.parametrize("key,value", [
+    ("x", float("inf")),
+    ("rotation", float("nan")),
+    ("w", 0),
+])
+def test_object_geometry_must_be_finite_and_bounded(key, value):
+    document = two_page_document()
+    document["pages"][0]["boxes"][0][key] = value
+
+    with pytest.raises(ModelValidationError, match="objeto|Geometria"):
+        normalize_model_document(document)
+
+
+@pytest.mark.parametrize("html", [
+    '<p>Texto<img src="file:///tmp/private.png"></p>',
+    '<p style="background-image:url(../../private.png)">Texto</p>',
+    '<link rel="stylesheet" href="file:///tmp/private.css"><p>Texto</p>',
+    '<object data="https://example.invalid/content"></object>',
+])
+def test_model_text_rejects_external_or_graphical_resources(html):
+    document = two_page_document()
+    document["pages"][0]["boxes"][0]["html"] = html
+
+    with pytest.raises(ModelValidationError, match="recurso externo"):
         normalize_model_document(document)
 
 

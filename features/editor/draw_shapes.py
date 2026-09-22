@@ -81,17 +81,18 @@ class ShapeDrawing(QObject):
             if event.type() == QEvent.MouseButtonRelease and event.button() == Qt.LeftButton:
                 distance = math.hypot(end.x()-self.start.x(), end.y()-self.start.y())
                 if distance * self.w.view.transform().m11() >= 3 and (self.kind == 'line' or min(rect.width(), rect.height()) > 0):
-                    item = RectangleItem(distance if self.kind == 'line' else rect.width(), 1 if self.kind == 'line' else rect.height(), '#d9d9d9')
+                    height = mm_to_px(0.25) if self.kind == 'line' else rect.height()
+                    item = RectangleItem(distance if self.kind == 'line' else rect.width(), height, '#d9d9d9')
                     item.shape_type = self.kind
                     base_name = {'rectangle': 'Quadrado', 'ellipse': 'Círculo', 'line': 'Linha'}[self.kind]
                     item.custom_name = self.w._unique_layer_name(base_name)
                     if self.kind == 'line':
                         center = (self.start + end)/2
-                        item.setPos(center.x()-distance/2, center.y()-0.5)
+                        item.setPos(center.x()-distance/2, center.y()-height/2)
                         item.setRotation(math.degrees(math.atan2(end.y()-self.start.y(), end.x()-self.start.x())))
-                        item.outline_enabled = True
+                        item.fill_color = '#000000'
+                        item.keep_proportion = False
                         item.outline_position = 'center'
-                        item.outline_width = mm_to_px(0.2)
                     else:
                         item.setPos(rect.topLeft())
                     item.setZValue(self.w._next_object_z())

@@ -57,14 +57,16 @@ class ThemeManager(QObject):
         self._prepare_icons()
 
     def _prepare_icons(self):
-        for name, icon_name in [('spin_up', 'spin-up'),
-                                ('spin_down', 'spin-down'),
-                                ('combo_arrow', 'combo-down')]:
+        # Setas preenchidas nos campos numéricos; chevron nas comboboxes.
+        for name, icon_name in [('spin_up', 'arrow_drop_up'),
+                                ('spin_down', 'arrow_drop_down'),
+                                ('combo_arrow', 'chevron-down')]:
             color = self.color('icon')
             target = Path(self._icon_directory.name) / (name + color[1:] + '.svg')
             if not target.exists():
                 svg = navigation_icon_path(icon_name).read_text(encoding='utf-8')
                 svg = re.sub(r'#[0-9a-fA-F]{6}', color, svg)
+                svg = svg.replace('currentColor', color)
                 target.write_text(svg, encoding='utf-8')
             self._icon_paths[name] = target.as_posix()
         # Marcas explícitas: não dependem do contraste do estilo nativo do SO.

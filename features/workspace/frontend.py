@@ -104,10 +104,10 @@ QPushButton#outputFolderBrowse {
 }
 QLineEdit#dynamicImageDirectory { min-height: 22px; max-height: 22px; }
 QPushButton#previewPrevious, QPushButton#previewNext {
-    min-height: 0; padding: 0; border-radius: 5px; font-size: 15px;
+    min-height: 20px; max-height: 20px; padding: 0; border-radius: 5px; font-size: 15px;
 }
 QPushButton#previewPageButton {
-    min-height: 0; padding: 0 8px; border-radius: 5px;
+    min-height: 20px; max-height: 20px; padding: 0 8px; border-radius: 5px;
 }
 QPushButton#previewPageButton:checked {
     background: @selection@; border-color: @accent@;
@@ -139,6 +139,7 @@ QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QComboBox:focus, QTextEdi
 QComboBox:hover { border-color: @border_strong@; }
 QComboBox::drop-down { border: none; width: 24px; }
 QComboBox::down-arrow { image: url(@combo_arrow@); width: 10px; height: 6px; }
+QComboBox[dropArrow="true"]::down-arrow { image: url(@spin_down@); width: 10px; height: 6px; }
 QListView#workspaceComboOptions {
     background: @button@; color: @text@; border: 1px solid @border_strong@;
     border-radius: 8px; padding: 6px; outline: none;
@@ -191,6 +192,10 @@ def install_frontend(window):
     themed_style(window.progress_bar, '')
 
     window.table_panel.table.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    for combo in (window.preview_panel.cbo_models,
+                  window.cbo_presets_main, window.cbo_export_format):
+        combo.setProperty('dropArrow', True)
 
     # Popups consistentes com o menu de Formas do editor.
     workspace_combos = (
@@ -528,12 +533,14 @@ def install_frontend(window):
     ajuda.addAction(tr('Sobre o FORNAX Forge'), lambda: QMessageBox.about(
         window, tr('Sobre o FORNAX Forge'),
         tr('<b>FORNAX Forge</b><br>Geração de material personalizado em lote.<br><br>'
+           'Desenvolvido por Leonardo Joordan Belisário Lima da Silva.<br>'
+           'Licenciado sob a GNU GPL v3 exclusivamente.<br><br>'
            'Interface desenvolvida com <a href="https://www.qt.io/qt-for-python">Qt for Python (PySide6)</a>.')
     ))
     ajuda.addAction(tr('Licenças de terceiros'), lambda: QMessageBox.information(
         window, tr('Licenças de terceiros'),
         tr('Este programa utiliza Qt for Python (PySide6), disponibilizado sob opções de licença LGPLv3/GPLv3 ou comercial. '
-           'Os textos completos das licenças serão incluídos no pacote de distribuição.')
+           'Os componentes de terceiros permanecem sob suas próprias licenças. Consulte os avisos incluídos no pacote de distribuição.')
     ))
     # Mantém wrappers Python vivos durante toda a janela (necessário no PySide).
     window._workspace_menus = (

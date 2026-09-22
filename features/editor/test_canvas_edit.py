@@ -15,6 +15,46 @@ class CanvasEditingTest(unittest.TestCase):
     def setUpClass(cls):
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_arrow_moves_keep_canvas_focus_after_reselecting_text(self):
+        from unittest.mock import patch
+        from .canvas_items import px_to_mm
+        w = EditorWindow()
+        w.show()
+        try:
+            w.add_new_box()
+            self.app.processEvents()
+            box = next(i for i in w.scene.items() if isinstance(i, DesignerBox))
+            w.scene.clearSelection()
+            self.app.processEvents()
+            point = w.view.mapFromScene(box.mapToScene(box.rect().center()))
+            QTest.mouseClick(w.view.viewport(), Qt.LeftButton, pos=point)
+            self.app.processEvents()
+            initial_y = box.y()
+            previous_y = initial_y
+            for _ in range(4):
+                # Envia ao foco real: enviar sempre à view esconderia o bug.
+                self.assertIs(self.app.focusWidget(), w.view)
+                QTest.keyClick(self.app.focusWidget(), Qt.Key_Up)
+                self.app.processEvents()
+                self.assertLess(box.y(), previous_y)
+                previous_y = box.y()
+                self.assertTrue(box.isSelected())
+                self.assertAlmostEqual(w.spin_pos_y.value(), px_to_mm(box.y()), places=2)
+            self.assertIs(self.app.focusWidget(), w.view)
+            # Sincronizar uma fonte diferente também não deve tomar o foco.
+            with patch.object(w.editor_texto_panel.txt_content, 'setFocus') as focus:
+                box.state.font_family = 'monospace'
+                w.on_selection_changed()
+                focus.assert_not_called()
+            w.undo()
+            restored = next(i for i in w.scene.items() if isinstance(i, DesignerBox))
+            self.assertGreater(restored.y(), previous_y)
+            self.assertLess(restored.y(), initial_y)
+        finally:
+            w._last_saved_state = w.get_current_scene_state()
+            w.close()
+            w.deleteLater()
+
     def test_typing_commit_and_history(self):
         w = EditorWindow()
         w.show()

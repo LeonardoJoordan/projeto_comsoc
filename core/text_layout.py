@@ -1,8 +1,8 @@
 """Layout de texto compartilhado pelo renderer e pela edição no canvas."""
 import re
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QFontMetrics, QTextDocument, QTextCursor, QTextCharFormat, QTextBlockFormat, QColor, QBrush
-from core.html_utils import normalize_text_decoration
+from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QTextCharFormat, QTextBlockFormat, QColor, QBrush
+from core.html_utils import TextOnlyDocument, normalize_text_decoration, sanitize_text_html
 from core.object_style import outline_pen
 
 ALIGNMENTS = {"left": Qt.AlignLeft, "center": Qt.AlignHCenter, "right": Qt.AlignRight, "justify": Qt.AlignJustify}
@@ -30,15 +30,15 @@ def line_reference_ink_bounds(doc, block, line):
 
 
 def variables_in_html(content):
-    doc = QTextDocument()
-    doc.setHtml(content)
+    doc = TextOnlyDocument()
+    doc.setHtml(sanitize_text_html(content))
     return re.findall(PLACEHOLDER_PATTERN, doc.toPlainText())
 
 
 def _html_plain_text(content):
     """Extrai texto real de um fragmento HTML, incluindo entidades do Qt."""
-    doc = QTextDocument()
-    doc.setHtml(str(content or ""))
+    doc = TextOnlyDocument()
+    doc.setHtml(sanitize_text_html(content))
     return doc.toPlainText()
 
 
@@ -49,8 +49,8 @@ def _insert_cell_html(cursor, html, base_format):
     atributos pertencem à interface da planilha, não ao conteúdo do modelo. Da
     célula importamos somente as ênfases que o usuário pode editar na tabela.
     """
-    source = QTextDocument()
-    source.setHtml(str(html or ""))
+    source = TextOnlyDocument()
+    source.setHtml(sanitize_text_html(html))
 
     block = source.begin()
     first_block = True
@@ -113,10 +113,10 @@ def resolve_rich_text(box, values):
     return doc.toHtml()
 
 def build_document(box, content):
-    doc = QTextDocument()
+    doc = TextOnlyDocument()
     doc.setDocumentMargin(0)
     rich = box.get("rich_text_version") == 1
-    cleaned = content
+    cleaned = sanitize_text_html(content)
     if not rich:
         for name in ("color", "background-color", "font-size", "font-family"):
             cleaned = re.sub(name + r'\s*:[^;"]+;?', "", cleaned)

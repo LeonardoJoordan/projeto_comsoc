@@ -46,6 +46,40 @@ def test_resolver_accepts_filename_with_or_without_extension_and_rejects_ambigui
     assert resolve_dynamic_image(tmp_path, "../ana.png").status == "invalid"
 
 
+def test_resolver_rejects_symlink_that_leaves_selected_directory(tmp_path):
+    root = tmp_path / "selected"
+    root.mkdir()
+    outside = tmp_path / "outside.png"
+    outside.write_bytes(b"outside")
+    link = root / "photo.png"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError):
+        import pytest
+        pytest.skip("O ambiente não permite links simbólicos.")
+
+    result = resolve_dynamic_image(root, "photo.png")
+
+    assert result.path is None
+    assert result.status == "invalid"
+
+
+def test_resolver_accepts_subdirectory_and_internal_symlink(tmp_path):
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    actual = photos / "inside.png"
+    actual.write_bytes(b"inside")
+    link = tmp_path / "alias.png"
+    try:
+        link.symlink_to(actual)
+    except (OSError, NotImplementedError):
+        import pytest
+        pytest.skip("O ambiente não permite links simbólicos.")
+
+    assert resolve_dynamic_image(tmp_path, "photos/inside.png").path == actual
+    assert resolve_dynamic_image(tmp_path, "alias.png").path == actual
+
+
 def test_dynamic_field_enters_document_placeholder_union():
     shape = _shape()
     source = _template(shape)

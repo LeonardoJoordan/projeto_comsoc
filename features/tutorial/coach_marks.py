@@ -174,7 +174,7 @@ class TutorialCard(QFrame):
         themed_style(self.skip, secondary_style)
         themed_style(self.back, secondary_style)
         self.back.setIcon(themed_svg_icon(navigation_icon_path('chevron-back')))
-        self.skip.setIcon(themed_svg_icon(navigation_icon_path('double-chevron-right')))
+        self.skip.setIcon(themed_svg_icon(navigation_icon_path('chevron-right')))
         self.back.setIconSize(QRect(0, 0, 12, 12).size())
         self.skip.setIconSize(QRect(0, 0, 12, 12).size())
         self.skip.setLayoutDirection(Qt.LayoutDirection.RightToLeft)

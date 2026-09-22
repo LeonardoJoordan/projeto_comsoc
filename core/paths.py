@@ -96,6 +96,21 @@ def get_logs_dir() -> Path:
     logs_dir.mkdir(parents=True, exist_ok=True)
     return logs_dir
 
+def get_temp_dir() -> Path:
+    temporary_dir = get_app_data_dir() / "temporary"
+    try:
+        temporary_dir.mkdir(parents=True, exist_ok=True)
+    except OSError:
+        user_token = getattr(os, "getuid", lambda: "user")()
+        temporary_dir = Path(tempfile.gettempdir()) / f"{APP_ID}-{user_token}"
+        temporary_dir.mkdir(parents=True, exist_ok=True)
+    if platform.system() != "Windows":
+        try:
+            temporary_dir.chmod(0o700)
+        except OSError:
+            pass
+    return temporary_dir
+
 def get_models_dir() -> Path:
     models_dir = get_app_data_dir() / "models"
     models_dir.mkdir(parents=True, exist_ok=True)

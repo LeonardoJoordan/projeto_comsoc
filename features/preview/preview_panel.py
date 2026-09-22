@@ -76,7 +76,10 @@ class PreviewPanel(QWidget):
 
         self.page_selector = QWidget()
         page_selector_layout = QHBoxLayout(self.page_selector)
-        page_selector_layout.setContentsMargins(0, 0, 0, 0)
+        # Repete a folga inferior da navegação para os seletores de face.
+        # Como a prévia ocupa o espaço elástico, ela é quem cede esses pixels;
+        # o topo do painel continua alinhado com a tabela de dados.
+        page_selector_layout.setContentsMargins(0, 8, 0, 8)
         page_selector_layout.setSpacing(5)
         page_selector_layout.addStretch(1)
         self.btn_front = QPushButton(tr("Frente"))
@@ -84,7 +87,7 @@ class PreviewPanel(QWidget):
         for index, button in enumerate((self.btn_front, self.btn_back)):
             button.setObjectName("previewPageButton")
             button.setCheckable(True)
-            button.setFixedSize(76, 24)
+            button.setFixedSize(76, 22)
             button.clicked.connect(lambda checked=False, value=index: self.pageChanged.emit(value))
             page_selector_layout.addWidget(button)
         page_selector_layout.addStretch(1)

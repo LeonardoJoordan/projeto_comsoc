@@ -2,7 +2,7 @@
 #define AppDescription "Geração de material personalizado em lote"
 #define AppVersion "1.0.0"
 #define AppExeName "FORNAX_Forge.exe"
-#define AppPublisher "Leonardo Belisário"
+#define AppPublisher "Leonardo Joordan Belisário Lima da Silva"
 
 [Setup]
 ; Não altere o AppId em versões futuras: ele identifica atualizações e desinstalações.
@@ -20,7 +20,7 @@ VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppDescription}
 VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
-LicenseFile=docs\EULA-pt-BR.txt
+LicenseFile=LICENSE
 InfoAfterFile=docs\AVISO-DISTRIBUICAO.txt
 DefaultDirName={autopf}\FORNAX Forge
 DefaultGroupName={#AppName}
@@ -48,7 +48,11 @@ Name: "desktopicon"; Description: "Criar um atalho na Área de Trabalho"; GroupD
 [Files]
 ; Execute `python script_nuitka.py` antes de compilar este instalador.
 Source: "build\main.dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "docs\EULA-pt-BR.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
+Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "NOTICE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "AUTHORS.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "TRADEMARKS.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "docs\USO_INSTITUCIONAL.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "docs\THIRD_PARTY_LICENSES.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
 Source: "docs\AVISO-DISTRIBUICAO.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 

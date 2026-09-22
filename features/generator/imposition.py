@@ -2,6 +2,7 @@ import math
 
 from PySide6.QtGui import QImage, QPainter, QColor, QPen, QPageLayout, QTransform
 from PySide6.QtCore import Qt, QPointF, QRectF
+from core.model_document import ModelValidationError, validate_raster_dimensions
 
 DPI = 300
 EPS_MM = 1e-6
@@ -16,6 +17,12 @@ def _fit_count_mm(available_mm, item_mm):
 
 class SheetAssembler:
     def __init__(self, target_w_mm: float, target_h_mm: float, sheet_w_mm: float = 210.0, sheet_h_mm: float = 297.0, crop_marks: bool = True, bleed_margin: bool = False, auto_rotate: bool = True):
+        for label, value in (
+            ("largura do item", target_w_mm), ("altura do item", target_h_mm),
+            ("largura da folha", sheet_w_mm), ("altura da folha", sheet_h_mm),
+        ):
+            if not isinstance(value, (int, float)) or isinstance(value, bool) or not math.isfinite(value) or value <= 0:
+                raise ModelValidationError(f"A {label} deve ser um número positivo.")
         self.target_w_mm = target_w_mm
         self.target_h_mm = target_h_mm
         self.crop_marks = crop_marks
@@ -68,6 +75,11 @@ class SheetAssembler:
             self.rows = rows_p
             self.capacity = cap_p
             self.orientation = QPageLayout.Orientation.Portrait
+
+        validate_raster_dimensions(
+            mm_to_px_300(self.sheet_w_mm), mm_to_px_300(self.sheet_h_mm),
+            label="folha de impressão",
+        )
 
         self.sheet_w = mm_to_px_300(self.sheet_w_mm)
         self.sheet_h = mm_to_px_300(self.sheet_h_mm)

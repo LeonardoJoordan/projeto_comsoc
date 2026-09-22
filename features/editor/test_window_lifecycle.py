@@ -72,10 +72,10 @@ class EditorWindowLifecycleTest(unittest.TestCase):
         def center_x(widget):
             return widget.mapToGlobal(QPoint(widget.width() // 2, 0)).x()
 
-        self.assertLessEqual(abs(center_x(editor.btn_save) - center_x(alignment.sidebar)), 1)
+        self.assertLessEqual(abs(center_x(editor.save_button_group) - center_x(alignment.sidebar)), 1)
         alignment.sidebar.parentWidget().setSizes([230, 700, 500])
         self.app.processEvents()
-        self.assertLessEqual(abs(center_x(editor.btn_save) - center_x(alignment.sidebar)), 1)
+        self.assertLessEqual(abs(center_x(editor.save_button_group) - center_x(alignment.sidebar)), 1)
 
         editor._last_saved_state = editor.get_current_scene_state()
         editor.close()

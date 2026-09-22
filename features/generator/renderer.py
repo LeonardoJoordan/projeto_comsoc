@@ -4,7 +4,9 @@ from html import unescape
 import re
 from pathlib import Path
 from core.render_cache import get_background_proxy_path, infer_model_dir
-from core.model_document import adapt_model_page, normalize_model_document
+from core.model_document import (
+    adapt_model_page, normalize_model_document, validate_raster_dimensions,
+)
 from core.document_layers import layer_entries
 from core.object_style import draw_shape, outline_margin, rounded_rect_path
 from core.text_layout import PLACEHOLDER_PATTERN, build_document, text_geometry, resolve_rich_text
@@ -59,6 +61,8 @@ class NativeRenderer:
                 "NativeRenderer recebe uma única página. Use renderers_for_document()."
             )
         self.tpl = template_data
+        canvas = self.tpl.get("canvas_size", {})
+        validate_raster_dimensions(canvas.get("w"), canvas.get("h"), label="canvas")
         self.page_id = self.tpl.get("__page_id", "front")
         self.model_dir = infer_model_dir(self.tpl)
         self._image_cache = ImageMemoryCache()
@@ -130,8 +134,9 @@ class NativeRenderer:
             painter.restore()
 
     def pre_render_static_base(self):
-        w = self.tpl["canvas_size"]["w"]
-        h = self.tpl["canvas_size"]["h"]
+        w, h = validate_raster_dimensions(
+            self.tpl["canvas_size"]["w"], self.tpl["canvas_size"]["h"], label="canvas"
+        )
         
         self._static_base_cache = QImage(w, h, QImage.Format_ARGB32)
         self._static_base_cache.setDotsPerMeterX(3780)
@@ -161,8 +166,9 @@ class NativeRenderer:
 
     def render_preview_image(self, row_rich=None, max_side=None, transparent=False) -> QImage:
         """Prévia em QImage, utilizável em workers sem criar QPixmap."""
-        w = self.tpl["canvas_size"]["w"]
-        h = self.tpl["canvas_size"]["h"]
+        w, h = validate_raster_dimensions(
+            self.tpl["canvas_size"]["w"], self.tpl["canvas_size"]["h"], label="canvas"
+        )
 
         scale = 1.0
         if max_side and max(w, h) > max_side:
@@ -196,8 +202,9 @@ class NativeRenderer:
         if self._static_base_cache is not None:
             image = self._static_base_cache.copy()
         else:
-            w = self.tpl["canvas_size"]["w"]
-            h = self.tpl["canvas_size"]["h"]
+            w, h = validate_raster_dimensions(
+                self.tpl["canvas_size"]["w"], self.tpl["canvas_size"]["h"], label="canvas"
+            )
             image = QImage(w, h, QImage.Format_ARGB32)
             image.setDotsPerMeterX(3780)
             image.setDotsPerMeterY(3780)

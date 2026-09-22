@@ -9,7 +9,8 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QWidget,
                                QMessageBox,
                                QListWidgetItem, QDoubleSpinBox, QComboBox, QGraphicsItem,
                                QFileDialog, QGraphicsOpacityEffect, QApplication,
-                               QSizePolicy, QLineEdit)
+                               QSizePolicy, QLineEdit, QDialog, QFormLayout,
+                               QDialogButtonBox, QVBoxLayout)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
                            QFont, QFontDatabase, QFontInfo, QTextDocument)
@@ -31,14 +32,16 @@ from core.resources import action_icon_path, app_icon_path, state_icon_path, nav
 from core.theme_icons import themed_svg_icon
 from core.themes import themed_style, theme_color
 from core.i18n import tr
-from core.dialog_buttons import get_text as dialog_get_text, style_message_box, NEUTRAL_STYLE
+from core.dialog_buttons import (get_text as dialog_get_text, style_message_box,
+                                 style_dialog_button_box, NEUTRAL_STYLE)
 from core.fornax_container import (
     FULL_MODE, PUBLIC_MODE, SIGNATURES_MODE, FornaxError,
     open_public_fornax, password_bytes, save_protected_fornax,
-    save_public_fornax, unlock_fornax,
+    save_public_fornax, unlock_fornax, reencrypt_fornax,
 )
 from core.fornax_session import FornaxExternalChangeError
 from core.ui_font import DOCUMENT_FONT_FAMILY
+from core.html_utils import TextOnlyDocument, sanitize_text_html
 from core.model_document import (
     adapt_model_page,
     document_signatures,
@@ -57,8 +60,8 @@ _VISIBILITY_ICONS = {}
 
 def _scaled_rich_text_html(html, factor):
     """Escala somente tamanhos explícitos; a fonte padrão vem do TextState."""
-    document = QTextDocument()
-    document.setHtml(str(html or ""))
+    document = TextOnlyDocument()
+    document.setHtml(sanitize_text_html(html))
     fragments = []
     block = document.begin()
     while block.isValid():
@@ -152,21 +155,11 @@ class LayerGroupBadge(QPushButton):
 
 
 def _visibility_icon(visible):
-    """Retorna o olho original ou uma cópia neutra para o estado oculto."""
+    """Alterna o desenho do olho; a opacidade é aplicada pelo botão da camada."""
     if visible not in _VISIBILITY_ICONS:
-        source = QIcon(str(state_icon_path("eye")))
-        if visible:
-            result = source
-        else:
-            image = source.pixmap(16, 16).toImage().convertToFormat(QImage.Format.Format_ARGB32)
-            for y in range(image.height()):
-                for x in range(image.width()):
-                    color = image.pixelColor(x, y)
-                    gray = round(0.299 * color.red() + 0.587 * color.green() + 0.114 * color.blue())
-                    color.setRgb(gray, gray, gray, color.alpha())
-                    image.setPixelColor(x, y, color)
-            result = QIcon(QPixmap.fromImage(image))
-        _VISIBILITY_ICONS[visible] = result
+        _VISIBILITY_ICONS[visible] = themed_svg_icon(
+            state_icon_path("eye" if visible else "eye-off")
+        )
     return _VISIBILITY_ICONS[visible]
 
 
@@ -230,6 +223,8 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         self._fornax_asset_provider = None
         self._fornax_session_manager = getattr(parent, "_fornax_sessions", None)
         self._fornax_save_as_required = False
+        self._pending_protection_mode = None
+        self._pending_protection_password = None
         self._recovery_source_path = None
         self._recovered_unsaved = False
         self._autosave_timer = QTimer(self)
@@ -707,7 +702,10 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                                 item._keyboard_move = True
                                 item.moveBy(dx, dy)
                                 item._keyboard_move = False
-                        self.on_selection_changed() # Sincroniza a barra superior
+                        # A seleção não mudou: recarregar o editor de texto aqui
+                        # pode transferir o foco e consumir as próximas setas.
+                        self.update_position_ui()
+                        self._refresh_selection_frame()
                         return True
 
             # --- Eventos de Teclado (Soltar) ---
@@ -766,6 +764,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         self._recovered_unsaved = bool(recovered)
         self._current_model_dir = None
         self._load_document_into_scene(document)
+        self.refresh_protection_control()
         self._autosave_timer.start()
 
     @staticmethod
@@ -781,6 +780,17 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             except KeyError as error:
                 raise FileNotFoundError(f"Asset não encontrado: {reference}") from error
 
+        return resolve
+
+    @staticmethod
+    def _combined_asset_provider(primary, fallback):
+        def resolve(reference):
+            try:
+                return primary(reference)
+            except (FileNotFoundError, KeyError):
+                if fallback is None:
+                    raise
+                return fallback(reference)
         return resolve
 
     @staticmethod
@@ -1009,6 +1019,191 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             return None
         return first
 
+    def _protection_mode_for_ui(self):
+        return self._pending_protection_mode or self._fornax_mode or PUBLIC_MODE
+
+    def refresh_protection_control(self):
+        mode = self._protection_mode_for_ui()
+        icons = {
+            PUBLIC_MODE: "shield",
+            SIGNATURES_MODE: "shield-ass",
+            FULL_MODE: "shield-full",
+        }
+        labels = {
+            PUBLIC_MODE: tr("Sem proteção"),
+            SIGNATURES_MODE: tr("Proteger assinaturas"),
+            FULL_MODE: tr("Proteger modelo inteiro"),
+        }
+        if hasattr(self, "btn_save_security"):
+            self.btn_save_security.setIcon(themed_svg_icon(state_icon_path(icons[mode])))
+            self.btn_save_security.setToolTip(labels[mode])
+        if hasattr(self, "protection_actions"):
+            for action_mode, action in self.protection_actions.items():
+                action.setChecked(action_mode == mode)
+            # Abrir o menu não encerra uma interação nem modifica o documento.
+            data = self.get_current_scene_state()
+            document = self._model_document or normalize_model_document(data)
+            document = replace_model_page(document, data, self._active_page_id)
+            has_signatures = bool(document_signatures(document))
+            self.protection_actions[SIGNATURES_MODE].setEnabled(has_signatures)
+        if hasattr(self, "action_change_password"):
+            self.action_change_password.setEnabled(
+                self._fornax_path is not None and self._fornax_mode in {SIGNATURES_MODE, FULL_MODE}
+            )
+
+    def _document_with_active_page(self):
+        self._finish_page_interaction()
+        data = self.get_current_scene_state()
+        data["name"] = self._current_model_name
+        document = self._model_document or normalize_model_document(data)
+        document = replace_model_page(document, data, self._active_page_id)
+        document["name"] = self._current_model_name
+        return document
+
+    def request_protection_mode(self, mode):
+        if mode not in {PUBLIC_MODE, SIGNATURES_MODE, FULL_MODE}:
+            return
+        if mode == SIGNATURES_MODE and not document_signatures(
+            self._document_with_active_page()
+        ):
+            QMessageBox.information(
+                self, tr("Proteção do modelo"),
+                tr("Este modelo não possui assinaturas para proteger."),
+            )
+            self.refresh_protection_control()
+            return
+        if mode == self._protection_mode_for_ui():
+            return
+
+        password = None
+        current_mode = self._fornax_mode or PUBLIC_MODE
+        if current_mode == PUBLIC_MODE and mode != PUBLIC_MODE:
+            password = self._request_new_fornax_password()
+            if password is None:
+                self.refresh_protection_control()
+                return
+
+        # Modelos ainda sem arquivo guardam a escolha até o primeiro salvamento.
+        if self._fornax_path is None:
+            self._pending_protection_mode = mode
+            self._pending_protection_password = password
+            self.refresh_protection_control()
+            return
+
+        document = self._document_with_active_page()
+        document = copy.deepcopy(document)
+        if mode == PUBLIC_MODE and document_signatures(document):
+            document["protection_preferences"] = {
+                "public_signatures_acknowledged": True,
+            }
+        else:
+            document.pop("protection_preferences", None)
+        destination = Path(self._fornax_path)
+        try:
+            manager = self._fornax_session_manager
+            if current_mode in {SIGNATURES_MODE, FULL_MODE}:
+                if manager is None:
+                    raise FornaxError(tr("A sessão protegida não está disponível."))
+                status = manager.save(
+                    document, path=destination, destination=destination, mode=mode,
+                    asset_provider=self._save_asset_provider,
+                )
+                descriptor = status.descriptor
+            elif mode == PUBLIC_MODE:
+                return
+            else:
+                descriptor = save_protected_fornax(
+                    document, destination, password, mode=mode,
+                    asset_provider=self._save_asset_provider,
+                    model_id=self._fornax_model_id,
+                )
+                if manager is not None:
+                    manager.forget(destination)
+                    manager.unlock(destination, password)
+
+            if manager is not None:
+                opened_document = manager.document(destination)
+                provider = lambda reference, p=destination: manager.asset(reference, p)
+            else:
+                opened = unlock_fornax(descriptor, password)
+                opened_document, provider = opened.document(), opened.asset
+        except Exception as error:
+            QMessageBox.critical(
+                self, tr("Erro"),
+                tr("Falha ao alterar a proteção do modelo:\n{erro}").format(erro=error),
+            )
+            self.refresh_protection_control()
+            return
+
+        previous_provider = self._fornax_asset_provider
+        self._fornax_mode = descriptor.mode
+        self._fornax_model_id = descriptor.model_id
+        self._model_document = opened_document
+        fresh_provider = self._detached_asset_provider(opened_document, provider)
+        self._fornax_asset_provider = self._combined_asset_provider(
+            fresh_provider, previous_provider,
+        )
+        self._remove_fornax_recovery()
+        self._last_saved_state = self.get_current_scene_state()
+        self._last_saved_document_state = self._capture_document_history_state()
+        self.modelSaved.emit(
+            self._current_model_name, opened_document["placeholders"], str(destination),
+        )
+        self.refresh_protection_control()
+
+    def change_fornax_password(self):
+        if self._fornax_path is None or self._fornax_mode not in {SIGNATURES_MODE, FULL_MODE}:
+            return
+        dialog = QDialog(self)
+        dialog.setWindowTitle(tr("Alterar senha"))
+        layout = QVBoxLayout(dialog)
+        form = QFormLayout()
+        current = QLineEdit(dialog)
+        new = QLineEdit(dialog)
+        confirmation = QLineEdit(dialog)
+        for field in (current, new, confirmation):
+            field.setEchoMode(QLineEdit.EchoMode.Password)
+        form.addRow(tr("Senha atual"), current)
+        form.addRow(tr("Nova senha"), new)
+        form.addRow(tr("Confirmar nova senha"), confirmation)
+        layout.addLayout(form)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            parent=dialog,
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        style_dialog_button_box(buttons)
+        layout.addWidget(buttons)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            if password_bytes(new.text()) != password_bytes(confirmation.text()):
+                raise FornaxError(tr("As senhas informadas não coincidem."))
+            destination = Path(self._fornax_path)
+            descriptor = reencrypt_fornax(
+                destination, current.text(), destination, new.text(), mode=self._fornax_mode,
+            )
+            manager = self._fornax_session_manager
+            if manager is not None:
+                manager.forget(destination)
+                manager.unlock(destination, new.text())
+                opened_document = manager.document(destination)
+                provider = lambda reference, p=destination: manager.asset(reference, p)
+                self._model_document = opened_document
+                fresh_provider = self._detached_asset_provider(opened_document, provider)
+                self._fornax_asset_provider = self._combined_asset_provider(
+                    fresh_provider, self._fornax_asset_provider,
+                )
+            self._fornax_model_id = descriptor.model_id
+            self._remove_fornax_recovery()
+        except Exception as error:
+            QMessageBox.warning(self, tr("Senha inválida"), str(error))
+            return
+        QMessageBox.information(
+            self, tr("Alterar senha"), tr("A senha do modelo foi alterada."),
+        )
+
     def _show_save_success_dialog(self, skip_close_dialog=False):
         if skip_close_dialog:
             self.close()
@@ -1061,14 +1256,14 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             .get("public_signatures_acknowledged") is True
         )
 
-        mode = self._fornax_mode
-        password = None
+        mode = self._pending_protection_mode or self._fornax_mode
+        password = self._pending_protection_password
         protection_transition = (
             mode is None
             or (mode == PUBLIC_MODE and has_signatures and not acknowledged)
             or (mode == SIGNATURES_MODE and not has_signatures)
         )
-        if save_as or protection_transition:
+        if (save_as or protection_transition) and self._pending_protection_mode is None:
             choice = self._choose_fornax_protection(has_signatures)
             if choice is None:
                 return
@@ -1078,7 +1273,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 and (save_as or self._fornax_mode in {None, PUBLIC_MODE})
             )
             if needs_new_password:
-                password = self._request_new_fornax_password()
+                password = password or self._request_new_fornax_password()
                 if password is None:
                     return
             document = copy.deepcopy(document)
@@ -1171,6 +1366,8 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             opened_document, provider,
         )
         self._fornax_save_as_required = False
+        self._pending_protection_mode = None
+        self._pending_protection_password = None
         self._recovered_unsaved = False
         self._remove_fornax_recovery()
         self._recovery_source_path = self._fornax_path
@@ -1178,6 +1375,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         self._current_model_name = model_name
         self._current_model_dir = None
         self._load_document_into_scene(opened_document)
+        self.refresh_protection_control()
         self.modelSaved.emit(model_name, opened_document["placeholders"], str(destination))
         self._show_save_success_dialog(skip_close_dialog)
     
@@ -1353,6 +1551,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
 
     def toggle_guides_visibility(self, checked):
         self.op_eye.setOpacity(1.0 if checked else 0.2)
+        self.btn_toggle_guides.setIcon(_visibility_icon(checked))
         for item in self.scene.items():
             if isinstance(item, Guideline):
                 item.setVisible(checked)
@@ -1360,6 +1559,9 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
 
     def toggle_guides_lock(self, locked):
         self.btn_lock_guides.setText("")
+        self.btn_lock_guides.setIcon(themed_svg_icon(
+            state_icon_path("lock" if locked else "unlock")
+        ))
         self.op_lock.setOpacity(1.0 if locked else 0.2)
         for item in self.scene.items():
             if isinstance(item, Guideline):
@@ -2329,9 +2531,9 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
 
     def _refresh_doc_proportion_button(self):
         checked = self.chk_doc_proporcao.isChecked()
-        self.chk_doc_proporcao.setIcon(QIcon(str(action_icon_path(
+        self.chk_doc_proporcao.setIcon(themed_svg_icon(action_icon_path(
             "lock ratio" if checked else "unlock ratio"
-        ))))
+        )))
         self.chk_doc_proporcao.setIconSize(QSize(20, 20))
         themed_style(self.chk_doc_proporcao, self._doc_proportion_button_style(checked))
         self.op_doc_proporcao.setOpacity(1.0 if checked else 0.2)
@@ -2988,7 +3190,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 
             # Aplica opacidade 1.0 (trancado) ou 0.15 (destrancado)
             effect.setOpacity(1.0 if new_locked else 0.15)
-            button.setIcon(QIcon(str(state_icon_path("lock" if new_locked else "unlock"))))
+            button.setIcon(themed_svg_icon(state_icon_path("lock" if new_locked else "unlock")))
             themed_style(label, "color: @disabled@; font-style: italic;" if new_locked else "")
             self.save_snapshot()
 
@@ -3088,7 +3290,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 
                 # --- Botão Bloqueio (Cadeado - DIREITA) ---
                 btn_lock = QPushButton()
-                btn_lock.setIcon(QIcon(str(state_icon_path("lock" if is_locked else "unlock"))))
+                btn_lock.setIcon(themed_svg_icon(state_icon_path("lock" if is_locked else "unlock")))
                 btn_lock.setIconSize(QSize(14, 14))
                 btn_lock.setFixedSize(24, 24)
                 if getattr(item, 'is_document_background', False):
@@ -3523,6 +3725,7 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             is_visible = True
         self.btn_toggle_guides.blockSignals(True)
         self.btn_toggle_guides.setChecked(is_visible)
+        self.btn_toggle_guides.setIcon(_visibility_icon(is_visible))
         self.op_eye.setOpacity(1.0 if is_visible else 0.2)
         self.btn_toggle_guides.blockSignals(False)
 
@@ -3530,6 +3733,9 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
         is_locked = data.get("guidelines_locked", False)
         self.btn_lock_guides.blockSignals(True)
         self.btn_lock_guides.setChecked(is_locked)
+        self.btn_lock_guides.setIcon(themed_svg_icon(
+            state_icon_path("lock" if is_locked else "unlock")
+        ))
         self.btn_lock_guides.setText("")
         self.op_lock.setOpacity(1.0 if is_locked else 0.2)
         self.btn_lock_guides.blockSignals(False)
@@ -3541,7 +3747,9 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                 item.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, not is_locked)
                 item.setOpacity(0.4 if is_locked else 1.0)
 
+        from core.object_style import normalize_line_body
         for entry in data.get('shapes', []):
+            entry = normalize_line_body(entry)
             item = RectangleItem(entry.get('width', canvas_w), entry.get('height', canvas_h), entry.get('fill_color', '#ffffff'))
             for key in item.style_data():
                 if key in entry:

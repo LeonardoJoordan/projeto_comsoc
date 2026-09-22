@@ -32,7 +32,7 @@ def test_object_icons_are_valid_svg_icons():
     app = QApplication.instance() or QApplication([])
 
     for name in (
-        "text", "shapes", "image", "signature", "quantity",
+        "text", "shapes", "image", "signature",
         "square", "circle", "line",
     ):
         path = object_icon_path(name)
@@ -44,8 +44,8 @@ def test_guide_icons_are_valid_svg_icons():
     app = QApplication.instance() or QApplication([])
 
     for name in (
-        "guide", "h.guide", "v.guide", "l.guide", "lock", "unlock", "eye",
-        "opacity",
+        "h.guide", "v.guide", "lock", "unlock", "eye", "eye-off",
+        "opacity", "rotate", "shield", "shield-ass", "shield-full",
     ):
         path = state_icon_path(name)
         assert path.is_file()
@@ -56,7 +56,7 @@ def test_action_icons_are_valid_svg_icons():
     app = QApplication.instance() or QApplication([])
 
     for name in (
-        "link", "lock ratio", "unlock ratio", "rotate-left", "rotate-right",
+        "lock ratio", "unlock ratio", "rotate-left", "rotate-right",
         "undo", "redo", "delete", "duplicate", "edit", "expand-content",
         "more", "more-vertical", "group",
     ):
@@ -83,9 +83,9 @@ def test_navigation_icons_are_valid_svg_icons():
     app = QApplication.instance() or QApplication([])
 
     for name in (
-        "chevron-down", "chevron-up", "double-chevron-left",
+        "chevron-back", "chevron-down", "chevron-right", "chevron-up",
+        "double-chevron-left", "arrow_drop_up", "arrow_drop_down",
         "double-chevron-right", "left-arrow", "right-arrow", "layer-child",
-        "spin-up", "spin-down", "combo-down",
     ):
         path = navigation_icon_path(name)
         assert path.is_file()

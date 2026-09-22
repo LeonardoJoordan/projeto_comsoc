@@ -12,6 +12,8 @@ import tempfile
 from typing import Any
 from uuid import NAMESPACE_URL, uuid4, uuid5
 
+from core.html_utils import text_html_has_unsupported_resources
+
 
 SCHEMA_VERSION = 4
 LEGACY_SCHEMA_VERSION = 3
@@ -19,6 +21,14 @@ V4_FILENAME = "template_v4.json"
 V4_BACKUP_FILENAME = "template_v4.json.bak"
 V3_FILENAME = "template_v3.json"
 PAGE_IDS = ("front", "back")
+
+# O Qt armazena imagens ARGB em aproximadamente quatro bytes por pixel. O
+# canvas usa um teto menor que assets isolados porque geração paralela mantém
+# bases e imagens de saída simultaneamente.
+MAX_CANVAS_DIMENSION = 16_384
+MAX_CANVAS_PIXELS = 32_000_000
+MAX_PHYSICAL_DIMENSION_MM = 5_000.0
+MAX_OBJECT_COORDINATE = MAX_CANVAS_DIMENSION * 16
 
 PAGE_COLLECTIONS = ("boxes", "images", "signatures", "shapes")
 PAGE_KEYS = {
@@ -85,10 +95,30 @@ def _positive_number(value: Any) -> bool:
     )
 
 
+def validate_raster_dimensions(width: Any, height: Any, *, label: str = "imagem") -> tuple[int, int]:
+    """Valida dimensões antes de entregá-las a um buffer raster do Qt."""
+    if not _positive_number(width) or not _positive_number(height):
+        raise ModelValidationError(f"As dimensões de {label} devem ser positivas.")
+    numeric_width = float(width)
+    numeric_height = float(height)
+    if not numeric_width.is_integer() or not numeric_height.is_integer():
+        raise ModelValidationError(f"As dimensões de {label} devem ser números inteiros de pixels.")
+    pixel_width, pixel_height = int(numeric_width), int(numeric_height)
+    if (
+        pixel_width > MAX_CANVAS_DIMENSION
+        or pixel_height > MAX_CANVAS_DIMENSION
+        or pixel_width * pixel_height > MAX_CANVAS_PIXELS
+    ):
+        raise ModelValidationError(f"As dimensões de {label} excedem o limite seguro do programa.")
+    return pixel_width, pixel_height
+
+
 def _validate_dimensions(document: dict) -> None:
     canvas = document.get("canvas_size")
     if not isinstance(canvas, dict) or not _positive_number(canvas.get("w")) or not _positive_number(canvas.get("h")):
         raise ModelValidationError("canvas_size deve conter largura e altura positivas.")
+
+    validate_raster_dimensions(canvas["w"], canvas["h"], label="canvas")
 
     width = document.get("target_w_mm")
     height = document.get("target_h_mm")
@@ -96,6 +126,28 @@ def _validate_dimensions(document: dict) -> None:
         raise ModelValidationError("As dimensões físicas devem possuir largura e altura juntas.")
     if width is not None and (not _positive_number(width) or not _positive_number(height)):
         raise ModelValidationError("As dimensões físicas devem ser positivas.")
+    if width is not None and (
+        float(width) > MAX_PHYSICAL_DIMENSION_MM
+        or float(height) > MAX_PHYSICAL_DIMENSION_MM
+    ):
+        raise ModelValidationError("As dimensões físicas excedem o limite seguro do programa.")
+
+
+def _validate_object_geometry(item: dict, *, page_id: str) -> None:
+    for key in ("x", "y", "z_value", "rotation"):
+        value = item.get(key)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+            raise ModelValidationError(f"Geometria inválida em objeto da página {page_id}.")
+        if abs(float(value)) > MAX_OBJECT_COORDINATE:
+            raise ModelValidationError(f"Geometria de objeto excede o limite na página {page_id}.")
+    for key in ("w", "h", "width", "height"):
+        if key not in item:
+            continue
+        value = item[key]
+        if not _positive_number(value) or float(value) > MAX_OBJECT_COORDINATE:
+            raise ModelValidationError(f"Dimensão de objeto inválida na página {page_id}.")
 
 
 def _ensure_legacy_object_ids(page: dict) -> None:
@@ -225,10 +277,19 @@ def _validate_page(page: Any, expected_id: str, *, legacy_source: bool) -> None:
             if not isinstance(object_id, str) or not object_id.strip():
                 raise ModelValidationError(f"Objeto sem identidade na página {expected_id}.")
             object_ids.append(object_id)
+            _validate_object_geometry(item, page_id=expected_id)
     if len(object_ids) != len(set(object_ids)):
         raise ModelValidationError(f"Há object_id repetido na página {expected_id}.")
 
     shapes = {item['object_id']: item for item in page.get('shapes', [])}
+    for box in page.get("boxes", []):
+        html = box.get("html", "")
+        if not isinstance(html, str):
+            raise ModelValidationError(f"HTML de texto inválido na página {expected_id}.")
+        if text_html_has_unsupported_resources(html):
+            raise ModelValidationError(
+                f"Caixa de texto contém recurso externo ou gráfico não permitido na página {expected_id}."
+            )
     for shape in shapes.values():
         field = shape.get("dynamic_image_field")
         if field is not None and not isinstance(field, str):

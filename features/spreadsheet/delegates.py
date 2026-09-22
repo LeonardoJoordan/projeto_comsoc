@@ -5,6 +5,7 @@ from PySide6.QtGui import (QTextDocument, QPalette, QTextCursor, QFont, QPen, QC
                            QTextOption, QPainter)
 from PySide6.QtCore import Qt, QEvent, QRectF, QRect, QPointF
 from core.themes import theme_color
+from core.html_utils import TextOnlyDocument, sanitize_text_html
 
 
 RICH_TEXT_STYLESHEET = "b, strong { font-weight: 800; }"
@@ -12,12 +13,12 @@ RICH_TEXT_STYLESHEET = "b, strong { font-weight: 800; }"
 
 def rich_text_document(html, font, color, *, no_wrap=False):
     """Monta o documento usado tanto na célula quanto nos testes visuais."""
-    doc = QTextDocument()
+    doc = TextOnlyDocument()
     doc.setDefaultFont(font)
     doc.setDefaultStyleSheet(
         f"body {{ color: {color}; }} {RICH_TEXT_STYLESHEET}"
     )
-    doc.setHtml(html)
+    doc.setHtml(sanitize_text_html(html))
     _promote_bold_fragments(doc)
     doc.setDocumentMargin(0 if no_wrap else 2)
     if no_wrap:

@@ -65,24 +65,6 @@ def outline_margin(item):
 
 def paint_shape_path(painter, path, item):
     """Posicionamento opt-in; documentos sem a opção mantêm o desenho antigo."""
-    if item.get('shape_type') == 'line':
-        radius = max(0, float(item.get('corner_radius', 0)))
-        if radius:
-            bounds = path.boundingRect()
-            width = max(0.1, float(item.get('outline_width', 1)))
-            bounds = QRectF(bounds.left(), bounds.center().y()-width/2, bounds.width(), width)
-            radius = min(radius, width/2, bounds.width()/2)
-            rounded = QPainterPath()
-            rounded.addRoundedRect(bounds, radius, radius)
-            painter.fillPath(rounded, style_color(item, 'outline'))
-            return
-        pen = QPen(style_color(item, 'outline'))
-        pen.setWidthF(max(0.1, float(item.get('outline_width', 1))))
-        pen.setCapStyle(Qt.FlatCap)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-        painter.drawPath(path)
-        return
     position = item.get('outline_position')
     if not item.get('outline_enabled') or position not in ('inside', 'outside', 'center'):
         painter.setPen(outline_pen(item))
@@ -102,7 +84,23 @@ def paint_shape_path(painter, path, item):
     painter.fillPath(stroke, style_color(item, 'outline'))
 
 
+def normalize_line_body(item):
+    """Preserva o traço antigo ao convertê-lo em corpo com altura independente."""
+    if item.get('shape_type') != 'line' or item.get('line_body', False):
+        return item
+    result = dict(item)
+    height = max(0.1, float(item.get('outline_width', 1)))
+    result.update(
+        line_body=True, height=height,
+        y=item.get('y', 0) + (item.get('height', 1) - height) / 2,
+        fill_color=item.get('outline_color', '#000000'),
+        fill_opacity=item.get('outline_opacity', 1), outline_enabled=False,
+    )
+    return result
+
+
 def draw_shape(painter, item):
+    item = normalize_line_body(item)
     if not item.get("visible", True):
         return
     w, h = item.get("width", 200), item.get("height", 120)
@@ -117,8 +115,8 @@ def draw_shape(painter, item):
         path = QPainterPath()
         bounds = QRectF(-w/2, -h/2, w, h)
         if item.get('shape_type') == 'line':
-            path.moveTo(bounds.left(), 0)
-            path.lineTo(bounds.right(), 0)
+            radius = min(max(0, item.get('corner_radius', 0)), w / 2, h / 2)
+            path.addRoundedRect(bounds, radius, radius)
         elif item.get("shape_type", "rectangle") in ("ellipse", "circle"):
             path.addEllipse(bounds)
         else:

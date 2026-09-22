@@ -34,8 +34,8 @@
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="461" />
-      <source>&lt;b&gt;FORNAX Forge&lt;/b&gt;&lt;br&gt;Geração de material personalizado em lote.&lt;br&gt;&lt;br&gt;Interface desenvolvida com &lt;a href="https://www.qt.io/qt-for-python"&gt;Qt for Python (PySide6)&lt;/a&gt;.</source>
-      <translation>&lt;b&gt;FORNAX Forge&lt;/b&gt;&lt;br&gt;Personalized batch material generation.&lt;br&gt;&lt;br&gt;Interface built with &lt;a href="https://www.qt.io/qt-for-python"&gt;Qt for Python (PySide6)&lt;/a&gt;.</translation>
+      <source>&lt;b&gt;FORNAX Forge&lt;/b&gt;&lt;br&gt;Geração de material personalizado em lote.&lt;br&gt;&lt;br&gt;Desenvolvido por Leonardo Joordan Belisário Lima da Silva.&lt;br&gt;Licenciado sob a GNU GPL v3 exclusivamente.&lt;br&gt;&lt;br&gt;Interface desenvolvida com &lt;a href="https://www.qt.io/qt-for-python"&gt;Qt for Python (PySide6)&lt;/a&gt;.</source>
+      <translation>&lt;b&gt;FORNAX Forge&lt;/b&gt;&lt;br&gt;Personalized batch material generation.&lt;br&gt;&lt;br&gt;Developed by Leonardo Joordan Belisário Lima da Silva.&lt;br&gt;Licensed under GNU GPL v3 only.&lt;br&gt;&lt;br&gt;Interface built with &lt;a href="https://www.qt.io/qt-for-python"&gt;Qt for Python (PySide6)&lt;/a&gt;.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1127" />
@@ -688,8 +688,8 @@ Links work only in PDF. Do you want to continue and generate images without link
     </message>
     <message>
       <location filename="../../features/workspace/frontend.py" line="466" />
-      <source>Este programa utiliza Qt for Python (PySide6), disponibilizado sob opções de licença LGPLv3/GPLv3 ou comercial. Os textos completos das licenças serão incluídos no pacote de distribuição.</source>
-      <translation>This application uses Qt for Python (PySide6), available under LGPLv3/GPLv3 or commercial license options. The complete license texts will be included in the distribution package.</translation>
+      <source>Este programa utiliza Qt for Python (PySide6), disponibilizado sob opções de licença LGPLv3/GPLv3 ou comercial. Os componentes de terceiros permanecem sob suas próprias licenças. Consulte os avisos incluídos no pacote de distribuição.</source>
+      <translation>This application uses Qt for Python (PySide6), available under LGPLv3/GPLv3 or commercial license options. Third-party components remain under their own licenses. See the notices included in the distribution package.</translation>
     </message>
     <message>
       <location filename="../../features/workspace/main_window.py" line="1097" />
@@ -2432,8 +2432,12 @@ Enter a name to save this preset:</translation>
       <translation>LINK</translation>
     </message>
     <message>
-      <source>Ativar contorno</source>
+      <source>Habilitar contorno</source>
       <translation>Enable outline</translation>
+    </message>
+    <message>
+      <source>Desabilitar contorno</source>
+      <translation>Disable outline</translation>
     </message>
     <message>
       <source>ARQUIVO ORIGINAL</source>
@@ -3697,5 +3701,18 @@ role: Mayor</translation>
     <message><source>Usados recentemente</source><translation>Recently used</translation></message>
     <message><source>Formato</source><translation>Format</translation></message>
     <message><source>Predefinição</source><translation>Preset</translation></message>
+  </context>
+  <context>
+    <name>EditorProtection</name>
+    <message><source>Alterar senha</source><translation>Change password</translation></message>
+    <message><source>Senha atual</source><translation>Current password</translation></message>
+    <message><source>Nova senha</source><translation>New password</translation></message>
+    <message><source>Confirmar nova senha</source><translation>Confirm new password</translation></message>
+    <message><source>A senha do modelo foi alterada.</source><translation>The template password has been changed.</translation></message>
+    <message><source>A sessão protegida não está disponível.</source><translation>The protected session is not available.</translation></message>
+    <message><source>Este modelo não possui assinaturas para proteger.</source><translation>This template has no signatures to protect.</translation></message>
+    <message><source>Falha ao alterar a proteção do modelo:
+{erro}</source><translation>Failed to change template protection:
+{erro}</translation></message>
   </context>
 </TS>

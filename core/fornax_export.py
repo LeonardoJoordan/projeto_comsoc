@@ -24,6 +24,7 @@ from core.fornax_container import (
     unlock_fornax,
 )
 from core.template_manager import slugify_model_name
+from core.paths import get_temp_dir
 from core.file_transactions import file_sha256
 from core.model_document import without_signatures
 
@@ -142,7 +143,7 @@ def export_models(
                 raise FornaxFormatError("Um modelo original mudou durante a exportação.")
 
     exported = []
-    with tempfile.TemporaryDirectory(prefix="fornax_export_") as temporary_dir:
+    with tempfile.TemporaryDirectory(prefix="export-", dir=get_temp_dir()) as temporary_dir:
         temporary_root = Path(temporary_dir)
         used_names = set()
         for request in requests:

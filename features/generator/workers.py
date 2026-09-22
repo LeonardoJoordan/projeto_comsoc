@@ -8,6 +8,7 @@ from .production_plan import build_imposition_plan
 from .pdf_links import inject_pdf_links
 from core.i18n import tr
 from core.model_document import resolve_model_file
+from core.naming_engine import confined_output_path
 from core.render_cache import publish_thumbnail_cache, source_revision
 
 
@@ -55,10 +56,10 @@ class DirectRenderWorker(QThread):
                 published_paths = []
                 active_secure_paths = []
                 if self.export_format == "PDF":
-                    out_path = self.output_dir / f"{filename}.pdf"
+                    out_path = confined_output_path(self.output_dir, f"{filename}.pdf")
                     temporary = (
                         out_path if self.secure_output else
-                        self.output_dir / f".{filename}.{original_idx}.partial.pdf"
+                        confined_output_path(self.output_dir, f".{filename}.{original_idx}.partial.pdf")
                     )
                     if not self.secure_output:
                         temporary_paths.append(temporary)
@@ -107,10 +108,10 @@ class DirectRenderWorker(QThread):
                         if not self._is_running:
                             break
                         suffix = f"_pag{page_index + 1}" if multiple_pages else ""
-                        out_path = self.output_dir / f"{filename}{suffix}.png"
+                        out_path = confined_output_path(self.output_dir, f"{filename}{suffix}.png")
                         temporary = (
                             out_path if self.secure_output else
-                            self.output_dir / f".{filename}{suffix}.{original_idx}.partial.png"
+                            confined_output_path(self.output_dir, f".{filename}{suffix}.{original_idx}.partial.png")
                         )
                         if not self.secure_output:
                             temporary_paths.append(temporary)
@@ -233,10 +234,10 @@ class PageRenderWorker(QThread):
                 output_base = page_task["output_base"]
                 final_names = []
                 if self.export_format == "PDF":
-                    out_path = self.output_dir / f"{output_base}.pdf"
+                    out_path = confined_output_path(self.output_dir, f"{output_base}.pdf")
                     temporary = (
                         out_path if self.secure_output else
-                        self.output_dir / f".{output_base}.{page_num}.partial.pdf"
+                        confined_output_path(self.output_dir, f".{output_base}.{page_num}.partial.pdf")
                     )
                     if not self.secure_output:
                         temporary_paths.append(temporary)
@@ -272,10 +273,10 @@ class PageRenderWorker(QThread):
                     suffixes = ("_frente", "_verso") if self.duplex else ("",)
                     for face_index, image in enumerate(face_images):
                         suffix = suffixes[face_index]
-                        out_path = self.output_dir / f"{output_base}{suffix}.png"
+                        out_path = confined_output_path(self.output_dir, f"{output_base}{suffix}.png")
                         temporary = (
                             out_path if self.secure_output else
-                            self.output_dir / f".{output_base}{suffix}.{page_num}.partial.png"
+                            confined_output_path(self.output_dir, f".{output_base}{suffix}.{page_num}.partial.png")
                         )
                         if not self.secure_output:
                             temporary_paths.append(temporary)
