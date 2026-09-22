@@ -50,9 +50,9 @@ class TransferDialog(QDialog):
                 background: @field@; border: 1px solid @border@;
                 border-radius: 6px; outline: none;
             }
-            QListWidget::item { min-height: 32px; padding: 4px 10px; }
+            QListWidget::item { min-height: 24px; padding: 2px 10px; }
             QListWidget::item:selected { background: @selection@; }
-            QTableWidget::item { padding: 6px; }
+            QTableWidget::item { padding: 2px 6px; }
             QHeaderView::section { background: @surface@; padding: 8px; border: none; }
             QFrame#transferDivider { background: @border@; border: none; }
             QLabel#transferSummary { color: @muted@; }

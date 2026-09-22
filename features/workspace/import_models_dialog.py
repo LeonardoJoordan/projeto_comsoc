@@ -29,7 +29,7 @@ class ImportModelsDialog(TransferDialog):
         self.table = QTableWidget(len(self.zip_models), 3)
         self.table.setHorizontalHeaderLabels([tr('Modelo'), tr('Proteção / formato'), tr('Na biblioteca')])
         self.table.verticalHeader().hide()
-        self.table.verticalHeader().setDefaultSectionSize(44)
+        self.table.verticalHeader().setDefaultSectionSize(28)
         self.table.setShowGrid(False)
         self.table.setWordWrap(False)
         self.table.setTextElideMode(Qt.TextElideMode.ElideRight)
@@ -60,7 +60,7 @@ class ImportModelsDialog(TransferDialog):
                     button = QPushButton(label)
                     button.setCheckable(True)
                     button.setAutoDefault(False)
-                    button.setFixedHeight(28)
+                    button.setFixedHeight(24)
                     button.setMinimumWidth(button.fontMetrics().horizontalAdvance(label) + 36)
                     themed_style(button, NEUTRAL_STYLE + """
                         QPushButton:checked { background: @selection@; border-color: @accent@; }
@@ -91,7 +91,7 @@ class ImportModelsDialog(TransferDialog):
             self.replace_all = QPushButton(tr('Substituir'))
             for button in (self.copy_all, self.replace_all):
                 button.setAutoDefault(False)
-                button.setFixedHeight(28)
+                button.setFixedHeight(24)
                 themed_style(button, NEUTRAL_STYLE)
                 button.setMinimumWidth(button.fontMetrics().horizontalAdvance(button.text()) + 36)
                 batch.addWidget(button)

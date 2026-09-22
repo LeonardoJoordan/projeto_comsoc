@@ -215,6 +215,8 @@ Get-FileHash build\installer-windows\*.exe -Algorithm SHA256
 
 ## 6. Registro de execução e próxima retomada
 
+**Ajuste posterior ao build W5/W6:** seletores de importar/exportar agora usam linhas de 28 px (24 px de conteúdo + 2 px acima/abaixo); botões internos de importação com 24 px. Três testes de transferência aprovados, incluindo geometria Qt offscreen. O executável e o instalador anteriores não contêm esse ajuste: reconstruir ambos antes da próxima validação/distribuição.
+
 **Estado em 22/09/2026:** W1 e W2 concluídos no Windows; W2 com pulos de capacidade documentados. W3 com inspeção nativa impedida; W4 com validação automatizada aprovada e aceite completo pendente. W5 com novo executável e auditoria estática aprovados, validação funcional pendente. W6 com instalador de teste gerado, instalação real pendente. W7 não executada para esta revisão. Os testes/builds de 20/09 não validam este commit.
 
 | Checkpoint | Estado | Evidências / correções / pendências |
