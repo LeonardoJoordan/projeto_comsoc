@@ -1,12 +1,8 @@
 app-id: com.leobelisario.FornaxForge
 runtime: org.gnome.Platform
-runtime-version: '47'
+runtime-version: '50'
 sdk: org.gnome.Sdk
 command: fornax-forge
-
-build-options:
-  build-args:
-    - --share=network
 
 finish-args:
   - --socket=fallback-x11
@@ -19,7 +15,11 @@ modules:
   - name: dependencias
     buildsystem: simple
     build-commands:
-      - pip3 install --prefix=/app PySide6==6.11.0 pypdf==6.14.2 cryptography==50.0.1
+      - pip3 install --prefix=/app --no-index --find-links=wheels --require-hashes -r wheels/requirements.lock
+    sources:
+      - type: dir
+        path: build/flatpak-wheels
+        dest: wheels
     
   - name: fornax-forge
     buildsystem: simple
@@ -32,14 +32,10 @@ modules:
       - mkdir -p /app/share/doc/fornax-forge
       - mkdir -p /app/share/icons/hicolor/32x32/apps /app/share/icons/hicolor/48x48/apps /app/share/icons/hicolor/64x64/apps /app/share/icons/hicolor/128x128/apps /app/share/icons/hicolor/256x256/apps /app/share/icons/hicolor/512x512/apps
       
-      # VASSOURA: Apaga os ambientes virtuais e pastas de compilação antes de copiar
-      - cp main.py /app/share/fornax-forge/
-      - cp -r core /app/share/fornax-forge/
-      - cp -r features /app/share/fornax-forge/
-      - cp -r shared /app/share/fornax-forge/
-      - cp -r assets /app/share/fornax-forge/
-      - cp LICENSE NOTICE AUTHORS.md TRADEMARKS.md /app/share/doc/fornax-forge/
-      - cp docs/USO_INSTITUCIONAL.md docs/PRIVACIDADE_E_ARMAZENAMENTO.md docs/THIRD_PARTY_LICENSES.md docs/AVISO-DISTRIBUICAO.txt /app/share/doc/fornax-forge/
+      # A mesma seleção explícita usada na preparação do standalone.
+      - python3 scripts/release_tools.py stage --output /app/share/fornax-forge
+      - cp LICENSE NOTICE AUTHORS.md TRADEMARKS.md SECURITY.md /app/share/doc/fornax-forge/
+      - cp -r /app/share/fornax-forge/docs/. /app/share/doc/fornax-forge/
       - cp assets/icons/fornax-forge_32.png /app/share/icons/hicolor/32x32/apps/com.leobelisario.FornaxForge.png
       - cp assets/icons/fornax-forge_48.png /app/share/icons/hicolor/48x48/apps/com.leobelisario.FornaxForge.png
       - cp assets/icons/fornax-forge_64.png /app/share/icons/hicolor/64x64/apps/com.leobelisario.FornaxForge.png

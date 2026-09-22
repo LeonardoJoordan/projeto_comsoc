@@ -1,6 +1,6 @@
 # Modelos `.fornax`: uso, migração e recuperação
 
-Estado em 20/09/2026: implementação em validação. Consulte o
+Estado em 22/09/2026: implementação em validação. Consulte o
 [checklist de distribuição](CHECKLIST_DISTRIBUICAO_FORNAX.md) antes de publicar.
 
 ## Arquivo individual e lote
@@ -21,7 +21,9 @@ modelo público com assinaturas. Essa distinção permite que versões anteriore
 programa recusem a capacidade desconhecida, em vez de interpretar o arquivo como
 corrompido. O documento gráfico interno permanece no schema v4.
 
+Use **Arquivo > Importar modelos…** e **Arquivo > Exportar modelos…** para transportar modelos.
 Ao abrir um `.fornax` externo, o programa oferece adicioná-lo à biblioteca.
+Se o caminho já pertence à biblioteca, o modelo é selecionado sem pedir nova incorporação.
 Recusar permite o uso temporário; ele não passa a fazer parte da biblioteca na
 próxima execução. Importar cria uma cópia local, preservando o arquivo recebido.
 Abertura por duplo clique depende da associação instalada pelo sistema; sua
@@ -62,8 +64,13 @@ salvamento apresenta novamente a recomendação e as opções de proteção.
 Enquanto um modelo autorizado permanece ativo, a senha não expira por um timer
 de inatividade. Ao trocar de modelo, começa uma tolerância individual de cinco
 minutos. Retornar dentro dela evita digitar novamente. Após expirar, o retorno
-solicita desbloqueio ou permite a cópia sem assinaturas, quando esse modo existe.
+mostra apenas o conteúdo disponível sem senha.
 Encerrar o programa encerra a autorização; não é um login permanente.
+
+A seleção do modelo não abre automaticamente uma pergunta de senha. Para proteção de assinaturas, a prévia abre a cópia sem assinaturas; com proteção integral, o conteúdo permanece indisponível. Use **Desbloquear modelo** abaixo da prévia para inserir a senha. Após desbloquear, o mesmo botão passa a **Bloquear modelo**, encerrando esse acesso quando você desejar.
+
+No editor, o escudo ao lado de **Salvar modelo** indica o nível atual e oferece **Sem proteção**, **Proteger assinaturas**, **Proteger modelo inteiro** e **Alterar senha**. A troca entre modos protegidos preserva a senha existente; a primeira proteção exige cadastro e confirmação. Alterar a senha exige a atual e a confirmação da nova.
+
 
 ## Compartilhar e receber
 

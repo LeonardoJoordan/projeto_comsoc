@@ -105,7 +105,7 @@ Este documento é planejamento; não executa as correções. Cada checkpoint dev
 
 Esta etapa pode avançar em paralelo à sequência técnica, mas depende de duas informações do autor. Não escolher uma licença em seu nome nem presumir a origem de um ícone.
 
-**Situação: parcialmente concluída em 21/09/2026.** A autoria foi registrada em nome de Leonardo Joordan Belisário Lima da Silva e a licença própria foi definida como GPL-3.0-only. A antiga EULA contraditória foi retirada. O inventário registra a origem declarada da marca e dos ícones. A publicação permanece bloqueada até que os SVGs derivados do Flaticon sejam substituídos por desenhos originais e que a evidência do ícone do aplicativo seja preservada.
+**Situação: concluída no escopo documental em 22/09/2026.** Autoria e GPL-3.0-only definidas, EULA contraditória retirada. O autor declarou concluída a substituição dos SVGs por recursos de Lucide, Google Material e Bootstrap Icons. Os textos oficiais ISC/MIT/Apache-2.0 foram preservados em `docs/licenses/`, com inventário individual em `docs/ASSET_PROVENANCE.md`. Os 11 arquivos sem identificação externa foram confirmados pelo autor como criações próprias no Inkscape; a origem dos 67 SVGs está registrada. A origem da marca foi esclarecida: imagem gerada com ChatGPT e editada pelo autor no Photoshop para arredondar as bordas e incluir a constelação ao fundo. O autor informou geração em 13 de setembro às 01:33, sem preservação do PSD; a declaração, os PNGs/ICO finais e seus hashes foram registrados como evidência disponível, com seus limites. Os termos de conteúdo da OpenAI foram consultados e referenciados no inventário. A ausência do PSD não é tratada como impedimento para este registro documental. A presença das licenças no pacote instalado será validada na Etapa 5. Não é necessário redesenhar ícones cuja origem e licença estejam confirmadas.
 
 ### 4.1 — Unificar a licença do FORNAX — J1 e J5
 
@@ -137,6 +137,8 @@ Depois da decisão:
 **Conclusão esperada:** não resta asset com origem desconhecida no pacote publicado.
 
 ## Etapa 5 — Adequar dependências e construir releases verificáveis
+
+**Situação: implementação e validação local realizadas em 22/09/2026; aceite multiplataforma pendente.** Runtime sem Addons validado, locks com hashes, seleção explícita de conteúdo, standalone Linux compilado, avisos e fontes Qt/Rust arquivados, CI preparada e análises locais executadas. pypdf atualizado para 6.16.1 e parser SVG endurecido com defusedxml. Suíte: 472 aprovados, 1 ignorado, 1 aviso e 12 subtestes; quatro testes de empacotamento passaram após o ajuste final. Fontes/avisos finais por artefato, execução de CI no GitHub, distribuição instalada por plataforma e política de assinatura ainda exigem fechamento. Evidências e próximos checkpoints: [registro da etapa 5](history/ETAPA_5_DISTRIBUICAO_E_DEPENDENCIAS.md).
 
 ### 5.1 — Inventariar e reduzir o que realmente é distribuído — J3 e L4
 
@@ -180,6 +182,8 @@ Depois da decisão:
 **Conclusão esperada:** cada release tem rastreabilidade de componentes e verificações repetíveis. Selos externos podem ser avaliados depois; não são requisito para resolver os achados.
 
 ## Etapa 6 — Atualizar documentação e validar a distribuição
+
+**Situação: documentação e revisão local realizadas em 22/09/2026; aprovação dos pacotes nativos pendente.** Guias atualizados, referências legadas inventariadas e preservadas, empacotamento documental e momento do inventário macOS corrigidos. Suíte: 473 aprovados, 1 pulado, 1 aviso e 12 subtestes; IPC Linux executado à parte com 3 testes aprovados. Evidências e limites no [registro da etapa 6](history/ETAPA_6_DOCUMENTACAO_E_VALIDACAO.md).
 
 ### 6.1 — Corrigir documentação sem quebrar compatibilidade — L1, L2 e L3
 
@@ -241,4 +245,4 @@ Nesse momento, atualizar os URLs inventariados em L3 e verificar novamente os li
 | J4 | 4.2 | Comprovar origem ou substituir recursos |
 | J5 | 4.1 e 6.2 | Documentar autoria, alcance e limites das conclusões |
 
-**Próximo trabalho recomendado:** checkpoint 1.1. As decisões sobre licença própria e origem dos ícones podem ser resolvidas durante o avanço técnico, sem bloquear essas primeiras correções.
+**Próximo trabalho recomendado:** executar o checklist dos pacotes finais e fechar a correspondência de fontes/avisos por plataforma (5.2 e 6.2). A sequência de implementação e revisão local chegou à última etapa; isso não equivale a aprovar distribuição multiplataforma. Consultar os registros das [etapas 5](history/ETAPA_5_DISTRIBUICAO_E_DEPENDENCIAS.md) e [6](history/ETAPA_6_DOCUMENTACAO_E_VALIDACAO.md). A separação do repositório permanece posterior.

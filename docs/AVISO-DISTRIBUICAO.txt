@@ -1,4 +1,4 @@
-O FORNAX Forge é software livre licenciado sob a GNU General Public License versão 3 exclusivamente (GPL-3.0-only). O texto da licença está no arquivo LICENSE, e os avisos dos componentes externos estão na pasta “licenses”.
+O FORNAX Forge é software livre licenciado sob a GNU General Public License versão 3 exclusivamente (GPL-3.0-only). O texto da licença está no arquivo LICENSE, e os avisos dos componentes externos estão na pasta “docs/licenses”.
 
 Copyright © 2026 Leonardo Joordan Belisário Lima da Silva.
 

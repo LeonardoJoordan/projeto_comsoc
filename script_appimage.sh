@@ -49,9 +49,8 @@ cp assets/linux/com.leobelisario.FornaxForge.xml "$APP_DIR/usr/share/mime/packag
 # Licença do aplicativo, autoria, marca e avisos de terceiros.
 DOC_DIR="$APP_DIR/usr/share/doc/fornax-forge"
 mkdir -p "$DOC_DIR"
-cp LICENSE NOTICE AUTHORS.md TRADEMARKS.md "$DOC_DIR/"
-cp docs/USO_INSTITUCIONAL.md docs/PRIVACIDADE_E_ARMAZENAMENTO.md \
-  docs/THIRD_PARTY_LICENSES.md docs/AVISO-DISTRIBUICAO.txt "$DOC_DIR/"
+cp -r "$USR_BIN/docs/." "$DOC_DIR/"
+cp "$USR_BIN"/{LICENSE,NOTICE,AUTHORS.md,TRADEMARKS.md,SECURITY.md} "$DOC_DIR/"
 
 # Ícone do aplicativo
 cp "$APP_ICON" "$APP_DIR/app.png"

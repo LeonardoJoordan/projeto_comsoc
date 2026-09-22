@@ -9,10 +9,13 @@ resultado, evidência e responsável/data. Campos vazios são pendências.
 
 - [ ] Confirmar que `LICENSE`, `NOTICE`, `AUTHORS.md`, `TRADEMARKS.md`, a orientação
   de uso institucional e os avisos de terceiros estão presentes no pacote final.
-- [ ] Substituir todos os SVGs derivados do Flaticon por desenhos originais antes
-  de publicar o repositório ou distribuir um novo pacote público.
-- [ ] Preservar a evidência de criação e edição do ícone principal, incluindo
-  arquivo-fonte, ferramenta, data aproximada e termos aplicáveis.
+- [x] Registrar a substituição declarada dos SVGs pelas coleções Lucide, Google Material e Bootstrap.
+- [x] Registrar a origem dos 67 SVGs atuais em `ASSET_PROVENANCE.md`, incluindo
+  os 11 declarados pelo autor como criações próprias no Inkscape.
+- [ ] Conferir a entrega das licenças/créditos dos ícones e os avisos de modificação.
+- [x] Registrar a procedência do ícone principal: declaração do autor, ChatGPT,
+  ajustes no Photoshop, data/hora informada, PNGs/ICO finais e termos consultados.
+  PSD não preservado; limites da evidência explicitados em `ASSET_PROVENANCE.md`.
 - [ ] Conferir no pacote instalado os textos PT/EN/ES da recomendação de proteção,
   importação, exportação e erros de senha.
 - [ ] Confirmar versão do produto; `instalador.iss` ainda declara `1.0.0`.
@@ -127,3 +130,10 @@ retornou `application/x-fornax-template`, padrão
 continuou `application/x-trash`. Isso não conclui a matriz de pacotes nativos.
 O gerenciador de arquivos pode precisar atualizar a pasta para descartar ícones
 já armazenados em cache.
+
+## Revisão local de 22/09/2026
+
+A [etapa 6](../history/ETAPA_6_DOCUMENTACAO_E_VALIDACAO.md) atualizou os guias,
+verificou a seleção documental de release e repetiu testes funcionais e IPC Linux.
+A observação de rede na inicialização do standalone encontrou apenas IPC local.
+Essas evidências não marcam como concluídas as instalações da matriz acima.

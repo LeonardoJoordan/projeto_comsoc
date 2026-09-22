@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Vetor criptográfico determinístico e público documentado na especificação; não é credencial de serviço."
+condition = "AND"
+paths = ['''history/ETAPA_2_ESPECIFICACAO_FORMATO_FORNAX\.md$''']
+regexTarget = "secret"
+regexes = ['''^38a86c33205773b74bd80be90c5afc36e0f89c497453cf530b8cee0c7086383ba1a9a843a89063c417af9be7056891e2$''']

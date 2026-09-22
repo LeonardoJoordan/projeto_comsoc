@@ -351,3 +351,11 @@ def test_reader_rejects_more_than_entry_limit(tmp_path, monkeypatch):
     ])
     with pytest.raises(FornaxLimitError, match="entradas demais"):
         inspect_fornax(package)
+
+
+@pytest.mark.parametrize('encoding', ['utf-8', 'utf-16', 'utf-32'])
+def test_svg_rejects_dtd_and_entities_in_any_encoding(encoding):
+    svg = ('<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY payload "expanded">]>'
+           '<svg xmlns="http://www.w3.org/2000/svg"><text>&payload;</text></svg>')
+    with pytest.raises(FornaxFormatError):
+        container._validate_svg(svg.encode(encoding), reference='entity-test.svg')

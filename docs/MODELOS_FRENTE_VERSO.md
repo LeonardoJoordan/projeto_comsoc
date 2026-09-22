@@ -16,8 +16,6 @@ A tabela apresenta a união dos placeholders encontrados na frente e no verso. U
 
 Cada linha representa um documento completo. **Cópias** multiplica documentos, não páginas. Uma linha com `Cópias = 3` em um modelo frente e verso produz três documentos, cada um com sua frente e seu verso.
 
-Campos removidos do modelo podem ser mantidos temporariamente como inativos na sessão. Campos inativos permanecem na tabela, mas não participam da geração.
-
 ## Arquivos gerados
 
 - **PNG:** cada documento gera `_pag1.png` e `_pag2.png`. Modelos de uma página conservam a nomenclatura simples.
@@ -35,8 +33,8 @@ O arquivo não controla o driver da impressora. Antes de produzir um lote, gere 
 
 ## Formato e recuperação
 
-Modelos antigos em `template_v3.json` continuam sendo abertos como documentos de uma página. Ao salvar no editor atual, o FORNAX grava `template_v4.json`, que contém o documento e suas páginas. O arquivo v4 válido passa a ser a versão principal.
+A biblioteca atual usa arquivos `.fornax`. Ao selecionar uma pasta legada, o programa converte o modelo e normaliza seu documento interno para o schema v4. Um modelo antigo de uma página permanece com uma página; a migração não cria um verso automaticamente.
 
-Quando um `template_v4.json` anterior é substituído, o programa mantém `template_v4.json.bak` como cópia de recuperação. O salvamento usa um arquivo temporário e somente publica o novo documento depois que a gravação é concluída. Um v4 inválido produz um erro explícito; o programa não abre silenciosamente um v3 desatualizado no lugar dele.
+O documento versionado e os assets ficam dentro do contêiner. O salvamento transacional, o backup `.fornax.bak` e a recuperação do editor seguem as regras do [guia de modelos](GUIA_MODELOS_FORNAX.md). Não edite os JSONs ou backups manualmente como procedimento normal de uso.
 
-Versões antigas do FORNAX/COMSOC não devem editar modelos de duas páginas. Para transportar ou arquivar um modelo, use a exportação ZIP, que inclui o documento e seus assets.
+Para transportar modelos, use **Arquivo > Exportar modelos…**: um modelo produz `.fornax`; vários produzem um ZIP com arquivos `.fornax`. No destino, use **Arquivo > Importar modelos…**. ZIPs antigos continuam aceitos; versões antigas do COMSOC não abrem necessariamente o formato atual.

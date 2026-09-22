@@ -20,7 +20,8 @@ from typing import Any, Callable, Mapping
 import unicodedata
 from uuid import UUID, uuid4
 import zipfile
-from xml.etree import ElementTree
+from defusedxml import ElementTree
+from defusedxml.common import DefusedXmlException
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice
 from PySide6.QtGui import QImageReader
@@ -437,8 +438,8 @@ def _validate_svg(data: bytes, *, reference: str) -> None:
     if any(token in lowered for token in forbidden):
         raise FornaxFormatError(f"SVG contém conteúdo externo ou executável: {reference!r}.")
     try:
-        root = ElementTree.fromstring(data)
-    except ElementTree.ParseError as exc:
+        root = ElementTree.fromstring(data, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+    except (ElementTree.ParseError, DefusedXmlException) as exc:
         raise FornaxFormatError(f"SVG inválido em {reference!r}: {exc}.") from exc
     if root.tag.rsplit("}", 1)[-1].lower() != "svg":
         raise FornaxFormatError(f"Asset com extensão SVG não contém um SVG: {reference!r}.")

@@ -20,8 +20,8 @@ VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppDescription}
 VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
-LicenseFile=LICENSE
-InfoAfterFile=docs\AVISO-DISTRIBUICAO.txt
+LicenseFile=build\main.dist\LICENSE
+InfoAfterFile=build\main.dist\docs\AVISO-DISTRIBUICAO.txt
 DefaultDirName={autopf}\FORNAX Forge
 DefaultGroupName={#AppName}
 DisableProgramGroupPage=yes
@@ -48,18 +48,11 @@ Name: "desktopicon"; Description: "Criar um atalho na Área de Trabalho"; GroupD
 [Files]
 ; Execute `python script_nuitka.py` antes de compilar este instalador.
 Source: "build\main.dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "LICENSE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "NOTICE"; DestDir: "{app}"; Flags: ignoreversion
-Source: "AUTHORS.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "TRADEMARKS.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "docs\USO_INSTITUCIONAL.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
-Source: "docs\THIRD_PARTY_LICENSES.md"; DestDir: "{app}\licenses"; Flags: ignoreversion
-Source: "docs\AVISO-DISTRIBUICAO.txt"; DestDir: "{app}\licenses"; Flags: ignoreversion
 
 [Icons]
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"
-Name: "{group}\Licenças e avisos"; Filename: "{app}\licenses\THIRD_PARTY_LICENSES.md"
+Name: "{group}\Licenças e avisos"; Filename: "{app}\docs\THIRD_PARTY_LICENSES.md"
 Name: "{group}\Desinstalar {#AppName}"; Filename: "{uninstallexe}"
 
 [Registry]

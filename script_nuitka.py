@@ -3,6 +3,8 @@ import sys
 import platform
 import os
 import plistlib
+import tempfile
+from scripts.release_tools import stage, inventory, collect_notices, remove_unused_pdf_plugin
 from pathlib import Path
 
 def build_app():
@@ -11,15 +13,29 @@ def build_app():
     # Define o ponto de entrada e caminhos
     base_dir = Path(__file__).parent.absolute()
     os.chdir(base_dir)
-    main_file = base_dir / "main.py"
+    build_dir = base_dir / 'build'
+    build_dir.mkdir(exist_ok=True)
+    from importlib.metadata import distribution, PackageNotFoundError
+    for unwanted in ('PySide6', 'PySide6_Addons'):
+        try:
+            distribution(unwanted)
+        except PackageNotFoundError:
+            continue
+        raise RuntimeError('Use um venv limpo com requirements-build.txt, sem PySide6/Addons.')
+    stage_dir = Path(tempfile.mkdtemp(prefix='release-stage-', dir=build_dir))
+    stage(stage_dir)
+    collect_notices(stage_dir / 'docs' / 'licenses' / 'packages')
+    main_file = stage_dir / "main.py"
     exe_name = "FORNAX_Forge"
 
-   # Base do comando Nuitka com Clang
+    # Usa o compilador suportado disponível no sistema.
     cmd = [
         sys.executable, "-m", "nuitka",
         "--standalone", 
         f"--output-filename={exe_name}",
-        "--output-dir=build",
+        f"--report={build_dir / 'compilation-report.xml'}",
+        f"--report-template=LicenseReport:{build_dir / 'nuitka-licenses.rst'}",
+        f"--output-dir={build_dir}",
         "--plugin-enable=pyside6",
         "--include-qt-plugins=imageformats,platforms",
         "--include-module=encodings",
@@ -29,8 +45,11 @@ def build_app():
         "--include-package=shared",
         "--include-package=pypdf",
         "--include-package=cryptography",
-        "--include-data-dir=assets=assets",
-        "--clang",                      # A MÁGICA ACONTECE AQUI: Força o uso do LLVM/Clang
+        f"--include-data-dir={stage_dir / 'assets'}=assets",
+        f"--include-data-dir={stage_dir / 'docs'}=docs",
+        *[f"--include-data-files={stage_dir / name}={name}"
+          for name in ('LICENSE', 'NOTICE', 'AUTHORS.md', 'TRADEMARKS.md', 'SECURITY.md')],
+        "--nofollow-import-to=*.test_*,*.tests,pytest",
         "--lto=no",                     
         f"--jobs={max(1, int(os.environ.get('FORNAX_BUILD_JOBS', min(4, os.cpu_count() or 1))))}",
         "--show-progress",              # Mostra o que está acontecendo no terminal
@@ -63,7 +82,11 @@ def build_app():
     
     try:
         os.makedirs("build", exist_ok=True)
-        subprocess.run(cmd, check=True)
+        subprocess.run(cmd, check=True, cwd=stage_dir)
+        standalone = build_dir / ('main.app' if sistema == 'Darwin' else 'main.dist')
+        remove_unused_pdf_plugin(standalone)
+        if sistema != 'Darwin':
+            inventory(standalone, build_dir / 'release-inventory', build_dir / 'compilation-report.xml')
         print(f"\n✅ Compilação Nuitka concluída! O executável base está na pasta 'build'.")
         
         if sistema == "Darwin":
@@ -98,6 +121,8 @@ def build_app():
             }]
             with plist_path.open("wb") as stream:
                 plistlib.dump(plist, stream)
+            # O inventário deve refletir o bundle final, incluindo a associação.
+            inventory(app_path, build_dir / 'release-inventory', build_dir / 'compilation-report.xml')
             
             try:
                 subprocess.run([
