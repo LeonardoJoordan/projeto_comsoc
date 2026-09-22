@@ -7,6 +7,7 @@ from PySide6.QtGui import QColor, QImage
 
 from core.dynamic_images import dynamic_image_fields, resolve_dynamic_image
 from core.model_document import normalize_model_document
+from tests.symlinks import create_symlink
 from features.generator.renderer import NativeRenderer
 
 
@@ -52,11 +53,7 @@ def test_resolver_rejects_symlink_that_leaves_selected_directory(tmp_path):
     outside = tmp_path / "outside.png"
     outside.write_bytes(b"outside")
     link = root / "photo.png"
-    try:
-        link.symlink_to(outside)
-    except (OSError, NotImplementedError):
-        import pytest
-        pytest.skip("O ambiente não permite links simbólicos.")
+    create_symlink(link, outside)
 
     result = resolve_dynamic_image(root, "photo.png")
 
@@ -70,11 +67,7 @@ def test_resolver_accepts_subdirectory_and_internal_symlink(tmp_path):
     actual = photos / "inside.png"
     actual.write_bytes(b"inside")
     link = tmp_path / "alias.png"
-    try:
-        link.symlink_to(actual)
-    except (OSError, NotImplementedError):
-        import pytest
-        pytest.skip("O ambiente não permite links simbólicos.")
+    create_symlink(link, actual)
 
     assert resolve_dynamic_image(tmp_path, "photos/inside.png").path == actual
     assert resolve_dynamic_image(tmp_path, "alias.png").path == actual
@@ -98,6 +91,14 @@ def test_dynamic_field_enters_document_placeholder_union():
 
     assert dynamic_image_fields(document) == ["Foto"]
     assert "Foto" in document["placeholders"]
+
+
+def test_resolver_accepts_subdirectory_without_symlinks(tmp_path):
+    photos = tmp_path / 'photos'
+    photos.mkdir()
+    actual = photos / 'inside.png'
+    actual.write_bytes(b'inside')
+    assert resolve_dynamic_image(tmp_path, 'photos/inside.png').path == actual
 
 
 def test_renderer_uses_external_image_for_the_selected_row(tmp_path):

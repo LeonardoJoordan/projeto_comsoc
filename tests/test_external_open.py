@@ -133,6 +133,17 @@ def test_opening_identical_revision_copy_selects_library_but_new_revision_prompt
     assert MainWindow._matching_library_model(harness, received) is None
 
 
+def test_windows_upgrade_removes_only_obsolete_pdf_plugin():
+    root = Path(__file__).resolve().parents[1]
+    installer = (root / 'instalador.iss').read_text(encoding='utf-8')
+    section = installer.split('[InstallDelete]', 1)[1].split('[', 1)[0]
+    entries = [line.strip() for line in section.splitlines()
+               if line.strip() and not line.lstrip().startswith(';')]
+    assert entries == [
+        'Type: files; Name: "{app}\\PySide6\\qt-plugins\\imageformats\\qpdf.dll"'
+    ]
+
+
 def test_distribution_files_register_fornax_extension():
     root = Path(__file__).resolve().parents[1]
     installer = (root / "instalador.iss").read_text(encoding="utf-8")

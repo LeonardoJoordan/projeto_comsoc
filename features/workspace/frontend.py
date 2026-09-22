@@ -300,7 +300,7 @@ def install_frontend(window):
     destination.setSpacing(8)
     destination_label = QLabel(tr('Salvar em'))
     destination_label.setObjectName('outputDestinationLabel')
-    destination.addWidget(destination_label)
+    output_grid.addWidget(destination_label, 0, 0)
     destination.addWidget(window.txt_output_path, 1)
     window.txt_output_path.setPlaceholderText(tr('Escolha a pasta de destino dos arquivos'))
     window.btn_sel_out.setText('')
@@ -310,7 +310,7 @@ def install_frontend(window):
     window.btn_sel_out.setFixedSize(34, 34)
     window.btn_sel_out.setToolTip(tr('Escolher a pasta de destino'))
     destination.addWidget(window.btn_sel_out)
-    output_grid.addLayout(destination, 0, 0, 1, 5)
+    output_grid.addLayout(destination, 0, 1, 1, 4)
     format_label = QLabel(tr('Formato'))
     format_label.setObjectName('outputFormatLabel')
     output_label_width = max(
@@ -437,7 +437,17 @@ def install_frontend(window):
 
     data_toggle.clicked.connect(lambda: set_data_panel_collapsed(not panel_state['collapsed']))
     refresh_data_toggle_icon()
-    theme_manager().changed.connect(refresh_data_toggle_icon)
+    manager = theme_manager()
+    manager.changed.connect(refresh_data_toggle_icon)
+
+    def disconnect_data_toggle_theme(*_):
+        try:
+            manager.changed.disconnect(refresh_data_toggle_icon)
+        except (RuntimeError, TypeError):
+            # The application/theme manager may already be shutting down.
+            pass
+
+    data_toggle.destroyed.connect(disconnect_data_toggle_theme)
 
     # Menus conhecidos de aplicativos de criação, reutilizando as ações existentes.
     menu = window.menuBar()

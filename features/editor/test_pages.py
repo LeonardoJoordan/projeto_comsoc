@@ -208,6 +208,21 @@ class EditorPagesTest(unittest.TestCase):
         finally:
             self.close_window(window)
 
+    def test_missing_font_name_survives_scene_roundtrip(self):
+        window = self.make_window()
+        try:
+            window.add_new_box()
+            box = next(item for item in window.scene.items() if isinstance(item, DesignerBox))
+            family = 'FornaxRegressionMissingFont_20260922'
+            box.state.font_family = family
+            box.apply_state()
+            window.apply_scene_state(window.get_current_scene_state())
+            restored = next(item for item in window.scene.items() if isinstance(item, DesignerBox))
+            self.assertEqual(restored.state.font_family, family)
+            self.assertEqual(window.get_current_scene_state()['boxes'][0]['font_family'], family)
+        finally:
+            self.close_window(window)
+
     def test_copy_and_paste_between_pages_preserves_styles_and_asset_reference(self):
         with tempfile.TemporaryDirectory() as directory:
             asset = Path(directory) / "imagem.png"

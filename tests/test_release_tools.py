@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import pytest
 from scripts.release_tools import ROOT, selected_files, stage, inventory
+from tests.symlinks import create_symlink
 
 
 def test_release_selection_excludes_development_and_keeps_legal():
@@ -18,7 +19,11 @@ def test_stage_refuses_to_merge_or_follow_resource_symlinks(tmp_path):
     existing=tmp_path/'existing';existing.mkdir();(existing/'keep').write_text('keep')
     with pytest.raises(ValueError):stage(existing)
     assert (existing/'keep').read_text()=='keep'
-    fake=tmp_path/'root';fake.mkdir();(fake/'main.py').symlink_to(ROOT/'main.py')
+
+
+def test_stage_refuses_resource_symlinks(tmp_path):
+    fake=tmp_path/'root';fake.mkdir()
+    create_symlink(fake/'main.py', ROOT/'main.py')
     with pytest.raises(ValueError,match='fora da árvore'):stage(tmp_path/'out', fake)
 
 
@@ -31,7 +36,11 @@ def test_artifact_inventory_hashes_actual_files_and_separates_environment(tmp_pa
     bom=json.loads((tmp_path/'report/files.cdx.json').read_text())
     assert bom['components'][0]['type']=='file'
     with pytest.raises(ValueError):inventory(artifact,artifact/'report')
-    (artifact/'outside').symlink_to(ROOT/'main.py')
+
+
+def test_artifact_inventory_refuses_external_symlink(tmp_path):
+    artifact=tmp_path/'artifact';artifact.mkdir()
+    create_symlink(artifact/'outside', ROOT/'main.py')
     with pytest.raises(ValueError,match='fora do artefato'):inventory(artifact,tmp_path/'report2')
 
 

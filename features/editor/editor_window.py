@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (QMainWindow, QGraphicsView, QWidget,
                                QDialogButtonBox, QVBoxLayout)
 from PySide6.QtGui import (QPainter, QBrush, QPen, QColor, QShortcut, QIcon, QImage,
                            QKeySequence, QTextCursor, QTextCharFormat, QImageReader, QPixmap,
-                           QFont, QFontDatabase, QFontInfo, QTextDocument)
+                           QFont, QTextDocument)
 from PySide6.QtCore import Qt, Signal, QEvent, QRectF, QSize, QPointF, QTimer
 from shiboken6 import isValid
 
@@ -190,19 +190,6 @@ class ElidedLayerLabel(QLabel):
 class EditorWindow(DocumentSessionMixin, QMainWindow):
     closed = Signal()
     modelSaved = Signal(str, list, str)
-
-    @staticmethod
-    def _normalized_font_name(name: str) -> str:
-        return " ".join(str(name or "").strip().casefold().split())
-
-    @classmethod
-    def _resolve_editor_font_family(cls, family: str, available_fonts: set[str]) -> str:
-        requested = str(family or DOCUMENT_FONT_FAMILY).strip() or DOCUMENT_FONT_FAMILY
-        if cls._normalized_font_name(requested) in available_fonts:
-            return requested
-
-        resolved = QFontInfo(QFont(requested)).family().strip()
-        return resolved or requested
 
     def _apply_tooltip(self, widget, text):
         """Aplica tooltip e garante que labels estáticos capturem o evento no motor customizado."""
@@ -3665,7 +3652,6 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
                     img.setAcceptedMouseButtons(Qt.MouseButton.NoButton)
 
         # Caixas de Texto
-        available_fonts = {self._normalized_font_name(family) for family in QFontDatabase.families()}
         for b in data.get("boxes", []):
             box = DesignerBox(
                 x=b.get("x", 0), 
@@ -3682,8 +3668,11 @@ class EditorWindow(DocumentSessionMixin, QMainWindow):
             if "html" in b:
                 box.state.html_content = b["html"]
                 
-            box.state.font_family = self._resolve_editor_font_family(
-                b.get("font_family", DOCUMENT_FONT_FAMILY), available_fonts
+            # Qt may render with a local fallback, but the saved family belongs
+            # to the document and must survive copying/reopening on another PC.
+            box.state.font_family = (
+                str(b.get("font_family") or DOCUMENT_FONT_FAMILY).strip()
+                or DOCUMENT_FONT_FAMILY
             )
             box.state.font_size = b.get("font_size", 16)
             box.state.font_color = b.get("font_color", "#000000")

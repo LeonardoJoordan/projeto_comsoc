@@ -3714,5 +3714,28 @@ cargo: Alcaldesa</translation>
     <message><source>Falha ao alterar a proteção do modelo:
 {erro}</source><translation>No se pudo cambiar la protección de la plantilla:
 {erro}</translation></message>
+    <message><source>Adicionar novo</source><translation>Añadir nueva</translation></message>
+    <message><source>Aplicar a todos os modelos repetidos</source><translation>Aplicar a todas las plantillas duplicadas</translation></message>
+    <message><source>Buscar modelos</source><translation>Buscar plantillas</translation></message>
+    <message><source>Buscar modelos…</source><translation>Buscar plantillas…</translation></message>
+    <message><source>Criar cópia</source><translation>Crear copia</translation></message>
+    <message><source>Criar cópias de todos os modelos repetidos.</source><translation>Crear copias de todas las plantillas duplicadas.</translation></message>
+    <message><source>Escolha os modelos que deseja compartilhar. Os originais permanecem na sua biblioteca.</source><translation>Elija las plantillas que desea compartir. Los originales permanecen en su biblioteca.</translation></message>
+    <message><source>Importar com outro nome, preservando o modelo existente.</source><translation>Importar con otro nombre, conservando la plantilla existente.</translation></message>
+    <message><source>Limpar seleção</source><translation>Limpiar selección</translation></message>
+    <message><source>Lote: arquivo ZIP com {count} modelos .fornax. A seguir, escolha as opções de proteção e o destino.</source><translation>Lote: archivo ZIP con {count} plantillas .fornax. A continuación, elija las opciones de protección y el destino.</translation></message>
+    <message><source>Modelo antigo</source><translation>Plantilla antigua</translation></message>
+    <message><source>Na biblioteca</source><translation>En la biblioteca</translation></message>
+    <message><source>Não foi possível concluir a operação.</source><translation>No se pudo completar la operación.</translation></message>
+    <message><source>Os modelos existentes serão preservados. Para nomes repetidos, selecione Criar cópia ou Substituir existente.</source><translation>Las plantillas existentes se conservarán. Para nombres repetidos, seleccione Crear copia o Sustituir existente.</translation></message>
+    <message><source>Proteção / formato</source><translation>Protección / formato</translation></message>
+    <message><source>Revise o conteúdo recebido e escolha o que adicionar à biblioteca. O arquivo de origem será preservado.</source><translation>Revise el contenido recibido y elija qué añadir a la biblioteca. El archivo de origen se conservará.</translation></message>
+    <message><source>Selecionar todos</source><translation>Seleccionar todas</translation></message>
+    <message><source>Selecione pelo menos um modelo para continuar.</source><translation>Seleccione al menos una plantilla para continuar.</translation></message>
+    <message><source>Substituir todos os modelos repetidos selecionados para importar.</source><translation>Sustituir todas las plantillas duplicadas seleccionadas para importar.</translation></message>
+    <message><source>Trocar o modelo existente pelo modelo recebido.</source><translation>Sustituir la plantilla existente por la recibida.</translation></message>
+    <message><source>Um modelo: arquivo .fornax. A seguir, escolha as opções de proteção e o destino.</source><translation>Una plantilla: archivo .fornax. A continuación, elija las opciones de protección y el destino.</translation></message>
+    <message><source>{count} modelo(s) existente(s) serão substituídos. Confira as escolhas antes de continuar.</source><translation>Se sustituirán {count} plantilla(s) existente(s). Revise sus elecciones antes de continuar.</translation></message>
+    <message><source>{selected} de {total} selecionados</source><translation>{selected} de {total} seleccionadas</translation></message>
   </context>
 </TS>

@@ -49,6 +49,11 @@ Name: "desktopicon"; Description: "Criar um atalho na Área de Trabalho"; GroupD
 ; Execute `python script_nuitka.py` antes de compilar este instalador.
 Source: "build\main.dist\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
+[InstallDelete]
+; Plugin removido pelo build atual: uma atualização não deve conservar a cópia antiga.
+; Alvo único e restrito; não apagar diretórios nem dados do usuário.
+Type: files; Name: "{app}\PySide6\qt-plugins\imageformats\qpdf.dll"
+
 [Icons]
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"; Tasks: desktopicon
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"; WorkingDir: "{app}"

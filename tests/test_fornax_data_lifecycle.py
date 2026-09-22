@@ -152,16 +152,24 @@ def test_abrupt_process_exit_leaves_only_encrypted_model_and_recovery(tmp_path):
     import os
     import subprocess
     import sys
+    profile = tmp_path.parent / (tmp_path.name + '-profile')
     code = """
-import os, sys
+import os, sys, json, hashlib
 from pathlib import Path
+from tests.isolated_environment import activate
+profile = activate(sys.argv[2])
 from tests.test_fornax_data_lifecycle import protected_model
 from features.editor.editor_window import EditorWindow
 from features.editor.canvas_items import ImageItem, BackgroundItem, SignatureItem
 from core.fornax_container import FULL_MODE
 root = Path(sys.argv[1])
-path, manager, status, _ = protected_model(root)
 window = EditorWindow()
+# Known UI icons/settings exist before any protected document is loaded.
+from core.paths import get_app_data_dir
+get_app_data_dir()
+print(json.dumps({str(p.relative_to(profile)): hashlib.sha256(p.read_bytes()).hexdigest()
+    for p in profile.rglob('*') if p.is_file()}), flush=True)
+path, manager, status, _ = protected_model(root)
 window.load_from_fornax(manager.document(), path=path, mode=FULL_MODE,
     model_id=status.descriptor.model_id, asset_provider=manager.asset,
     session_manager=manager)
@@ -172,12 +180,22 @@ window._write_fornax_recovery()
 os._exit(17)
 """
     completed = subprocess.run(
-        [sys.executable, "-c", code, str(tmp_path)],
+        [sys.executable, "-c", code, str(tmp_path), str(profile)],
         env={**os.environ, "QT_QPA_PLATFORM": "offscreen"},
         capture_output=True, timeout=30,
     )
     assert completed.returncode == 17, completed.stderr.decode()
     assert MARKER.encode() not in completed.stdout + completed.stderr
+    import json
+    import hashlib
+    baseline = json.loads(completed.stdout)
+    for artifact in profile.rglob('*'):
+        if artifact.is_file():
+            data = artifact.read_bytes()
+            assert MARKER.encode() not in data
+            assert hashlib.sha256(data).hexdigest() == baseline.get(
+                str(artifact.relative_to(profile))
+            ), artifact
     assert_no_cleartext_artifacts(tmp_path)
     recovery = EditorWindow.fornax_recovery_path(tmp_path / "model.fornax")
     assert recovery.exists()
@@ -197,7 +215,8 @@ def test_oversized_local_message_is_disconnected_without_opening_files():
     assert received == []
 
 
-def test_generation_releases_all_protected_renderers_after_final_output(tmp_path):
+@pytest.mark.parametrize('export_format,single_pdf', [('PNG', False), ('PDF', False), ('PDF', True)])
+def test_generation_releases_all_protected_renderers_after_final_output(tmp_path, export_format, single_pdf):
     from PySide6.QtTest import QTest
     from features.generator.manager import RenderManager
     from core.fornax_container import FornaxError
@@ -211,6 +230,7 @@ def test_generation_releases_all_protected_renderers_after_final_output(tmp_path
         renderers_for_document(snapshot.document(), asset_provider=snapshot.asset),
         [{}], [{}], output, "result", authorized_snapshot=snapshot,
         protected_content=True,
+        export_format=export_format, single_pdf=single_pdf,
     )
     done, errors, logs = [], [], []
     manager.finished_process.connect(lambda: done.append(True))
@@ -223,9 +243,16 @@ def test_generation_releases_all_protected_renderers_after_final_output(tmp_path
                 break
             QTest.qWait(10)
         assert done and not errors, errors
-        result = list(output.glob("*.png"))
+        suffix = '.' + export_format.lower()
+        result = list(output.glob('*' + suffix))
         assert len(result) == 1
-        assert QImage(str(result[0])) == expected
+        if export_format == 'PNG':
+            assert QImage(str(result[0])) == expected
+        else:
+            from pypdf import PdfReader
+            reader = PdfReader(result[0])
+            assert not reader.is_encrypted
+            assert len(reader.pages) == 1
         assert not manager.page_renderers and manager.renderer is None
         assert not manager.rows_plain and not manager.rows_rich
         assert all(not w.renderers for w in manager.workers)
@@ -233,7 +260,7 @@ def test_generation_releases_all_protected_renderers_after_final_output(tmp_path
             snapshot.document()
         assert MARKER not in "\n".join(logs)
         assert_no_cleartext_artifacts(root)
-        assert {p.suffix for p in output.iterdir()} == {".png"}
+        assert {p.suffix for p in output.iterdir()} == {suffix}
     finally:
         manager.stop()
         sessions.close()

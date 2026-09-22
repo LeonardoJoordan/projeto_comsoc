@@ -240,7 +240,7 @@ class RichTableWidget(QTableWidget):
                 
                 # Caso especial: Coluna de Qtd ou texto comum (copia alinhamento)
                 else:
-                    new_item.setTextAlignment(old_item.textAlignment())
+                    new_item.setTextAlignment(Qt.AlignmentFlag(old_item.textAlignment()))
 
                 # Preserva os dados Rich Text (HTML) se existirem
                 rich_data = old_item.data(self.RICH_ROLE)

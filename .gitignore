@@ -2,6 +2,7 @@
 venv/
 env/
 .venv/
+.venv-windows/
 .env
 
 # Compilados e Cache Python

@@ -109,6 +109,18 @@ def test_new_and_duplicated_rows_preserve_each_signature_default():
     assert table.item(2, 2).checkState() == Qt.CheckState.Unchecked
 
 
+def test_duplicated_text_cell_preserves_alignment():
+    table = RichTableWidget(1, 2)
+    table.setHorizontalHeaderLabels(['Quantidade', 'Nome'])
+    alignment = Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter
+    cell = QTableWidgetItem('Texto')
+    cell.setTextAlignment(alignment)
+    table.setItem(0, 1, cell)
+    table.selectRow(0)
+    table._duplicate_selected_rows()
+    assert table.item(1, 1).textAlignment() == alignment
+
+
 def test_clicking_signature_header_icon_toggles_only_that_whole_column():
     table = RichTableWidget(0, 0)
     harness = SimpleNamespace(table_panel=SimpleNamespace(table=table))

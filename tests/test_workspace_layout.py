@@ -44,6 +44,20 @@ def _close(window):
     APP.processEvents()
 
 
+def test_destroyed_workspace_disconnects_theme_callback(tmp_path):
+    from PySide6.QtCore import QCoreApplication, QEvent
+    from shiboken6 import isValid
+    from core.themes import theme_manager
+    window, _models = _workspace(tmp_path)
+    _close(window)
+    window.deleteLater()
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    assert not isValid(window)
+    # pytest-qt catches any callback attempting to access deleted controls.
+    theme_manager().changed.emit()
+    APP.processEvents()
+
+
 def test_workspace_builds_the_approved_layout_directly(tmp_path):
     window, _models = _workspace(tmp_path)
     try:

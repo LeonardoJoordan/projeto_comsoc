@@ -75,12 +75,12 @@ Não somar esses números: vários testes se repetem. Recolher a suíte atual, e
 
 ### W1 — Conferir árvore e preparar ambiente limpo
 
-- [ ] Ler `AGENTS.md`, se existir, e inspecionar `git status`, branch e commit. Preservar alterações do usuário. Verificar se os arquivos novos deste trabalho chegaram ao Windows; não confiar só no nome da branch.
-- [ ] Registrar Windows/build, arquitetura, Python, Qt, DPI, compiladores e ferramentas.
-- [ ] Criar venv novo; não copiar `.venv` nem binários Linux. Usar Python 3.13 x64 como referência atual.
-- [ ] Instalar `requirements-dev.txt`; consultar os arquivos atuais para versões. Não atualizar dependências indiscriminadamente.
-- [ ] Confirmar `pip check` e ausência de PySide6 metapacote/Addons. Não usar lock Linux como lock Windows.
-- [ ] Localizar Inno Setup 6 e compilador suportado pelo Nuitka. Em teste anterior, ISCC existia em `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`, fora do PATH; conferir antes de declarar ausência.
+- [x] Ler `AGENTS.md`, se existir, e inspecionar `git status`, branch e commit. Preservar alterações do usuário. Verificar se os arquivos novos deste trabalho chegaram ao Windows; não confiar só no nome da branch.
+- [x] Registrar Windows/build, arquitetura, Python, Qt, DPI, compiladores e ferramentas.
+- [x] Criar venv novo; não copiar `.venv` nem binários Linux. Usar Python 3.13 x64 como referência atual.
+- [x] Instalar `requirements-dev.txt`; consultar os arquivos atuais para versões. Não atualizar dependências indiscriminadamente.
+- [x] Confirmar `pip check` e ausência de PySide6 metapacote/Addons. Não usar lock Linux como lock Windows.
+- [x] Localizar Inno Setup 6 e compilador suportado pelo Nuitka. Em teste anterior, ISCC existia em `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`, fora do PATH; conferir antes de declarar ausência.
 
 Exemplo PowerShell, na raiz (ajustar launcher Python se necessário):
 
@@ -106,10 +106,10 @@ $env:FORNAX_RUN_NATIVE_IPC = '1'
 & $python -m pytest --import-mode=importlib -q tests features/editor --junitxml=build/security/windows-tests.xml
 ```
 
-- [ ] Registrar falhas, pulos e avisos individualmente. Link simbólico sem privilégio Windows pode justificar pulo; não ocultar falhas genéricas de filesystem.
-- [ ] Cobrir `test_fornax_export`, `test_fornax_import`, `test_fornax_persistence_failures`, `test_transfer_dialogs`, `test_dialog_buttons`, `test_data_migration`, `test_legacy_migration`, `test_fornax_data_lifecycle`, `test_temp_storage`, `test_app_instance_native`, `test_release_tools`.
-- [ ] Conferir gravação/fsync em `r+b`, substituição atômica, arquivo aberto por outro processo, backup e recuperação.
-- [ ] Corrigir a causa das falhas e adicionar regressão quando justificar. Executar testes afetados e, ao terminar mudanças funcionais, a suíte completa novamente.
+- [x] Registrar falhas, pulos e avisos individualmente. Link simbólico sem privilégio Windows pode justificar pulo; não ocultar falhas genéricas de filesystem.
+- [x] Cobrir `test_fornax_export`, `test_fornax_import`, `test_fornax_persistence_failures`, `test_transfer_dialogs`, `test_dialog_buttons`, `test_data_migration`, `test_legacy_migration`, `test_fornax_data_lifecycle`, `test_temp_storage`, `test_app_instance_native`, `test_release_tools`.
+- [x] Conferir gravação/fsync em `r+b`, substituição atômica, arquivo aberto por outro processo, backup e recuperação.
+- [x] Corrigir a causa das falhas e adicionar regressão quando justificar. Executar testes afetados e, ao terminar mudanças funcionais, a suíte completa novamente.
 
 **Aceite W2:** nenhuma falha sem resolução; pulos justificados por capacidade real e rastreados; resultados atuais arquivados. Não aprovar IPC se foi pulado.
 
@@ -152,8 +152,8 @@ Usar biblioteca sintética com: modelo público de uma página, frente/verso, as
 
 ### W5 — Build Windows e inspeção do standalone
 
-- [ ] Gerar locks com hashes no Windows para runtime/build/dev usados; arquivar wheels e versões. Reinstalar o lock em venv limpo de build e executar `pip check`.
-- [ ] Compilar com `script_nuitka.py`. Ele recusa PySide6/Addons; usa árvore permitida, exclui testes/caches/histórico e gera inventários em `build/`.
+- [x] Gerar locks com hashes no Windows para runtime/build/dev usados; arquivar wheels e versões. Reinstalar o lock em venv limpo de build e executar `pip check`.
+- [x] Compilar com `script_nuitka.py`. Ele recusa PySide6/Addons; usa árvore permitida, exclui testes/caches/histórico e gera inventários em `build/`.
 - [ ] Abrir `build/main.dist/FORNAX_Forge.exe` diretamente em ambiente sem Python instalado, preferencialmente VM. Não usar apenas o programa pelo código como validação do binário.
 - [ ] Repetir os cenários críticos W3/W4 no standalone: importação/exportação, senha, editor, geração, reinício por idioma e IPC.
 - [ ] Conferir ícone, Inter incorporada, SVGs, traduções, Qt plugins e ausência de DLL faltante. O plugin qpdf não é necessário à geração via pypdf e é removido de forma restrita pelo build.
@@ -215,29 +215,97 @@ Get-FileHash build\installer-windows\*.exe -Algorithm SHA256
 
 ## 6. Registro de execução e próxima retomada
 
-**Estado inicial:** documento preparado no Linux; W1–W7 ainda não executados para esta revisão no Windows.
+**Estado em 22/09/2026:** W1 e W2 concluídos no Windows; W2 com pulos de capacidade documentados. W3 com inspeção nativa impedida; W4 com validação automatizada aprovada e aceite completo pendente. W5 com novo executável e auditoria estática aprovados, validação funcional pendente. W6 com instalador de teste gerado, instalação real pendente. W7 não executada para esta revisão. Os testes/builds de 20/09 não validam este commit.
 
 | Checkpoint | Estado | Evidências / correções / pendências |
 |---|---|---|
-| W1 Ambiente | Pendente | |
-| W2 Suíte | Pendente | |
-| W3 Interface e fluxos | Pendente | |
-| W4 Proteção e persistência | Pendente | |
-| W5 Standalone | Pendente | |
-| W6 Instalador instalado | Pendente | |
+| W1 Ambiente | Concluído | Venv novo `.venv-windows`, requisitos atuais instalados, pip check aprovado, sem PySide6/Addons; inventário abaixo e `history/WINDOWS_W1_REQUIREMENTS_RESOLVIDOS.txt`. |
+| W2 Suíte | Concluído com limitações registradas | 482 aprovados, 12 subtestes, 12 pulados, sem falhas/avisos; IPC real aprovado. Ver `history/VALIDACAO_WINDOWS_W2_FORNAX.md`. |
+| W3 Interface e fluxos | Iniciada; inspeção nativa impedida | Iniciador isolado verificado; controle Windows indisponível. Ver `history/VALIDACAO_WINDOWS_W3_FORNAX.md`. |
+| W4 Proteção e persistência | Automatizada aprovada; aceite completo pendente | 128 aprovados, 2 pulados; offline limitado ao bloqueio Python. Ver `history/VALIDACAO_WINDOWS_W4_FORNAX.md`. |
+| W5 Standalone | Build e auditoria estática realizados; aceite funcional pendente | 442 arquivos verificados; falta máquina sem Python e fluxos nativos. Ver `history/VALIDACAO_WINDOWS_W5_FORNAX.md`. |
+| W6 Instalador instalado | Instalador de teste gerado; instalação real pendente | ISCC saiu com 0; 9 testes de código/IPC aprovados. Ver `history/VALIDACAO_WINDOWS_W6_FORNAX.md`. |
 | W7 Fechamento | Pendente | |
 
-Preencher ao retomar:
+### W1 — execução em 22/09/2026 por Codex
 
-- Data, responsável e versão do SO:
-- Commit/branch e alterações locais presentes:
-- Python/Qt/Nuitka/Inno/compilador:
-- Último checkpoint concluído:
-- Comandos e localização das evidências:
-- Testes aprovados/pulados/avisos/falhas:
-- Artefato final, versão e SHA-256:
-- Pendências bloqueantes versus limitações de plataforma:
-- Próxima ação concreta:
+- Árvore inicialmente limpa, branch `novo_main`, commit `13ccde34b6758a1a430dc597176f7c96641f0e59`. Nenhum `AGENTS.md` encontrado no projeto. Confirmados no Git os novos requisitos, `scripts/release_tools.py`, `tests/test_transfer_dialogs.py`, `tests/test_temp_storage.py` e este plano; referências listadas acima consultadas.
+- Windows 11 build 26200, AMD64/64 bits, C: NTFS. Tela reportada pelo Qt nativo: LG ULTRAWIDE, 2560×1080, DPI lógico 96, fator 1,0 (100%). Isso é inventário de tela, não inspeção visual W3.
+- Novo `.venv-windows`, criado com `C:\Users\leona\AppData\Local\Programs\Python\Python313\python.exe`, Python 3.13.11 x64. `include-system-site-packages = false`; ambiente anterior preservado.
+- Runtime: Qt/PySide6_Essentials/shiboken6 6.11.0, pypdf 6.16.1, cryptography 50.0.1 e defusedxml 0.7.1. Ausência de distribuições `PySide6` e `PySide6_Addons` confirmada por `importlib.metadata`.
+- Ferramentas: Nuitka 4.0.7, zstandard 0.25.0, pytest 9.0.3, pytest-qt 4.5.0, pip-tools 7.6.1, pip-audit 2.10.1 e Bandit 1.9.4. Pip 25.3 mantido.
+- Clang/clang-cl 22.1.3 em `C:\Program Files\LLVM\bin`, alvo x86_64-pc-windows-msvc. Visual Studio Community 2026 18.1.11312.151 localizado por vswhere, com toolsets MSVC 14.44.35207 e 14.50.35717. Inno Setup localizado no caminho previsto; notas locais indicam série 6.7. A seleção e execução efetiva do compilador são verificadas em W5.
+- `pip check`: `No broken requirements found.` A instalação precisou de acesso à rede fora do sandbox após WinError 10013 na primeira tentativa; concluída com código 0. Nenhum requisito direto foi alterado.
+- Inventário de todas as versões, incluindo transitivas: `history/WINDOWS_W1_REQUIREMENTS_RESOLVIDOS.txt` (versionado) e `build/security/windows-w1-freeze.txt` (cópia local). É um snapshot Windows de `pip freeze --all`; locks com hashes, wheels arquivados e reinstalação de build continuam em W5.
+- Arquivos alterados: `.gitignore` (ignora somente o novo `.venv-windows/`), este plano e o snapshot versionado. Nenhuma alteração funcional, teste da suíte, compilação ou instalação do aplicativo foi feita em W1.
+- Artefato final desta revisão: ainda não gerado. A biblioteca real e as preferências do aplicativo não foram usadas para esta preparação.
+- Último checkpoint concluído: **W1**. Próximo: **W2**, começando pela inspeção de isolamento de QSettings, pasta de dados, temporários e subprocessos dos testes; só depois coletar e executar a suíte atual no novo venv. No Windows, mudar apenas APPDATA não isola o registro.
+
+Comandos executados (raiz do projeto):
+
+```powershell
+& 'C:\Users\leona\AppData\Local\Programs\Python\Python313\python.exe' -m venv .venv-windows
+.\.venv-windows\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\.venv-windows\Scripts\python.exe -m pip check
+.\.venv-windows\Scripts\python.exe -m pip freeze --all
+clang-cl --version
+& 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products '*' -format json
+& 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe' /?
+git diff --check
+```
+
+Verificação complementar: imports de QtCore/QtGui e consulta `QGuiApplication.screens()` com `QT_QPA_PLATFORM=windows`, sem iniciar `main.py` nem criar janela do FORNAX. W2 terá contagens novas; não reutilizar as contagens históricas deste documento.
+
+### W2 — execução em 22/09/2026 por Codex
+
+- Mesma branch/commit-base de W1, preservando suas alterações locais. Ambiente `.venv-windows`, Qt offscreen, Fusion/Inter e `FORNAX_RUN_NATIVE_IPC=1`.
+- Criado isolamento anterior à coleta em `conftest.py` e `tests/isolated_environment.py`: dados/temporários descartáveis e QSettings em INI explícito; subprocesso de falha isolado. Liberação das janelas entre testes evita acúmulo e expõe callbacks tardios.
+- Corrigidos: preservação da família de fonte ausente no editor; desconexão do callback de tema do botão da tabela; alinhamento do destino na grade de saída; sobrecarga Qt depreciada ao duplicar células; 23 traduções em cada catálogo EN/ES, com `.qm` recompilados.
+- Regressões: fontes ausentes, janela destruída, alinhamento combinado de texto, arquivo público/protegido somente leitura e aberto por processo independente, isolamento de preferências e armazenamento. Testes de links agora distinguem capacidade ausente de falha genérica.
+- Resultado final: **494 casos coletados; 482 aprovados + 12 subtestes aprovados; 12 pulados; zero falhas/erros/avisos em 104,80 s**. Pulos: nove symlinks sem privilégio Windows 1314, dois Amiri indisponível e um exclusivo Linux. Os três testes de IPC passaram; não foi pulado.
+- Comando: `.\.venv-windows\Scripts\python.exe -m pytest --import-mode=importlib -q tests features/editor --junitxml=build/security/windows-tests.xml -ra --durations=10 -o faulthandler_timeout=45`, com as variáveis acima. `git diff --check` e `pip check` passaram.
+- Evidências e lista individual de pulos: `history/VALIDACAO_WINDOWS_W2_FORNAX.md`; JUnit final `build/security/windows-tests.xml`; coleta `build/security/windows-w2-collection.txt`; baterias intermediárias também em `build/security/`.
+- Arquivos funcionais alterados: `features/editor/editor_window.py`, `features/workspace/frontend.py`, `features/spreadsheet/table_panel.py` e catálogos TS/QM EN/ES. Testes/apoio: conftest, isolamento, helper de symlinks, ciclo de vida, páginas, tabela, workspace, persistência Windows, imagens dinâmicas, nomenclatura, empacotamento e temporários. Mudanças detalhadas no relatório W2 e no diff.
+- **Último checkpoint concluído: W2. Próxima ação: W3**, preparar biblioteca sintética e isolamento também das preferências para a aplicação nativa, então validar visualmente fluxos/layout conforme a seção W3. Não iniciar `main.py` com a biblioteca real como massa de teste. QSettings INI do pytest não se aplica automaticamente ao programa iniciado fora do pytest.
+- Nenhum instalador novo foi gerado em W2. W3–W7 seguem pendentes, inclusive reconstrução do binário com as correções desta etapa.
+
+### Retomada W3 — 22/09/2026
+
+- W3 iniciada, mas não aprovada: o controle nativo retornou `Computer Use native pipe is unavailable` ao listar janelas.
+- Preparado `tools/windows_visual_validation.py`, com biblioteca/INI/temporários e IPC isolados em `build/security/windows-w3-profile`; verificação de isolamento executada com sucesso.
+- **Último checkpoint concluído continua W2. Próxima ação: restabelecer o controle nativo e continuar W3** pelo iniciador isolado, criar massa sintética e executar o checklist visual/funcional. Nenhum item visual foi marcado como aprovado.
+- Evidências e comando de execução: `history/VALIDACAO_WINDOWS_W3_FORNAX.md`. W4–W7 não iniciadas.
+
+### Retomada W4 — 22/09/2026
+
+- Usuário autorizou avançar apesar do impedimento de W3; W3 permanece pendente.
+- Executado `tools/validate_windows_w4.py`: **128 aprovados, 2 pulados, zero falhas, 35,01 s**, armazenamento isolado e Qt offscreen. Testes de geração protegida ampliados para PDF individual/agrupado sem senha na saída.
+- Zero tentativas de rede nos eventos Python monitorados. Ainda falta ensaio realmente sem conexão e inspeção nativa; não houve bloqueio/monitoramento de tráfego de bibliotecas nativas ou filhos.
+- NTFS confirmado; FAT/exFAT/rede não testados. Dois pulos por privilégio de links simbólicos. Relatório: `history/VALIDACAO_WINDOWS_W4_FORNAX.md`.
+- **Próximo checkpoint sequencial: W5**, sem considerar W3/W4 integralmente aprovadas. Último checkpoint integralmente concluído continua W2. Nenhum novo binário ou instalador foi gerado em W4.
+
+### Retomada W5 — 22/09/2026
+
+- Locks com hashes runtime/build/dev em `history/windows-w5-locks/`; ambiente limpo de build instalado offline pelos hashes e `pip check` aprovado.
+- Novo `build/main.dist/FORNAX_Forge.exe` AMD64 gerado pelo Nuitka/MSVC; auditoria estática de 442 arquivos aprovada. Fontes/recursos comparados com staging sem diferenças, fora avisos regenerados dos pacotes.
+- SHA-256 do executável: `12a76f8384cda2d16a9932489c4260052df2350cd4acc0a6b92567ce98c86ed1`.
+- **W5 não integralmente aprovada**: falta execução em máquina sem Python, inspeção visual e cenários críticos do standalone. W3 e offline real W4 continuam pendentes.
+- Próximo checkpoint sequencial: **W6**, sem dispensar pendências de W3–W5. Nenhum novo instalador gerado. Relatório e ressalva sobre código de saída PowerShell: `history/VALIDACAO_WINDOWS_W5_FORNAX.md`.
+
+### Retomada W6 — 22/09/2026
+
+- Gerado `build/installer-windows/Instalador-FORNAX-Forge-1.0.0.exe` pelo Inno Setup, saída 0, 30.864.019 bytes. Versão de teste e AppId preservados.
+- SHA-256: `e2fda680c85b795b107ea30441e5a058f6e0aad31c2dbe1373aa7a2880e8c776`. Sem assinatura digital.
+- Auditoria dos 442 arquivos W5 repetida e aprovada; 9 testes de abertura externa/IPC pelo código aprovados. Não equivalem a instalação/Explorer.
+- **W6 não aprovada integralmente**: instalador não executado; é necessário disponibilizar VM descartável para testar instalação administrativa, associações, atualização e desinstalação sem afetar o ambiente real.
+- Próximo checkpoint documental sequencial: W7, mantendo W3–W6 pendentes de aceite completo. Não declarar pronto para publicar. Relatório: `history/VALIDACAO_WINDOWS_W6_FORNAX.md`.
+
+### W6 — atualização real autorizada no host
+
+- Usuário autorizou usar este Windows. Atualização da instalação de 19/09 aplicada com saída 0; 442 arquivos conferidos sem divergência, atalhos e associação verificados.
+- Detectado qpdf antigo remanescente. ISS corrigido para remover só esse plugin, com backup recuperável; 10 testes aprovados. Novo instalador SHA-256 `b4de1a1e3e677a2969477670d282082d425b25a64d88c29579df42cdf07d8b89`.
+- **Próxima ação imediata: confirmar UAC e finalizar segunda instalação**, ainda pendente (sessão 23174, processo consent presente). Verificar saída e ausência de qpdf antes de considerar correção instalada. Não houve desinstalação nem limpeza de dados. W6 ainda não integralmente aprovada.
+- Atualização posterior: sessão 23174 terminou com código 2, sem aplicar a correção. Nova tentativa na sessão 82872, ainda aguardando UAC (processo `consent` observado). Log esperado: `build/security/windows-w6-install-upgrade-fix-retry.log`. Os 442 arquivos instalados permanecem corretos; qpdf ainda presente na última conferência.
 
 Texto que o usuário pode enviar à outra instância:
 

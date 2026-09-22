@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pytest
+from tests.symlinks import create_symlink
 
 from core.naming_engine import (
     MAX_OUTPUT_BASENAME,
@@ -43,12 +44,14 @@ def test_confined_output_rejects_escape_and_existing_external_symlink(tmp_path):
     outside = tmp_path / "outside.png"
     outside.write_bytes(b"outside")
     link = output / "result.png"
-    try:
-        link.symlink_to(outside)
-    except (OSError, NotImplementedError):
-        pytest.skip("O ambiente não permite links simbólicos.")
+    create_symlink(link, outside)
 
     with pytest.raises(ValueError, match="fora da pasta"):
         confined_output_path(output, "result.png")
+
+
+def test_confined_output_rejects_path_escape_without_symlinks(tmp_path):
+    output = tmp_path / 'output'
+    output.mkdir()
     with pytest.raises(ValueError, match="inválido"):
         confined_output_path(output, "../result.png")

@@ -3714,5 +3714,28 @@ role: Mayor</translation>
     <message><source>Falha ao alterar a proteção do modelo:
 {erro}</source><translation>Failed to change template protection:
 {erro}</translation></message>
+    <message><source>Adicionar novo</source><translation>Add new</translation></message>
+    <message><source>Aplicar a todos os modelos repetidos</source><translation>Apply to all duplicate templates</translation></message>
+    <message><source>Buscar modelos</source><translation>Search templates</translation></message>
+    <message><source>Buscar modelos…</source><translation>Search templates…</translation></message>
+    <message><source>Criar cópia</source><translation>Create copy</translation></message>
+    <message><source>Criar cópias de todos os modelos repetidos.</source><translation>Create copies of all duplicate templates.</translation></message>
+    <message><source>Escolha os modelos que deseja compartilhar. Os originais permanecem na sua biblioteca.</source><translation>Choose the templates you want to share. The originals remain in your library.</translation></message>
+    <message><source>Importar com outro nome, preservando o modelo existente.</source><translation>Import under another name, preserving the existing template.</translation></message>
+    <message><source>Limpar seleção</source><translation>Clear selection</translation></message>
+    <message><source>Lote: arquivo ZIP com {count} modelos .fornax. A seguir, escolha as opções de proteção e o destino.</source><translation>Batch: ZIP file with {count} .fornax templates. Next, choose protection options and the destination.</translation></message>
+    <message><source>Modelo antigo</source><translation>Legacy template</translation></message>
+    <message><source>Na biblioteca</source><translation>In library</translation></message>
+    <message><source>Não foi possível concluir a operação.</source><translation>Could not complete the operation.</translation></message>
+    <message><source>Os modelos existentes serão preservados. Para nomes repetidos, selecione Criar cópia ou Substituir existente.</source><translation>Existing templates will be preserved. For duplicate names, select Create copy or Replace existing.</translation></message>
+    <message><source>Proteção / formato</source><translation>Protection / format</translation></message>
+    <message><source>Revise o conteúdo recebido e escolha o que adicionar à biblioteca. O arquivo de origem será preservado.</source><translation>Review the received content and choose what to add to the library. The source file will be preserved.</translation></message>
+    <message><source>Selecionar todos</source><translation>Select all</translation></message>
+    <message><source>Selecione pelo menos um modelo para continuar.</source><translation>Select at least one template to continue.</translation></message>
+    <message><source>Substituir todos os modelos repetidos selecionados para importar.</source><translation>Replace all duplicate templates selected for import.</translation></message>
+    <message><source>Trocar o modelo existente pelo modelo recebido.</source><translation>Replace the existing template with the received template.</translation></message>
+    <message><source>Um modelo: arquivo .fornax. A seguir, escolha as opções de proteção e o destino.</source><translation>One template: .fornax file. Next, choose protection options and the destination.</translation></message>
+    <message><source>{count} modelo(s) existente(s) serão substituídos. Confira as escolhas antes de continuar.</source><translation>{count} existing template(s) will be replaced. Review your choices before continuing.</translation></message>
+    <message><source>{selected} de {total} selecionados</source><translation>{selected} of {total} selected</translation></message>
   </context>
 </TS>
