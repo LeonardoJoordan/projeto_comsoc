@@ -243,3 +243,53 @@ def test_failed_export_does_not_publish_output_or_change_source(tmp_path):
 
     assert not destination.exists()
     assert source.read_bytes() == before
+
+
+@pytest.mark.parametrize("count", [1, 2])
+def test_workspace_export_reports_success_after_writing_models(tmp_path, monkeypatch, count):
+    """Exercita também a mensagem final, que falhava apenas no lote."""
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+    from features.workspace import main_window as workspace
+
+    models = {}
+    for index in range(count):
+        source = tmp_path / f"source-{index}.fornax"
+        descriptor = save_public_fornax(
+            signature_free_document(), source, source_dir=FIXTURE_DIR,
+        )
+        models[str(index)] = SimpleNamespace(
+            path=source, display_name=f"Modelo {index}", is_fornax=True,
+            descriptor=descriptor,
+        )
+    combo = Mock()
+    combo.count.return_value = count
+    combo.itemData.side_effect = lambda index: str(index)
+    combo.itemText.side_effect = lambda index: models[str(index)].display_name
+    window = SimpleNamespace(
+        preview_panel=SimpleNamespace(cbo_models=combo),
+        _library_models_by_key=models, log_panel=Mock(),
+    )
+    dialog = Mock()
+    dialog.exec.return_value = True
+    dialog.get_selected_models.return_value = list(models)
+    monkeypatch.setattr(workspace, "ExportModelsDialog", lambda *_: dialog)
+    destination = tmp_path / ("envio.fornax" if count == 1 else "envio.zip")
+    monkeypatch.setattr(workspace.QFileDialog, "getSaveFileName",
+                        lambda *_: (str(destination), ""))
+    success, failure = Mock(), Mock()
+    monkeypatch.setattr(workspace.QMessageBox, "information", success)
+    monkeypatch.setattr(workspace.QMessageBox, "critical", failure)
+
+    workspace.MainWindow._on_export_models(window)
+
+    failure.assert_not_called()
+    success.assert_called_once()
+    message = window.log_panel.append.call_args.args[0]
+    assert str(count) in message and destination.name in message
+    if count == 1:
+        assert inspect_fornax(destination).mode == PUBLIC_MODE
+    else:
+        with zipfile.ZipFile(destination) as archive:
+            assert len(archive.namelist()) == count
+            assert archive.testzip() is None

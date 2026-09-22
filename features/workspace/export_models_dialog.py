@@ -1,70 +1,52 @@
-from PySide6.QtWidgets import (QDialog, QVBoxLayout, QCheckBox, QListWidget,
-                               QListWidgetItem, QDialogButtonBox)
+from PySide6.QtWidgets import QListWidget, QListWidgetItem
 from PySide6.QtCore import Qt
 from core.i18n import tr
-from core.dialog_buttons import style_dialog_button_box
+from features.workspace.transfer_dialog import TransferDialog
 
-class ExportModelsDialog(QDialog):
+
+class ExportModelsDialog(TransferDialog):
     def __init__(self, parent=None, models=None):
-        super().__init__(parent)
-        self.setWindowTitle(tr("Exportar modelos"))
-        self.resize(350, 400)
-        
-        layout = QVBoxLayout(self)
-        
-        self.chk_master = QCheckBox(tr("Selecionar/desmarcar todos"))
-        self.chk_master.setChecked(False)
-        self.chk_master.stateChanged.connect(self._on_master_toggled)
-        layout.addWidget(self.chk_master)
-        
+        super().__init__(parent, tr('Exportar modelos'), tr(
+            'Escolha os modelos que deseja compartilhar. Os originais permanecem na sua biblioteca.'))
         self.list_widget = QListWidget()
-        layout.addWidget(self.list_widget)
-        
-        for model in (models or []):
-            if isinstance(model, (tuple, list)) and len(model) == 2:
-                model_key, model_name = model
-            else:
-                model_key = model_name = model
-            item = QListWidgetItem(model_name)
-            item.setData(Qt.ItemDataRole.UserRole, model_key)
+        self.body.addWidget(self.list_widget, 1)
+        for model in models or []:
+            key, name = model if isinstance(model, (tuple, list)) and len(model) == 2 else (model, model)
+            item = QListWidgetItem(str(name))
+            item.setToolTip(str(name))
+            item.setData(Qt.ItemDataRole.UserRole, key)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Unchecked)
             self.list_widget.addItem(item)
-            
-        self.list_widget.itemChanged.connect(self._on_item_changed)
-            
-        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        self.button_box.accepted.connect(self.accept)
-        self.button_box.rejected.connect(self.reject)
-        style_dialog_button_box(self.button_box)
-        layout.addWidget(self.button_box)
-
-        self._updating = False
+        self.add_footer(tr('Continuar'))
+        self.search.textChanged.connect(self._filter)
+        self.select_all.clicked.connect(lambda: self._select(True))
+        self.clear_selection.clicked.connect(lambda: self._select(False))
+        self.list_widget.itemChanged.connect(self._refresh)
+        self._refresh()
 
     def get_selected_models(self):
-        selected = []
+        return [self.list_widget.item(i).data(Qt.ItemDataRole.UserRole)
+                for i in range(self.list_widget.count())
+                if self.list_widget.item(i).checkState() == Qt.CheckState.Checked]
+
+    def _filter(self, text):
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
-            if item.checkState() == Qt.CheckState.Checked:
-                selected.append(item.data(Qt.ItemDataRole.UserRole))
-        return selected
+            item.setHidden(text.casefold() not in item.text().casefold())
 
-    def _on_master_toggled(self, state):
-        if self._updating: return
-        self._updating = True
-        check_state = Qt.CheckState.Checked if state == Qt.CheckState.Checked.value else Qt.CheckState.Unchecked
+    def _select(self, checked):
+        self.list_widget.blockSignals(True)
         for i in range(self.list_widget.count()):
-            self.list_widget.item(i).setCheckState(check_state)
-        self._updating = False
+            item = self.list_widget.item(i)
+            item.setCheckState(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked)
+        self.list_widget.blockSignals(False)
+        self._refresh()
 
-    def _on_item_changed(self, item):
-        if self._updating: return
-        self._updating = True
-        all_checked = True
-        for i in range(self.list_widget.count()):
-            if self.list_widget.item(i).checkState() == Qt.CheckState.Unchecked:
-                all_checked = False
-                break
-        
-        self.chk_master.setCheckState(Qt.CheckState.Checked if all_checked else Qt.CheckState.Unchecked)
-        self._updating = False
+    def _refresh(self, *_):
+        count = len(self.get_selected_models())
+        self.update_count(count, self.list_widget.count())
+        self.summary.setText(
+            tr('Selecione pelo menos um modelo para continuar.') if not count else
+            tr('Um modelo: arquivo .fornax. A seguir, escolha as opções de proteção e o destino.') if count == 1 else
+            tr('Lote: arquivo ZIP com {count} modelos .fornax. A seguir, escolha as opções de proteção e o destino.').format(count=count))

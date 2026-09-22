@@ -1552,9 +1552,11 @@ class MainWindow(QMainWindow):
                 imported_log = (
                     tr("📥 1 modelo processado e importado de: {arquivo}")
                     if imported_count == 1 else
-                    tr("📥 {quantidade} modelos processados e importados de: {arquivo}").format(quantidade=imported_count)
+                    tr("📥 {quantidade} modelos processados e importados de: {arquivo}")
                 )
-                self.log_panel.append(imported_log.format(arquivo=Path(file_path).name))
+                self.log_panel.append(imported_log.format(
+                    quantidade=imported_count, arquivo=Path(file_path).name,
+                ))
                 self._reload_models_from_disk()
                 imported_message = (
                     tr("1 modelo adicionado à sua biblioteca!") if imported_count == 1 else
@@ -1741,9 +1743,11 @@ class MainWindow(QMainWindow):
             exported_count = len(exported)
             exported_log = (
                 tr("📤 1 modelo exportado para: {arquivo}") if exported_count == 1 else
-                tr("📤 {quantidade} modelos exportados para: {arquivo}").format(quantidade=exported_count)
+                tr("📤 {quantidade} modelos exportados para: {arquivo}")
             )
-            self.log_panel.append(exported_log.format(arquivo=Path(save_path).name))
+            self.log_panel.append(exported_log.format(
+                quantidade=exported_count, arquivo=Path(save_path).name,
+            ))
             exported_message = (
                 tr("1 modelo exportado com sucesso!") if exported_count == 1 else
                 tr("{quantidade} modelos exportados com sucesso!").format(quantidade=exported_count)

@@ -1,6 +1,6 @@
 """Padrão visual portátil para ações de aceitar e cancelar em diálogos."""
 
-from PySide6.QtCore import QEvent, QObject, QTimer
+from PySide6.QtCore import QEvent, QObject, QTimer, Qt
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import (
     QDialog,
@@ -8,15 +8,19 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLineEdit,
     QMessageBox,
+    QLabel, QSpacerItem, QSizePolicy,
 )
 
 from core.themes import themed_style
+from core.i18n import tr
 
 
 class _DialogButtonStyleFilter(QObject):
     """Captura também rodapés criados internamente pelos diálogos do Qt."""
 
     def eventFilter(self, watched, event):
+        if isinstance(watched, QMessageBox) and event.type() == QEvent.Type.Polish:
+            style_message_layout(watched)
         if (isinstance(watched, QDialogButtonBox)
                 and event.type() == QEvent.Type.Show
                 and not watched.property("fornaxActionButtonsStyled")):
@@ -30,6 +34,51 @@ class _DialogButtonStyleFilter(QObject):
 
 
 _style_filter = None
+
+
+def style_message_layout(message_box):
+    """Reserva uma estrutura comum sem trocar os papéis ou sinais dos botões Qt."""
+    if message_box.property('fornaxMessageLayoutStyled'):
+        return
+    message_box.setProperty('fornaxMessageLayoutStyled', True)
+    if (message_box.icon() == QMessageBox.Icon.Critical
+            and len(message_box.text()) > 1000):
+        full_text = message_box.text()
+        first_line = full_text.splitlines()[0]
+        message_box.setText(first_line if len(first_line) <= 160 else
+                            tr('Não foi possível concluir a operação.'))
+        existing = message_box.detailedText()
+        message_box.setDetailedText(full_text + ('\n\n' + existing if existing else ''))
+    layout = message_box.layout()
+    layout.setContentsMargins(24, 20, 24, 20)
+    layout.setHorizontalSpacing(16)
+    layout.setVerticalSpacing(16)
+    # Preservar a grade interna (ícone, mensagem, detalhes e botões).
+    entries = []
+    while layout.count():
+        position = layout.getItemPosition(0)
+        entries.append((layout.takeAt(0), position))
+    for item, (row, column, rows, columns) in entries:
+        layout.addItem(item, row + 1, column, rows, columns)
+    heading = QLabel(message_box.windowTitle(), message_box)
+    heading.setObjectName('fornaxMessageTitle')
+    heading.setTextFormat(Qt.TextFormat.PlainText)
+    heading.setWordWrap(True)
+    layout.addWidget(heading, 0, 0, 1, layout.columnCount())
+    themed_style(heading, 'QLabel { color: @text@; font-size: 16px; font-weight: 600; }')
+    screen = message_box.screen()
+    available = screen.availableGeometry().width() if screen else 800
+    content_width = max(240, min(432, available - 96))
+    layout.addItem(QSpacerItem(content_width, 8, QSizePolicy.Policy.Minimum,
+                              QSizePolicy.Policy.Minimum), layout.rowCount(), 0,
+                   1, layout.columnCount())
+    message_box.setMinimumHeight(180)
+    for label in message_box.findChildren(QLabel):
+        if label.objectName() in ('qt_msgbox_label', 'qt_msgbox_informativelabel'):
+            label.setWordWrap(True)
+    button_box = message_box.findChild(QDialogButtonBox)
+    if button_box is not None:
+        button_box.setCenterButtons(True)
 
 
 def install_dialog_button_style(app):
@@ -146,6 +195,7 @@ def style_dialog_button_box(button_box):
     style_action_pair(accepts, cancels)
 
 
+
 def style_message_box(message_box):
     """Aplica o padrão depois que todos os botões da QMessageBox existirem."""
     accept_roles = {
@@ -166,6 +216,19 @@ def style_message_box(message_box):
         elif role in cancel_roles:
             cancels.append(button)
     style_action_pair(accepts, cancels)
+
+    # As escolhas adicionais (por exemplo, abrir sem assinaturas) são neutras.
+    others = [button for button in message_box.buttons()
+              if button not in accepts and button not in cancels]
+    for button in others:
+        button.setIcon(QIcon())
+        themed_style(button, NEUTRAL_STYLE)
+    buttons = accepts + cancels + others
+    if buttons:
+        width = max(96, *(button.sizeHint().width() for button in buttons))
+        height = max(30, *(button.sizeHint().height() for button in buttons))
+        for button in buttons:
+            button.setFixedSize(width, height)
 
 
 def style_standard_dialog_later(dialog):
